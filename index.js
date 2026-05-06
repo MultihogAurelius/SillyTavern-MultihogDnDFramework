@@ -3813,8 +3813,8 @@ Rules:
                     <button class="rpg-tracker-nav-btn" id="rpg-tracker-memo-clear" style="padding: 1px 5px; font-size: 9px; opacity: 0.8; margin-left: 5px;" title="Clear memo and history">CLEAR</button>
                     <div style="position: relative; display: flex; align-items: center;">
                         <div id="rt-sysprompt-menu" class="rt-sysprompt-menu" style="display: none;">
-                             <button class="rt-sysprompt-opt" data-file="sysprompt.txt"><b>v1.8.27</b> (Tool Call + Queue)</button>
-                             <button class="rt-sysprompt-opt" data-file="sysprompt_legacy.txt"><b>v1.3.x</b> (Queue Only)</button>
+                             <button class="rt-sysprompt-opt" data-file="sysprompt.txt">Tool Call + Queue (recommended)</button>
+                             <button class="rt-sysprompt-opt" data-file="sysprompt_legacy.txt">Queue Only</button>
                              <hr style="margin: 2px 0; border: none; border-top: 1px solid rgba(255,255,255,0.05);">
                              <button class="rt-sysprompt-opt" id="rt-sysprompt-help-btn">What are these?</button>
                          </div>
@@ -4260,7 +4260,7 @@ Rules:
                             <h4 style="color: var(--rt-accent);">System Prompt Selection</h4>
                             <p>Choose the system prompt that matches your selected RNG method:</p>
                             <ul style="padding-left: 20px;">
-                                <li style="margin-bottom: 8px;"><b>Tool Call + Queue</b>: The modern hybrid system. Mandatory for the Tool Call RNG toggle to function.</li>
+                                <li style="margin-bottom: 8px;"><b>Tool Call + Queue</b>: The modern hybrid system (recommended). Mandatory for the Tool Call RNG toggle to function.</li>
                                 <li><b>Queue Only</b>: The legacy behavior. Ideal if your model doesn't support tool calling or if you prefer the classic "always-in-context" RNG.</li>
                             </ul>
                         </div>
