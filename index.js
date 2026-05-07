@@ -764,8 +764,8 @@ Rules:
 - Ensure text colors have sufficient contrast against the background for readability.`;
 
         const statusEl = document.getElementById('rpg_tracker_theme_wizard_status');
-        const generateBtn = document.getElementById('rpg_tracker_theme_generate');
-        const iterateBtn = document.getElementById('rpg_tracker_theme_iterate');
+        const generateBtn = /** @type {HTMLButtonElement|null} */ (document.getElementById('rpg_tracker_theme_generate'));
+        const iterateBtn = /** @type {HTMLButtonElement|null} */ (document.getElementById('rpg_tracker_theme_iterate'));
 
         const setStatus = (msg, isError = false) => {
             if (!statusEl) return;
@@ -1005,7 +1005,7 @@ Rules:
 
             popup.querySelectorAll('.mode-btn').forEach(btn => {
                 btn.addEventListener('click', () => {
-                    cfg.mode = btn.dataset.mode;
+                    cfg.mode = /** @type {HTMLElement} */ (btn).dataset.mode;
                     if (cfg.mode === 'gradient' && !cfg.color2) cfg.color2 = cfg.color;
                     applyLive();
                     renderContent();
@@ -1014,8 +1014,8 @@ Rules:
 
             const c1 = popup.querySelector('#color1');
             const c2 = popup.querySelector('#color2');
-            if (c1) c1.addEventListener('input', (e) => { cfg.color = e.target.value; applyLive(); });
-            if (c2) c2.addEventListener('input', (e) => { cfg.color2 = e.target.value; applyLive(); });
+            if (c1) c1.addEventListener('input', (e) => { cfg.color = /** @type {HTMLInputElement} */ (e.target).value; applyLive(); });
+            if (c2) c2.addEventListener('input', (e) => { cfg.color2 = /** @type {HTMLInputElement} */ (e.target).value; applyLive(); });
 
             popup.querySelector('#recolor-ok').addEventListener('click', () => {
                 applyLive();
@@ -5028,7 +5028,7 @@ Rules:
                 { okButton: 'Overwrite Existing', cancelButton: 'Skip Conflicts' }
             );
             if (choice === null || choice === undefined) return; // user dismissed
-            overwriteConflicts = (choice === true);
+            overwriteConflicts = (choice === 1);
         }
 
         if (!s.blockOrder) s.blockOrder = ['COMBAT', 'CHARACTER', 'PARTY', 'INVENTORY', 'ABILITIES', 'SPELLS', 'XP', 'TIME'];
@@ -6119,8 +6119,9 @@ Rules:
     // Usage from DevTools console:
     //   window.rpgDebug.testCleanToolCall(someMessage)
     //   window.rpgDebug.testCleanToolCall()   <- uses last assistant message from chat
-    window.rpgDebug = window.rpgDebug || {};
-    window.rpgDebug.testCleanToolCall = function (text) {
+    const _dbgWin = /** @type {any} */ (window);
+    _dbgWin.rpgDebug = _dbgWin.rpgDebug || {};
+    _dbgWin.rpgDebug.testCleanToolCall = function (text) {
         if (text === undefined) {
             // Auto-grab the last non-user message from the current chat
             const { chat } = SillyTavern.getContext();
