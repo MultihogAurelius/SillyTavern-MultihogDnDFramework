@@ -1,5 +1,4 @@
-(function () {
-    "use strict";
+
 
     // Capture the folder name dynamically from the module URL so it works regardless of what the user names the folder
     const FOLDER_NAME = (function () {
@@ -6145,4 +6144,4 @@ Rules:
     };
 
     })();
-})();
+
