@@ -25,6 +25,95 @@ import { getDiceToolName, getDiceCommandName, getDiceCommandAliases, doDiceRoll,
     const _sectionPages = {};
 
 
+
+    // ── Chat-Linked State (deferred from settings.js — touches DOM + _historyViewIndex) ──
+
+    /**
+     * Restore a previously saved chat state into the live settings.
+     * Returns true if a saved state was found, false if no state existed (clean slate).
+     * @param {string} chatId
+     * @returns {boolean}
+     */
+    function loadChatState(chatId) {
+        if (!chatId) return false;
+        const s = getSettings();
+        const saved = s.chatStates?.[chatId];
+        if (!saved) return false;
+
+        s.currentMemo  = saved.currentMemo  ?? '';
+        s.memoHistory  = saved.memoHistory  ?? [];
+        s.lastDelta    = saved.lastDelta    ?? '';
+        if (saved.modules)      s.modules      = { ...s.modules, ...saved.modules };
+        if (saved.blockOrder)   s.blockOrder   = JSON.parse(JSON.stringify(saved.blockOrder));
+        if (saved.stockPrompts) s.stockPrompts = JSON.parse(JSON.stringify(saved.stockPrompts));
+        if (saved.customFields) s.customFields = JSON.parse(JSON.stringify(saved.customFields));
+
+        _historyViewIndex = -1;
+
+        const dp = document.getElementById('rpg-tracker-delta-content');
+        if (dp) dp.innerHTML = s.lastDelta || '<span class="delta-empty">No changes yet.</span>';
+
+        refreshOrderList();
+        syncMemoView();
+        return true;
+    }
+
+    /**
+     * Called on CHAT_CHANGED. Saves the departing chat's state,
+     * then loads the arriving chat's state — or resets the memo if
+     * this is a new/unseen chat (no saved state).
+     * @param {string} newChatId
+     */
+    function onChatChanged(newChatId) {
+        const s = getSettings();
+
+        const oldChatId = _currentChatId;
+        _currentChatId  = newChatId || null;
+
+        if (!s.chatLinkEnabled) {
+            updateChatLinkUI();
+            return;
+        }
+
+        if (oldChatId) saveChatState(oldChatId);
+
+        const found = loadChatState(newChatId);
+        if (!found) {
+            s.currentMemo  = '';
+            s.memoHistory  = [];
+            s.lastDelta    = '';
+            _historyViewIndex = -1;
+
+            const dp = document.getElementById('rpg-tracker-delta-content');
+            if (dp) dp.innerHTML = '<span class="delta-empty">No changes yet.</span>';
+
+            updateUIMemo('');
+            refreshRenderedView();
+        }
+
+        updateChatLinkUI();
+    }
+
+    /**
+     * Syncs the 🔗/🔓 icon in the panel header and the settings checkbox
+     * to reflect the current chatLinkEnabled state.
+     */
+    function updateChatLinkUI() {
+        const s = getSettings();
+        const on = s.chatLinkEnabled;
+
+        const btn = document.getElementById('rpg-tracker-chat-link-btn');
+        if (btn) {
+            btn.textContent = on ? '🔗' : '🔓';
+            btn.title = on
+                ? `Chat Link ON — state is bound to the active chat\n(Click to unlock / use global state)`
+                : `Chat Link OFF — using global state\n(Click to re-lock to current chat)`;
+        }
+
+        const cb = document.getElementById('rpg_tracker_chat_link_enabled');
+        if (cb instanceof HTMLInputElement) cb.checked = on;
+    }
+
     /**
      * Update the visual status of the panel (active, running, paused, disabled)
      */
