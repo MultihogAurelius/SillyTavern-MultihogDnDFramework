@@ -17,6 +17,10 @@
     let _stateModelRunning = false;
     let _currentChatId = null;
     let themeUndoStack = [];
+    // ── Renderer / navigation state ──
+    let _historyViewIndex = -1;    // -1 = live, 0 = most recent snapshot, higher = older
+    let _renderedViewActive = false;
+    const _sectionPages = {};
 
     const EXAMPLES = `((B)) Health: 45/100
 ((XB)) Level 3: 1,200/2,700 XP
@@ -2900,11 +2904,6 @@ Rules:
         }).join('');
     };
 
-    // ── History index: -1 means "live", 0 = most recent snapshot, higher = older
-    let _historyViewIndex = -1;
-
-    /** Whether the rendered card view is active */
-    let _renderedViewActive = false;
 
     /**
      * Parse the memo's [TAG]...[/TAG] blocks and return structured object.
@@ -2928,7 +2927,7 @@ Rules:
     const COLLAPSE_KEY = 'rpg_tracker_collapsed';
     const DETACHED_KEY = 'rpg_tracker_detached';
 
-    const _sectionPages = {};
+
 
     function getPageSize(renderType) {
         return renderType === 'SPELLS' ? 5 : PAGE_SIZE;
