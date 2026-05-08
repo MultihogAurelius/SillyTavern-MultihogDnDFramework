@@ -907,10 +907,10 @@ Rules:
                 <div style="background: rgba(255,200,50,0.08); border: 1px solid rgba(255,200,50,0.25); border-radius: 8px; padding: 10px 14px; margin-bottom: 12px; font-size: 0.88em; text-align: left;">
                     <b style="color: #ffcc33;">⚠ Important:</b> Tool Call RNG requires <b>"Enable function calling"</b> to be enabled in SillyTavern's AI Response Configuration.
                 </div>
-                ${card('📋', 'Which prompt should I use?',
+                ${card('📋', 'Which system should I use?',
                     `<ul style="margin: 4px 0 0 0; padding-left: 20px; text-align: left; list-style-position: outside;">
-                        <li style="margin-bottom: 4px;"><b>Hybrid RNG (recommended):</b> Enables both systems. Required for Tool Call RNG to function.</li>
-                        <li><b>Legacy RNG:</b> Queue-only. Use if your model doesn't support tool calling or you prefer the simpler setup.</li>
+                        <li style="margin-bottom: 4px;"><b>Hybrid RNG (recommended):</b> Enables both systems. A more "waterproof" system.</li>
+                        <li><b>Legacy RNG:</b> Queue-only. Use if your model doesn't support tool calling or you prefer the simpler setup for any other reason.</li>
                     </ul>`
                 )}
             </div>`;
