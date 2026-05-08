@@ -891,29 +891,29 @@ Rules:
     async function showRngExplanation() {
         const { Popup } = SillyTavern.getContext();
         const card = (icon, title, body) => `
-            <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 12px 14px; margin-bottom: 12px;">
+            <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 12px 14px; margin-bottom: 12px; text-align: left;">
                 <div style="font-size: 1em; font-weight: bold; margin-bottom: 6px;">${icon} ${title}</div>
                 <div style="font-size: 0.9em; line-height: 1.5; opacity: 0.88;">${body}</div>
             </div>`;
         const popupBody = `
-            <div style="font-size: 0.9em; line-height: 1.5; max-width: 480px;">
+            <div style="font-size: 0.9em; line-height: 1.5; max-width: 480px; text-align: left;">
                 ${card('🎲', 'RNG Queue <span style="font-weight:normal;opacity:0.6;">(Combat)</span>',
-                    `Generates a list of pre-rolled dice and injects them directly into the story context. The AI uses the next roll in the queue for every attack and damage roll—no tool call needed, so combat stays fast and fluid.<br><br>
-                    Works perfectly in combat because initiative creates a deterministic "grid," removing any opportunity for the AI to game the outcome.`
+                    `Generates a list of pre-rolled dice and injects them directly into the story context. The AI uses the next roll in the queue until it reaches the last one, then wraps about to the start again. Each input injects a fresh set of numbers.<br><br>
+                    Ideal for combat because initiative creates a deterministic "grid," removing any opportunity for the AI to game the outcome. This is why it's the default chosen method for combat over tool calls.`
                 )}
                 ${card('🔧', 'Tool Call RNG <span style="font-weight:normal;opacity:0.6;">(Narrative)</span>',
                     `A reactive system where the AI proactively calls a dice tool for a specific narrative action (e.g., picking a lock, persuading a guard). The AI must declare a <b>Difficulty Class (DC)</b> before seeing the result, which prevents sycophancy—it can't retroactively make rolls "just good enough" to succeed.`
                 )}
-                <div style="background: rgba(255,200,50,0.08); border: 1px solid rgba(255,200,50,0.25); border-radius: 8px; padding: 10px 14px; margin-bottom: 12px; font-size: 0.88em;">
+                <div style="background: rgba(255,200,50,0.08); border: 1px solid rgba(255,200,50,0.25); border-radius: 8px; padding: 10px 14px; margin-bottom: 12px; font-size: 0.88em; text-align: left;">
                     <b style="color: #ffcc33;">⚠ Requirements for Tool Call RNG:</b><br>
-                    <ul style="margin: 6px 0 0 0; padding-left: 18px; opacity: 0.9;">
-                        <li>Select <b>Hybrid RNG</b> (this menu).</li>
-                        <li>Enable <b>Function Calling</b> in SillyTavern's AI Response Configuration.</li>
-                        <li>Use the <b>Hybrid system prompt</b> (applied via the button below).</li>
+                    <ul style="margin: 6px 0 0 0; padding-left: 20px; opacity: 0.9; text-align: left; list-style-position: outside;">
+                        <li style="margin-bottom: 2px;">Select <b>Hybrid RNG</b> (this menu).</li>
+                        <li style="margin-bottom: 2px;">Enable <b>Function Calling</b> in SillyTavern's AI Response Configuration.</li>
+                        <li style="margin-bottom: 2px;">Use the <b>Hybrid system prompt</b> (applied via the button below).</li>
                     </ul>
                 </div>
                 ${card('📋', 'Which prompt should I use?',
-                    `<ul style="margin: 4px 0 0 0; padding-left: 18px;">
+                    `<ul style="margin: 4px 0 0 0; padding-left: 20px; text-align: left; list-style-position: outside;">
                         <li style="margin-bottom: 4px;"><b>Hybrid RNG (recommended):</b> Enables both systems. Required for Tool Call RNG to function.</li>
                         <li><b>Legacy RNG:</b> Queue-only. Use if your model doesn't support tool calling or you prefer the simpler setup.</li>
                     </ul>`
