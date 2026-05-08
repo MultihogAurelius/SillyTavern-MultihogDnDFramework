@@ -56,7 +56,7 @@ function getProxyHeaders() {
 
 // ── Ollama ─────────────────────────────────────────────────────────────────────
 
-export async function sendViaOllama(url, model, systemPrompt, userPrompt, maxTokens, presetSettings = {}) {
+export async function sendViaOllama(url, model, systemPrompt, userPrompt, maxTokens, presetSettings = {}, signal = null) {
     if (!url) throw new Error('Ollama URL is not configured.');
     if (!model) throw new Error('Ollama model is not selected.');
 
@@ -92,6 +92,7 @@ export async function sendViaOllama(url, model, systemPrompt, userPrompt, maxTok
             method: 'POST',
             headers: finalHeaders,
             body: JSON.stringify(requestBody),
+            signal,
         });
         if (!response.ok && response.status === 404) {
             throw new Error('Proxy 404');
@@ -102,6 +103,7 @@ export async function sendViaOllama(url, model, systemPrompt, userPrompt, maxTok
                 method: 'POST',
                 headers: headers,
                 body: JSON.stringify(requestBody),
+                signal,
             });
         } catch (directError) {
             throw new Error(`Failed to connect to Ollama. Proxy error: ${proxyError.message}. Direct error: ${directError.message}`);
@@ -142,7 +144,7 @@ export async function fetchOllamaModels(url) {
 
 // ── OpenAI Compatible ──────────────────────────────────────────────────────────
 
-export async function sendViaOpenAI(url, apiKey, model, systemPrompt, userPrompt, maxTokens, presetSettings = {}) {
+export async function sendViaOpenAI(url, apiKey, model, systemPrompt, userPrompt, maxTokens, presetSettings = {}, signal = null) {
     if (!url) throw new Error('OpenAI Compatible URL is not configured.');
     if (!model) throw new Error('OpenAI Compatible model name is not set.');
 
@@ -178,15 +180,15 @@ export async function sendViaOpenAI(url, apiKey, model, systemPrompt, userPrompt
         try {
             const proxyHeaders = getProxyHeaders();
             const finalHeaders = { ...headers, ...proxyHeaders };
-            response = await fetch(proxiedUrl(endpoint), { method: 'POST', headers: finalHeaders, body: JSON.stringify(requestBody) });
+            response = await fetch(proxiedUrl(endpoint), { method: 'POST', headers: finalHeaders, body: JSON.stringify(requestBody), signal });
             if (!response.ok && response.status === 404) {
                 throw new Error('Proxy 404');
             }
         } catch (e) {
-            response = await fetch(endpoint, { method: 'POST', headers: headers, body: JSON.stringify(requestBody), credentials: 'omit' });
+            response = await fetch(endpoint, { method: 'POST', headers: headers, body: JSON.stringify(requestBody), credentials: 'omit', signal });
         }
     } else {
-        response = await fetch(endpoint, { method: 'POST', headers: headers, body: JSON.stringify(requestBody), credentials: 'omit' });
+        response = await fetch(endpoint, { method: 'POST', headers: headers, body: JSON.stringify(requestBody), credentials: 'omit', signal });
     }
 
     if (!response.ok) {
@@ -298,7 +300,7 @@ export async function testOpenAIConnection(url, apiKey, model) {
  * @param {string} userPrompt
  * @returns {Promise<string>}
  */
-export async function sendStateRequest(settings, systemPrompt, userPrompt) {
+export async function sendStateRequest(settings, systemPrompt, userPrompt, signal = null) {
     const context = SillyTavern.getContext();
 
     console.log(`[RPG Tracker] sendStateRequest — source: "${settings.connectionSource}", profileId: "${settings.connectionProfileId}", preset: "${settings.completionPresetId}"`);
@@ -352,6 +354,7 @@ export async function sendStateRequest(settings, systemPrompt, userPrompt) {
                     custom_prompt_post_processing: profile['prompt-post-processing'],
                 }, {
                     presetName: presetToUse,
+                    signal,
                 }, true);
             } else if (selectedApiMap.selected === 'textgenerationwebui') {
                 const promptString = messages.map(m => `### ${m.role}:\n${m.content}`).join('\n\n');
@@ -367,6 +370,7 @@ export async function sendStateRequest(settings, systemPrompt, userPrompt) {
                 }, {
                     instructName: profile.instruct,
                     presetName: presetToUse,
+                    signal,
                 }, true);
             } else {
                 throw new Error(`[RPG Tracker] Unsupported API type: ${selectedApiMap.selected}`);
@@ -406,13 +410,13 @@ export async function sendStateRequest(settings, systemPrompt, userPrompt) {
     // ── Ollama Mode ──
     if (settings.connectionSource === 'ollama') {
         if (settings.debugMode) console.log(`[RPG Tracker] Sending via Ollama: ${settings.ollamaModel}`);
-        return await sendViaOllama(settings.ollamaUrl, settings.ollamaModel, systemPrompt, userPrompt, settings.maxTokens, presetSettings);
+        return await sendViaOllama(settings.ollamaUrl, settings.ollamaModel, systemPrompt, userPrompt, settings.maxTokens, presetSettings, signal);
     }
 
     // ── OpenAI Compatible Mode ──
     if (settings.connectionSource === 'openai') {
         if (settings.debugMode) console.log(`[RPG Tracker] Sending via OpenAI Compatible: ${settings.openaiModel}`);
-        return await sendViaOpenAI(settings.openaiUrl, settings.openaiKey, settings.openaiModel, systemPrompt, userPrompt, settings.maxTokens, presetSettings);
+        return await sendViaOpenAI(settings.openaiUrl, settings.openaiKey, settings.openaiModel, systemPrompt, userPrompt, settings.maxTokens, presetSettings, signal);
     }
 
     // ── Default mode: generateRaw through the active connection ──
@@ -431,6 +435,7 @@ export async function sendStateRequest(settings, systemPrompt, userPrompt) {
             prompt: userPrompt,
             systemPrompt: systemPrompt,
             bypassAll: true,
+            signal,
         };
 
         if (settings.maxTokens && settings.maxTokens > 0) {

@@ -20,6 +20,7 @@ import { registerLogQuestTool } from './quests.js';
     })();
 
     let _stateModelRunning = false;
+    let _stateController = null;   // To abort ongoing state updates
     let _currentChatId = null;
     let themeUndoStack = [];
 
@@ -544,6 +545,11 @@ Rules:
             _stateModelRunning = true;
             updateStatusIndicator('running');
 
+            // Abort previous if any
+            if (_stateController) _stateController.abort();
+            _stateController = new AbortController();
+            const signal = _stateController.signal;
+
             const modulesText = buildModulesInstructionText(settings);
 
             let systemPrompt = settings.systemPromptTemplate.replace("{{modulesText}}", modulesText);
@@ -655,9 +661,14 @@ Rules:
                 }
             }
         } catch (error) {
+            if (error.name === 'AbortError') {
+                if (settings.debugMode) console.log("[RPG Tracker] State Model pass aborted by user.");
+                return;
+            }
             console.error("[RPG Tracker] State Model pass failed:", error);
         } finally {
             _stateModelRunning = false;
+            _stateController = null;
             updateStatusIndicator('active');
         }
     }
@@ -692,6 +703,11 @@ Rules:
         try {
             _stateModelRunning = true;
             updateStatusIndicator('running');
+
+            // Abort previous if any
+            if (_stateController) _stateController.abort();
+            _stateController = new AbortController();
+            const signal = _stateController.signal;
             const worldLore = await buildLorebookContext();
             const worldLoreSection = worldLore ? worldLore + '\n\n' : '';
 
@@ -775,10 +791,15 @@ Rules:
                 }
             }
         } catch (err) {
+            if (err.name === 'AbortError') {
+                if (settings.debugMode) console.log("[RPG Tracker] Direct prompt aborted by user.");
+                return;
+            }
             console.error('[RPG Tracker] Direct prompt failed:', err);
             toastr['error']('Direct prompt failed. Check console.', 'RPG Tracker');
         } finally {
             _stateModelRunning = false;
+            _stateController = null;
             updateStatusIndicator('active');
         }
     }
@@ -1300,6 +1321,12 @@ Rules:
         if (stopBtn) {
             stopBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
+                // 1. Abort the state update controller (kills fetch/Ollama/OpenAI)
+                if (_stateController) {
+                    _stateController.abort();
+                    _stateController = null;
+                }
+                // 2. Stop SillyTavern generation (kills internal ST requests)
                 const { stopGeneration } = SillyTavern.getContext();
                 if (stopGeneration) stopGeneration();
             });
