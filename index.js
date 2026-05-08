@@ -890,25 +890,36 @@ Rules:
 
     async function showRngExplanation() {
         const { Popup } = SillyTavern.getContext();
-        const body = `
-            <div style="font-size: 0.95em; line-height: 1.4;">
-                <h4 style="margin-top: 0; color: var(--rt-accent);">RNG Queue (Combat)</h4>
-                <p>Generates a list of pre-rolled dice and injects them into the story context. This keeps combat fast and fluid because the AI doesn't need to stop for a tool call on every attack—it just uses the next roll in the queue.</p>
-                <p>Functions perfectly in combat because combat works on a "grid" determined by initiative, taking any opportunity of mechanical sycophancy away from the AI.</p>
-
-                <h4 style="color: var(--rt-accent);">Tool Call RNG (Narrative)</h4>
-                <p>A reactive tool call where the AI proactively asks to roll specific dice for a specific action (e.g., picking a lock). This prevents "cheating" by forcing the AI to commit to a difficulty (DC) before seeing the roll result.</p>
-                <p><small><b>NOTE:</b> "Enable function calling" must be enabled in SillyTavern's AI Response Configuration for tool calls to work.</small></p>
-
-                <h4 style="color: var(--rt-accent);">System Prompt Selection</h4>
-                <p>Choose the system prompt that matches your selected RNG method:</p>
-                <ul>
-                    <li><b>Tool Call + Queue:</b> The modern hybrid system (recommended). Mandatory for the Tool Call RNG toggle to function.</li>
-                    <li><b>Queue Only:</b> The legacy behavior. Ideal if your model doesn't support tool calling or if you prefer the classic "always-in-context" RNG.</li>
-                </ul>
-            </div>
-        `;
-        await Popup.show.confirm('🎲 RNG Systems Explained', body, { okButton: 'Got it', cancelButton: false });
+        const card = (icon, title, body) => `
+            <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 12px 14px; margin-bottom: 12px;">
+                <div style="font-size: 1em; font-weight: bold; margin-bottom: 6px;">${icon} ${title}</div>
+                <div style="font-size: 0.9em; line-height: 1.5; opacity: 0.88;">${body}</div>
+            </div>`;
+        const popupBody = `
+            <div style="font-size: 0.9em; line-height: 1.5; max-width: 480px;">
+                ${card('🎲', 'RNG Queue <span style="font-weight:normal;opacity:0.6;">(Combat)</span>',
+                    `Generates a list of pre-rolled dice and injects them directly into the story context. The AI uses the next roll in the queue for every attack and damage roll—no tool call needed, so combat stays fast and fluid.<br><br>
+                    Works perfectly in combat because initiative creates a deterministic "grid," removing any opportunity for the AI to game the outcome.`
+                )}
+                ${card('🔧', 'Tool Call RNG <span style="font-weight:normal;opacity:0.6;">(Narrative)</span>',
+                    `A reactive system where the AI proactively calls a dice tool for a specific narrative action (e.g., picking a lock, persuading a guard). The AI must declare a <b>Difficulty Class (DC)</b> before seeing the result, which prevents sycophancy—it can't retroactively make rolls "just good enough" to succeed.`
+                )}
+                <div style="background: rgba(255,200,50,0.08); border: 1px solid rgba(255,200,50,0.25); border-radius: 8px; padding: 10px 14px; margin-bottom: 12px; font-size: 0.88em;">
+                    <b style="color: #ffcc33;">⚠ Requirements for Tool Call RNG:</b><br>
+                    <ul style="margin: 6px 0 0 0; padding-left: 18px; opacity: 0.9;">
+                        <li>Select <b>Hybrid RNG</b> (this menu).</li>
+                        <li>Enable <b>Function Calling</b> in SillyTavern's AI Response Configuration.</li>
+                        <li>Use the <b>Hybrid system prompt</b> (applied via the button below).</li>
+                    </ul>
+                </div>
+                ${card('📋', 'Which prompt should I use?',
+                    `<ul style="margin: 4px 0 0 0; padding-left: 18px;">
+                        <li style="margin-bottom: 4px;"><b>Hybrid RNG (recommended):</b> Enables both systems. Required for Tool Call RNG to function.</li>
+                        <li><b>Legacy RNG:</b> Queue-only. Use if your model doesn't support tool calling or you prefer the simpler setup.</li>
+                    </ul>`
+                )}
+            </div>`;
+        await Popup.show.confirm('🎲 RNG Systems Explained', popupBody, { okButton: 'Got it', cancelButton: false });
     }
 
     function bindRenderedCardEvents(el, memo, isDetachedContext = false, onRefresh = null) {
