@@ -2661,20 +2661,9 @@ Rules:
      */
     function buildSysprompt(rawText) {
         if (!rawText) return "";
-        const s = getSettings();
-        const isLegacyQuests  = !!s.questLegacyMode;
-        const isLegacyRolling = !!s.legacyRollingMode;
-
+        const mods = getSettings().syspromptModules || {};
         return rawText
             .replace(/<(\w[\w_-]*)>([\s\S]*?)<\/\1>/g, (match, tag) => {
-                // Mutual exclusion for Quests
-                if (tag === 'quests'         &&  isLegacyQuests) return '';
-                if (tag === 'quests_legacy'  && !isLegacyQuests) return '';
-                // Mutual exclusion for Rolling
-                if (tag === 'rng_system'     &&  isLegacyRolling) return '';
-                if (tag === 'rng_system_legacy' && !isLegacyRolling) return '';
-
-                // Honour the syspromptModules toggle for other tags
                 if (mods[tag] === false) return '';
                 return match;
             })
@@ -3319,8 +3308,8 @@ Rules:
                 refreshOrderList();
                 ctx.saveSettingsDebounced();
 
-                // 3. Fetch sysprompt.txt and apply to ST Quick Prompt "Main"
-                const fileName = 'sysprompt.txt';
+                // 3. Fetch sysprompt and apply to ST Quick Prompt "Main"
+                const fileName = getSettings().questLegacyMode ? 'sysprompt_legacy.txt' : 'sysprompt.txt';
                 let content;
                 try {
                     const response = await fetch(`/scripts/extensions/third-party/${FOLDER_NAME}/${fileName}`);
@@ -3422,20 +3411,8 @@ Rules:
                 });
             }
 
-            // Legacy Rolling Mode toggle
-            const _legacyRollingEl = /** @type {HTMLInputElement} */ (document.getElementById('rpg_legacy_rolling_mode'));
-            if (_legacyRollingEl) {
-                _legacyRollingEl.checked = !!getSettings().legacyRollingMode;
-                _legacyRollingEl.addEventListener('change', function () {
-                    const fresh = getSettings();
-                    fresh.legacyRollingMode = !!this.checked;
-                    registerDiceFunctionTool();
-                    ctx.saveSettingsDebounced();
-                });
-            }
-
             $('#rpg_tracker_btn_apply_sysprompt').on('click', async function () {
-                const fileName = 'sysprompt.txt';
+                const fileName = getSettings().questLegacyMode ? 'sysprompt_legacy.txt' : 'sysprompt.txt';
                 let content;
                 try {
                     const response = await fetch(`/scripts/extensions/third-party/${FOLDER_NAME}/${fileName}`);

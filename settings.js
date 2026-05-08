@@ -123,7 +123,6 @@ You may be asked to use Markers: ((PLS)), ((B)), ((XB)), ((BDG)), ((HGT)). These
         chatStates: {},
         quests: [],
         questLegacyMode: false,
-        legacyRollingMode: false,
         syspromptModules: {
             loot: true,
             random_events: true,
