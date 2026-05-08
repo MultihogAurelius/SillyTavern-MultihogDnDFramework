@@ -909,7 +909,6 @@ Rules:
                     <ul style="margin: 6px 0 0 0; padding-left: 20px; opacity: 0.9; text-align: left; list-style-position: outside;">
                         <li style="margin-bottom: 2px;">Select <b>Hybrid RNG</b> (this menu).</li>
                         <li style="margin-bottom: 2px;">Enable <b>Function Calling</b> in SillyTavern's AI Response Configuration.</li>
-                        <li style="margin-bottom: 2px;">Use the <b>Hybrid system prompt</b> (applied via the button below).</li>
                     </ul>
                 </div>
                 ${card('📋', 'Which prompt should I use?',
