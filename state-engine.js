@@ -198,16 +198,26 @@ export function syncQuestsToMemo() {
     const settings = getSettings();
     if (!settings.quests) return;
 
+    const tag = 'QUESTS';
+    const escapedTag = escapeRegex(tag);
+    const pattern = new RegExp(`\\s*\\[${escapedTag}\\][\\s\\S]*?\\[\\/${escapedTag}\\]`, 'i');
+    const blockExists = pattern.test(settings.currentMemo);
+
+    // If no quests, remove the block if present — never insert an empty one
+    if (!settings.quests.length) {
+        if (blockExists) {
+            settings.currentMemo = settings.currentMemo.replace(pattern, '').trim();
+        }
+        return;
+    }
+
     const content = settings.questLegacyMode
         ? serializeQuestsToText(settings.quests)
         : JSON.stringify(settings.quests, null, 2);
 
-    const tag = 'QUESTS';
-    const escapedTag = escapeRegex(tag);
-    const pattern = new RegExp(`\\s*\\[${escapedTag}\\][\\s\\S]*?\\[\\/${escapedTag}\\]`, 'i');
     const block = `\n\n[${tag}]\n${content}\n[/${tag}]`;
 
-    if (pattern.test(settings.currentMemo)) {
+    if (blockExists) {
         settings.currentMemo = settings.currentMemo.replace(pattern, block);
     } else {
         settings.currentMemo = (settings.currentMemo + block).trim();
