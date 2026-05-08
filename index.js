@@ -1,9 +1,10 @@
-﻿import { EXAMPLES, COLOR_EXAMPLES, DEFAULT_STOCK_PROMPTS, RT_PROMPTS, BLOCK_ICONS, BLOCK_ORDER, PAGE_SIZE, NO_PAGINATE } from './constants.js';
+import { EXAMPLES, COLOR_EXAMPLES, DEFAULT_STOCK_PROMPTS, RT_PROMPTS, BLOCK_ICONS, BLOCK_ORDER, PAGE_SIZE, NO_PAGINATE } from './constants.js';
 import { MODULE_NAME, getSettings, getBarBackground, migrateCustomFields, saveChatState, saveProfile, deleteProfile } from './settings.js';
 import { sendStateRequest, fetchOllamaModels, fetchOpenAIModels, testOpenAIConnection, getConnectionProfiles, getCurrentCompletionPreset, setCompletionPreset } from './api.js';
 import { getDiceToolName, getDiceCommandName, getDiceCommandAliases, doDiceRoll, registerDiceFunctionTool, registerDiceSlashCommand, installInterceptor, getNarrativeBlocks, onGenerationEnded } from './rng.js';
-import { deduplicateMemo, mergeMemo, computeDelta, escapeHtml, escapeRegex, highlightParens, cleanToolCallMessage, getLastUserAction, buildLorebookContext, buildModulesInstructionText, buildModuleFormatInstruction } from './state-engine.js';
-import { renderSubFieldByRule, tryRenderMarker, renderCustomBlockLine, stripMemoHtml, escapeHtmlWithColor, parseMemoBlocks, getPageSize, loadCollapsed, saveCollapsed, loadDetached, saveDetached, blockToItems, renderMemoAsCards } from './renderer.js';
+import { deduplicateMemo, mergeMemo, computeDelta, escapeHtml, escapeRegex, highlightParens, cleanToolCallMessage, getLastUserAction, buildLorebookContext, buildModulesInstructionText, buildModuleFormatInstruction, syncQuestsFromMemo, syncQuestsToMemo } from './state-engine.js';
+import { renderSubFieldByRule, tryRenderMarker, renderCustomBlockLine, stripMemoHtml, escapeHtmlWithColor, parseMemoBlocks, getPageSize, loadCollapsed, saveCollapsed, loadDetached, saveDetached, blockToItems, renderMemoAsCards, renderQuestLog } from './renderer.js';
+import { registerLogQuestTool } from './quests.js';
 
     // Capture the folder name dynamically from the module URL so it works regardless of what the user names the folder
     const FOLDER_NAME = (function () {
@@ -49,8 +50,13 @@ import { renderSubFieldByRule, tryRenderMarker, renderCustomBlockLine, stripMemo
         if (saved.blockOrder)   s.blockOrder   = JSON.parse(JSON.stringify(saved.blockOrder));
         if (saved.stockPrompts) s.stockPrompts = JSON.parse(JSON.stringify(saved.stockPrompts));
         if (saved.customFields) s.customFields = JSON.parse(JSON.stringify(saved.customFields));
+        if (saved.quests)       s.quests       = JSON.parse(JSON.stringify(saved.quests));
+        else s.quests = [];
 
         _historyViewIndex = -1;
+        
+        // Ensure the [QUESTS] block is present in the memo for Raw View editing
+        syncQuestsToMemo();
 
         const dp = document.getElementById('rpg-tracker-delta-content');
         if (dp) dp.innerHTML = s.lastDelta || '<span class="delta-empty">No changes yet.</span>';
@@ -823,9 +829,13 @@ Rules:
         s.blockOrder = p.blockOrder ? JSON.parse(JSON.stringify(p.blockOrder)) : s.blockOrder;
         s.stockPrompts = p.stockPrompts ? JSON.parse(JSON.stringify(p.stockPrompts)) : { ...DEFAULT_STOCK_PROMPTS };
         s.customFields = p.customFields ? JSON.parse(JSON.stringify(p.customFields)) : [];
+        s.quests = p.quests ? JSON.parse(JSON.stringify(p.quests)) : [];
         s.lastDelta = p.lastDelta ?? '';
         s.activeProfile = name;
         _historyViewIndex = -1;
+        
+        // Sync quests to memo for Raw View
+        syncQuestsToMemo();
         SillyTavern.getContext().saveSettingsDebounced();
         // Refresh UI
         refreshOrderList();
@@ -1049,7 +1059,21 @@ Rules:
             : (s.memoHistory[_historyViewIndex] ?? '');
         const el = document.getElementById('rpg-tracker-render');
         if (el) {
-            el.innerHTML = renderMemoAsCards(memo, null, _sectionPages);
+            const collapsed = loadCollapsed();
+            const detached  = loadDetached();
+
+            // Extract current in-world time for frustration computation
+            const timeMatch = (s.currentMemo || '').match(/\[TIME\]([\s\S]*?)\[\/TIME\]/i);
+            const currentTime = timeMatch ? timeMatch[1].split('\n').filter(Boolean)[0]?.trim() || '' : '';
+
+            let html = renderMemoAsCards(memo, null, _sectionPages);
+
+            // Append quest log section if module is enabled
+            if (s.modules?.quests) {
+                html += renderQuestLog(s.quests || [], currentTime, collapsed, detached);
+            }
+
+            el.innerHTML = html;
             bindRenderedCardEvents(el, memo, false);
         }
 
@@ -1373,7 +1397,12 @@ Rules:
         let _rawEditDebounce = null;
         textarea.addEventListener('input', (e) => {
             if (_historyViewIndex !== -1) return;
-            settings.currentMemo = /** @type {HTMLTextAreaElement} */ (e.target).value;
+            const newText = /** @type {HTMLTextAreaElement} */ (e.target).value;
+            settings.currentMemo = newText;
+            
+            // Sync internal quest state
+            syncQuestsFromMemo(newText);
+
             panel.querySelector('#rpg-tracker-count').textContent = `~${Math.round(settings.currentMemo.length / 2.62)} tokens`;
             SillyTavern.getContext().saveSettingsDebounced();
             // Refresh the rendered view live so changes are visible without toggling modes
@@ -2624,14 +2653,12 @@ Rules:
         });
     }
 
-    /*
     /**
-     * Assembles the sysprompt from rawText, stripping XML sections that are
+     * Rebuilds the system prompt by stripping out XML blocks that are
      * disabled in settings.syspromptModules.
-     * Only sections explicitly set to false are removed.
      * @param {string} rawText
      * @returns {string}
-     * /
+     */
     function buildSysprompt(rawText) {
         if (!rawText) return "";
         const mods = getSettings().syspromptModules || {};
@@ -2644,7 +2671,6 @@ Rules:
             .replace(/\n{3,}/g, "\n\n")
             .trim();
     }
-    */
 
     /**
      * Initialization
@@ -2747,6 +2773,14 @@ Rules:
             installInterceptor();
             registerDiceFunctionTool();
             registerDiceSlashCommand();
+
+            // ─── Quest System ───
+            import('./quests.js').then(({ registerLogQuestTool, installQuestDebugTools, computeFrustration }) => {
+                registerLogQuestTool();
+                installQuestDebugTools();
+                // Expose computeFrustration for renderQuestLog (renderer can't import dynamically)
+                globalThis.__rpgQuestUtils = { computeFrustration };
+            }).catch(e => console.error('[RPG Tracker] quests.js failed to load:', e));
 
             // Connection Settings
             const sourceSelect = $('#rpg_tracker_connection_source');
@@ -3307,7 +3341,7 @@ Rules:
                     // Copy to clipboard as a graceful fallback.
                     const ta = document.createElement('textarea');
                     ta.value = content;
-                    // content = typeof buildSysprompt === 'function' ? buildSysprompt(content) : content;
+                    content = typeof buildSysprompt === 'function' ? buildSysprompt(content) : content;
                     ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;';
                     document.body.appendChild(ta);
                     ta.focus();
@@ -3323,65 +3357,70 @@ Rules:
                 }
             });
 
+            // ── Sysprompt Section Toggles ──
+            const _syspromptModDefs = [
+                { key: 'loot',          id: 'rpg_sysprompt_mod_loot' },
+                { key: 'random_events', id: 'rpg_sysprompt_mod_random_events' },
+                { key: 'resting',       id: 'rpg_sysprompt_mod_resting' },
+                { key: 'quests',        id: 'rpg_sysprompt_mod_quests' },
+            ];
+            _syspromptModDefs.forEach(({ key, id }) => {
+                const s = getSettings();
+                const val = s.syspromptModules?.[key] ?? true;
+                $(`#${id}`).prop('checked', val).on('change', function () {
+                    const fresh = getSettings();
+                    if (!fresh.syspromptModules) fresh.syspromptModules = {};
+                    fresh.syspromptModules[key] = !!$(this).prop('checked');
+                    
+                    // If toggling quests, refresh the tool schema too
+                    if (key === 'quests') {
+                        registerLogQuestTool();
+                    }
+
+                    ctx.saveSettingsDebounced();
+                });
+            });
+
+            $('#rpg_tracker_btn_apply_sysprompt').on('click', async function () {
+                const fileName = 'sysprompt.txt';
+                let content;
+                try {
+                    const response = await fetch(`/scripts/extensions/third-party/${FOLDER_NAME}/${fileName}`);
+                    if (response.ok) {
+                        content = await response.text();
+                    } else {
+                        throw new Error(`Server returned ${response.status}`);
+                    }
+                } catch (err) {
+                    console.warn(`[Fatbody Framework] Could not fetch ${fileName}, using hardcoded fallback:`, err);
+                    content = RT_PROMPTS[fileName];
+                }
+
+                if (!content) {
+                    toastr['error']('Could not load sysprompt.txt.', 'RPG Tracker');
+                    return;
+                }
+
+                if (typeof buildSysprompt === 'function') content = buildSysprompt(content);
+
+                const mainTextarea = /** @type {HTMLTextAreaElement} */ (document.getElementById('main_prompt_quick_edit_textarea'));
+                if (mainTextarea) {
+                    mainTextarea.value = content;
+                    mainTextarea.dispatchEvent(new Event('blur', { bubbles: true }));
+                    toastr['success']('Main sysprompt applied! \u2705', 'RPG Tracker');
+                } else {
+                    try {
+                        await navigator.clipboard.writeText(content);
+                        toastr['warning']('Quick Prompt "Main" textarea not found. Sysprompt copied to clipboard. Make sure to enable function calls in the completion preset! \u2705', 'RPG Tracker');
+                    } catch (e) {
+                        toastr['warning']('Quick Prompt "Main" textarea not found and clipboard copy failed.', 'RPG Tracker');
+                    }
+                }
+            });
+
             $('#rpg_tracker_btn_update').on('click', async function () {
                 const { chat } = SillyTavern.getContext();
                 if (!chat || chat.length === 0) return toastr['info']("No chat history found.", "RPG Tracker");
-
-                /*
-                // ── Sysprompt Section Toggles ──
-                const _syspromptModDefs = [
-                    { key: 'loot',          id: 'rpg_sysprompt_mod_loot' },
-                    { key: 'random_events', id: 'rpg_sysprompt_mod_random_events' },
-                    { key: 'resting',       id: 'rpg_sysprompt_mod_resting' },
-                ];
-                _syspromptModDefs.forEach(({ key, id }) => {
-                    const s = getSettings();
-                    const val = s.syspromptModules?.[key] ?? true;
-                    $(`#${id}`).prop('checked', val).on('change', function () {
-                        const fresh = getSettings();
-                        if (!fresh.syspromptModules) fresh.syspromptModules = {};
-                        fresh.syspromptModules[key] = !!$(this).prop('checked');
-                        ctx.saveSettingsDebounced();
-                    });
-                });
-
-                $('#rpg_tracker_btn_apply_sysprompt').on('click', async function () {
-                    const fileName = 'sysprompt.txt';
-                    let content;
-                    try {
-                        const response = await fetch(`/scripts/extensions/third-party/${FOLDER_NAME}/${fileName}`);
-                        if (response.ok) {
-                            content = await response.text();
-                        } else {
-                            throw new Error(`Server returned ${response.status}`);
-                        }
-                    } catch (err) {
-                        console.warn(`[Fatbody Framework] Could not fetch ${fileName}, using hardcoded fallback:`, err);
-                        content = RT_PROMPTS[fileName];
-                    }
-
-                    if (!content) {
-                        toastr['error']('Could not load sysprompt.txt.', 'RPG Tracker');
-                        return;
-                    }
-
-                    if (typeof buildSysprompt === 'function') content = buildSysprompt(content);
-
-                    const mainTextarea = (document.getElementById('main_prompt_quick_edit_textarea'));
-                    if (mainTextarea) {
-                        mainTextarea.value = content;
-                        mainTextarea.dispatchEvent(new Event('blur', { bubbles: true }));
-                        toastr['success']('Main sysprompt applied! \u2705', 'RPG Tracker');
-                    } else {
-                        try {
-                            await navigator.clipboard.writeText(content);
-                            toastr['warning']('Quick Prompt "Main" textarea not found. Sysprompt copied to clipboard. Make sure to enable function calls in the completion preset! \u2705', 'RPG Tracker');
-                        } catch (e) {
-                            toastr['warning']('Quick Prompt "Main" textarea not found and clipboard copy failed.', 'RPG Tracker');
-                        }
-                    }
-                });
-                */
 
                 let lastAssistantMsg = "";
                 for (let i = chat.length - 1; i >= 0; i--) {

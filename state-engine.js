@@ -87,6 +87,12 @@ export function mergeMemo(currentMemo, aiOutput) {
         const tag = match[1].trim();
         const newContent = match[2].trim();
 
+        // [QUESTS] block contains JSON — route to quest merger
+        if (tag.toUpperCase() === 'QUESTS') {
+            mergeQuestUpdates(newContent);
+            // Do NOT continue — we want the [QUESTS] block to be replaced/inserted in the memo string
+        }
+
         const isRemoval = /^(?:REMOVED|EXPIRED|CLEARED|NONE|END_COMBAT)$/i.test(newContent);
 
         const escapedTag = escapeRegex(tag);
@@ -117,6 +123,111 @@ export function mergeMemo(currentMemo, aiOutput) {
 
     const cleaned = memo.replace(/\n{3,}/g, '\n\n').trim();
     return deduplicateMemo(cleaned);
+}
+
+// ── Quest update merge ────────────────────────────────────────────────────────
+
+/**
+ * Applies a constrained {"updates":[...]} diff from the state model to settings.quests.
+ * Only mutates `status` and `objectives[n].status`. All other fields are locked.
+ * Does NOT touch quests with status 'failed'.
+ * @param {string} jsonText
+ */
+export function mergeQuestUpdates(jsonText) {
+    const settings = getSettings();
+    if (!settings.quests || !settings.quests.length) return;
+
+    let parsed;
+    try {
+        parsed = JSON.parse(jsonText);
+    } catch (e) {
+        console.warn('[RPG Tracker] mergeQuestUpdates: invalid JSON in [QUESTS] block:', jsonText);
+        return;
+    }
+
+    const updates = Array.isArray(parsed?.updates) ? parsed.updates : [];
+    if (!updates.length) return;
+
+    let changed = false;
+    for (const update of updates) {
+        const quest = settings.quests.find(q => q.id === update.id);
+        if (!quest) continue;
+        if (quest.status === 'failed') continue; // locked — script already handled this
+
+        if (update.status && ['active', 'completed'].includes(update.status)) {
+            quest.status = update.status;
+            changed = true;
+        }
+
+        if (Array.isArray(update.objectives)) {
+            for (const objUpdate of update.objectives) {
+                const obj = quest.objectives.find(o => o.id === objUpdate.id);
+                if (!obj) continue;
+                if (objUpdate.status && ['active', 'completed', 'failed'].includes(objUpdate.status)) {
+                    obj.status = objUpdate.status;
+                    changed = true;
+                }
+            }
+        }
+    }
+
+    if (changed) {
+        if (settings.debugMode) console.log('[RPG Tracker] mergeQuestUpdates: applied quest state changes.');
+        SillyTavern.getContext().saveSettingsDebounced();
+        // After merging updates, we MUST rebuild the [QUESTS] block in the memo to reflect the new state
+        syncQuestsToMemo();
+    }
+}
+
+/**
+ * Rebuilds the [QUESTS] block in settings.currentMemo using the full state in settings.quests.
+ * This ensures Raw View and Internal State are always in sync.
+ */
+export function syncQuestsToMemo() {
+    const settings = getSettings();
+    if (!settings.quests) return;
+
+    const fullJson = JSON.stringify(settings.quests, null, 2);
+    const tag = 'QUESTS';
+    const escapedTag = escapeRegex(tag);
+    const pattern = new RegExp(`\\s*\\[${escapedTag}\\][\\s\\S]*?\\[\\/${escapedTag}\\]`, 'i');
+    const block = `\n\n[${tag}]\n${fullJson}\n[/${tag}]`;
+
+    if (pattern.test(settings.currentMemo)) {
+        settings.currentMemo = settings.currentMemo.replace(pattern, block);
+    } else {
+        settings.currentMemo = (settings.currentMemo + block).trim();
+    }
+}
+
+/**
+ * Parses the [QUESTS] block from a text string and updates settings.quests.
+ * Used when the user manually edits the Raw View.
+ * @param {string} memoText
+ */
+export function syncQuestsFromMemo(memoText) {
+    const settings = getSettings();
+    const match = memoText.match(/\[QUESTS\]([\s\S]*?)\[\/QUESTS\]/i);
+
+    if (!match) {
+        // If the block is entirely missing from the memo, clear the internal state
+        if (settings.quests && settings.quests.length > 0) {
+            settings.quests = [];
+            if (settings.debugMode) console.log('[RPG Tracker] syncQuestsFromMemo: quests cleared because [QUESTS] block was removed.');
+        }
+        return;
+    }
+
+    try {
+        const parsed = JSON.parse(match[1]);
+        if (Array.isArray(parsed)) {
+            settings.quests = parsed;
+            if (settings.debugMode) console.log('[RPG Tracker] syncQuestsFromMemo: updated internal state from memo edit.');
+        }
+    } catch (e) {
+        // Silently fail or log — user might be mid-edit
+        if (settings.debugMode) console.warn('[RPG Tracker] syncQuestsFromMemo: invalid JSON in quest block. Error:', e.message);
+    }
 }
 
 // ── Delta display ─────────────────────────────────────────────────────────────

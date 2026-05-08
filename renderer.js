@@ -1,4 +1,4 @@
-﻿import { getSettings, getBarBackground } from './settings.js';
+import { getSettings, getBarBackground } from './settings.js';
 import { escapeHtml, highlightParens } from './state-engine.js';
 import { BLOCK_ICONS, BLOCK_ORDER, PAGE_SIZE, NO_PAGINATE } from './constants.js';
 
@@ -699,6 +699,7 @@ import { BLOCK_ICONS, BLOCK_ORDER, PAGE_SIZE, NO_PAGINATE } from './constants.js
         const tagsToRender = arguments[1] ? [arguments[1]] : sorted;
 
         return tagsToRender.map(tag => {
+            if (tag === 'QUESTS') return ''; // Quest log has dedicated high-fidelity renderer, skip standard card
             const content = blocks[tag];
             if (content === undefined && arguments[1]) {
                 return `<div class="rt-empty">Waiting for ${tag} data...</div>`;
@@ -765,3 +766,127 @@ import { BLOCK_ICONS, BLOCK_ORDER, PAGE_SIZE, NO_PAGINATE } from './constants.js
             </div>`;
         }).join('');
     }
+
+// ── Quest Log Renderer ─────────────────────────────────────────────────────
+
+/**
+ * Renders the quest log as a section card, matching the rt-section-card structure
+ * so collapse/detach/reattach work identically to other blocks.
+ * @param {object[]} quests
+ * @param {string} currentTime  in-world time string e.g. "08:00 AM, Day 2"
+ * @param {Set<string>} collapsed
+ * @param {Set<string>} detached
+ * @param {string|null} filterTag  if set, only render if tag === 'QUESTS'
+ * @returns {string}
+ */
+export function renderQuestLog(quests, currentTime, collapsed, detached, filterTag = null) {
+    const TAG = 'QUESTS';
+
+    if (filterTag && filterTag !== TAG) return '';
+
+    if (!filterTag && detached.has(TAG)) {
+        return `<div class="rt-detached-placeholder" data-tag="${TAG}">
+            <span class="rt-placeholder-icon">⧉</span> QUESTS is detached
+            <button class="rt-reattach-btn-inline" data-tag="${TAG}" title="Re-attach">↓</button>
+        </div>`;
+    }
+
+    const allQuests = quests || [];
+    const isCollapsed = collapsed.has(TAG);
+    const detachBtn = !filterTag ? `<button class="rt-detach-btn" data-tag="${TAG}" title="Detach panel">⧉</button>` : '';
+
+    if (allQuests.length === 0) {
+        return `<div class="rt-section-card${isCollapsed ? ' rt-collapsed' : ''}" data-tag="${TAG}">
+            <div class="rt-section-header" data-tag="${TAG}">
+                <span>📋 QUESTS</span>
+                <div class="rt-section-header-right">
+                    ${detachBtn}
+                    <span class="rt-item-count">0 entries</span>
+                    <span class="rt-collapse-icon">${isCollapsed ? '&#9656;' : '&#9662;'}</span>
+                </div>
+            </div>
+            <div class="rt-section-body"><div class="rt-card-line" style="opacity:0.6;">No active quests.</div></div>
+        </div>`;
+    }
+
+    const cards = allQuests.map(quest => {
+        const { computeFrustration } = /** @type {any} */ (globalThis.__rpgQuestUtils || {});
+        const frust = typeof computeFrustration === 'function' ? computeFrustration(quest, currentTime) : 0;
+
+        // frust: -1 = very pleased, 0 = neutral, 1 = frustrated at deadline, >1 = overdue
+        // Map to a centered display: 50% = neutral, 0% = very pleased, 100% = max frustrated
+        // Clamp display to [-1, 2] range (values beyond 2 are "off the chart")
+        const displayFrust = Math.max(-1, Math.min(2, frust));
+        const centerPct    = 50; // Neutral sits at 50% of the bar
+        const scale        = 100 / 3; // -1→0%, 0→33%, 1→67%, 2→100%
+        const fillPct      = Math.round((displayFrust + 1) * scale);
+
+        let frustBarColor = '#00cc77'; // green = pleased
+        let moodLabel = 'Pleased';
+        if (frust <= -0.5) { frustBarColor = '#00cc77';  moodLabel = 'Very Pleased'; }
+        else if (frust <= -0.1) { frustBarColor = '#44dd88'; moodLabel = 'Pleased'; }
+        else if (frust <=  0.1) { frustBarColor = '#aaaaaa'; moodLabel = 'Neutral'; }
+        else if (frust <=  0.5) { frustBarColor = '#ffcc00'; moodLabel = 'Mildly Frustrated'; }
+        else if (frust <=  1.0) { frustBarColor = '#ff8800'; moodLabel = 'Frustrated'; }
+        else if (frust <=  1.5) { frustBarColor = '#ff4400'; moodLabel = 'Very Frustrated'; }
+        else                    { frustBarColor = '#ff1111'; moodLabel = 'Furious'; }
+
+        // Tick mark at the neutral position (33%) and deadline position (67%)
+        const moodBarHtml = `
+            <div class="rt-quest-mood-bar-wrap" title="NPC Mood: ${moodLabel} (${frust >= 0 ? '+' : ''}${frust.toFixed(2)})">
+                <div class="rt-quest-mood-bar" style="width:${fillPct}%; background:${frustBarColor};"></div>
+                <div class="rt-quest-mood-tick rt-quest-mood-tick-neutral"></div>
+                <div class="rt-quest-mood-tick rt-quest-mood-tick-deadline"></div>
+            </div>`;
+
+        let statusBadgeClass = 'rt-quest-badge-active';
+        let statusLabel = 'Active';
+        if (quest.status === 'completed') { statusBadgeClass = 'rt-quest-badge-completed'; statusLabel = 'Completed'; }
+        if (quest.status === 'failed')    { statusBadgeClass = 'rt-quest-badge-failed';    statusLabel = 'Failed'; }
+
+        const objectives = (quest.objectives || []).map(obj => {
+            const done = obj.status === 'completed';
+            const optLabel = obj.required ? '' : ' <span class="rt-quest-optional">(Optional)</span>';
+            return `<div class="rt-quest-obj${done ? ' rt-quest-obj-done' : ''}">
+                <span class="rt-quest-check">${done ? '✓' : '○'}</span>
+                <span>${escapeHtml(obj.text)}${optLabel}</span>
+            </div>`;
+        }).join('');
+
+        const rewards = (quest.rewards || []).map(r =>
+            `<span class="rt-quest-reward">${escapeHtml(r)}</span>`
+        ).join('');
+
+        const deadlineRow = quest.deadline_time ? `
+            <div class="rt-quest-deadline">
+                <div class="rt-quest-deadline-header">
+                    <span class="rt-entity-sub-label">Deadline:</span> ${escapeHtml(quest.deadline_time)}
+                    <span class="rt-quest-mood-label" style="color:${frustBarColor};">${moodLabel}</span>
+                </div>
+                ${moodBarHtml}
+            </div>` : '';
+
+        return `<div class="rt-quest-card${quest.status !== 'active' ? ' rt-quest-inactive' : ''}">
+            <div class="rt-quest-header">
+                <span class="rt-quest-title">${escapeHtml(quest.title)}</span>
+                <span class="rt-quest-badge ${statusBadgeClass}">${statusLabel}</span>
+            </div>
+            <div class="rt-quest-giver">${escapeHtml(quest.giver_name)} · <em>${escapeHtml(quest.giver_location)}</em></div>
+            <div class="rt-quest-objectives">${objectives}</div>
+            ${rewards ? `<div class="rt-quest-rewards">${rewards}</div>` : ''}
+            ${deadlineRow}
+        </div>`;
+    }).join('');
+
+    return `<div class="rt-section-card${isCollapsed ? ' rt-collapsed' : ''}" data-tag="${TAG}">
+        <div class="rt-section-header" data-tag="${TAG}">
+            <span>📋 QUESTS</span>
+            <div class="rt-section-header-right">
+                ${detachBtn}
+                <span class="rt-item-count">${allQuests.length} ${allQuests.length === 1 ? 'entry' : 'entries'}</span>
+                <span class="rt-collapse-icon">${isCollapsed ? '&#9656;' : '&#9662;'}</span>
+            </div>
+        </div>
+        <div class="rt-section-body">${cards}</div>
+    </div>`;
+}

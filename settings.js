@@ -97,7 +97,8 @@ You may be asked to use Markers: ((PLS)), ((B)), ((XB)), ((BDG)), ((HGT)). These
             abilities: true,
             spells: true,
             time: true,
-            xp: true
+            xp: true,
+            quests: true,
         },
         stockPrompts: { ...DEFAULT_STOCK_PROMPTS },
         customFields: [],
@@ -120,6 +121,13 @@ You may be asked to use Markers: ((PLS)), ((B)), ((XB)), ((BDG)), ((HGT)). These
         openaiMaxTokens: 0,
         chatLinkEnabled: true,
         chatStates: {},
+        quests: [],
+        syspromptModules: {
+            loot: true,
+            random_events: true,
+            resting: true,
+            quests: true
+        }
     };
 
     if (!extensionSettings[MODULE_NAME]) {
@@ -228,6 +236,7 @@ export function saveChatState(chatId) {
         blockOrder:   JSON.parse(JSON.stringify(s.blockOrder  || BLOCK_ORDER)),
         stockPrompts: JSON.parse(JSON.stringify(s.stockPrompts || DEFAULT_STOCK_PROMPTS)),
         customFields: JSON.parse(JSON.stringify(s.customFields || [])),
+        quests:       JSON.parse(JSON.stringify(s.quests || [])),
     };
     SillyTavern.getContext().saveSettingsDebounced();
 }
@@ -249,6 +258,7 @@ export function saveProfile(name) {
         blockOrder: JSON.parse(JSON.stringify(s.blockOrder || BLOCK_ORDER)),
         stockPrompts: JSON.parse(JSON.stringify(s.stockPrompts || DEFAULT_STOCK_PROMPTS)),
         customFields: JSON.parse(JSON.stringify(s.customFields || [])),
+        quests: JSON.parse(JSON.stringify(s.quests || [])),
         lastDelta: s.lastDelta || ''
     };
     s.activeProfile = name;

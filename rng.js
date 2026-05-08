@@ -225,7 +225,21 @@ export function installInterceptor() {
         }
 
         if (settings.currentMemo && !content.includes("### STATE MEMO (DO NOT REPEAT)")) {
-            injections += `### STATE MEMO (DO NOT REPEAT)\n${stripMemoHtml(settings.currentMemo)}\n\n`;
+            // Strip the JSON [QUESTS] block from the narrative context to save tokens and avoid redundancy
+            const memoText = stripMemoHtml(settings.currentMemo).replace(/\[QUESTS\][\s\S]*?\[\/QUESTS\]/gi, '').trim();
+            injections += `### STATE MEMO (DO NOT REPEAT)\n${memoText}\n\n`;
+        }
+
+        // Quest deadline check — fires before state model pass, deterministically
+        if (settings.modules?.quests && settings.quests?.length) {
+            const { checkQuestDeadlines, renderQuestsAsPlainText } = await import('./quests.js');
+            checkQuestDeadlines();
+
+            // Inject active quests as plain text into narrative context
+            const timeMatch = (settings.currentMemo || '').match(/\[TIME\]([\s\S]*?)\[\/TIME\]/i);
+            const currentTime = timeMatch ? timeMatch[1].split('\n').filter(Boolean)[0]?.trim() || '' : '';
+            const questText = renderQuestsAsPlainText(settings.quests, currentTime);
+            if (questText) injections += questText;
         }
 
         if (!injections) return;

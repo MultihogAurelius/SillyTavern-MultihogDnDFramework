@@ -93,6 +93,7 @@ Example:
 
 'Last Rest' is ONLY triggered on Long Rest, NOT Short Rest (when Hit Dice, etc, are spent.) If the [TIME] delta between PREVIOUS STATE MEMO and your current update is only an hour, it is a Short Rest.`,
     xp: "Character Level and Experience Points (XP). Format as `Level: X | XP: current/max`. You MUST output this field whenever the narrative mentions gaining experience or leveling up.",
+    quests: `Quest status updates ONLY. When a quest objective is completed or a quest concludes, emit a [QUESTS] block containing ONLY a JSON object with an "updates" array. Each entry must have the quest "id" and only the fields that changed: "status" (active/completed/failed) and/or "objectives" (array of {"id", "status"}). Do NOT emit quests with status "failed" — those are handled by the engine. Do NOT re-emit the full quest schema. If no quest changed, omit this block entirely.`,
 };
 
 // ── Embedded sysprompts — mobile/Termux fallback (fetch preferred, this is the safety net) ──
@@ -529,9 +530,10 @@ Declare their COMBAT PROFILE immediately:
 export const BLOCK_ICONS = {
     TIME: '🕒', XP: '🇽🇵', CHARACTER: '🧙', PARTY: '👥',
     COMBAT: '⚔️', INVENTORY: '🎒', ABILITIES: '✨', SPELLS: '📖',
+    QUESTS: '📋',
 };
 
-export const BLOCK_ORDER = ['COMBAT', 'CHARACTER', 'PARTY', 'INVENTORY', 'ABILITIES', 'SPELLS', 'XP', 'TIME'];
+export const BLOCK_ORDER = ['COMBAT', 'CHARACTER', 'PARTY', 'INVENTORY', 'ABILITIES', 'SPELLS', 'XP', 'TIME', 'QUESTS'];
 
 export const PAGE_SIZE = 8;
 
