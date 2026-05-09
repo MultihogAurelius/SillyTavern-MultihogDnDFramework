@@ -3450,9 +3450,9 @@ Rules:
                 // Re-merge defaults
                 const finalSettings = getSettings();
                 
-                // If legacy mode is on, we MUST apply the legacy quest prompt after reset
+                // If legacy mode is on, re-apply the legacy quest prompt with current toggle state
                 if (finalSettings.questLegacyMode) {
-                    finalSettings.stockPrompts.quests = DEFAULT_STOCK_PROMPTS.quests_legacy;
+                    refreshQuestLegacyPrompt(finalSettings);
                 }
                 
                 refreshOrderList();
@@ -3617,14 +3617,8 @@ Rules:
                         if (!fresh.stockPrompts) fresh.stockPrompts = {};
                         if (!fresh._questToolPromptBackup) fresh._questToolPromptBackup = fresh.stockPrompts.quests;
                         
-                        let prompt = DEFAULT_STOCK_PROMPTS.quests_legacy;
-                        if (!fresh.questsHardcore) {
-                            prompt = prompt.replace(/  DEADLINE:.*\n/g, '');
-                            prompt = prompt.replace(/  FRUSTRATION_COEFF:.*\n/g, '');
-                            prompt = prompt.replace(/- DEADLINE \/ FRUSTRATION_COEFF:.*\n/g, '');
-                            prompt = prompt.replace(/- FRUSTRATION_COEFF:.*\n/g, '');
-                        }
-                        fresh.stockPrompts.quests = prompt;
+                        // Apply current deadline/frustration toggle state to the legacy prompt
+                        refreshQuestLegacyPrompt(fresh);
                     } else {
                         fresh.stockPrompts.quests = fresh._questToolPromptBackup ?? DEFAULT_STOCK_PROMPTS.quests;
                         delete fresh._questToolPromptBackup;
