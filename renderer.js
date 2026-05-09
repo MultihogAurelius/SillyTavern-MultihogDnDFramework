@@ -865,32 +865,49 @@ export function renderQuestLog(quests, currentTime, collapsed, detached, filterT
         </div>`;
     }
 
+    const settings = getSettings();
+    const showFrustration = settings.isFrustration;
+    const showDeadlines = settings.isDeadlines;
+
     const cards = allQuests.map(quest => {
+
         const { computeFrustration } = /** @type {any} */ (globalThis.__rpgQuestUtils || {});
         const frust = typeof computeFrustration === 'function' ? computeFrustration(quest, currentTime) : 0;
 
-        // frust: -1 = very pleased, 0 = neutral, 1 = frustrated at deadline, >1 = overdue
+        // frust: -1 = very pleased/just accepted, 0 = neutral/halfway, 1 = frustrated at deadline, >1 = overdue
         // Map to a centered display: 50% = neutral, 0% = very pleased, 100% = max frustrated
         // Clamp display to [-1, 2] range (values beyond 2 are "off the chart")
         const displayFrust = Math.max(-1, Math.min(2, frust));
-        const centerPct    = 50; // Neutral sits at 50% of the bar
         const scale        = 100 / 3; // -1→0%, 0→33%, 1→67%, 2→100%
         const fillPct      = Math.round((displayFrust + 1) * scale);
 
-        let frustBarColor = '#00cc77'; // green = pleased
-        let moodLabel = 'Pleased';
-        if (frust <= -0.5) { frustBarColor = '#00cc77';  moodLabel = 'Very Pleased'; }
-        else if (frust <= -0.1) { frustBarColor = '#44dd88'; moodLabel = 'Pleased'; }
-        else if (frust <=  0.1) { frustBarColor = '#aaaaaa'; moodLabel = 'Neutral'; }
-        else if (frust <=  0.5) { frustBarColor = '#ffcc00'; moodLabel = 'Mildly Frustrated'; }
-        else if (frust <=  1.0) { frustBarColor = '#ff8800'; moodLabel = 'Frustrated'; }
-        else if (frust <=  1.5) { frustBarColor = '#ff4400'; moodLabel = 'Very Frustrated'; }
-        else                    { frustBarColor = '#ff1111'; moodLabel = 'Furious'; }
+        let barColor = '#00cc77'; // green = pleased
+        let label = 'Pleased';
+        
+        if (showFrustration) {
+            if (frust <= -0.5) { barColor = '#00cc77';  label = 'Very Pleased'; }
+            else if (frust <= -0.1) { barColor = '#44dd88'; label = 'Pleased'; }
+            else if (frust <=  0.1) { barColor = '#aaaaaa'; label = 'Neutral'; }
+            else if (frust <=  0.5) { barColor = '#ffcc00'; label = 'Mildly Frustrated'; }
+            else if (frust <=  1.0) { barColor = '#ff8800'; label = 'Frustrated'; }
+            else if (frust <=  1.5) { barColor = '#ff4400'; label = 'Very Frustrated'; }
+            else                    { barColor = '#ff1111'; label = 'Furious'; }
+        } else {
+            // Deadline only color scheme
+            if (frust <= 0) { barColor = '#00cc77'; label = 'Ahead of Schedule'; }
+            else if (frust <= 0.5) { barColor = '#ffcc00'; label = 'On Time'; }
+            else if (frust <= 1.0) { barColor = '#ff8800'; label = 'Near Deadline'; }
+            else { barColor = '#ff1111'; label = 'Overdue'; }
+        }
+
+        const barTitle = showFrustration 
+            ? `NPC Mood: ${label} (${frust >= 0 ? '+' : ''}${frust.toFixed(2)})`
+            : `Time Progress: ${label}`;
 
         // Tick mark at the neutral position (33%) and deadline position (67%)
         const moodBarHtml = `
-            <div class="rt-quest-mood-bar-wrap" title="NPC Mood: ${moodLabel} (${frust >= 0 ? '+' : ''}${frust.toFixed(2)})">
-                <div class="rt-quest-mood-bar" style="width:${fillPct}%; background:${frustBarColor};"></div>
+            <div class="rt-quest-mood-bar-wrap" title="${escapeHtml(barTitle)}">
+                <div class="rt-quest-mood-bar" style="width:${fillPct}%; background:${barColor};"></div>
                 <div class="rt-quest-mood-tick rt-quest-mood-tick-neutral"></div>
                 <div class="rt-quest-mood-tick rt-quest-mood-tick-deadline"></div>
             </div>`;
@@ -914,14 +931,6 @@ export function renderQuestLog(quests, currentTime, collapsed, detached, filterT
             `<span class="rt-quest-reward">${escapeHtml(r)}</span>`
         ).join('');
 
-        const settings = getSettings();
-        const showFrustration = settings.isFrustration;
-
-        const moodLabelHtml = showFrustration 
-            ? `<span class="rt-quest-mood-label" style="color:${frustBarColor};">${moodLabel}</span>` 
-            : '';
-        const moodBarFinalHtml = showFrustration ? moodBarHtml : '';
-
         const currentTotalMins = parseInWorldTime(currentTime);
         const deadlineMins = parseInWorldTime(quest.deadline_time);
         let timeLeftHtml = '';
@@ -930,13 +939,13 @@ export function renderQuestLog(quests, currentTime, collapsed, detached, filterT
             timeLeftHtml = ` <i style="opacity: 0.7; font-size: 0.9em;">(${formatTimeDiff(diff, diff > 0)})</i>`;
         }
 
-        const deadlineRow = (quest.deadline_time && settings.isDeadlines) ? `
+        const deadlineRow = (quest.deadline_time && showDeadlines) ? `
             <div class="rt-quest-deadline">
                 <div class="rt-quest-deadline-header">
                     <span class="rt-entity-sub-label">Deadline:</span> ${escapeHtml(quest.deadline_time)}${timeLeftHtml}
-                    ${moodLabelHtml}
+                    ${showFrustration ? `<span class="rt-quest-mood-label" style="color:${barColor};">${label}</span>` : ''}
                 </div>
-                ${moodBarFinalHtml}
+                ${moodBarHtml}
             </div>` : '';
 
         const acceptedMins = parseInWorldTime(quest.accepted_time);
