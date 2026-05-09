@@ -21,12 +21,11 @@ export function getQuestToolName() {
  * Formula: (elapsed/window)^(1/coeff) * 2 - 1
  *
  * At t=0 (quest accepted): always -1  (NPC is pleased you took it)
- * At t=deadline/2, coeff=1: 0 (neutral)
- * At t=deadline: always +1  (NPC is frustrated — regardless of personality)
- * Beyond deadline: >1, unbounded (NPC grows increasingly angry)
+ * At t=deadline: always 0 (Neutral)
+ * Beyond deadline: >0, unbounded (NPC grows increasingly angry)
  *
- * Low coeff (0.4, patient): rises slowly — NPC barely registers frustration until near deadline
- * High coeff (3.0, volatile): spikes early — NPC is anxious even halfway through
+ * Low coeff (0.4, patient): stays pleased longer, gets mad slowly after deadline.
+ * High coeff (3.0, volatile): becomes neutral faster, gets mad quickly after deadline.
  *
  * @param {object} quest
  * @param {string} currentTime
@@ -52,8 +51,15 @@ export function computeFrustration(quest, currentTime) {
     const window   = deadline - accepted;
     if (window <= 0) return 1;
 
-    const ratio = elapsed / window; // <1 = ahead of deadline, 1 = at deadline, >1 = overdue
-    return Math.pow(ratio, 1 / coeff) * 2 - 1;
+    const ratio = elapsed / window;
+    
+    if (ratio <= 1.0) {
+        // Before or at deadline: -1 (Very Pleased) to 0 (Neutral)
+        return Math.pow(ratio, 1 / coeff) - 1;
+    } else {
+        // After deadline: 0 (Neutral) scaling upwards
+        return (ratio - 1) * coeff;
+    }
 }
 
 // ── State Management ─────────────────────────────────────────────────────────
@@ -111,10 +117,10 @@ export function renderQuestsAsPlainText(quests, currentTime) {
                 const frust = computeFrustration(q, currentTime);
                 let moodLabel;
                 if (frust <= -0.5)       moodLabel = 'Very Pleased — NPC is optimistic you will make it';
-                else if (frust <= -0.1)  moodLabel = 'Pleased — ahead of schedule';
-                else if (frust <=  0.1)  moodLabel = 'Neutral — on track';
-                else if (frust <=  0.5)  moodLabel = 'Mildly Frustrated — running behind';
-                else if (frust <=  1.0)  moodLabel = 'Frustrated — deadline is near or passed';
+                else if (frust <= -0.1)  moodLabel = 'Pleased — on schedule';
+                else if (frust <=  0.1)  moodLabel = 'Neutral — at deadline';
+                else if (frust <=  0.5)  moodLabel = 'Mildly Frustrated — deadline missed';
+                else if (frust <=  1.0)  moodLabel = 'Frustrated — deadline missed';
                 else if (frust <=  1.5)  moodLabel = 'Very Frustrated — deadline passed long ago';
                 else                      moodLabel = 'Furious — NPC may withdraw the quest entirely';
                 moodInfo = ` (NPC Mood: ${moodLabel})`;
@@ -192,8 +198,9 @@ export function registerLogQuestTool() {
                 ' If the quest is time-sensitive, you MUST calculate and supply deadline_time in the format "HH:MM AM/PM, Day N". ' +
                 (isFrustration
                     ? 'The NPC Mood evolves continuously based on frustration_coefficient. ' +
-                      'Reserve status "failed" only for quests that are logically impossible to complete or explicitly called off by the NPC.'
-                    : 'The quest will automatically fail if the current time passes the deadline.');
+                      'Reserve status "failed" ONLY for quests that are logically impossible to complete or explicitly called off by the NPC.'
+                    : 'The quest will automatically fail if the current time passes the deadline. ' +
+                      'However, YOU MUST still mark the status as "failed" if the quest becomes narratively impossible (e.g. a target dies).');
         }
 
         if (isFrustration) {
@@ -230,6 +237,10 @@ export function registerLogQuestTool() {
                             type: 'boolean',
                             description: 'True if this objective is required for quest completion; false if it is optional.'
                         },
+                        total: {
+                            type: 'number',
+                            description: 'For collection/count objectives, the total amount required (e.g. 6 for "collect 6 mushrooms"). Omit if not a quantity objective.'
+                        },
                     },
                     required: ['text', 'required'],
                 },
@@ -259,9 +270,9 @@ export function registerLogQuestTool() {
                 type: 'number',
                 description:
                     'How quickly this NPC\'s mood deteriorates as time passes. Scale: 0.4–3.0.\n' +
-                    '· 0.4 = Very patient. NPC is pleased if you arrive early; barely worried until near the deadline.\n' +
-                    '· 1.0 = Normal. NPC is neutral at the halfway point, frustrated only at the deadline.\n' +
-                    '· 3.0 = Volatile. NPC grows anxious and irritable well before the deadline.\n' +
+                    '· 0.4 = Very patient. NPC stays pleased longer, and gets mad slowly if you miss the deadline.\n' +
+                    '· 1.0 = Normal. NPC is neutral exactly at the deadline, and frustrated if you miss it.\n' +
+                    '· 3.0 = Volatile. NPC becomes neutral quickly, and gets mad rapidly if you miss the deadline.\n' +
                     'Assign based on the NPC\'s established personality in the narrative. Default: 1.0.'
             };
         }
@@ -346,7 +357,7 @@ export function installQuestDebugTools() {
         console.log(`"${t2}" -> ${parseInWorldTime(t2)} mins`);
         console.log(`"${t3}" -> ${parseInWorldTime(t3)} mins`);
 
-        console.log("--- Testing Frustration Math ---");
+        console.log("--- Testing Frustration Math (Pre-Deadline: Halfway) ---");
         const dummyQuest = {
             status: 'active',
             accepted_time: "08:00 AM, Day 1",
@@ -356,13 +367,29 @@ export function installQuestDebugTools() {
         const halfwayTime = "08:00 AM, Day 2";
         
         dummyQuest.frustration_coefficient = 0.4;
-        console.log(`Coeff 0.4 (Patient), Halfway -> ${computeFrustration(dummyQuest, halfwayTime).toFixed(3)} (expected ~0.177)`);
+        console.log(`Coeff 0.4 (Patient), Halfway -> ${computeFrustration(dummyQuest, halfwayTime).toFixed(3)} (expected -0.823)`);
         
         dummyQuest.frustration_coefficient = 1.0;
-        console.log(`Coeff 1.0 (Neutral), Halfway -> ${computeFrustration(dummyQuest, halfwayTime).toFixed(3)} (expected 0.500)`);
+        console.log(`Coeff 1.0 (Neutral), Halfway -> ${computeFrustration(dummyQuest, halfwayTime).toFixed(3)} (expected -0.500)`);
         
         dummyQuest.frustration_coefficient = 3.0;
-        console.log(`Coeff 3.0 (Volatile), Halfway -> ${computeFrustration(dummyQuest, halfwayTime).toFixed(3)} (expected ~0.794)`);
+        console.log(`Coeff 3.0 (Volatile), Halfway -> ${computeFrustration(dummyQuest, halfwayTime).toFixed(3)} (expected -0.206)`);
+
+        console.log("--- Testing Frustration Math (At Deadline) ---");
+        const atDeadline = "08:00 AM, Day 3";
+        dummyQuest.frustration_coefficient = 1.0;
+        console.log(`Coeff 1.0, At Deadline -> ${computeFrustration(dummyQuest, atDeadline).toFixed(3)} (expected 0.000)`);
+
+        console.log("--- Testing Frustration Math (Post-Deadline: 50% Overtime) ---");
+        const overtimeTime = "08:00 AM, Day 4"; // ratio = 1.5
+        dummyQuest.frustration_coefficient = 0.4;
+        console.log(`Coeff 0.4 (Patient), 50% Over -> ${computeFrustration(dummyQuest, overtimeTime).toFixed(3)} (expected 0.200)`);
+
+        dummyQuest.frustration_coefficient = 1.0;
+        console.log(`Coeff 1.0 (Neutral), 50% Over -> ${computeFrustration(dummyQuest, overtimeTime).toFixed(3)} (expected 0.500)`);
+
+        dummyQuest.frustration_coefficient = 3.0;
+        console.log(`Coeff 3.0 (Volatile), 50% Over -> ${computeFrustration(dummyQuest, overtimeTime).toFixed(3)} (expected 1.500)`);
         
         console.log("==========================");
     };

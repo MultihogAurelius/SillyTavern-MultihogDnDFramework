@@ -93,7 +93,7 @@ Example:
 
 'Last Rest' is ONLY triggered on Long Rest, NOT Short Rest (when Hit Dice, etc, are spent.) If the [TIME] delta between PREVIOUS STATE MEMO and your current update is only an hour, it is a Short Rest.`,
     xp: "Character Level and Experience Points (XP). Format as `Level: X | XP: current/max`. You MUST output this field whenever the narrative mentions gaining experience or leveling up.",
-    quests: `Quest status updates ONLY. When a quest objective is completed or a quest concludes, emit a [QUESTS] block containing ONLY a JSON object with an "updates" array. Each entry must have the quest "id" and only the fields that changed: "status" (active/completed/failed) and/or "objectives" (array of {"id", "status"}). Do NOT emit quests with status "failed" — those are handled by the engine. Do NOT re-emit the full quest schema. If no quest changed, omit this block entirely.`,
+    quests: `Quest status updates ONLY. When a quest objective is completed or a quest concludes, emit a [QUESTS] block containing ONLY a JSON object with an "updates" array. Each entry must have the quest "id" and only the fields that changed: "status" (active/completed/failed) and/or "objectives" (array of {"id", "status", "progress"}). For quantity-based objectives (e.g. "collect 6 mushrooms"), include "progress" as the current count (e.g. 4) even if the objective is not yet completed. NOTE: Do NOT fail quests for time-out/deadline reasons (the system handles those automatically), but YOU MUST mark a quest as "failed" if it becomes narratively impossible (e.g. a protection target dies). Do NOT re-emit the full quest schema. If no quest changed, omit this block entirely.`,
     quests_legacy: `Track quests using the [QUESTS] block. Maintain the COMPLETE list of all quests at all times — active, completed, and failed. Only add a quest if [QUEST ACCEPTED] is outputted in the narrative.
 
 Format each quest exactly as shown:
@@ -106,13 +106,20 @@ QUEST: The Missing Sheep
   DEADLINE: 06:00 PM, Day 4
   FRUSTRATION_COEFF: 1.2
   OBJ_ACTIVE: Find the missing sheep
+  OBJ_ACTIVE: Collect 6 Phosphor-Cap mushrooms [4/6]
+  OBJ_TOTAL: 6
   OBJ_COMPLETED: Ask about the wolf
   OBJ_FAILED: Save the lamb
 - Use OBJ_ACTIVE / OBJ_COMPLETED / OBJ_FAILED markers. 
 - Append ' (optional)' only if the task is not required.
+- For collection/count objectives, append [current/total] after the text (e.g. [4/6]) and add an OBJ_TOTAL line with the total. Update the count each turn as progress is made.
 - Never delete old quests. Keep completed/failed ones with updated STATUS.
 - If no quests exist yet, emit [QUESTS][/QUESTS] (empty).`,
 };
+
+export const QUESTS_NARRATOR_MODERN = `When the player formally accepts a quest or task from an NPC, you MUST call the LogQuest tool. If a duration is given (e.g., 'four days'), you MUST calculate the specific "Day N" timestamp based on the current in-world time. After LogQuest finishes, output *[QUEST ACCEPTED]*. Do NOT do this for rumors, casual mentions, or tasks the player has not yet agreed to.`;
+
+export const QUESTS_NARRATOR_LEGACY = `When the player formally accepts a quest from an NPC, describe it clearly in the narrative and conclude with the tag [QUEST ACCEPTED]. State who gave the quest, where they are located, what the task entails, any time pressure, and what rewards were promised. Do NOT do this for rumors, casual requests, or tasks the player has not yet agreed to.\n\nWhen an objective is completed, mention it naturally in the narrative. When a quest concludes (success or failure), narrate the outcome.`;
 
 // ── Embedded sysprompts — mobile/Termux fallback (fetch preferred, this is the safety net) ──
 
@@ -124,7 +131,7 @@ You are a Dungeon Master/World Simulator running a D&D-style tabletop RPG. Narra
 <rng_system>
 Whenever a roll is needed, use the appropriate RNG method based on the situation:
 
-1. IN COMBAT: Use the [RNG_QUEUE v6.0_PROPER] provided in the context. Consume entries in strict order (Index 0, 1, 2...). The queue length is 12; wrap around on exhaustion. This keeps combat fluid and reliable.
+1. IN COMBAT: Use the [RNG_QUEUE v6.0_PROPER] provided in the context. Consume entries in strict order (Index 0, 1, 2...). The first number in each entry is the d20 result. The queue length is 12; wrap around on exhaustion. This keeps combat fluid and reliable.
 2. OUT OF COMBAT (and in pre-combat initiative rolls): Use a tool call via RollTheDice. You MUST include the Difficulty Class (DC) in the tool call parameters. This prevents "cheating" by anchoring the difficulty before the roll result is known. After rolling, output the DC, the roll, and the outcome (success/failure) in parentheses.
 
 ROLL FORMAT (Strictly enforced for both systems):
@@ -337,7 +344,7 @@ You are a Dungeon Master/World Simulator running a D&D-style tabletop RPG. Narra
 <rng_system>
 Whenever a roll is needed, use the appropriate RNG method based on the situation:
 
-1. IN COMBAT: Use the [RNG_QUEUE v6.0_PROPER] provided in the context. Consume entries in strict order (Index 0, 1, 2...). The queue length is 12; wrap around on exhaustion. This keeps combat fluid and reliable.
+1. IN COMBAT: Use the [RNG_QUEUE v6.0_PROPER] provided in the context. Consume entries in strict order (Index 0, 1, 2...). The first number in each entry is the d20 result. The queue length is 12; wrap around on exhaustion. This keeps combat fluid and reliable.
 2. OUT OF COMBAT (and in pre-combat initiative rolls): Use a tool call via RollTheDice. You MUST include the Difficulty Class (DC) in the tool call parameters. This prevents "cheating" by anchoring the difficulty before the roll result is known. After rolling, output the DC, the roll, and the outcome (success/failure) in parentheses.
 
 ROLL FORMAT (Strictly enforced for both systems):

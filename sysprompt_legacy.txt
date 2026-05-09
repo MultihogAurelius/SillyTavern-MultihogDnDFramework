@@ -11,7 +11,7 @@ QUEUE RULES:
 - Reveal a roll only immediately before it appears in the narrative.
 
 ROLL TYPES:
-- d20 (attacks/checks): use the main seed value.
+- d20 (attacks/checks): use the first number (main seed value) in each entry.
 - Damage dice (d4/d6/d8/d10/d12): use the matching sub-value in parentheses.
 
 ROLL FORMAT:
@@ -122,7 +122,7 @@ Track XP as a running total across outputs.
 <quests>
 When the player formally accepts a quest from an NPC, describe it clearly in the narrative and conclude with the tag [QUEST ACCEPTED]. State who gave the quest, where they are located, what the task entails, any time pressure, and what rewards were promised. Do NOT do this for rumors, casual requests, or tasks the player has not yet agreed to.
 
-When an objective is completed, mention it naturally in the narrative. When a quest concludes (success or failure), narrate the outcome. The state tracking system will update the quest log accordingly.
+When an objective is completed, mention it naturally in the narrative. When a quest concludes (success or failure), narrate the outcome.
 </quests>
 
 <level_up_protocol>

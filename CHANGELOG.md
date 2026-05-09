@@ -2,10 +2,29 @@
 
 All notable changes to the **Fatbody D&D Framework** will be documented in this file.
 
-## [1.8.7] - 2026-05-09
+## [1.8.10] - 2026-05-10
 
-**Modular Pagination & History Persistence Refinements**  
-This update introduces granular UI controls for module pagination and resolves critical edge-cases in the state history architecture, particularly regarding "Direct Prompt" interventions and snapshot restoration.
+**Quest Framework Refinements & Progress Tracking**  
+This update overhauls the quest logic to support narrative-driven failures, partial objective progress tracking, and recalibrated NPC emotional modeling.
+
+### Added
+- **Objective Progress Tracking**: Added support for quantity-based objectives (e.g., "Collect 6 Mushrooms [4/6]").
+    - Visual progress pills in the quest log UI.
+    - Automated state merging for partial progress updates.
+    - Support for both Modern (JSON) and Legacy (Plain Text) tracking modes.
+- **Dynamic Narrator Instructions**: The system prompt now automatically swaps quest instructions based on the active mode (Standard vs. Legacy) and RNG settings.
+- **Automatic Prompt Synchronization**: Implemented an "auto-sync" mechanism that updates unmodified stock prompts to the latest version upon extension load.
+
+### Changed
+- **Frustration Logic Recalibration**: NPCs now stay in the "Pleased" to "Neutral" range until a deadline is actually missed. Frustration penalties now ramp up exclusively *after* the deadline has passed.
+- **Narrative-Driven Failures**: Explicitly authorized the AI to trigger quest failures if an objective becomes narratively impossible (e.g., target death), independent of automated deadline logic.
+- **RNG Queue Instructions**: Clarified that the first number in each `[RNG_QUEUE]` entry is the d20 result to eliminate ambiguity during combat.
+
+### Fixed
+- **Legacy Prompt Routing**: Fixed a bug where Legacy Mode was stripping instructions from the modern prompt instead of injecting the dedicated legacy prompt.
+- **LogQuest Tool Descriptions**: Updated tool documentation to reflect the new post-deadline frustration behavior.
+
+## [1.8.7] - 2026-05-09
 
 ### Added
 - **Per-Module Pagination Thresholds**: You can now set independent pagination limits for every module (stock and custom).

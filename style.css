@@ -1740,6 +1740,20 @@
     font-style: italic;
 }
 
+.rt-quest-progress {
+    display: inline-block;
+    font-size: 0.78em;
+    font-weight: 600;
+    color: var(--rt-accent);
+    background: rgba(var(--rt-accent-rgb, 0, 204, 119), 0.12);
+    border: 1px solid rgba(var(--rt-accent-rgb, 0, 204, 119), 0.25);
+    border-radius: 4px;
+    padding: 0 5px;
+    margin-left: 5px;
+    vertical-align: middle;
+    letter-spacing: 0.03em;
+}
+
 .rt-quest-rewards {
     display: flex;
     flex-wrap: wrap;

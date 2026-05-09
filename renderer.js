@@ -931,9 +931,15 @@ export function renderQuestLog(quests, currentTime, collapsed, detached, filterT
             if (done) objClass += ' rt-quest-obj-done';
             if (failed) objClass += ' rt-quest-obj-failed';
 
+            // Progress counter (e.g. "4/6")
+            const hasProgress = typeof obj.total === 'number' && !done && !failed;
+            const progressHtml = hasProgress
+                ? ` <span class="rt-quest-progress">${obj.progress ?? 0}/${obj.total}</span>`
+                : '';
+
             return `<div class="${objClass}">
                 <span class="rt-quest-check">${done ? '✓' : (failed ? '✗' : '○')}</span>
-                <span>${escapeHtml(obj.text)}${optLabel}</span>
+                <span>${escapeHtml(obj.text)}${progressHtml}${optLabel}</span>
             </div>`;
         }).join('');
 

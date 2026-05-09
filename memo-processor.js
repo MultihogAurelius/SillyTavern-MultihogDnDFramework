@@ -247,6 +247,10 @@ export function mergeQuestUpdates(jsonText, memoText = null) {
                     obj.status = objUpdate.status;
                     changed = true;
                 }
+                if (typeof objUpdate.progress === 'number') {
+                    obj.progress = objUpdate.progress;
+                    changed = true;
+                }
             }
         }
     }
@@ -353,6 +357,13 @@ export function parseQuestsFromText(text) {
         // Robust: handles both one-per-line and comma-separated objectives on a single line
         const objectives = [];
         const objRe = /^\s*(OBJ_ACTIVE|OBJ_DONE|OBJ_COMPLETED|OBJ_FAILED):\s*(.+)$/gmi;
+        // Read OBJ_TOTAL lines into a map keyed by order index for assignment below
+        const objTotals = [];
+        const objTotalRe = /^\s*OBJ_TOTAL:\s*(\d+)$/gmi;
+        let objTotalMatch;
+        while ((objTotalMatch = objTotalRe.exec(block)) !== null) {
+            objTotals.push(parseInt(objTotalMatch[1], 10));
+        }
         let objMatch;
         let objIdx = 0;
         while ((objMatch = objRe.exec(block)) !== null) {
@@ -373,14 +384,27 @@ export function parseQuestsFromText(text) {
                 const p = part.trim();
                 if (!p) continue;
                 const isOptional = /\(optional\)$/i.test(p);
-                const objText = p.replace(/\s*\((required|optional)\)\s*$/i, '').trim();
+                // Strip (required)/(optional) suffix
+                let objText = p.replace(/\s*\((required|optional)\)\s*$/i, '').trim();
+                // Extract inline [progress/total] counter, e.g. "Collect mushrooms [4/6]"
+                let progress = undefined;
+                let total = objTotals[objIdx] ?? undefined;
+                const progressMatch = objText.match(/\[(\d+)\/(\d+)\]\s*$/);
+                if (progressMatch) {
+                    progress = parseInt(progressMatch[1], 10);
+                    total    = parseInt(progressMatch[2], 10);
+                    objText  = objText.replace(/\s*\[\d+\/\d+\]\s*$/, '').trim();
+                }
                 if (!objText) continue;
-                objectives.push({
+                const entry = {
                     id:       `obj_${objIdx++}`,
                     text:     objText,
                     required: !isOptional,
                     status:   isDone ? 'completed' : (isFailed ? 'failed' : 'active'),
-                });
+                };
+                if (total != null)    entry.total    = total;
+                if (progress != null) entry.progress = progress;
+                objectives.push(entry);
             }
         }
 
@@ -432,7 +456,10 @@ export function serializeQuestsToText(quests) {
             else if (obj.status === 'failed') tag = 'OBJ_FAILED';
             
             const suffix = obj.required ? '(required)' : '(optional)';
-            lines.push(`  ${tag}: ${obj.text} ${suffix}`);
+            const progressStr = (typeof obj.progress === 'number' && typeof obj.total === 'number')
+                ? ` [${obj.progress}/${obj.total}]` : '';
+            lines.push(`  ${tag}: ${obj.text}${progressStr} ${suffix}`);
+            if (obj.total != null) lines.push(`  OBJ_TOTAL: ${obj.total}`);
         }
         for (const r of (q.rewards || [])) {
             lines.push(`  REWARD: ${r}`);
@@ -642,20 +669,17 @@ export function buildModulesInstructionText(settings) {
         if (settings.modules[key]) {
             let p = prompt;
 
-            // ── Dynamic prompt stripping for Legacy Quests ──────────────────
+            // ── Dynamic prompt swap for Legacy Quests ──────────────────────
             if (key === 'quests' && settings.questLegacyMode) {
                 const isDeadlines = !!settings.syspromptModules?.questsDeadlines;
                 const isFrustration = !!settings.syspromptModules?.questsFrustration;
-
-                if (!isDeadlines) {
-                    // Strip DEADLINE line
-                    p = p.replace(/\n\s*DEADLINE:.*?\n/g, '\n');
-                }
-                if (!isFrustration) {
-                    // Strip FRUSTRATION_COEFF line
-                    p = p.replace(/\n\s*FRUSTRATION_COEFF:.*?\n/g, '\n');
-                }
+                // Use the dedicated legacy format prompt
+                p = (promptsMap['quests_legacy'] || DEFAULT_STOCK_PROMPTS.quests_legacy);
+                if (!isDeadlines) p = p.replace(/\n\s*DEADLINE:.*?\n/g, '\n');
+                if (!isFrustration) p = p.replace(/\n\s*FRUSTRATION_COEFF:.*?\n/g, '\n');
             }
+            // Never emit the quests_legacy key as its own module — it's injected via the quests key above
+            if (key === 'quests_legacy') continue;
 
             modulesText += `- [${key.toUpperCase()}]: ${p}\n`;
         }

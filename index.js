@@ -1,4 +1,4 @@
-import { EXAMPLES, COLOR_EXAMPLES, DEFAULT_STOCK_PROMPTS, RT_PROMPTS, BLOCK_ICONS, BLOCK_ORDER, PAGE_SIZE, NO_PAGINATE } from './constants.js';
+import { EXAMPLES, COLOR_EXAMPLES, DEFAULT_STOCK_PROMPTS, RT_PROMPTS, BLOCK_ICONS, BLOCK_ORDER, PAGE_SIZE, NO_PAGINATE, QUESTS_NARRATOR_MODERN, QUESTS_NARRATOR_LEGACY } from './constants.js';
 import { MODULE_NAME, getSettings, getBarBackground, migrateCustomFields, saveChatState, saveProfile, deleteProfile } from './state-manager.js';
 import { sendStateRequest, fetchOllamaModels, fetchOpenAIModels, testOpenAIConnection, getConnectionProfiles, getCurrentCompletionPreset, setCompletionPreset } from './llm-client.js';
 import { getDiceToolName, getDiceCommandName, getDiceCommandAliases, doDiceRoll, registerDiceFunctionTool, registerDiceSlashCommand, installInterceptor, getNarrativeBlocks, onGenerationEnded } from './narrative-hooks.js';
@@ -2975,6 +2975,11 @@ Rules:
         let content = rawText
             .replace(/<(\w[\w_-]*)>([\s\S]*?)<\/\1>/g, (match, tag) => {
                 if (mods[tag] === false) return '';
+                // Inject correct instructions for quests based on legacy mode
+                if (tag === 'quests') {
+                    const instruction = s.questLegacyMode ? QUESTS_NARRATOR_LEGACY : QUESTS_NARRATOR_MODERN;
+                    return `<quests>\n${instruction}\n</quests>`;
+                }
                 return match;
             });
 
@@ -3024,11 +3029,36 @@ Rules:
 
             const settings = getSettings();
 
-            // One-time legacy mode prompt synchronization for existing sessions
-            if (settings.questLegacyMode && settings.stockPrompts?.quests) {
-                if (settings.stockPrompts.quests.includes('JSON object with an "updates" array')) {
-                    settings.stockPrompts.quests = DEFAULT_STOCK_PROMPTS.quests_legacy;
-                    console.log('[RPG Tracker] Legacy Mode detected: Synchronized quest stock prompt to legacy version.');
+            // --- Automatic Stock Prompt Synchronization (v1.8.7 Update) ---
+            if (settings.stockPrompts) {
+                let changed = false;
+                
+                // Modern Quests Sync: Update if it mentions "id" and "status" but NOT "progress"
+                if (settings.stockPrompts.quests && 
+                    settings.stockPrompts.quests.includes('"id", "status"') && 
+                    !settings.stockPrompts.quests.includes('"progress"')) {
+                    settings.stockPrompts.quests = DEFAULT_STOCK_PROMPTS.quests;
+                    console.log('[RPG Tracker] Synchronized modern quest prompt to v1.8.7 (added progress tracking).');
+                    changed = true;
+                }
+
+                // Legacy Quests Sync: Update if it mentions "OBJ_ACTIVE" but NOT "OBJ_TOTAL"
+                if (settings.stockPrompts.quests_legacy && 
+                    settings.stockPrompts.quests_legacy.includes('OBJ_ACTIVE') && 
+                    !settings.stockPrompts.quests_legacy.includes('OBJ_TOTAL')) {
+                    settings.stockPrompts.quests_legacy = DEFAULT_STOCK_PROMPTS.quests_legacy;
+                    console.log('[RPG Tracker] Synchronized legacy quest prompt to v1.8.7 (added progress tracking).');
+                    changed = true;
+                }
+
+                // Force sync for Legacy Mode users who might still have the modern prompt in the 'quests' slot
+                if (settings.questLegacyMode && settings.stockPrompts.quests && settings.stockPrompts.quests.includes('JSON object with an "updates" array')) {
+                    settings.stockPrompts.quests = settings.stockPrompts.quests_legacy || DEFAULT_STOCK_PROMPTS.quests_legacy;
+                    console.log('[RPG Tracker] Legacy Mode detected: Synchronized active quest prompt to legacy version.');
+                    changed = true;
+                }
+
+                if (changed) {
                     saveSettings();
                 }
             }
