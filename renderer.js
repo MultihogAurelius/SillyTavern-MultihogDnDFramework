@@ -939,24 +939,26 @@ export function renderQuestLog(quests, currentTime, collapsed, detached, filterT
             timeLeftHtml = ` <i style="opacity: 0.7; font-size: 0.9em;">(${formatTimeDiff(diff, diff > 0)})</i>`;
         }
 
+        const acceptedMins = parseInWorldTime(quest.accepted_time);
+        let acceptedRow = '';
+        if (currentTotalMins > 0 && acceptedMins > 0) {
+            const diff = currentTotalMins - acceptedMins;
+            acceptedRow = `
+                <div class="rt-quest-deadline">
+                    <div class="rt-quest-deadline-header">
+                        <span class="rt-entity-sub-label">Accepted:</span> ${escapeHtml(quest.accepted_time)} <i style="opacity: 0.7; font-size: 0.9em;">(${formatTimeDiff(diff, false)})</i>
+                    </div>
+                </div>`;
+        }
+
         const deadlineRow = (quest.deadline_time && showDeadlines) ? `
-            <div class="rt-quest-deadline">
+            <div class="rt-quest-deadline" style="${acceptedRow ? 'border-top: none; margin-top: 0;' : ''}">
                 <div class="rt-quest-deadline-header">
                     <span class="rt-entity-sub-label">Deadline:</span> ${escapeHtml(quest.deadline_time)}${timeLeftHtml}
                     ${showFrustration ? `<span class="rt-quest-mood-label" style="color:${barColor};">${label}</span>` : ''}
                 </div>
                 ${moodBarHtml}
             </div>` : '';
-
-        const acceptedMins = parseInWorldTime(quest.accepted_time);
-        let acceptedRow = '';
-        if (currentTotalMins > 0 && acceptedMins > 0) {
-            const diff = currentTotalMins - acceptedMins;
-            acceptedRow = `
-                <div class="rt-quest-accepted">
-                    <span class="rt-entity-sub-label">Accepted:</span> ${escapeHtml(quest.accepted_time)} <i style="opacity: 0.7; font-size: 0.9em;">(${formatTimeDiff(diff, false)})</i>
-                </div>`;
-        }
 
         return `<div class="rt-quest-card${quest.status !== 'active' ? ' rt-quest-inactive' : ''}">
             <div class="rt-quest-header">
