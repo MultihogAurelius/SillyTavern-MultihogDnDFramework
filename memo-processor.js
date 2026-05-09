@@ -145,17 +145,13 @@ export function mergeMemo(currentMemo, aiOutput) {
         if (tag.toUpperCase() === 'QUESTS') {
             const s = getSettings();
             if (s.questLegacyMode) {
-                // Legacy: state model wrote the full text block — parse it wholesale
-                const parsed = parseQuestsFromText(newContent);
-                if (parsed) {
-                    s.quests = parsed;
-                    // Do NOT continue; let the standard replacement logic below
-                    // integrate the new [QUESTS] block into the 'memo' string.
-                }
+                // Legacy: state model wrote the full text block.
+                // Let the standard replacement logic below integrate it into the memo string.
+                // The memo text is the single source of truth — no separate settings.quests needed.
             } else {
                 // Tool mode: state model emits a diff JSON.
-                // This updates settings.quests and calls syncQuestsToMemo() internally.
-                mergeQuestUpdates(newContent);
+                // Apply the diff to our local 'memo' string being built
+                memo = mergeQuestUpdates(newContent, memo);
                 continue;
             }
         }
@@ -192,28 +188,30 @@ export function mergeMemo(currentMemo, aiOutput) {
     return deduplicateMemo(cleaned);
 }
 
-// ── Quest update merge ────────────────────────────────────────────────────────
-
 /**
- * Applies a constrained {"updates":[...]} diff from the state model to settings.quests.
- * Only mutates `status` and `objectives[n].status`. All other fields are locked.
- * Does NOT touch quests with status 'failed'.
+ * Applies a constrained {"updates":[...]} diff from the state model.
+ * Parses quests from memoText, applies mutations, and returns the updated string.
  * @param {string} jsonText
+ * @param {string} [memoText]
+ * @returns {string}
  */
-export function mergeQuestUpdates(jsonText) {
+export function mergeQuestUpdates(jsonText, memoText = null) {
     const settings = getSettings();
-    if (!settings.quests || !settings.quests.length) return;
+    const target = (memoText !== null) ? memoText : settings.currentMemo;
+    const quests = parseQuestsFromMemo(target);
+    
+    if (!quests.length) return target;
 
     let parsed;
     try {
         parsed = JSON.parse(jsonText);
     } catch (e) {
         console.warn('[RPG Tracker] mergeQuestUpdates: invalid JSON in [QUESTS] diff block:', jsonText);
-        return;
+        return target;
     }
 
     const updates = Array.isArray(parsed?.updates) ? parsed.updates : [];
-    if (!updates.length) return;
+    if (!updates.length) return target;
 
     const mods = settings.syspromptModules || {};
     const isDeadlines = !!mods.questsDeadlines;
@@ -221,7 +219,7 @@ export function mergeQuestUpdates(jsonText) {
 
     let changed = false;
     for (const update of updates) {
-        const quest = settings.quests.find(q => q.id === update.id);
+        const quest = quests.find(q => q.id === update.id);
         if (!quest) continue;
         if (quest.status === 'failed') continue;
 
@@ -255,43 +253,64 @@ export function mergeQuestUpdates(jsonText) {
 
     if (changed) {
         if (settings.debugMode) console.log('[RPG Tracker] mergeQuestUpdates: applied quest state changes.');
-        SillyTavern.getContext().saveSettingsDebounced();
-        syncQuestsToMemo();
+        const result = writeQuestsToMemo(quests, target);
+        if (memoText === null) {
+            SillyTavern.getContext().saveSettingsDebounced();
+        }
+        return /** @type {string} */ (result);
     }
+
+    return target;
 }
 
 /**
- * Rebuilds the [QUESTS] block in settings.currentMemo from settings.quests.
- * Uses plain-text format in legacy mode, JSON in tool mode.
+ * Writes a quest array into a [QUESTS] block.
+ * If memoText is provided, returns the updated string.
+ * Otherwise, updates settings.currentMemo directly.
+ * @param {any[]} quests
+ * @param {string} [memoText]
+ * @returns {string|void}
  */
-export function syncQuestsToMemo() {
+export function writeQuestsToMemo(quests, memoText = null) {
     const settings = getSettings();
-    if (!settings.quests) return;
+    let target = (memoText !== null) ? memoText : settings.currentMemo;
 
     const tag = 'QUESTS';
     const escapedTag = escapeRegex(tag);
     const pattern = new RegExp(`\\s*\\[${escapedTag}\\][\\s\\S]*?\\[\\/${escapedTag}\\]`, 'i');
-    const blockExists = pattern.test(settings.currentMemo);
+    const blockExists = pattern.test(target);
 
     // If no quests, remove the block if present — never insert an empty one
-    if (!settings.quests.length) {
-        if (blockExists) {
-            settings.currentMemo = settings.currentMemo.replace(pattern, '').trim();
-        }
+    if (!quests || !quests.length) {
+        const result = blockExists ? target.replace(pattern, '').trim() : target;
+        if (memoText !== null) return result;
+        settings.currentMemo = result;
         return;
     }
 
     const content = settings.questLegacyMode
-        ? serializeQuestsToText(settings.quests)
-        : JSON.stringify(settings.quests, null, 2);
+        ? serializeQuestsToText(quests)
+        : JSON.stringify(quests, null, 2);
 
     const block = `\n\n[${tag}]\n${content}\n[/${tag}]`;
 
+    let result;
     if (blockExists) {
-        settings.currentMemo = settings.currentMemo.replace(pattern, block);
+        result = target.replace(pattern, block);
     } else {
-        settings.currentMemo = (settings.currentMemo + block).trim();
+        result = (target + block).trim();
     }
+
+    if (memoText !== null) return result;
+    settings.currentMemo = result;
+}
+
+/**
+ * @deprecated Use writeQuestsToMemo(quests) instead. Kept for backward compat.
+ */
+export function syncQuestsToMemo() {
+    const settings = getSettings();
+    writeQuestsToMemo(settings.quests || []);
 }
 
 // ── Legacy quest text format ───────────────────────────────────────────────────
@@ -423,42 +442,52 @@ export function serializeQuestsToText(quests) {
 }
 
 /**
+ * Parses the [QUESTS] block from a text string and returns a quest array.
+ * Pure function — no side effects.
+ * @param {string} memoText
+ * @returns {any[]}
+ */
+export function parseQuestsFromMemo(memoText) {
+    const match = (memoText || '').match(/\[QUESTS\]([\s\S]*?)\[\/QUESTS\]/i);
+    if (!match) return [];
+
+    const content = match[1].trim();
+
+    // Auto-detect format: plain-text starts with QUEST:
+    if (content.startsWith('QUEST:')) {
+        return parseQuestsFromText(content);
+    } else {
+        try {
+            const parsed = JSON.parse(content);
+            const quests = Array.isArray(parsed) ? parsed : (parsed.quests || []);
+            return quests;
+        } catch (e) {
+            console.warn('[RPG Tracker] parseQuestsFromMemo: Failed to parse [QUESTS] as JSON:', e);
+            return [];
+        }
+    }
+}
+
+/**
  * Parses the [QUESTS] block from a text string and updates settings.quests.
  * Used when the user manually edits the Raw View.
  * @param {string} memoText
  */
 export function syncQuestsFromMemo(memoText) {
     const settings = getSettings();
-    const match = memoText.match(/\[QUESTS\]([\s\S]*?)\[\/QUESTS\]/i);
-
-    if (!match) {
-        if (settings.quests && settings.quests.length > 0) {
+    const quests = parseQuestsFromMemo(memoText);
+    
+    if (quests.length === 0) {
+        const match = (memoText || '').match(/\[QUESTS\]([\s\S]*?)\[\/QUESTS\]/i);
+        if (!match && settings.quests && settings.quests.length > 0) {
             settings.quests = [];
             if (settings.debugMode) console.log('[RPG Tracker] syncQuestsFromMemo: quests cleared because [QUESTS] block was removed.');
         }
         return;
     }
 
-    const content = match[1].trim();
-
-    // Auto-detect format: plain-text starts with QUEST:, otherwise try JSON
-    if (content.startsWith('QUEST:') || settings.questLegacyMode) {
-        const parsed = parseQuestsFromText(content);
-        if (parsed) {
-            settings.quests = parsed;
-            if (settings.debugMode) console.log('[RPG Tracker] syncQuestsFromMemo: updated internal state from plain-text edit.');
-        }
-    } else {
-        try {
-            const parsed = JSON.parse(content);
-            if (Array.isArray(parsed)) {
-                settings.quests = parsed;
-                if (settings.debugMode) console.log('[RPG Tracker] syncQuestsFromMemo: updated internal state from JSON edit.');
-            }
-        } catch (e) {
-            if (settings.debugMode) console.warn('[RPG Tracker] syncQuestsFromMemo: could not parse quest block. Error:', e.message);
-        }
-    }
+    settings.quests = quests;
+    if (settings.debugMode) console.log(`[RPG Tracker] syncQuestsFromMemo: updated internal state with ${quests.length} quest(s).`);
 }
 
 // ── Delta display ─────────────────────────────────────────────────────────────

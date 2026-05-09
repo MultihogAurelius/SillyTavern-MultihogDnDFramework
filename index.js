@@ -2,7 +2,7 @@ import { EXAMPLES, COLOR_EXAMPLES, DEFAULT_STOCK_PROMPTS, RT_PROMPTS, BLOCK_ICON
 import { MODULE_NAME, getSettings, getBarBackground, migrateCustomFields, saveChatState, saveProfile, deleteProfile } from './state-manager.js';
 import { sendStateRequest, fetchOllamaModels, fetchOpenAIModels, testOpenAIConnection, getConnectionProfiles, getCurrentCompletionPreset, setCompletionPreset } from './llm-client.js';
 import { getDiceToolName, getDiceCommandName, getDiceCommandAliases, doDiceRoll, registerDiceFunctionTool, registerDiceSlashCommand, installInterceptor, getNarrativeBlocks, onGenerationEnded } from './narrative-hooks.js';
-import { deduplicateMemo, mergeMemo, computeDelta, escapeHtml, escapeRegex, highlightParens, cleanToolCallMessage, getLastUserAction, buildLorebookContext, buildModulesInstructionText, buildModuleFormatInstruction, syncQuestsFromMemo, syncQuestsToMemo } from './memo-processor.js';
+import { deduplicateMemo, mergeMemo, computeDelta, escapeHtml, escapeRegex, highlightParens, cleanToolCallMessage, getLastUserAction, buildLorebookContext, buildModulesInstructionText, buildModuleFormatInstruction, parseQuestsFromMemo, syncQuestsFromMemo, syncQuestsToMemo, writeQuestsToMemo } from './memo-processor.js';
 import { renderSubFieldByRule, tryRenderMarker, renderCustomBlockLine, stripMemoHtml, escapeHtmlWithColor, parseMemoBlocks, getPageSize, loadCollapsed, saveCollapsed, loadDetached, saveDetached, blockToItems, renderMemoAsCards, renderQuestLog } from './renderer.js';
 import { registerLogQuestTool, checkQuestDeadlines } from './quests.js';
 
@@ -96,6 +96,27 @@ import { registerLogQuestTool, checkQuestDeadlines } from './quests.js';
 
 
     // ── Chat-Linked State (deferred from state-manager.js — touches DOM + _historyViewIndex) ──
+
+    function refreshQuestLegacyPrompt(s) {
+        let prompt = DEFAULT_STOCK_PROMPTS.quests_legacy;
+        if (!s.syspromptModules?.questsDeadlines && !s.syspromptModules?.questsFrustration) {
+            prompt = prompt.replace(/  DEADLINE:.*\n/g, '');
+            prompt = prompt.replace(/  FRUSTRATION_COEFF:.*\n/g, '');
+            prompt = prompt.replace(/- DEADLINE \/ FRUSTRATION_COEFF:.*\n/g, '');
+            prompt = prompt.replace(/- FRUSTRATION_COEFF:.*\n/g, '');
+        } else {
+            if (!s.syspromptModules?.questsDeadlines) {
+                prompt = prompt.replace(/  DEADLINE:.*\n/g, '');
+                prompt = prompt.replace(/- DEADLINE.*\n/g, '');
+            }
+            if (!s.syspromptModules?.questsFrustration) {
+                prompt = prompt.replace(/  FRUSTRATION_COEFF:.*\n/g, '');
+                prompt = prompt.replace(/- FRUSTRATION_COEFF:.*\n/g, '');
+            }
+        }
+        if (!s.stockPrompts) s.stockPrompts = {};
+        s.stockPrompts.quests = prompt;
+    }
 
     /**
      * Restore a previously saved chat state into the live settings.
@@ -685,7 +706,7 @@ Rules:
                 // contaminated by a prior session that saved raw tags.
                 const sanitizedCurrent = settings.currentMemo.replace(/<\/?memo>/gi, '').trim();
 
-                const merged = mergeMemo(sanitizedCurrent, cleanedOutput);
+                let merged = mergeMemo(sanitizedCurrent, cleanedOutput);
 
                 if (settings.debugMode) {
                     console.log(`[RPG Tracker] Memo ${merged !== sanitizedCurrent ? 'updated (partial merge)' : 'unchanged'}.`);
@@ -694,14 +715,38 @@ Rules:
                 // Push snapshot to rolling history
                 const delta = computeDelta(sanitizedCurrent, merged);
 
-                if (settings.historyIndex !== -1) {
-                    if (settings.debugMode) console.log(`[RPG Tracker] Discarding ${settings.historyIndex} future snapshots due to new update.`);
-                    settings.memoHistory = settings.memoHistory.slice(settings.historyIndex + 1);
-                    settings.historyIndex = -1;
+                // Flush any quests staged by LogQuest during this generation.
+                // We do this BEFORE pushing to history so the NEW state in history includes the quest.
+                if (globalThis._rpgPendingQuests && globalThis._rpgPendingQuests.length) {
+                    const existingQuests = parseQuestsFromMemo(merged);
+                    existingQuests.push(...globalThis._rpgPendingQuests);
+                    merged = writeQuestsToMemo(existingQuests, merged);
+                    const count = globalThis._rpgPendingQuests.length;
+                    globalThis._rpgPendingQuests = [];
+                    if (settings.debugMode) console.log(`[RPG Tracker] Flushed ${count} pending quest(s) into merged memo.`);
                 }
 
-                settings.memoHistory.unshift(sanitizedCurrent);
+                // Linear Stone History Logic:
+                // 1. If we were viewing/committed to a past state, delete the "abandoned" future.
+                if (settings.historyIndex !== undefined && settings.historyIndex !== -1) {
+                    if (settings.debugMode) console.log(`[RPG Tracker] Splicing history at index ${settings.historyIndex} due to new update.`);
+                    settings.memoHistory = settings.memoHistory.slice(settings.historyIndex);
+                    // Note: We slice from historyIndex because the stone AT historyIndex (the one we were at) 
+                    // will be replaced by the new unshift.
+                }
+
+                // 2. Ensure the state BEFORE this generation is preserved if it's the very first stone
+                if (settings.memoHistory.length === 0) {
+                    settings.memoHistory.push(sanitizedCurrent);
+                }
+
+                // 3. Unshift the NEW state as the latest stone
+                settings.memoHistory.unshift(merged);
                 if (settings.memoHistory.length > 1000) settings.memoHistory.length = 1000;
+
+                // 4. Set pointer to the latest stone
+                settings.historyIndex = 0;
+                _historyViewIndex = -1;
 
                 // Persist delta and update panel
                 settings.lastDelta = delta;
@@ -713,8 +758,7 @@ Rules:
                 settings.prevMemo1 = sanitizedCurrent;
                 settings.currentMemo = merged;
 
-                // Sync internal quest objects from the merged memo
-                // (handles Legacy plain-text [QUESTS] blocks written by the state model)
+                // Sync internal quest cache from the merged memo (legacy compat)
                 syncQuestsFromMemo(merged);
 
                 updateUIMemo(merged);
@@ -1054,13 +1098,63 @@ Rules:
         // --- Onboarding Narrator Configuration (Salad Bar Sync) ---
         const s = getSettings();
         
+        /**
+         * Helper to update a setting, save it, and sync the UIs.
+         * This avoids the 'ghost click' problem where onboarding UI tries to
+         * trigger changes on non-existent settings panel elements.
+         */
+        const syncSettingsAndUI = (updateFn) => {
+            const fresh = getSettings();
+            updateFn(fresh);
+            
+            // Sync the main settings panel if it exists
+            const rngHybrid = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_rng_hybrid'));
+            const rngLegacy = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_rng_legacy'));
+            const questsCb = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_sysprompt_mod_quests'));
+            const deadlinesCb = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_quests_deadlines'));
+            const frustrationCb = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_quests_frustration'));
+            const qmStandard = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_quest_standard'));
+            const qmLegacy = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_quest_legacy'));
+
+            if (rngHybrid && rngLegacy) {
+                rngHybrid.checked = !!fresh.diceFunctionTool;
+                rngLegacy.checked = !fresh.diceFunctionTool;
+            }
+            if (questsCb) questsCb.checked = fresh.syspromptModules?.quests !== false;
+            if (deadlinesCb) deadlinesCb.checked = !!fresh.syspromptModules?.questsDeadlines;
+            if (frustrationCb) frustrationCb.checked = !!fresh.syspromptModules?.questsFrustration;
+            if (qmStandard && qmLegacy) {
+                qmStandard.checked = !fresh.questLegacyMode;
+                qmLegacy.checked = !!fresh.questLegacyMode;
+            }
+            
+            // Optional components
+            const mods = { 'loot': '#rpg_sysprompt_mod_loot', 'random_events': '#rpg_sysprompt_mod_random_events', 'resting': '#rpg_sysprompt_mod_resting' };
+            for (const [key, id] of Object.entries(mods)) {
+                const cb = /** @type {HTMLInputElement|null} */ (document.getElementById(id.replace('#','')));
+                if (cb) cb.checked = !!fresh.syspromptModules?.[key];
+            }
+
+            // Save and sync the onboarding view
+            saveSettings();
+            
+            // Handle specific logic like tool registration
+            if (fresh.questLegacyMode) {
+                refreshQuestLegacyPrompt(fresh);
+                refreshOrderList();
+            } else {
+                registerLogQuestTool();
+            }
+        };
+
         // RNG Mode Sync
         const onboardingRngInputs = el.querySelectorAll('input[name="rt_onboarding_rng_mode"]');
         onboardingRngInputs.forEach(input => {
             input.checked = (input.value === (s.diceFunctionTool ? 'hybrid' : 'legacy'));
             input.addEventListener('change', () => {
-                const targetId = input.value === 'hybrid' ? '#rpg_rng_hybrid' : '#rpg_rng_legacy';
-                $(targetId).prop('checked', true).trigger('change');
+                syncSettingsAndUI(settings => {
+                    settings.diceFunctionTool = (input.value === 'hybrid');
+                });
             });
         });
 
@@ -1072,8 +1166,12 @@ Rules:
             if (optionsDiv) optionsDiv.style.display = onboardingQuestsCb.checked ? 'flex' : 'none';
             
             onboardingQuestsCb.addEventListener('change', () => {
-                if (optionsDiv) optionsDiv.style.display = onboardingQuestsCb.checked ? 'flex' : 'none';
-                $('#rpg_sysprompt_mod_quests').prop('checked', onboardingQuestsCb.checked).trigger('change');
+                const isEnabled = !!onboardingQuestsCb.checked;
+                if (optionsDiv) optionsDiv.style.display = isEnabled ? 'flex' : 'none';
+                syncSettingsAndUI(settings => {
+                    if (!settings.syspromptModules) settings.syspromptModules = {};
+                    settings.syspromptModules.quests = isEnabled;
+                });
             });
         }
 
@@ -1082,8 +1180,10 @@ Rules:
         if (onboardingDeadlinesCb) {
             onboardingDeadlinesCb.checked = !!s.syspromptModules?.questsDeadlines;
             onboardingDeadlinesCb.addEventListener('change', () => {
-                const mainCb = document.getElementById('rpg_quests_deadlines');
-                if (mainCb) $(mainCb).prop('checked', onboardingDeadlinesCb.checked).trigger('change');
+                syncSettingsAndUI(settings => {
+                    if (!settings.syspromptModules) settings.syspromptModules = {};
+                    settings.syspromptModules.questsDeadlines = !!onboardingDeadlinesCb.checked;
+                });
             });
         }
 
@@ -1092,8 +1192,10 @@ Rules:
         if (onboardingFrustrationCb) {
             onboardingFrustrationCb.checked = !!s.syspromptModules?.questsFrustration;
             onboardingFrustrationCb.addEventListener('change', () => {
-                const mainCb = document.getElementById('rpg_quests_frustration');
-                if (mainCb) $(mainCb).prop('checked', onboardingFrustrationCb.checked).trigger('change');
+                syncSettingsAndUI(settings => {
+                    if (!settings.syspromptModules) settings.syspromptModules = {};
+                    settings.syspromptModules.questsFrustration = !!onboardingFrustrationCb.checked;
+                });
             });
         }
 
@@ -1103,24 +1205,28 @@ Rules:
             const isLegacy = s.questLegacyMode;
             input.checked = (input.value === (isLegacy ? 'legacy' : 'standard'));
             input.addEventListener('change', () => {
-                const targetId = input.value === 'standard' ? '#rpg_quest_standard' : '#rpg_quest_legacy';
-                $(targetId).prop('checked', true).trigger('change');
+                syncSettingsAndUI(settings => {
+                    settings.questLegacyMode = (input.value === 'legacy');
+                });
             });
         });
 
         // Optional Components Sync
-        const syncOptionalMod = (onboardingId, mainId, settingKey) => {
+        const syncOptionalMod = (onboardingId, settingKey) => {
             const cb = el.querySelector(onboardingId);
             if (cb) {
                 cb.checked = !!s.syspromptModules?.[settingKey];
                 cb.addEventListener('change', () => {
-                    $(mainId).prop('checked', cb.checked).trigger('change');
+                    syncSettingsAndUI(settings => {
+                        if (!settings.syspromptModules) settings.syspromptModules = {};
+                        settings.syspromptModules[settingKey] = !!cb.checked;
+                    });
                 });
             }
         };
-        syncOptionalMod('#rt_onboarding_mod_loot', '#rpg_sysprompt_mod_loot', 'loot');
-        syncOptionalMod('#rt_onboarding_mod_random_events', '#rpg_sysprompt_mod_random_events', 'random_events');
-        syncOptionalMod('#rt_onboarding_mod_resting', '#rpg_sysprompt_mod_resting', 'resting');
+        syncOptionalMod('#rt_onboarding_mod_loot', 'loot');
+        syncOptionalMod('#rt_onboarding_mod_random_events', 'random_events');
+        syncOptionalMod('#rt_onboarding_mod_resting', 'resting');
 
         const onboardingApplyBtn = el.querySelector('#rt_onboarding_btn_apply_sysprompt');
         if (onboardingApplyBtn) {
@@ -1290,15 +1396,18 @@ Rules:
             const collapsed = loadCollapsed();
             const detached  = loadDetached();
 
-            // Extract current in-world time for frustration computation
-            const timeMatch = (s.currentMemo || '').match(/\[TIME\]([\s\S]*?)\[\/TIME\]/i);
+            // Extract world time from THIS snapshot for frustration computation
+            const timeMatch = (memo || '').match(/\[TIME\]([\s\S]*?)\[\/TIME\]/i);
             const currentTime = timeMatch ? timeMatch[1].split('\n').filter(Boolean)[0]?.trim() || '' : '';
 
             let html = renderMemoAsCards(memo, null, _sectionPages);
 
-            // Append quest log section if module is enabled and there are quests
-            if (s.modules?.quests && s.quests?.length) {
-                html += renderQuestLog(s.quests, currentTime, collapsed, detached);
+            // Append quest log section if module is enabled
+            if (s.modules?.quests) {
+                const snapshotQuests = parseQuestsFromMemo(memo);
+                if (snapshotQuests.length) {
+                    html += renderQuestLog(snapshotQuests, currentTime, collapsed, detached);
+                }
             }
 
             el.innerHTML = html;
@@ -1821,8 +1930,8 @@ Rules:
             if (snapshot === undefined) return;
 
             // Commit: set currentMemo to this snapshot and mark our point in history.
-            // This allows us to "revert" the live state without losing the future history
-            // until a new AI generation actually overwrites it.
+            // Nothing is deleted until the NEXT state update actually overwrites it.
+            // Quests are automatically rolled back because they live IN the memo text.
             s.currentMemo = snapshot;
             s.historyIndex = _historyViewIndex;
             _historyViewIndex = -1;
@@ -1852,20 +1961,23 @@ Rules:
 
     function navigateSnapshot(direction) {
         const s = getSettings();
+        const L = s.historyIndex === undefined ? -1 : s.historyIndex;
         const maxIndex = s.memoHistory.length - 1;
-
-        if (_historyViewIndex === -1) {
-            // Start from the restored point (or latest if none)
-            const start = s.historyIndex === -1 ? -1 : s.historyIndex;
-            _historyViewIndex = start + direction;
-        } else {
-            _historyViewIndex += direction;
-        }
-
-        // Clamp
-        if (_historyViewIndex < -1) _historyViewIndex = -1;
-        if (_historyViewIndex > maxIndex) _historyViewIndex = maxIndex;
-
+        const maxPos = L === -1 ? maxIndex + 1 : maxIndex;
+        
+        let pos = L === -1 
+            ? (_historyViewIndex === -1 ? 0 : _historyViewIndex + 1)
+            : (_historyViewIndex === -1 ? L : _historyViewIndex);
+            
+        pos += direction;
+        
+        if (pos < 0) pos = 0;
+        if (pos > maxPos) pos = maxPos;
+        
+        _historyViewIndex = L === -1
+            ? (pos === 0 ? -1 : pos - 1)
+            : (pos === L ? -1 : pos);
+            
         syncMemoView();
     }
 
@@ -1879,40 +1991,61 @@ Rules:
         if (!textarea || !navLabel) return;
 
         const histLen = s.memoHistory.length;
+        const L = s.historyIndex === undefined ? -1 : s.historyIndex;
+        const livePos = L === -1 ? 0 : L;
+        const currentPos = L === -1 
+            ? (_historyViewIndex === -1 ? 0 : _historyViewIndex + 1)
+            : (_historyViewIndex === -1 ? L : _historyViewIndex);
+
+        const maxPos = L === -1 ? histLen : histLen - 1;
 
         if (_historyViewIndex === -1) {
-            // Live view
+            // LIVE stone
             textarea.value = s.currentMemo;
             textarea.readOnly = false;
-            
-            if (s.historyIndex === -1) {
-                navLabel.textContent = '[ LIVE ]';
-                navLabel.classList.remove('clickable');
-                navLabel.title = 'Current Live State';
-                btnBack.disabled = histLen === 0;
-                btnFwd.disabled = true;
-            } else {
-                navLabel.textContent = `[ LIVE (-${s.historyIndex + 1}) ]`;
-                navLabel.classList.remove('clickable');
-                navLabel.title = 'Live State (Restored from History)';
-                btnBack.disabled = s.historyIndex >= histLen - 1;
-                btnFwd.disabled = false; // We can go forward to the "discarded" future
-            }
+            navLabel.classList.remove('clickable');
+            navLabel.title = 'Current Live State';
         } else {
-            // Snapshot view
+            // Snapshot stone
             const snapshot = s.memoHistory[_historyViewIndex];
             textarea.value = snapshot ?? '';
             textarea.readOnly = true;
-            navLabel.textContent = `[ -${_historyViewIndex + 1} 🔄 ]`;
             navLabel.classList.add('clickable');
             navLabel.title = 'Click to RESTORE this state as LIVE';
-            btnBack.disabled = _historyViewIndex >= histLen - 1;
-            btnFwd.disabled = false; // Always enabled because index -1 (Live) is forward
         }
+
+        const distance = currentPos - livePos;
+        if (distance === 0) {
+            navLabel.textContent = '[ LIVE ]';
+        } else if (distance > 0) {
+            navLabel.textContent = `[ -${distance} 🔄 ]`;
+        } else {
+            navLabel.textContent = `[ +${Math.abs(distance)} 🔄 ]`;
+        }
+
+        btnBack.disabled = currentPos >= maxPos;
+        btnFwd.disabled = currentPos <= 0;
 
         if (counter) {
             counter.textContent = `~${Math.round(textarea.value.length / 2.62)} tokens`;
         }
+
+        // Update delta panel: always show the diff that created the currently-viewed state
+        const deltaPanel = document.getElementById('rpg-tracker-delta-content');
+        if (deltaPanel) {
+            let deltaHtml = '';
+            const activeIdx = (_historyViewIndex === -1) ? L : _historyViewIndex;
+
+            if (activeIdx === -1) {
+                deltaHtml = s.lastDelta || '<span class="delta-empty">No changes yet.</span>';
+            } else {
+                const current  = s.memoHistory[activeIdx];
+                const previous = s.memoHistory[activeIdx + 1] || '';
+                deltaHtml = computeDelta(previous, current);
+            }
+            deltaPanel.innerHTML = deltaHtml;
+        }
+
         refreshRenderedView();
     }
 
@@ -2160,6 +2293,15 @@ Rules:
                         <input type="text" id="rt_cfe_label" class="text_pole" style="flex:1;min-width:80px;" placeholder="Display label">
                     </div>
 
+                    <!-- Layout Options -->
+                    <div style="display:flex; align-items:center; gap:10px; margin-top:4px; padding:2px 4px;">
+                        <div style="display:flex; align-items:center; gap:6px;">
+                            <span style="font-size:12px; font-weight:bold; opacity:0.8;">Pagination Threshold:</span>
+                            <input type="number" id="rt_cfe_pagesize" class="text_pole" style="width:50px; height:24px; text-align:center;" min="1" max="99" title="How many items to show before adding page buttons">
+                            <span style="font-size:11px; opacity:0.6;">entries</span>
+                        </div>
+                    </div>
+
                     <!-- AI Instructions -->
                     <div style="margin-top:12px; padding:10px; background:rgba(0,0,0,0.2); border-radius:8px; border:1px solid rgba(255,255,255,0.05);">
                         <div style="display:flex; align-items:center; gap:6px; margin-bottom:6px;">
@@ -2201,6 +2343,7 @@ Rules:
         const templateEl = /** @type {HTMLTextAreaElement} */ (document.getElementById('rt_cfe_template'));
         const promptEl   = /** @type {HTMLTextAreaElement} */ (document.getElementById('rt_cfe_prompt'));
         const previewEl  = document.getElementById('rt_cfe_preview');
+        const pageSizeEl = /** @type {HTMLInputElement}    */ (document.getElementById('rt_cfe_pagesize'));
 
         iconEl.value     = field.icon  || '📄';
         tagEl.value      = field.tag   || '';
@@ -2211,6 +2354,7 @@ Rules:
             field.prompt = '';
         }
         promptEl.value   = field.prompt || '';
+        pageSizeEl.value = String(s.modulePageSizes?.[field.tag.toUpperCase()] ?? (field.tag.toUpperCase() === 'SPELLS' ? 5 : PAGE_SIZE));
 
         // ── Live Preview ──
         let _previewDebounce = null;
@@ -2254,6 +2398,15 @@ Rules:
         tagEl.addEventListener('input', schedulePreview);
         labelEl.addEventListener('input', schedulePreview);
         templateEl.addEventListener('input', schedulePreview);
+        pageSizeEl.addEventListener('input', () => {
+            if (!s.modulePageSizes) s.modulePageSizes = {};
+            const val = parseInt(String(pageSizeEl.value), 10);
+            if (!isNaN(val) && val >= 1) {
+                s.modulePageSizes[tagEl.value.toUpperCase()] = val;
+                saveSettings();
+                schedulePreview();
+            }
+        });
 
         updatePreview();
         overlay.style.display = 'flex';
@@ -2276,6 +2429,14 @@ Rules:
         const save = () => {
             field.icon  = iconEl.value;
             const newTag = tagEl.value.replace(/[^a-zA-Z0-9_]/g, '').toUpperCase();
+            if (!newTag) { toastr['error']('Tag cannot be empty.', 'RPG Tracker'); return; }
+
+            // Save page size
+            if (!s.modulePageSizes) s.modulePageSizes = {};
+            const ps = parseInt(pageSizeEl.value, 10);
+            if (!isNaN(ps) && ps >= 1) {
+                s.modulePageSizes[newTag] = ps;
+            }
             if (!newTag) { toastr['error']('Tag cannot be empty.', 'RPG Tracker'); return; }
             if (BLOCK_ORDER.includes(newTag)) { toastr['error'](`[${newTag}] is a reserved stock module name.`, 'RPG Tracker'); return; }
             const dup = s.customFields.find((f, i) => i !== index && f.tag.toUpperCase() === newTag);
@@ -2319,7 +2480,7 @@ Rules:
         document.getElementById('rt_cfe_close').onclick  = close;
         document.getElementById('rt_cfe_export').onclick = () => exportModules([field]);
     }
-    function openPromptEditor(title, currentText, defaultText, onSave) {
+    function openPromptEditor(tag, title, currentText, defaultText, onSave) {
         let overlay = document.getElementById('rt_pe_overlay');
 
         if (!overlay) {
@@ -2339,10 +2500,18 @@ Rules:
                 <div class="popup shadowBase" style="min-width: 400px; max-width: 600px;">
                     <div class="popup-header">
                         <h3 class="margin0" id="rt_pe_title">Edit Prompt</h3>
-                        <div id="rt_pe_close" class="popup-close interactable"><i class="fa-solid fa-times"></i></div>
+                        <div id="rt_pe_close" class="popup-close interactable" title="Close"><i class="fa-solid fa-times"></i></div>
                     </div>
                     <div class="popup-body flex-container flexFlowColumn gap-1" style="padding: 10px;">
-                        <textarea id="rt_pe_text" class="text_pole" rows="6" style="width: 100%; resize: vertical;"></textarea>
+                        <!-- Layout Options -->
+                        <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px; padding:0 4px;">
+                            <div style="display:flex; align-items:center; gap:6px;">
+                                <span style="font-size:12px; font-weight:bold; opacity:0.8;">Pagination Threshold:</span>
+                                <input type="number" id="rt_pe_pagesize" class="text_pole" style="width:50px; height:24px; text-align:center;" min="1" max="99" title="How many items to show before adding page buttons">
+                                <span style="font-size:11px; opacity:0.6;">entries</span>
+                            </div>
+                        </div>
+                        <textarea id="rt_pe_text" class="text_pole" rows="10" style="width: 100%; resize: vertical;"></textarea>
                         <div class="flex-container gap-1 justifycontentend">
                             <button id="rt_pe_reset" class="menu_button interactable" style="margin-right: auto;"><i class="fa-solid fa-arrow-rotate-left"></i> Reset</button>
                             <button id="rt_pe_cancel" class="menu_button interactable">Cancel</button>
@@ -2356,8 +2525,24 @@ Rules:
 
         const titleEl = document.getElementById('rt_pe_title');
         const textEl = /** @type {HTMLTextAreaElement} */ (document.getElementById('rt_pe_text'));
+        const pageSizeEl = /** @type {HTMLInputElement} */ (document.getElementById('rt_pe_pagesize'));
         const saveBtn = document.getElementById('rt_pe_save');
         const resetBtn = document.getElementById('rt_pe_reset');
+        const closeBtn = document.getElementById('rt_pe_close');
+        const cancelBtn = document.getElementById('rt_pe_cancel');
+        
+        const s = getSettings();
+        pageSizeEl.value = String(s.modulePageSizes?.[tag.toUpperCase()] ?? (tag.toUpperCase() === 'SPELLS' ? 5 : PAGE_SIZE));
+        pageSizeEl.addEventListener('input', () => {
+            if (!s.modulePageSizes) s.modulePageSizes = {};
+            const val = parseInt(String(pageSizeEl.value), 10);
+            if (!isNaN(val) && val >= 1) {
+                s.modulePageSizes[tag.toUpperCase()] = val;
+                saveSettings();
+                refreshRenderedView();
+            }
+        });
+
         const close = () => { overlay.style.display = 'none'; };
 
         titleEl.textContent = title;
@@ -2365,6 +2550,12 @@ Rules:
         overlay.style.display = 'flex';
 
         const saveHandler = () => {
+            if (!s.modulePageSizes) s.modulePageSizes = {};
+            const ps = parseInt(String(pageSizeEl.value), 10);
+            if (!isNaN(ps) && ps >= 1) {
+                s.modulePageSizes[tag.toUpperCase()] = ps;
+            }
+            saveSettings();
             onSave(textEl.value);
             close();
         };
@@ -2707,6 +2898,7 @@ Rules:
                     const mod = tag.toLowerCase();
                     if (!s.stockPrompts) s.stockPrompts = { ...DEFAULT_STOCK_PROMPTS };
                     openPromptEditor(
+                        tag,
                         `Edit Default [${tag}] Prompt`,
                         s.stockPrompts[mod],
                         DEFAULT_STOCK_PROMPTS[mod],
@@ -3583,25 +3775,7 @@ Rules:
                 showQuestsHardcoreExplanation();
             });
 
-            function refreshQuestLegacyPrompt(s) {
-                let prompt = DEFAULT_STOCK_PROMPTS.quests_legacy;
-                if (!s.syspromptModules?.questsDeadlines && !s.syspromptModules?.questsFrustration) {
-                    prompt = prompt.replace(/  DEADLINE:.*\n/g, '');
-                    prompt = prompt.replace(/  FRUSTRATION_COEFF:.*\n/g, '');
-                    prompt = prompt.replace(/- DEADLINE \/ FRUSTRATION_COEFF:.*\n/g, '');
-                    prompt = prompt.replace(/- FRUSTRATION_COEFF:.*\n/g, '');
-                } else {
-                    if (!s.syspromptModules?.questsDeadlines) {
-                        prompt = prompt.replace(/  DEADLINE:.*\n/g, '');
-                        prompt = prompt.replace(/- DEADLINE.*\n/g, '');
-                    }
-                    if (!s.syspromptModules?.questsFrustration) {
-                        prompt = prompt.replace(/  FRUSTRATION_COEFF:.*\n/g, '');
-                        prompt = prompt.replace(/- FRUSTRATION_COEFF:.*\n/g, '');
-                    }
-                }
-                s.stockPrompts.quests = prompt;
-            }
+
 
             // Quest Mode (Standard vs Legacy)
             const questModeRadios = document.querySelectorAll('input[name="rpg_sysprompt_quest_mode"]');
@@ -3695,12 +3869,15 @@ Rules:
 
                 let lastAssistantMsg = "";
                 for (let i = chat.length - 1; i >= 0; i--) {
-                    if (!chat[i].is_user && !chat[i].is_system) {
+                    // Look for any message that isn't the user and isn't empty.
+                    // We include 'system' messages because some Narrator extensions/prompts
+                    // might mark their output as system, and we still want to track state from them.
+                    if (!chat[i].is_user && chat[i].mes && chat[i].mes.trim()) {
                         lastAssistantMsg = chat[i].mes;
                         break;
                     }
                 }
-                if (!lastAssistantMsg) return toastr['info']("No assistant message to parse.", "RPG Tracker");
+                if (!lastAssistantMsg) return toastr['info']("No assistant message with content found.", "RPG Tracker");
 
                 toastr['info']("Triggering manual State Update...", "RPG Tracker");
                 await runStateModelPass(lastAssistantMsg);
@@ -3714,6 +3891,8 @@ Rules:
                     settings.memoHistory = [];
                     settings.lastDelta = "";
                     settings.quests = [];
+                    settings.historyIndex = -1;
+                    _historyViewIndex = -1;
                     saveSettings();
                     updateUIMemo("");
                     refreshRenderedView();

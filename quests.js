@@ -4,7 +4,7 @@
  */
 
 import { getSettings } from './state-manager.js';
-import { syncQuestsToMemo, parseInWorldTime } from './memo-processor.js';
+import { parseQuestsFromMemo, writeQuestsToMemo, parseInWorldTime } from './memo-processor.js';
 
 export function getQuestToolName() {
     return 'LogQuest';
@@ -64,12 +64,13 @@ export function computeFrustration(quest, currentTime) {
  */
 export function checkQuestDeadlines() {
     const settings = getSettings();
-    if (!settings.quests || !settings.quests.length) return;
+    const quests = parseQuestsFromMemo(settings.currentMemo);
+    if (!quests.length) return;
     
     let changed = false;
     const currentTimeMinutes = parseInWorldTime(settings.currentMemo?.match(/\[TIME\]([\s\S]*?)\[\/TIME\]/i)?.[1]?.trim());
     
-    for (const quest of settings.quests) {
+    for (const quest of quests) {
         if (quest.status === 'active' && quest.deadline_time) {
             const deadlineMinutes = parseInWorldTime(quest.deadline_time);
             if (currentTimeMinutes >= deadlineMinutes && deadlineMinutes > 0) {
@@ -85,6 +86,7 @@ export function checkQuestDeadlines() {
     }
     
     if (changed) {
+        writeQuestsToMemo(quests);
         SillyTavern.getContext().saveSettingsDebounced();
     }
 }
@@ -276,7 +278,6 @@ export function registerLogQuestTool() {
             },
             action: async (args) => {
                 const s = getSettings();
-                if (!s.quests) s.quests = [];
 
                 // Extract T-1 time from the memo
                 const tMatch = s.currentMemo?.match(/\[TIME\]([\s\S]*?)\[\/TIME\]/i);
@@ -307,11 +308,11 @@ export function registerLogQuestTool() {
                     status: 'active'
                 };
 
-                s.quests.push(newQuest);
-                SillyTavern.getContext().saveSettingsDebounced();
-                
-                // Sync new quest into Raw View memo
-                syncQuestsToMemo();
+                // Stage the quest — do NOT write to currentMemo yet.
+                // The state model pass will flush pending quests into the merged
+                // output AFTER snapshotting, so rollback remains clean.
+                if (!globalThis._rpgPendingQuests) globalThis._rpgPendingQuests = [];
+                globalThis._rpgPendingQuests.push(newQuest);
 
                 await buildQuestLorebookEntry(newQuest);
 

@@ -13,6 +13,7 @@
  */
 
 import { getSettings } from './state-manager.js';
+import { parseQuestsFromMemo } from './memo-processor.js';
 
 // ── Dice naming helpers ────────────────────────────────────────────────────────
 
@@ -234,15 +235,20 @@ export function installInterceptor() {
         }
 
         // Quest deadline check — fires before state model pass, deterministically
-        if (settings.modules?.quests && settings.quests?.length) {
-            const { checkQuestDeadlines, renderQuestsAsPlainText } = await import('./quests.js');
-            checkQuestDeadlines();
+        if (settings.modules?.quests) {
+            const memoQuests = parseQuestsFromMemo(settings.currentMemo);
+            if (memoQuests.length) {
+                const { checkQuestDeadlines, renderQuestsAsPlainText } = await import('./quests.js');
+                checkQuestDeadlines();
 
-            // Inject active quests as plain text into narrative context
-            const timeMatch = (settings.currentMemo || '').match(/\[TIME\]([\s\S]*?)\[\/TIME\]/i);
-            const currentTime = timeMatch ? timeMatch[1].split('\n').filter(Boolean)[0]?.trim() || '' : '';
-            const questText = renderQuestsAsPlainText(settings.quests, currentTime);
-            if (questText) injections += questText;
+                // Inject active quests as plain text into narrative context
+                const timeMatch = (settings.currentMemo || '').match(/\[TIME\]([\s\S]*?)\[\/TIME\]/i);
+                const currentTime = timeMatch ? timeMatch[1].split('\n').filter(Boolean)[0]?.trim() || '' : '';
+                // Re-parse after checkQuestDeadlines may have mutated the memo
+                const freshQuests = parseQuestsFromMemo(settings.currentMemo);
+                const questText = renderQuestsAsPlainText(freshQuests, currentTime);
+                if (questText) injections += questText;
+            }
         }
 
         if (!injections) return;

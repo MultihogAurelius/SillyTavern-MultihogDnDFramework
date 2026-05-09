@@ -40,6 +40,7 @@ export function getSettings() {
         rngEnabled: true,
         diceFunctionTool: true,
         barColors: {},
+        modulePageSizes: {},
         customTheme: null,
         savedThemes: {},
         systemPromptTemplate:

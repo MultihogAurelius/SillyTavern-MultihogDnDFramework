@@ -1716,6 +1716,17 @@
     text-decoration: line-through;
 }
 
+.rt-quest-obj-failed {
+    color: #ff5555;
+    text-decoration: line-through;
+    opacity: 0.6;
+}
+
+.rt-quest-card-failed {
+    border-color: rgba(255, 60, 60, 0.3) !important;
+    background: rgba(255, 60, 60, 0.05) !important;
+}
+
 .rt-quest-check {
     flex-shrink: 0;
     font-size: 0.9em;

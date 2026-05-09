@@ -258,8 +258,13 @@ import { BLOCK_ICONS, BLOCK_ORDER, PAGE_SIZE, NO_PAGINATE } from './constants.js
 
 
 
-    export function getPageSize(renderType) {
-        return renderType === 'SPELLS' ? 5 : PAGE_SIZE;
+    export function getPageSize(tag) {
+        const s = getSettings();
+        if (s.modulePageSizes && s.modulePageSizes[tag]) {
+            return s.modulePageSizes[tag];
+        }
+        // Fallback to stock defaults
+        return tag === 'SPELLS' ? 5 : PAGE_SIZE;
     }
 
     export function loadCollapsed() {
@@ -778,7 +783,7 @@ import { BLOCK_ICONS, BLOCK_ORDER, PAGE_SIZE, NO_PAGINATE } from './constants.js
 
             const renderType = customField?.renderType || tag;
             const isFullView = getSettings().fullViewSections.includes(tag) || NO_PAGINATE.has(renderType);
-            const localPageSize = getPageSize(renderType);
+            const localPageSize = getPageSize(tag);
 
             const page = isFullView ? 0 : (sectionPages[tag] ?? 0);
             const totalPages = isFullView ? 1 : Math.ceil(items.length / localPageSize);
@@ -920,9 +925,14 @@ export function renderQuestLog(quests, currentTime, collapsed, detached, filterT
 
         const objectives = (quest.objectives || []).map(obj => {
             const done = obj.status === 'completed';
+            const failed = obj.status === 'failed';
             const optLabel = obj.required ? '' : ' <span class="rt-quest-optional">(Optional)</span>';
-            return `<div class="rt-quest-obj${done ? ' rt-quest-obj-done' : ''}">
-                <span class="rt-quest-check">${done ? '✓' : '○'}</span>
+            let objClass = 'rt-quest-obj';
+            if (done) objClass += ' rt-quest-obj-done';
+            if (failed) objClass += ' rt-quest-obj-failed';
+
+            return `<div class="${objClass}">
+                <span class="rt-quest-check">${done ? '✓' : (failed ? '✗' : '○')}</span>
                 <span>${escapeHtml(obj.text)}${optLabel}</span>
             </div>`;
         }).join('');
@@ -960,7 +970,12 @@ export function renderQuestLog(quests, currentTime, collapsed, detached, filterT
                 ${moodBarHtml}
             </div>` : '';
 
-        return `<div class="rt-quest-card${quest.status !== 'active' ? ' rt-quest-inactive' : ''}">
+        const isFailed = quest.status === 'failed' || quest.status === 'past deadline';
+        let cardClass = 'rt-quest-card';
+        if (quest.status !== 'active') cardClass += ' rt-quest-inactive';
+        if (isFailed) cardClass += ' rt-quest-card-failed';
+
+        return `<div class="${cardClass}">
             <div class="rt-quest-header">
                 <span class="rt-quest-title">${escapeHtml(quest.title)}</span>
                 <span class="rt-quest-badge ${statusBadgeClass}">${statusLabel}</span>
