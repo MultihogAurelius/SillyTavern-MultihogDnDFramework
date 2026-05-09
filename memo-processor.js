@@ -141,7 +141,7 @@ export function mergeMemo(currentMemo, aiOutput) {
         const tag = match[1].trim();
         const newContent = match[2].trim();
 
-    // [QUESTS] block — route to appropriate handler based on mode
+        // [QUESTS] block — route to appropriate handler based on mode
         if (tag.toUpperCase() === 'QUESTS') {
             const s = getSettings();
             if (s.questLegacyMode) {
@@ -149,15 +149,15 @@ export function mergeMemo(currentMemo, aiOutput) {
                 const parsed = parseQuestsFromText(newContent);
                 if (parsed) {
                     s.quests = parsed;
-                    SillyTavern.getContext().saveSettingsDebounced();
-                    syncQuestsToMemo();
+                    // Do NOT continue; let the standard replacement logic below
+                    // integrate the new [QUESTS] block into the 'memo' string.
                 }
             } else {
-                // Tool mode: state model emits a diff JSON
+                // Tool mode: state model emits a diff JSON.
+                // This updates settings.quests and calls syncQuestsToMemo() internally.
                 mergeQuestUpdates(newContent);
+                continue;
             }
-            // Skip the standard string replacement below — syncQuestsToMemo handled it
-            continue;
         }
 
         const isRemoval = /^(?:REMOVED|EXPIRED|CLEARED|NONE|END_COMBAT)$/i.test(newContent);
