@@ -866,8 +866,8 @@ export function renderQuestLog(quests, currentTime, collapsed, detached, filterT
     }
 
     const settings = getSettings();
-    const showFrustration = settings.isFrustration;
-    const showDeadlines = settings.isDeadlines;
+    const showFrustration = !!settings.syspromptModules?.questsFrustration;
+    const showDeadlines = !!settings.syspromptModules?.questsDeadlines;
 
     const cards = allQuests.map(quest => {
 
