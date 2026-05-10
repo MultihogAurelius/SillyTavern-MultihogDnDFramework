@@ -3029,32 +3029,35 @@ Rules:
 
             const settings = getSettings();
 
-            // --- Automatic Stock Prompt Synchronization (v1.8.7 Update) ---
+            // --- Automatic Stock Prompt Synchronization ---
             if (settings.stockPrompts) {
                 let changed = false;
                 
-                // Modern Quests Sync: Update if it mentions "id" and "status" but NOT "progress"
+                // Modern Quests: update if it has the old format (missing "progress" field)
                 if (settings.stockPrompts.quests && 
                     settings.stockPrompts.quests.includes('"id", "status"') && 
                     !settings.stockPrompts.quests.includes('"progress"')) {
                     settings.stockPrompts.quests = DEFAULT_STOCK_PROMPTS.quests;
-                    console.log('[RPG Tracker] Synchronized modern quest prompt to v1.8.7 (added progress tracking).');
+                    console.log('[RPG Tracker] Synchronized modern quest prompt (added progress tracking).');
                     changed = true;
                 }
 
-                // Legacy Quests Sync: Update if it mentions "OBJ_ACTIVE" but NOT "OBJ_TOTAL"
+                // Legacy Quests: update if it's missing OBJ_TOTAL
                 if (settings.stockPrompts.quests_legacy && 
                     settings.stockPrompts.quests_legacy.includes('OBJ_ACTIVE') && 
                     !settings.stockPrompts.quests_legacy.includes('OBJ_TOTAL')) {
                     settings.stockPrompts.quests_legacy = DEFAULT_STOCK_PROMPTS.quests_legacy;
-                    console.log('[RPG Tracker] Synchronized legacy quest prompt to v1.8.7 (added progress tracking).');
+                    console.log('[RPG Tracker] Synchronized legacy quest prompt (added progress tracking).');
                     changed = true;
                 }
 
-                // Force sync for Legacy Mode users who might still have the modern prompt in the 'quests' slot
-                if (settings.questLegacyMode && settings.stockPrompts.quests && settings.stockPrompts.quests.includes('JSON object with an "updates" array')) {
-                    settings.stockPrompts.quests = settings.stockPrompts.quests_legacy || DEFAULT_STOCK_PROMPTS.quests_legacy;
-                    console.log('[RPG Tracker] Legacy Mode detected: Synchronized active quest prompt to legacy version.');
+                // Restore: if quests slot was previously overwritten with the legacy prompt,
+                // reset it back to the modern prompt (buildModulesInstructionText swaps it at runtime)
+                if (settings.stockPrompts.quests && 
+                    settings.stockPrompts.quests.includes('OBJ_ACTIVE') &&
+                    !settings.stockPrompts.quests.includes('updates')) {
+                    settings.stockPrompts.quests = DEFAULT_STOCK_PROMPTS.quests;
+                    console.log('[RPG Tracker] Restored modern quest prompt in quests slot (was overwritten by legacy sync).');
                     changed = true;
                 }
 
