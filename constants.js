@@ -104,6 +104,8 @@ QUEST: The Missing Sheep
   GIVER: Farmer Hemwick @ Crestwood Mill
   ACCEPTED: 08:00 AM, Day 1
   DEADLINE: 06:00 PM, Day 4
+  REWARD: 100 GP
+  REWARD: Hemwick's family heirloom
   FRUSTRATION_COEFF: 1.2
   MOOD: Pleased
   OBJ_ACTIVE: Find the missing sheep
@@ -114,6 +116,7 @@ QUEST: The Missing Sheep
 - Use OBJ_ACTIVE / OBJ_COMPLETED / OBJ_FAILED markers. 
 - Append ' (optional)' only if the task is not required.
 - For collection/count objectives, append [current/total] after the text (e.g. [4/6]) and add an OBJ_TOTAL line with the total. Update the count each turn as progress is made.
+- For rewards, use the REWARD marker (e.g. REWARD: 50 Gold). List multiple rewards on separate lines.
 - The MOOD field is calculated by the engine based on time pressure and the frustration coefficient. Use this to guide how the NPC speaks and acts.
 - Never delete old quests. Keep completed/failed ones with updated STATUS.
 - If no quests exist yet, emit [QUESTS][/QUESTS] (empty).`,

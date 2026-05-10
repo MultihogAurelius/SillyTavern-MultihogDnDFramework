@@ -2,6 +2,14 @@
 
 All notable changes to the **Fatbody D&D Framework** will be documented in this file.
 
+## [1.8.15] - 2026-05-10
+
+**Enhancement: Legacy Quest Rewards**
+Added the `REWARD:` field to the Legacy Quest Mode system instructions, bringing it to feature parity with the Standard (Modern) JSON format.
+
+### Fixed
+- **Legacy Quest Rewards**: The `quests_legacy` prompt now explicitly instructs the AI to track promised rewards using the `REWARD:` marker. While the renderer and parser already supported rewards, the instructions were missing, causing the AI to omit them in legacy mode.
+
 ## [1.8.14] - 2026-05-10
 
 **Fix: Direct Prompt Consistency**
