@@ -163,6 +163,14 @@ Your primary focus is narrative consistency and preventing the AI Narrator from 
 Make multiple entries per turn if necessary and relevant.
 </basic_instructions>
 
+<formatting>
+The main label of a category entry should identify the entity clearly. Examples:
+
+- Main Category: Eldoria_Quests, single entry: QUEST: Clogged Vein. Giver: Overseer Harlen.
+
+- Main Category: Eldoria_NPCs, single entry: NPC: Overseer Harlen, an overseer for the Iron Syndicate
+</formatting>
+
 <quests>
 When you log a quest, describe the location and the quest giver in a single paragraph, including details about them that will be relevant to location persistence when {{user}} eventually returns to turn in the quest.
 </quests>

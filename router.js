@@ -102,7 +102,7 @@ export async function runRouterPass(narrativeOutput, manualPrompt = null, custom
 3. read_entry(uid): Read the full content of an archive entry.
 4. commit(activate, deactivate, record, update): Final action. Ends loop.
    - activate/deactivate: ["Book::UID", ...]
-   - record: [{"id": "name", "keys": [], "content": "", "comment": "NPC/LOC"}]
+   - record: [{"label": "Title/Name", "keys": ["keyword1", ...], "content": "Description", "category": "NPC/LOC/QUEST"}]
    - update: [{"id": "Book::UID", "content": "Full new content"}]
 
 ## PROCESS
@@ -113,7 +113,7 @@ Thought: The user mentioned a new character, Elara. I need to see if she exists.
 Action: grep_lore("Elara")
 Observation: No matches found.
 Thought: She is new. I will record her and activate the current location.
-Action: commit({"record":[{"id":"Elara","keys":["Elara"],"content":"A mysterious mage.","comment":"NPC"}], "activate":["Locations::12"]})
+Action: commit({"record":[{"label":"NPC: Elara","keys":["Elara","Mage"],"content":"A mysterious mage.","category":"NPC"}], "activate":["Locations::12"]})
 Observation: Committed successfully.
 Thought: I have recorded Elara. Research complete.
 
@@ -257,9 +257,10 @@ async function applyAction(action) {
     for (const rec of records) {
         // Map category to book name
         let targetBook = prefix || 'World Chronicle';
-        const cat = (rec.comment || '').toUpperCase();
+        const cat = (rec.category || rec.comment || '').toUpperCase();
         if (cat.includes('NPC')) targetBook = prefix ? `${prefix}_NPCs` : 'NPCs';
         else if (cat.includes('LOC')) targetBook = prefix ? `${prefix}_Locations` : 'Locations';
+        else if (cat.includes('QUEST')) targetBook = prefix ? `${prefix}_Quests` : 'Quests';
 
         const newId = await addLorebookEntry(targetBook, rec);
         if (!settings.activeRouterKeys.includes(newId)) {
@@ -274,7 +275,7 @@ async function applyAction(action) {
             time: timestamp,
             activate: activate,
             deactivate: deactivate,
-            record: records.map(r => r.id),
+            record: records.map(r => r.label || r.id),
             reason: action.reason || "Manual update."
         });
         if (settings.routerLog.length > 50) settings.routerLog.length = 50;
@@ -301,9 +302,9 @@ async function addLorebookEntry(lorebookName, entryData) {
     
     bookData.entries[nextUid] = {
         uid: nextUid,
-        key: entryData.keys || [entryData.id],
+        key: entryData.keys || [entryData.label || entryData.id],
         keysecondary: [],
-        comment: entryData.comment || 'LORE_GEN',
+        comment: entryData.label || entryData.id || entryData.category || entryData.comment || 'LORE_GEN',
         content: entryData.content,
         constant: false,
         selective: false,

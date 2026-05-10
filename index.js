@@ -2012,8 +2012,8 @@ Rules:
         
         async function renderRouterUI() {
             const s = getSettings();
-            const keysContainer = panel.querySelector('#rt-agent-router-active-keys');
-            const logContainer = panel.querySelector('#rt-agent-router-log');
+            const keysContainer = agentPanel.querySelector('#rt-agent-router-active-keys');
+            const logContainer = agentPanel.querySelector('#rt-agent-router-log');
             if (!keysContainer || !logContainer) return;
             
             const ctx = SillyTavern.getContext();
@@ -2087,7 +2087,7 @@ Rules:
             agentCloseBtn.addEventListener('click', () => {
                 (/** @type {HTMLElement} */ (agentPanel)).style.display = 'none';
             });
-            const enableCheck = panel.querySelector('#rt-agent-router-enable');
+            const enableCheck = agentPanel.querySelector('#rt-agent-router-enable');
             if (enableCheck) {
                 enableCheck.addEventListener('change', (e) => {
                     const s = getSettings();
@@ -2109,21 +2109,21 @@ Rules:
                 });
             }
             
-            const sourceSel = /** @type {HTMLSelectElement} */ (panel.querySelector('#rt-agent-router-source'));
-            const profGrp = /** @type {HTMLElement} */ (panel.querySelector('#rt-agent-router-profile-group'));
-            const profSel = /** @type {HTMLSelectElement} */ (panel.querySelector('#rt-agent-router-profile'));
-            const ollGrp = /** @type {HTMLElement} */ (panel.querySelector('#rt-agent-router-ollama-group'));
-            const ollUrl = /** @type {HTMLInputElement} */ (panel.querySelector('#rt-agent-router-ollama-url'));
-            const ollMod = /** @type {HTMLSelectElement} */ (panel.querySelector('#rt-agent-router-ollama-model'));
-            const ollRef = /** @type {HTMLElement} */ (panel.querySelector('#rt-agent-router-ollama-refresh'));
-            const oaiGrp = /** @type {HTMLElement} */ (panel.querySelector('#rt-agent-router-openai-group'));
-            const oaiUrl = /** @type {HTMLInputElement} */ (panel.querySelector('#rt-agent-router-openai-url'));
-            const oaiKey = /** @type {HTMLInputElement} */ (panel.querySelector('#rt-agent-router-openai-key'));
-            const oaiMod = /** @type {HTMLSelectElement} */ (panel.querySelector('#rt-agent-router-openai-model'));
-            const oaiRef = /** @type {HTMLElement} */ (panel.querySelector('#rt-agent-router-openai-refresh'));
-            const oaiMan = /** @type {HTMLInputElement} */ (panel.querySelector('#rt-agent-router-openai-model-manual'));
-            const preSel = /** @type {HTMLSelectElement} */ (panel.querySelector('#rt-agent-router-preset'));
-            const maxTok = /** @type {HTMLInputElement} */ (panel.querySelector('#rt-agent-router-max-tokens'));
+            const sourceSel = /** @type {HTMLSelectElement} */ (agentPanel.querySelector('#rt-agent-router-source'));
+            const profGrp = /** @type {HTMLElement} */ (agentPanel.querySelector('#rt-agent-router-profile-group'));
+            const profSel = /** @type {HTMLSelectElement} */ (agentPanel.querySelector('#rt-agent-router-profile'));
+            const ollGrp = /** @type {HTMLElement} */ (agentPanel.querySelector('#rt-agent-router-ollama-group'));
+            const ollUrl = /** @type {HTMLInputElement} */ (agentPanel.querySelector('#rt-agent-router-ollama-url'));
+            const ollMod = /** @type {HTMLSelectElement} */ (agentPanel.querySelector('#rt-agent-router-ollama-model'));
+            const ollRef = /** @type {HTMLElement} */ (agentPanel.querySelector('#rt-agent-router-ollama-refresh'));
+            const oaiGrp = /** @type {HTMLElement} */ (agentPanel.querySelector('#rt-agent-router-openai-group'));
+            const oaiUrl = /** @type {HTMLInputElement} */ (agentPanel.querySelector('#rt-agent-router-openai-url'));
+            const oaiKey = /** @type {HTMLInputElement} */ (agentPanel.querySelector('#rt-agent-router-openai-key'));
+            const oaiMod = /** @type {HTMLSelectElement} */ (agentPanel.querySelector('#rt-agent-router-openai-model'));
+            const oaiRef = /** @type {HTMLElement} */ (agentPanel.querySelector('#rt-agent-router-openai-refresh'));
+            const oaiMan = /** @type {HTMLInputElement} */ (agentPanel.querySelector('#rt-agent-router-openai-model-manual'));
+            const preSel = /** @type {HTMLSelectElement} */ (agentPanel.querySelector('#rt-agent-router-preset'));
+            const maxTok = /** @type {HTMLInputElement} */ (agentPanel.querySelector('#rt-agent-router-max-tokens'));
             if (maxTok) {
                 maxTok.addEventListener('input', (e) => {
                     const s = getSettings();
@@ -2132,7 +2132,7 @@ Rules:
                     saveSettings();
                 });
             }
-            const maxTur = /** @type {HTMLInputElement} */ (panel.querySelector('#rt-agent-router-max-turns'));
+            const maxTur = /** @type {HTMLInputElement} */ (agentPanel.querySelector('#rt-agent-router-max-turns'));
             if (maxTur) {
                 maxTur.addEventListener('input', (e) => {
                     const s = getSettings();
@@ -2142,7 +2142,7 @@ Rules:
                 });
             }
 
-            const directPromptInp = /** @type {HTMLTextAreaElement} */ (panel.querySelector('#rt-agent-router-direct-prompt'));
+            const directPromptInp = /** @type {HTMLTextAreaElement} */ (agentPanel.querySelector('#rt-agent-router-direct-prompt'));
             if (directPromptInp) {
                 directPromptInp.addEventListener('input', (e) => {
                     const s = getSettings();
@@ -2151,7 +2151,7 @@ Rules:
                 });
             }
 
-            const lookbackInp = /** @type {HTMLInputElement} */ (panel.querySelector('#rt-agent-router-lookback'));
+            const lookbackInp = /** @type {HTMLInputElement} */ (agentPanel.querySelector('#rt-agent-router-lookback'));
             if (lookbackInp) {
                 lookbackInp.addEventListener('input', (e) => {
                     const s = getSettings();
@@ -2161,7 +2161,7 @@ Rules:
                 });
             }
 
-            const runDirectBtn = panel.querySelector('#rt-agent-router-run-direct');
+            const runDirectBtn = agentPanel.querySelector('#rt-agent-router-run-direct');
             if (runDirectBtn) {
                 runDirectBtn.addEventListener('click', async (e) => {
                     e.stopPropagation();
@@ -2176,7 +2176,7 @@ Rules:
                 });
             }
 
-            const manualRunBtn = panel.querySelector('#rt-agent-router-manual-run');
+            const manualRunBtn = agentPanel.querySelector('#rt-agent-router-manual-run');
             if (manualRunBtn) {
                 manualRunBtn.addEventListener('click', async (e) => {
                     e.stopPropagation();
@@ -2387,8 +2387,8 @@ Rules:
 
         // ── Lorebook Terminal Logic ──
         let _routerSteps = [];
-        const terminal = panel.querySelector('#rt-agent-router-terminal');
-        const terminalClear = panel.querySelector('#rt-agent-router-terminal-clear');
+        const terminal = agentPanel.querySelector('#rt-agent-router-terminal');
+        const terminalClear = agentPanel.querySelector('#rt-agent-router-terminal-clear');
 
         document.addEventListener('rt_lore_agent_step', (e) => {
             if (!terminal) return;
