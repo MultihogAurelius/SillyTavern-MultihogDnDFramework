@@ -4,11 +4,11 @@ All notable changes to the **Fatbody D&D Framework** will be documented in this 
 
 ## [1.8.14] - 2026-05-10
 
-**Enhanced Quest Mode Diagnostics**
-Added runtime logging to verify quest mode during state extraction.
+**Fix: Direct Prompt Consistency**
+Fixed a bug where the "Direct Prompt" feature used its own isolated logic for building system instructions, ignoring Quest Legacy mode and other module settings.
 
-### Changed
-- **Runtime Diagnostics**: Added a log in `memo-processor.js` that fires every time the state model pass is built, showing exactly which quest prompt is being used.
+### Fixed
+- **Centralized Instruction Building**: `sendDirectPrompt` now uses the shared `buildModulesInstructionText` function, ensuring it respects the active Quest format and all other module configurations.
 
 ## [1.8.13] - 2026-05-10
 

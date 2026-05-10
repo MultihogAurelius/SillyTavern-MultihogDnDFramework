@@ -828,21 +828,7 @@ Rules:
             const worldLore = await buildLorebookContext();
             const worldLoreSection = worldLore ? worldLore + '\n\n' : '';
 
-            let modulesText = '';
-            const promptsMap = settings.stockPrompts || DEFAULT_STOCK_PROMPTS;
-            for (const [key, prompt] of Object.entries(promptsMap)) {
-                if (settings.modules[key]) {
-                    modulesText += `- [${key.toUpperCase()}]: ${prompt}\n`;
-                }
-            }
-            if (settings.customFields && settings.customFields.length > 0) {
-                settings.customFields.forEach(f => {
-                    if (f.enabled && f.tag && f.prompt) {
-                        modulesText += `- [${f.tag.toUpperCase()}]: ${f.prompt}\n`;
-                    }
-                });
-            }
-
+            const modulesText = buildModulesInstructionText(settings);
             const systemPrompt = settings.systemPromptTemplate.replace('{{modulesText}}', modulesText);
 
             const sanitizedCurrent = stripMemoHtml(settings.currentMemo.replace(/<\/?memo>/gi, '').trim());
