@@ -102,8 +102,10 @@ import { registerLogQuestTool, checkQuestDeadlines } from './quests.js';
         if (!s.syspromptModules?.questsDeadlines && !s.syspromptModules?.questsFrustration) {
             prompt = prompt.replace(/  DEADLINE:.*\n/g, '');
             prompt = prompt.replace(/  FRUSTRATION_COEFF:.*\n/g, '');
+            prompt = prompt.replace(/  MOOD:.*\n/g, '');
             prompt = prompt.replace(/- DEADLINE \/ FRUSTRATION_COEFF:.*\n/g, '');
             prompt = prompt.replace(/- FRUSTRATION_COEFF:.*\n/g, '');
+            prompt = prompt.replace(/- The MOOD field.*\n/g, '');
         } else {
             if (!s.syspromptModules?.questsDeadlines) {
                 prompt = prompt.replace(/  DEADLINE:.*\n/g, '');
@@ -112,10 +114,14 @@ import { registerLogQuestTool, checkQuestDeadlines } from './quests.js';
             if (!s.syspromptModules?.questsFrustration) {
                 prompt = prompt.replace(/  FRUSTRATION_COEFF:.*\n/g, '');
                 prompt = prompt.replace(/- FRUSTRATION_COEFF:.*\n/g, '');
+                prompt = prompt.replace(/  MOOD:.*\n/g, '');
+                prompt = prompt.replace(/- The MOOD field.*\n/g, '');
             }
         }
         if (!s.stockPrompts) s.stockPrompts = {};
-        s.stockPrompts.quests = prompt;
+        // Write ONLY to the legacy slot — the runtime swap in buildModulesInstructionText
+        // will read from here when questLegacyMode is active. Never touch stockPrompts.quests.
+        s.stockPrompts.quests_legacy = prompt;
     }
 
     /**
@@ -1149,10 +1155,14 @@ Rules:
             // Handle specific logic like tool registration
             if (fresh.questLegacyMode) {
                 refreshQuestLegacyPrompt(fresh);
-                refreshOrderList();
             } else {
+                // Ensure modern prompt is in the quests slot
+                if (!fresh.stockPrompts) fresh.stockPrompts = {};
+                fresh.stockPrompts.quests = DEFAULT_STOCK_PROMPTS.quests;
                 registerLogQuestTool();
             }
+            refreshOrderList();
+            saveSettings();
         };
 
         // RNG Mode Sync
