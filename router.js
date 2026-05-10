@@ -34,7 +34,7 @@ function buildKeyringText(allBooks) {
 /**
  * The core Researcher Agent loop.
  */
-export async function runRouterPass(narrativeOutput) {
+export async function runRouterPass(narrativeOutput, manualPrompt = null, customLookback = null) {
     const settings = getSettings();
     if (!settings.routerEnabled || _routerRunning) return;
 
@@ -76,7 +76,9 @@ export async function runRouterPass(narrativeOutput) {
 
         let keyringText = buildKeyringText(archiveBooks);
         const { chat } = ctx;
-        const recentChat = chat.slice(-3).map(m => {
+        
+        const N = customLookback !== null ? customLookback : (settings.routerLookback || 3);
+        const recentChat = chat.slice(-N).map(m => {
             const name = (/** @type {any} */ (m)).is_user ? 'Player' : ((/** @type {any} */ (m)).name || 'Narrator');
             const content = (/** @type {any} */ (m)).mes || (/** @type {any} */ (m)).content || '';
             return `${name}: ${content.replace(/<[^>]+>/g, '')}`;
@@ -121,7 +123,7 @@ Campaign Root: "${prefix || 'None'}" (All records go here. NPCs/Locations may be
 
         while (turns < maxTurns) {
             turns++;
-            const userPrompt = `## ACTIVE MEMORY\n${activeEntriesFull.join('\n\n') || 'None'}\n\n## ARCHIVE INDEX\n${keyringText}\n\n## NARRATIVE\n${recentChat}\n\n${loopHistory.join('\n\n')}\n\nNext Step:`;
+            const userPrompt = `## ACTIVE MEMORY\n${activeEntriesFull.join('\n\n') || 'None'}\n\n## ARCHIVE INDEX\n${keyringText}\n\n## NARRATIVE\n${recentChat}\n\n${manualPrompt ? `## INSTRUCTION\n${manualPrompt}\n\n` : ''}${loopHistory.join('\n\n')}\n\nNext Step:`;
 
             const routerSettings = {
                 ...settings,

@@ -149,6 +149,8 @@ You may be asked to use Markers: ((PLS)), ((B)), ((XB)), ((BDG)), ((HGT)). These
         routerMaxTokens: 0,
         routerMaxTurns: 5,
         routerCampaignPrefix: "",
+        routerLookback: 3,
+        routerDirectPrompt: "",
         routerSystemPromptTemplate: `<basic_instructions>
 You are the Researcher Agent, a specialized Dungeon Master's Assistant. Your goal is to maintain the narrative's "Active Context" by managing lorebook entries.
 
@@ -281,6 +283,8 @@ export function saveChatState(chatId) {
         activeRouterKeys: JSON.parse(JSON.stringify(s.activeRouterKeys || [])),
         routerLog:    JSON.parse(JSON.stringify(s.routerLog || [])),
         routerCampaignPrefix: s.routerCampaignPrefix || '',
+        routerLookback: s.routerLookback || 3,
+        routerDirectPrompt: s.routerDirectPrompt || '',
     };
     SillyTavern.getContext().saveSettingsDebounced();
 }
@@ -308,6 +312,8 @@ export function saveProfile(name) {
         activeRouterKeys: JSON.parse(JSON.stringify(s.activeRouterKeys || [])),
         routerLog:    JSON.parse(JSON.stringify(s.routerLog || [])),
         routerCampaignPrefix: s.routerCampaignPrefix || '',
+        routerLookback: s.routerLookback || 3,
+        routerDirectPrompt: s.routerDirectPrompt || '',
     };
     s.activeProfile = name;
     SillyTavern.getContext().saveSettingsDebounced();

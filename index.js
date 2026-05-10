@@ -1814,6 +1814,21 @@ Rules:
                             <input type="number" id="rt-agent-router-max-turns" value="${settings.routerMaxTurns || 5}" style="width: 100%; margin-bottom: 10px; background: #222; color: #ddd; border: 1px solid #444; border-radius: 3px; padding: 2px;">
                         </div>
                     </div>
+
+                    <div style="margin-bottom: 5px; font-weight: bold; opacity: 0.8; font-size: 11px;">Direct Command:</div>
+                    <textarea id="rt-agent-router-direct-prompt" placeholder="Ask the agent to find or record something specific..." style="width: 100%; height: 50px; background: rgba(0,0,0,0.3); color: #ddd; border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 5px; font-size: 11px; margin-bottom: 5px; resize: vertical; display: block;">${settings.routerDirectPrompt || ''}</textarea>
+                    
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <span style="font-size: 10px; opacity: 0.7;">Lookback:</span>
+                            <input type="number" id="rt-agent-router-lookback" value="${settings.routerLookback || 3}" min="1" max="100" style="width: 40px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); color: white; border-radius: 3px; text-align: center; font-size: 10px; padding: 1px;">
+                            <span style="font-size: 10px; opacity: 0.5;">msgs</span>
+                        </div>
+                        <button id="rt-agent-router-run-direct" style="background: var(--rt-custom-accent, #3498db); color: #000; border-radius: 4px; padding: 2px 10px; font-size: 10px; height: 20px; display: flex; align-items: center; gap: 4px; border: none; font-weight: bold; cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1" title="Run with command">
+                            <i class="fa-solid fa-paper-plane"></i> RUN COMMAND
+                        </button>
+                    </div>
+
                     <hr style="border-color: #333; margin: 10px 0;">
 
                     <div style="margin-bottom: 5px; font-weight: bold; opacity: 0.8; font-size: 11px;">Active Lore Keys:</div>
@@ -1991,9 +2006,9 @@ Rules:
         }
 
         // ── Router Agent UI ──
-        const agentBtn = panel.querySelector('#rpg-tracker-agent-btn');
-        const agentPanel = panel.querySelector('#rpg-tracker-agent');
-        const agentCloseBtn = panel.querySelector('#rpg-tracker-agent-close');
+        const agentBtn = /** @type {HTMLElement} */ (panel.querySelector('#rpg-tracker-agent-btn'));
+        const agentPanel = /** @type {HTMLElement} */ (panel.querySelector('#rpg-tracker-agent'));
+        const agentCloseBtn = /** @type {HTMLElement} */ (panel.querySelector('#rpg-tracker-agent-close'));
         
         async function renderRouterUI() {
             const s = getSettings();
@@ -2126,19 +2141,55 @@ Rules:
                     saveSettings();
                 });
             }
-        const manualRunBtn = panel.querySelector('#rt-agent-router-manual-run');
-        if (manualRunBtn) {
-            manualRunBtn.addEventListener('click', async (e) => {
-                e.stopPropagation();
-                const { chat } = SillyTavern.getContext();
-                const combinedNarrative = getNarrativeBlocks(chat, -1);
-                toastr['info']("Starting manual research pass...");
-                await runRouterPass(combinedNarrative);
-            });
-        }
+
+            const directPromptInp = /** @type {HTMLTextAreaElement} */ (panel.querySelector('#rt-agent-router-direct-prompt'));
+            if (directPromptInp) {
+                directPromptInp.addEventListener('input', (e) => {
+                    const s = getSettings();
+                    s.routerDirectPrompt = (/** @type {HTMLTextAreaElement} */ (e.target)).value;
+                    saveSettings();
+                });
+            }
+
+            const lookbackInp = /** @type {HTMLInputElement} */ (panel.querySelector('#rt-agent-router-lookback'));
+            if (lookbackInp) {
+                lookbackInp.addEventListener('input', (e) => {
+                    const s = getSettings();
+                    s.routerLookback = parseInt((/** @type {HTMLInputElement} */ (e.target)).value) || 3;
+                    $('#rpg_tracker_router_lookback').val(s.routerLookback);
+                    saveSettings();
+                });
+            }
+
+            const runDirectBtn = panel.querySelector('#rt-agent-router-run-direct');
+            if (runDirectBtn) {
+                runDirectBtn.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    const s = getSettings();
+                    const prompt = s.routerDirectPrompt?.trim() || null;
+                    const lookback = s.routerLookback || 3;
+                    
+                    const { chat } = SillyTavern.getContext();
+                    const combinedNarrative = getNarrativeBlocks(chat, -1);
+                    toastr['info'](prompt ? "Running agent with specific command..." : "Starting manual research pass...");
+                    await runRouterPass(combinedNarrative, prompt, lookback);
+                });
+            }
+
+            const manualRunBtn = panel.querySelector('#rt-agent-router-manual-run');
+            if (manualRunBtn) {
+                manualRunBtn.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    const s = getSettings();
+                    const { chat } = SillyTavern.getContext();
+                    const combinedNarrative = getNarrativeBlocks(chat, -1);
+                    toastr['info']("Starting manual research pass...");
+                    await runRouterPass(combinedNarrative, null, s.routerLookback || 3);
+                });
+            }
 
         // ── Lorebook Agent Detaching ──
-        const detachBtn = agentPanel.querySelector('#rt-agent-router-detach');
+        const detachBtn = /** @type {HTMLElement} */ (agentPanel.querySelector('#rt-agent-router-detach'));
         if (detachBtn) {
             const DETACHED_AGENT_KEY = 'rpg_tracker_agent_detached';
             const GEO_KEY = 'rpg_tracker_geometry_lorebook_agent';
@@ -4748,6 +4799,11 @@ Rules:
             });
             $('#rpg_tracker_router_max_turns').val(settings.routerMaxTurns).on('input', function () {
                 settings.routerMaxTurns = parseInt(String($(this).val() || '')) || 5;
+                saveSettings();
+            });
+            $('#rpg_tracker_router_lookback').val(settings.routerLookback).on('input', function () {
+                settings.routerLookback = parseInt(String($(this).val() || '')) || 3;
+                $('#rt-agent-router-lookback').val(settings.routerLookback);
                 saveSettings();
             });
 
