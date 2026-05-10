@@ -2,6 +2,15 @@
 
 All notable changes to the **Fatbody D&D Framework** will be documented in this file.
 
+## [1.8.12] - 2026-05-10
+
+**Prompt Routing Diagnostics**
+Added internal diagnostics to track quest prompt routing.
+
+### Changed
+- **Harden Quest Prompt Routing**: Improved the logic that swaps between Legacy and Modern quest formats to be more robust.
+- **Diagnostic Logging**: Added console logs to verify `questLegacyMode` status and prompt type during initialization and runtime.
+
 ## [1.8.11] - 2026-05-10
 
 **Lorebook Synchronization & Robust Loading**
