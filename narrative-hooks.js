@@ -340,7 +340,8 @@ export function getNarrativeBlocks(chat, limit = -1) {
  */
 export async function onGenerationEnded() {
     const settings = getSettings();
-    if (!settings.enabled || settings.paused || globalThis._rngStateModelRunning) return;
+    const isStateRunning = typeof globalThis._rpgStateModelRunning === 'function' && globalThis._rpgStateModelRunning();
+    if (!settings.enabled || settings.paused || isStateRunning) return;
 
     const { chat } = SillyTavern.getContext();
     const combinedNarrative = getNarrativeBlocks(chat, -1);
@@ -348,10 +349,10 @@ export async function onGenerationEnded() {
 
     if (settings.debugMode) console.log("[RPG Tracker] Assistant generation ended. Triggering State Model pass...", combinedNarrative);
 
-    // runStateModelPass lives in index.js until Phase 5. Resolved at call-time.
+    let stateUpdateSummary = null;
     if (typeof globalThis._rpgRunStateModelPass === 'function') {
-        await globalThis._rpgRunStateModelPass(combinedNarrative);
+        stateUpdateSummary = await globalThis._rpgRunStateModelPass(combinedNarrative);
     }
     
-    await runRouterPass(combinedNarrative);
+    await runRouterPass(combinedNarrative, null, -1, stateUpdateSummary);
 }

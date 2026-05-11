@@ -1097,11 +1097,13 @@ Rules:
                 saveSettings();
 
                 if (settings.debugMode) console.log("[RPG Tracker] State Model pass complete.");
-
+                
                 // Check for Level Up
                 if (/LEVEL_UP=true/i.test(merged)) {
                     handleLevelUp();
                 }
+                
+                return delta;
             }
         } catch (error) {
             if (error.name === 'AbortError') {
@@ -1119,6 +1121,7 @@ Rules:
     // ── Phase-5 bridge: exposes runStateModelPass for narrative-hooks.js/onGenerationEnded ──
     // Removed when memo-processor.js is created in Phase 5.
     globalThis._rpgRunStateModelPass = runStateModelPass;
+    globalThis._rpgStateModelRunning = () => _stateModelRunning;
 
     function handleLevelUp() {
         const { sendSystemMessage } = SillyTavern.getContext();
