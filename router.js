@@ -151,13 +151,17 @@ ${(settings.routerCustomTags || []).map(m => `- ${m.tag}: ${m.instruction}`).joi
 
         while (turns < maxTurns) {
             turns++;
-            const timeMatch = settings.currentMemo?.match(/\[TIME\]([\s\S]*?)\[\/TIME\]/i);
-            const worldTime = timeMatch ? `[TIME]${timeMatch[1].trim()}[/TIME]` : 'Unknown';
+            const timeRegex = /([0-9]{1,2}:[0-9]{2}\s*[AP]M,\s*Day\s*[0-9]+)/i;
+            const narrativeTimeMatch = recentChat.match(timeRegex);
+            const memoTimeMatch = settings.currentMemo?.match(/\[TIME\]([\s\S]*?)\[\/TIME\]/i);
+            const cleanMemoTime = memoTimeMatch ? memoTimeMatch[1].split('\n')[0].trim() : '';
+            
+            const currentTime = narrativeTimeMatch ? narrativeTimeMatch[1] : cleanMemoTime;
             
             const questMatch = settings.currentMemo?.match(/\[QUESTS\]([\s\S]*?)\[\/QUESTS\]/i);
             const questBlock = questMatch ? `[QUESTS]${questMatch[1].trim()}[/QUESTS]` : 'None';
             
-            const userPrompt = `## WORLD CLOCK\n${worldTime}\n\n## ACTIVE QUESTS\n${questBlock}\n\n## ACTIVE MEMORY (Lore)\n${activeEntriesFull.join('\n\n') || 'None'}\n\n## ARCHIVE INDEX\n${keyringText}\n\n## NARRATIVE\n${recentChat}\n\n${manualPrompt ? `## INSTRUCTION\n${manualPrompt}\n\n` : ''}${loopHistory.join('\n\n')}\n\nNext Step:`;
+            const userPrompt = `## ACTIVE QUESTS\n${questBlock}\n\n## ACTIVE MEMORY (Lore)\n${activeEntriesFull.join('\n\n') || 'None'}\n\n## ARCHIVE INDEX\n${keyringText}\n\n## NARRATIVE\n${recentChat}\n\n${manualPrompt ? `## INSTRUCTION\n${manualPrompt}\n\n` : ''}${loopHistory.join('\n\n')}\n\nNext Step:`;
 
             const routerSettings = {
                 ...settings,
@@ -241,7 +245,7 @@ Thought: I see a new NPC named Barnaby. I will record him.
                     
                     basicAction.reason = (thoughtMatch ? thoughtMatch[1].trim() : "Tag-based update.") + ` (${summaries.join(', ')})`;
                     
-                    await applyAction(basicAction, archiveBooks);
+                    await applyAction(basicAction, archiveBooks, currentTime);
                     basicSummary = summaries.join(', ');
                 } else {
                     broadcastStep('finish', 'Basic Mode: No tags found.');
@@ -272,7 +276,7 @@ Thought: I see a new NPC named Barnaby. I will record him.
 
                     try {
                         const currentAction = JSON.parse(cleanJson(argsStr));
-                        const result = await applyAction(currentAction, archiveBooks);
+                        const result = await applyAction(currentAction, archiveBooks, currentTime);
                         
                         // REFRESH STATE: Re-load books so next loop sees new entries
                         archiveBooks = await fetchArchiveBooks();
@@ -351,17 +355,16 @@ Thought: I see a new NPC named Barnaby. I will record him.
  * Applies the agent's final decision to settings and lorebooks.
  * @param {object} action - The action to apply.
  * @param {object} allBooks - The cached archive books for verification.
+ * @param {string} [currentTime=''] - The current time string for timestamping.
  * @returns {Promise<{success: boolean, errors: string[], recordedIds: string[]}>}
  */
-async function applyAction(action, allBooks = {}) {
+async function applyAction(action, allBooks = {}, currentTime = '') {
     const settings = getSettings();
     const ctx = SillyTavern.getContext();
     let changed = false;
     const errors = [];
     const allBookNames = Object.keys(allBooks);
 
-    const timeMatch = settings.currentMemo?.match(/\[TIME\]([\s\S]*?)\[\/TIME\]/i);
-    const currentTime = timeMatch ? timeMatch[1].trim() : '';
     const timePrefix = currentTime ? `[${currentTime}] ` : '';
 
     // 1. Activate/Deactivate
