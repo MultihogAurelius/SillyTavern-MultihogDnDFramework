@@ -58,10 +58,10 @@ export async function runRouterPass(narrativeOutput, manualPrompt = null, custom
         broadcastStep('start', 'Initializing Lorebook Agent...');
 
         const startTime = Date.now();
-        const allBookNames = await getWorldInfoNamesSafe();
         const prefix = settings.routerCampaignPrefix || '';
         
         async function fetchArchiveBooks() {
+            const allBookNames = await getWorldInfoNamesSafe();
             const scoped = prefix ? allBookNames.filter(n => n.startsWith(prefix)) : allBookNames;
             const books = {};
             for (const n of scoped) {
@@ -125,9 +125,12 @@ Maximum Active Entities: **${settings.routerMaxActivations || 5}**.
 - **IMPORTANT**: You MUST use the exact \`Book::UID\` format for activation/update. Never use names or invent IDs.
 
 ## PROCESS
-1. **SEARCH FIRST**: Always use \`grep_lore\` or \`inspect_book\` before recording a new entry to prevent duplicates.
-2. **CONSOLIDATE**: If you find duplicates, use \`delete_ids\` to remove the redundant ones and \`update\` the primary one with the combined info.
-3. Use Thought/Action/Observation. You can call "commit" multiple times. Your turn ends when you provide a "Thought" without an "Action".
+1. **SEARCH FIRST**: Use \`grep_lore\` or \`inspect_book\` to find IDs.
+2. **MODULAR UPDATES**: You can use \`commit\` to record NEW info or update existing entries. 
+   - **Note**: If you \`record\` an entry with a label that already exists, it will AUTOMATICALLY update the existing one.
+3. **TERMINATION**: You are allocated a turn budget, but you should **STOP** as soon as the archive is synchronized with the latest events. To finish, simply provide a final Thought summarizing your work and **do not output any Action tag**.
+
+Campaign Root: "${prefix || 'World Archive'}" (NPCs/Locations go into "${prefix ? prefix + '_NPCs' : 'NPCs'}" or "${prefix ? prefix + '_Locations' : 'Locations'}").
 
 ## EXAMPLE
 Thought: The user mentioned Elara. I will check if she exists.
@@ -261,7 +264,10 @@ Thought: I see a new NPC named Barnaby. I will record him.
                         if (result.errors.length > 0) {
                             observation = `Committed with warnings: ${result.errors.join(', ')}`;
                         } else {
-                            observation = "Committed successfully. Archive updated.";
+                            const details = [];
+                            if (result.recordedIds?.length > 0) details.push(`Recorded/Updated: ${result.recordedIds.join(', ')}`);
+                            if (currentAction.activate?.length > 0) details.push(`Activated: ${currentAction.activate.join(', ')}`);
+                            observation = `Committed successfully. ${details.join(' | ')}`;
                         }
                     } catch (e) {
                         observation = `Error: Invalid JSON in commit. ${e.message}`;
@@ -375,9 +381,10 @@ async function applyAction(action, allBooks = {}) {
         }
     }
 
-    // 3. Record new
+    // 3. Record new (with Deduplication)
     const records = action.record || [];
     const prefix = settings.routerCampaignPrefix || '';
+    const recordedIds = [];
     for (const rec of records) {
         // Map category to book name
         let targetBook = prefix || 'World Chronicle';
@@ -388,11 +395,37 @@ async function applyAction(action, allBooks = {}) {
         else if (cat.includes('FAC')) targetBook = prefix ? `${prefix}_Factions` : 'Factions';
         else if (cat.includes('EVENT')) targetBook = prefix ? `${prefix}_Events` : 'Events';
 
-        const newId = await addLorebookEntry(targetBook, rec, allBookNames);
-        if (!newActive.includes(newId)) {
-            newActive.push(newId);
+        // DEDUPLICATION: Check if an entry with this label already exists in the target book
+        let existingUid = null;
+        const targetBookData = allBooks[targetBook];
+        if (targetBookData?.entries) {
+            for (const [uid, entry] of Object.entries(targetBookData.entries)) {
+                if ((entry.comment || '').toLowerCase() === (rec.label || '').toLowerCase()) {
+                    existingUid = uid;
+                    break;
+                }
+            }
         }
-        changed = true;
+
+        if (existingUid) {
+            // Convert record to update
+            const book = await ctx.loadWorldInfo(targetBook);
+            if (book?.entries?.[existingUid]) {
+                book.entries[existingUid].content = rec.content;
+                await ctx.saveWorldInfo(targetBook, book);
+                const fullId = `${targetBook}::${existingUid}`;
+                if (!newActive.includes(fullId)) newActive.push(fullId);
+                recordedIds.push(`${fullId} (updated existing)`);
+                changed = true;
+            }
+        } else {
+            const newId = await addLorebookEntry(targetBook, rec, Object.keys(allBooks));
+            if (!newActive.includes(newId)) {
+                newActive.push(newId);
+            }
+            recordedIds.push(newId);
+            changed = true;
+        }
     }
 
     // 4. Enforce Max Activations (FIFO Pruning)
@@ -427,7 +460,7 @@ async function applyAction(action, allBooks = {}) {
             time: timestamp,
             activate: activate,
             deactivate: deactivate,
-            record: records.map(r => r.label || r.id),
+            record: recordedIds,
             delete: deleteIds,
             reason: action.reason || (settings.routerBasicMode ? "Tag-based update." : "Agent tool update.")
         });
@@ -436,7 +469,7 @@ async function applyAction(action, allBooks = {}) {
         document.dispatchEvent(new CustomEvent('rt_lore_agent_updated'));
     }
 
-    return { success: true, errors };
+    return { success: true, errors, recordedIds };
 }
 
 /**
