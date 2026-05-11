@@ -21,11 +21,7 @@ function buildKeyringText(allBooks) {
         if (!bookData || !bookData.entries) continue;
         for (const [uid, entry] of Object.entries(bookData.entries)) {
             const keys = (entry.key || []).join(', ');
-            let desc = entry.comment || '';
-            if (!desc) {
-                desc = (entry.content || '').substring(0, 80).replace(/\n/g, ' ') + '...';
-            }
-            lines.push(`ID: ${bookName}::${uid} | Keys: [${keys}] | Desc: ${desc}`);
+            lines.push(`[ARCHIVE] Label: ${entry.comment || entry.key?.[0] || 'Unnamed'} | Keys: [${keys}]`);
         }
     }
     return lines.join('\n');
@@ -106,6 +102,10 @@ export async function runRouterPass(narrativeOutput, manualPrompt = null, custom
    - update: [{"id": "Book::UID", "content": "Full new content"}]
    - delete_ids: ["Book::UID", ...] (Permanently REMOVES from lorebook)
 
+## MEMORY LIMIT
+Maximum Active Entities: **${settings.routerMaxActivations || 5}**.
+If you are at the limit and need to activate a new entity, you MUST use \`commit({"deactivate": ["Book::UID"]})\` on the least relevant active entity to make room.
+
 ## PROCESS
 1. **SEARCH FIRST**: Always use \`grep_lore\` or \`inspect_book\` before recording a new entry to prevent duplicates.
 2. **CONSOLIDATE**: If you find duplicates, use \`delete_ids\` to remove the redundant ones and \`update\` the primary one with the combined info.
@@ -120,13 +120,16 @@ Action: commit({"update":[{"id":"Adventure_NPCs::0","content":"Now a known ally.
 Observation: Committed successfully.
 Thought: I have updated Elara. Research complete.
 
-## SCOPE
 Campaign Root: "${prefix || 'None'}" (All records go here. NPCs/Locations may be sorted into "${prefix ? prefix + '_NPCs' : 'NPCs'}" or "${prefix ? prefix + '_Locations' : 'Locations'}").
+
+## FIELD INSTRUCTIONS
+${Object.values(settings.routerModules || {}).filter(m => m.enabled).map(m => `- ${m.tag}: ${m.instruction}`).join('\n')}
+${(settings.routerCustomTags || []).map(m => `- ${m.tag}: ${m.instruction}`).join('\n')}
 `;
 
         while (turns < maxTurns) {
             turns++;
-            const userPrompt = `## ACTIVE MEMORY\n${activeEntriesFull.join('\n\n') || 'None'}\n\n## ARCHIVE INDEX\n${keyringText}\n\n## NARRATIVE\n${recentChat}\n\n${manualPrompt ? `## INSTRUCTION\n${manualPrompt}\n\n` : ''}${loopHistory.join('\n\n')}\n\nNext Step:`;
+            const userPrompt = `## CURRENT STATE (Trackers/Clock)\n${settings.currentMemo || 'None'}\n\n## ACTIVE MEMORY (Lore)\n${activeEntriesFull.join('\n\n') || 'None'}\n\n## ARCHIVE INDEX\n${keyringText}\n\n## NARRATIVE\n${recentChat}\n\n${manualPrompt ? `## INSTRUCTION\n${manualPrompt}\n\n` : ''}${loopHistory.join('\n\n')}\n\nNext Step:`;
 
             const routerSettings = {
                 ...settings,
@@ -135,8 +138,71 @@ Campaign Root: "${prefix || 'None'}" (All records go here. NPCs/Locations may be
             };
 
             broadcastStep('thought', `Thinking (Turn ${turns}/${maxTurns})...`);
-            const response = await sendStateRequest(routerSettings, systemPrompt, userPrompt);
             
+            let currentSystemPrompt = systemPrompt;
+            if (settings.routerBasicMode) {
+                const modules = settings.routerModules || {};
+                const customTags = settings.routerCustomTags || [];
+                
+                let formatLines = [];
+                for (const [id, config] of Object.entries(modules)) {
+                    if (config.enabled) {
+                        formatLines.push(`- [[${config.tag}: ${config.format}]] (${config.instruction})`);
+                    }
+                }
+                for (const custom of customTags) {
+                    formatLines.push(`- [[${custom.tag}: Name | Description | Keywords]] (${custom.instruction})`);
+                }
+                formatLines.push(`- [[ACTIVATE: Name]] (Bring entry to active memory)`);
+                formatLines.push(`- [[DEACTIVATE: Name]] (Remove from active memory)`);
+                formatLines.push(`- [[DELETE: Name]] (Permanently remove an entry)`);
+
+                currentSystemPrompt = `You are the Research Assistant. Your task is to identify and record important narrative entities and events.
+
+## FORMAT
+Use these tags in your response:
+${formatLines.join('\n')}
+
+## ATTENTION & MEMORY
+1. **ACTIVE MEMORY**: You can see the full details of these entities. You can update them at any time.
+2. **ARCHIVE INDEX**: You only see names and keywords. You CANNOT see their full biography.
+3. **RECALL**: To "read" or "update" an archive entry, you MUST first use [[ACTIVATE: Name]]. It will become visible in the next turn.
+4. **LIMIT**: You are limited to **${settings.routerMaxActivations || 5} active entries**. If you need to activate a new one but are at the limit, you MUST use [[DEACTIVATE: Name]] on the least relevant active entry to make room. Prioritize currently present characters and locations.
+
+## RULES
+1. Only record persistent or significant entities/events.
+2. Use ACTIVATE to bring an existing entry into the current scene context.
+3. Use DEACTIVATE to remove an entry that is no longer relevant to the scene.
+4. Use DELETE to permanently remove duplicate or redundant entries.
+5. Output your thoughts first, then the tags.
+
+Example:
+Thought: I see a new NPC named Barnaby. I will record him.
+[[NPC: Barnaby | A retired blacksmith with a scar on his cheek. | Barnaby, blacksmith, ally]]`;
+            }
+
+            const response = await sendStateRequest(routerSettings, currentSystemPrompt, userPrompt);
+            
+            // Debug capture
+            settings.routerLastRequest = {
+                system: currentSystemPrompt,
+                user: userPrompt,
+                chars: (currentSystemPrompt.length + userPrompt.length),
+                estTokens: Math.ceil((currentSystemPrompt.length + userPrompt.length) / 4)
+            };
+
+            if (settings.routerBasicMode) {
+                broadcastStep('thought', 'Parsing tags...');
+                const basicAction = parseBasicTags(response, archiveBooks);
+                if (basicAction.record.length > 0 || basicAction.update.length > 0) {
+                    await applyAction(basicAction);
+                    broadcastStep('finish', `Basic Mode: Processed ${basicAction.record.length} records and ${basicAction.update.length} updates.`);
+                } else {
+                    broadcastStep('finish', 'Basic Mode: No tags found.');
+                }
+                break; // One-shot for basic mode
+            }
+
             const thoughtMatch = response.match(/Thought:\s*([\s\S]*?)(?=Action:|$)/i);
             const actionMatch = response.match(/(?:Action:\s*)?(\w+)\(([\s\S]*)\)/i);
 
@@ -264,6 +330,8 @@ async function applyAction(action) {
         if (cat.includes('NPC')) targetBook = prefix ? `${prefix}_NPCs` : 'NPCs';
         else if (cat.includes('LOC')) targetBook = prefix ? `${prefix}_Locations` : 'Locations';
         else if (cat.includes('QUEST')) targetBook = prefix ? `${prefix}_Quests` : 'Quests';
+        else if (cat.includes('FAC')) targetBook = prefix ? `${prefix}_Factions` : 'Factions';
+        else if (cat.includes('EVENT')) targetBook = prefix ? `${prefix}_Events` : 'Events';
 
         const newId = await addLorebookEntry(targetBook, rec);
         if (!settings.activeRouterKeys.includes(newId)) {
@@ -296,12 +364,81 @@ async function applyAction(action) {
             deactivate: deactivate,
             record: records.map(r => r.label || r.id),
             delete: deleteIds,
-            reason: action.reason || "Manual update."
+            reason: action.reason || (settings.routerBasicMode ? "Tag-based update." : "Agent tool update.")
         });
         if (settings.routerLog.length > 50) settings.routerLog.length = 50;
         ctx.saveSettingsDebounced();
         document.dispatchEvent(new CustomEvent('rt_lore_agent_updated'));
     }
+}
+
+/**
+ * Parses basic narrative tags [[TAG: ...]]
+ */
+function parseBasicTags(text, archiveBooks) {
+    const action = { record: [], update: [], activate: [], deactivate: [], delete_ids: [] };
+    const settings = getSettings();
+
+    const processMatch = (name, content, keywords, category) => {
+        name = name.trim();
+        content = content.trim();
+        const keys = (keywords || '').split(',').map(k => k.trim());
+
+        // Check for existing by name
+        let existingId = null;
+        for (const [bookName, book] of Object.entries(archiveBooks)) {
+            for (const [uid, entry] of Object.entries(book.entries)) {
+                if ((entry.comment || '').toLowerCase() === name.toLowerCase()) {
+                    existingId = `${bookName}::${uid}`;
+                    break;
+                }
+            }
+            if (existingId) break;
+        }
+
+        if (existingId) {
+            action.update.push({ id: existingId, content });
+        } else {
+            action.record.push({ label: name, content, keys, category });
+        }
+    };
+
+    // Generic tag parser: [[TAG: ...]]
+    const tagRegex = /\[\[(\w+):\s*([^\]]+?)\s*\]\]/gi;
+    let match;
+
+    while ((match = tagRegex.exec(text)) !== null) {
+        const tagName = match[1].toUpperCase();
+        const inner = match[2];
+        const parts = inner.split('|').map(p => p.trim());
+
+        if ((tagName === 'ACTIVATE' || tagName === 'DEACTIVATE' || tagName === 'DELETE') && parts.length >= 1) {
+            const name = inner.trim().toLowerCase();
+            let targetList = [];
+            if (tagName === 'ACTIVATE') targetList = action.activate;
+            else if (tagName === 'DEACTIVATE') targetList = action.deactivate;
+            else if (tagName === 'DELETE') targetList = action.delete_ids;
+
+            for (const [bookName, book] of Object.entries(archiveBooks)) {
+                for (const [uid, entry] of Object.entries(book.entries)) {
+                    if ((entry.comment || '').toLowerCase() === name) {
+                        targetList.push(`${bookName}::${uid}`);
+                        break;
+                    }
+                }
+            }
+        } else if (tagName === 'QUEST' && parts.length >= 3) {
+            const name = parts[0];
+            const loc = parts[1];
+            const desc = parts[2];
+            const keywords = parts[3] || '';
+            processMatch(name, `[Location: ${loc}] ${desc}`, keywords, 'QUEST');
+        } else if (parts.length >= 3) {
+            processMatch(parts[0], parts[1], parts[2], tagName);
+        }
+    }
+
+    return action;
 }
 
 /**
@@ -413,4 +550,57 @@ Output a JSON object:
         console.error("[Lorebook Agent] Save scene failed:", e);
         (/** @type {any} */ (toastr)).error('Failed to save scene.', 'Lorebook Agent');
     }
+}
+
+/**
+ * Fetches a manifest of all campaign-scoped lorebook entries for the UI.
+ */
+export async function getLorebookManifest() {
+    const settings = getSettings();
+    const ctx = SillyTavern.getContext();
+    const prefix = settings.routerCampaignPrefix || '';
+    
+    const names = await ctx.getWorldInfoNames();
+    const scoped = prefix ? names.filter(n => n.startsWith(prefix)) : names;
+    
+    const manifest = [];
+    for (const n of scoped) {
+        const b = await ctx.loadWorldInfo(n);
+        if (!b?.entries) continue;
+        for (const [uid, entry] of Object.entries(b.entries)) {
+            manifest.push({
+                id: `${n}::${uid}`,
+                book: n,
+                uid: uid,
+                label: entry.comment || entry.key?.[0] || 'Unnamed',
+                keys: entry.key || [],
+                content: entry.content,
+                is_active: settings.activeRouterKeys?.includes(`${n}::${uid}`)
+            });
+        }
+    }
+    return manifest;
+}
+
+/**
+ * Deletes a lorebook entry by ID (Book::UID).
+ */
+export async function deleteLorebookEntry(id) {
+    const [bookName, uid] = id.split('::');
+    if (!bookName || !uid) return false;
+    
+    const ctx = SillyTavern.getContext();
+    const book = await ctx.loadWorldInfo(bookName);
+    if (!book?.entries || !book.entries[uid]) return false;
+    
+    delete book.entries[uid];
+    await ctx.saveWorldInfo(bookName, book);
+    
+    // Also remove from active list if it was there
+    const settings = getSettings();
+    if (settings.activeRouterKeys?.includes(id)) {
+        settings.activeRouterKeys = settings.activeRouterKeys.filter(k => k !== id);
+    }
+    
+    return true;
 }

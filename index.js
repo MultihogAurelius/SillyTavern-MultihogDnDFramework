@@ -6,7 +6,7 @@ import { deduplicateMemo, mergeMemo, computeDelta, escapeHtml, escapeRegex, high
 import { renderSubFieldByRule, tryRenderMarker, renderCustomBlockLine, stripMemoHtml, escapeHtmlWithColor, parseMemoBlocks, getPageSize, loadCollapsed, saveCollapsed, loadDetached, saveDetached, blockToItems, renderMemoAsCards, renderQuestLog, renderLorebookTerminal } from './renderer.js';
 import { registerLogQuestTool, checkQuestDeadlines } from './quests.js';
 import { initializeDebugViewer, toggleDebugViewer } from './debug-viewer.js';
-import { runRouterPass } from './router.js';
+import { runRouterPass, getLorebookManifest, deleteLorebookEntry } from './router.js';
 
     // Capture the folder name dynamically from the module URL so it works regardless of what the user names the folder
     const FOLDER_NAME = (function () {
@@ -1822,6 +1822,13 @@ Rules:
 
             el.innerHTML = html;
             bindRenderedCardEvents(el, memo, false);
+
+            // Update footer location
+            const locMatch = (memo || '').match(/Location:\s*([^)\n]+)/i);
+            const footerLoc = document.getElementById('rt-footer-location');
+            if (footerLoc) {
+                footerLoc.textContent = locMatch ? locMatch[1].trim() : 'Unknown Location';
+            }
         }
 
         // Update any detached panels
@@ -1983,86 +1990,136 @@ Rules:
                 </div>
                 <div id="rpg-tracker-delta-content">${settings.lastDelta || '<span class="delta-empty">No changes yet.</span>'}</div>
             </div>
-            <div class="rpg-tracker-agent-panel" id="rpg-tracker-agent" style="display:none; position: absolute; right: 0; top: 30px; width: 300px; max-height: calc(100% - 30px); background: rgba(20,20,20,0.95); border-left: 1px solid #444; border-bottom: 1px solid #444; z-index: 1000; flex-direction: column;">
-                <div class="rpg-tracker-delta-toolbar" style="padding: 5px; background: rgba(0,0,0,0.5); display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #444;">
-                    <span class="rpg-tracker-delta-title">Lorebook Agent</span>
-                    <div style="display: flex; gap: 4px;">
-                        <button class="rpg-tracker-icon-btn" id="rt-agent-router-manual-run" title="Run Research Now" style="color: #3498db;"><i class="fa-solid fa-play"></i></button>
+            <div class="rpg-tracker-panel rpg-tracker-agent-panel ${settings.trackerTheme || 'rt-theme-native'}" id="rpg-tracker-agent" style="display:none; position: absolute; right: 0; top: 30px; width: 300px; max-height: calc(100% - 30px); z-index: 1000; flex-direction: column;">
+                <div class="rpg-tracker-header" style="cursor: default;">
+                    <span class="rpg-tracker-header-left"><i class="fa-solid fa-robot"></i> Lorebook Agent</span>
+                    <div class="rpg-tracker-header-right">
+                        <button class="rpg-tracker-icon-btn" id="rt-agent-router-manual-run" title="Run Research Now" style="color: var(--rt-accent);"><i class="fa-solid fa-play"></i></button>
                         <button class="rpg-tracker-icon-btn" id="rt-agent-router-detach" title="Detach Lorebook Agent">⧉</button>
                         <button class="rpg-tracker-icon-btn" id="rpg-tracker-agent-close" title="Close">✕</button>
                     </div>
                 </div>
-                <div style="flex: 1; overflow-y: auto; padding: 10px; font-size: 12px; color: #ddd;">
-                    <label style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; cursor: pointer; font-weight: bold;">
+                <div class="rpg-tracker-content" style="flex: 1; overflow-y: auto; padding: 10px; font-size: 11px; color: var(--rt-text);">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                        <div style="font-weight: bold; opacity: 0.9; font-size: 12px; color: var(--rt-accent, #3498db);">AUTONOMOUS RESEARCHER</div>
+                        <button id="rt-agent-help-btn" style="background: var(--rt-accent-bg); border: 1px solid var(--rt-accent-dim); color: var(--rt-accent); border-radius: 12px; width: 20px; height: 20px; font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center;" title="What is the Lorebook Agent?">?</button>
+                    </div>
+
+                    <div style="background: rgba(255, 165, 0, 0.1); border: 1px solid rgba(255, 165, 0, 0.3); color: #ffa500; padding: 6px; border-radius: 4px; font-size: 10px; text-align: center; font-weight: bold; margin-bottom: 15px;">
+                        ⚠️ UNDER CONSTRUCTION, NEEDS TESTING
+                    </div>
+
+                    <label style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; cursor: pointer; opacity: 0.8; font-size: 11px;" title="Enable the Lorebook Agent to automatically research and record world lore.">
                         Enable Lorebook Agent
                         <input type="checkbox" id="rt-agent-router-enable" ${settings.routerEnabled ? 'checked' : ''}>
                     </label>
+
+                    <label style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; cursor: pointer; opacity: 0.8; font-size: 11px;" title="Use simple text tags [[NPC: Name | Desc]] instead of complex tools. Better for small models.">
+                        Basic Mode (tag-based, no tool calls)
+                        <input type="checkbox" id="rt-agent-router-basic" ${settings.routerBasicMode ? 'checked' : ''}>
+                    </label>
+
+                    <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 10px;" title="Main Lookback: How many recent messages the agent analyzes during automatic passes.">
+                        <span style="font-size: 10px; opacity: 0.7;">Main Lookback:</span>
+                        <input type="number" id="rt-agent-router-lookback" value="${settings.routerLookback || 3}" min="1" max="100" style="width: 40px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); color: white; border-radius: 3px; text-align: center; font-size: 10px; padding: 1px;">
+                        <span style="font-size: 10px; opacity: 0.5;">msgs</span>
+                    </div>
+
+                    <div style="display: flex; gap: 8px; margin-bottom: 10px;">
+                        <div style="flex: 1;" title="Max Tokens: The maximum token limit for the agent's response. 0 = model default.">
+                            <div style="margin-bottom: 5px; opacity: 0.8; font-size: 11px; color: var(--rt-text-muted);">Max Tokens:</div>
+                            <input type="number" id="rt-agent-router-max-tokens" value="${settings.routerMaxTokens || 0}" style="width: 100%; background: var(--rt-card-bg); color: var(--rt-text); border: var(--rt-border); border-radius: 4px; padding: 4px; font-size: 11px; box-sizing: border-box;">
+                        </div>
+                        <div style="flex: 1;" title="Max Turns: How many Thought/Action loops the agent can perform before timing out (Advanced Mode only).">
+                            <div style="margin-bottom: 5px; opacity: 0.8; font-size: 11px; color: var(--rt-text-muted);">Max Turns:</div>
+                            <input type="number" id="rt-agent-router-max-turns" value="${settings.routerMaxTurns || 5}" style="width: 100%; background: var(--rt-card-bg); color: var(--rt-text); border: var(--rt-border); border-radius: 4px; padding: 4px; font-size: 11px; box-sizing: border-box;">
+                        </div>
+                        <div style="flex: 1;" title="Max Active: The maximum number of lore entries the agent can keep in Active Memory. Once reached, it must deactivate old entries to add new ones.">
+                            <div style="margin-bottom: 5px; opacity: 0.8; font-size: 11px; color: var(--rt-text-muted);">Max Active:</div>
+                            <input type="number" id="rt-agent-router-max-activations" value="${settings.routerMaxActivations || 5}" min="1" max="20" style="width: 100%; background: var(--rt-card-bg); color: var(--rt-text); border: var(--rt-border); border-radius: 4px; padding: 4px; font-size: 11px; box-sizing: border-box;">
+                        </div>
+                    </div>
                     
-                    <div style="margin-bottom: 5px; font-weight: bold; opacity: 0.8; font-size: 11px;">Connection (Router Only):</div>
-                    <select id="rt-agent-router-source" style="width: 100%; margin-bottom: 5px; background: #222; color: #ddd; border: 1px solid #444; border-radius: 3px; padding: 2px;">
-                        <option value="default" ${settings.routerConnectionSource === 'default' ? 'selected' : ''}>Main API</option>
-                        <option value="profile" ${settings.routerConnectionSource === 'profile' ? 'selected' : ''}>SillyTavern Profile</option>
-                        <option value="ollama" ${settings.routerConnectionSource === 'ollama' ? 'selected' : ''}>Ollama (Local)</option>
-                        <option value="openai" ${settings.routerConnectionSource === 'openai' ? 'selected' : ''}>OpenAI Compatible</option>
-                    </select>
+                    <div style="margin-bottom: 5px; font-weight: bold; opacity: 0.8; font-size: 11px; color: var(--rt-text-muted);">Direct Command:</div>
+                    <textarea id="rt-agent-router-direct-prompt" placeholder="Ask the agent to find or record something specific..." style="width: 100% !important; min-height: 60px !important; height: 60px !important; background: var(--rt-card-bg) !important; color: var(--rt-text) !important; border: var(--rt-border) !important; border-radius: 4px !important; padding: 6px !important; font-size: 11px !important; margin-bottom: 6px !important; resize: vertical !important; display: block !important; box-sizing: border-box !important; line-height: 1.3 !important;">${settings.routerDirectPrompt || ''}</textarea>
 
-                    <div id="rt-agent-router-profile-group" style="display: ${settings.routerConnectionSource === 'profile' ? 'block' : 'none'};">
-                        <select id="rt-agent-router-profile" style="width: 100%; margin-bottom: 5px; background: #222; color: #ddd; border: 1px solid #444; border-radius: 3px; padding: 2px;">
-                            <option value="">-- No Profile Selected --</option>
-                        </select>
-                    </div>
-
-                    <div id="rt-agent-router-ollama-group" style="display: ${settings.routerConnectionSource === 'ollama' ? 'block' : 'none'};">
-                        <input type="text" id="rt-agent-router-ollama-url" placeholder="Ollama URL" value="${settings.routerOllamaUrl || 'http://localhost:11434'}" style="width: 100%; margin-bottom: 5px; background: #222; color: #ddd; border: 1px solid #444; border-radius: 3px; padding: 2px;">
-                        <div style="display: flex; gap: 4px; margin-bottom: 5px;">
-                            <select id="rt-agent-router-ollama-model" style="flex: 1; background: #222; color: #ddd; border: 1px solid #444; border-radius: 3px; padding: 2px;">
-                                <option value="">-- Select Model --</option>
-                            </select>
-                            <button id="rt-agent-router-ollama-refresh" style="background: #333; border: 1px solid #444; color: #ddd; border-radius: 3px; padding: 0 8px; cursor: pointer;" title="Refresh Models"><i class="fa-solid fa-arrows-rotate"></i></button>
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; background: var(--rt-header-bg); padding: 4px 8px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.05); box-sizing: border-box; min-height: 32px;">
+                        <div style="display: flex; align-items: center; gap: 6px;" title="Direct Lookback: How many recent messages to analyze for this specific command.">
+                            <span style="font-size: 10px; opacity: 0.7; color: var(--rt-text-muted);">Lookback:</span>
+                            <input type="number" id="rt-agent-router-direct-lookback" value="${settings.routerDirectLookback || 10}" min="1" max="100" style="width: 38px; background: var(--rt-card-bg); border: 1px solid var(--rt-accent-dim); color: var(--rt-accent); border-radius: 3px; text-align: center; font-size: 10px; padding: 1px; box-sizing: border-box; height: 20px;">
+                            <span style="font-size: 10px; opacity: 0.5; color: var(--rt-text-muted);">msgs</span>
                         </div>
-                    </div>
-
-                    <div id="rt-agent-router-openai-group" style="display: ${settings.routerConnectionSource === 'openai' ? 'block' : 'none'};">
-                        <input type="text" id="rt-agent-router-openai-url" placeholder="Endpoint URL" value="${settings.routerOpenaiUrl || ''}" style="width: 100%; margin-bottom: 5px; background: #222; color: #ddd; border: 1px solid #444; border-radius: 3px; padding: 2px;">
-                        <input type="password" id="rt-agent-router-openai-key" placeholder="API Key (Optional)" value="${settings.routerOpenaiKey || ''}" style="width: 100%; margin-bottom: 5px; background: #222; color: #ddd; border: 1px solid #444; border-radius: 3px; padding: 2px;">
-                        <div style="display: flex; gap: 4px; margin-bottom: 5px;">
-                            <select id="rt-agent-router-openai-model" style="flex: 1; background: #222; color: #ddd; border: 1px solid #444; border-radius: 3px; padding: 2px;">
-                                <option value="">-- Select Model --</option>
-                            </select>
-                            <button id="rt-agent-router-openai-refresh" style="background: #333; border: 1px solid #444; color: #ddd; border-radius: 3px; padding: 0 8px; cursor: pointer;" title="Refresh Models"><i class="fa-solid fa-arrows-rotate"></i></button>
-                        </div>
-                        <input type="text" id="rt-agent-router-openai-model-manual" placeholder="Or type model name manually" value="${settings.routerOpenaiModel || ''}" style="width: 100%; margin-bottom: 5px; background: #222; color: #ddd; border: 1px solid #444; border-radius: 3px; padding: 2px;">
-                    </div>
-
-                    <div style="margin-bottom: 5px; opacity: 0.8; font-size: 11px;">Generation Preset:</div>
-                    <select id="rt-agent-router-preset" style="width: 100%; margin-bottom: 5px; background: #222; color: #ddd; border: 1px solid #444; border-radius: 3px; padding: 2px;">
-                        <option value="">-- Use Current Settings --</option>
-                    </select>
-
-                    <div style="display: flex; gap: 8px;">
-                        <div style="flex: 1;">
-                            <div style="margin-bottom: 5px; opacity: 0.8; font-size: 11px;">Max Tokens:</div>
-                            <input type="number" id="rt-agent-router-max-tokens" value="${settings.routerMaxTokens || 0}" style="width: 100%; margin-bottom: 10px; background: #222; color: #ddd; border: 1px solid #444; border-radius: 3px; padding: 2px;">
-                        </div>
-                        <div style="flex: 1;">
-                            <div style="margin-bottom: 5px; opacity: 0.8; font-size: 11px;">Max Turns:</div>
-                            <input type="number" id="rt-agent-router-max-turns" value="${settings.routerMaxTurns || 5}" style="width: 100%; margin-bottom: 10px; background: #222; color: #ddd; border: 1px solid #444; border-radius: 3px; padding: 2px;">
-                        </div>
-                    </div>
-
-                    <div style="margin-bottom: 5px; font-weight: bold; opacity: 0.8; font-size: 11px;">Direct Command:</div>
-                    <textarea id="rt-agent-router-direct-prompt" placeholder="Ask the agent to find or record something specific..." style="width: 100%; height: 50px; background: rgba(0,0,0,0.3); color: #ddd; border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 5px; font-size: 11px; margin-bottom: 5px; resize: vertical; display: block;">${settings.routerDirectPrompt || ''}</textarea>
-                    
-                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
-                        <div style="display: flex; align-items: center; gap: 6px;">
-                            <span style="font-size: 10px; opacity: 0.7;">Lookback:</span>
-                            <input type="number" id="rt-agent-router-lookback" value="${settings.routerLookback || 3}" min="1" max="100" style="width: 40px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); color: white; border-radius: 3px; text-align: center; font-size: 10px; padding: 1px;">
-                            <span style="font-size: 10px; opacity: 0.5;">msgs</span>
-                        </div>
-                        <button id="rt-agent-router-run-direct" style="background: var(--rt-custom-accent, #3498db); color: #000; border-radius: 4px; padding: 2px 10px; font-size: 10px; height: 20px; display: flex; align-items: center; gap: 4px; border: none; font-weight: bold; cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1" title="Run with command">
-                            <i class="fa-solid fa-paper-plane"></i> RUN COMMAND
+                        <button id="rt-agent-router-run-direct" class="rpg-tracker-prompt-send" style="width: auto; height: 22px; padding: 0 10px; font-size: 10px; font-weight: bold; gap: 4px; margin: 0;" title="Execute Lorebook Agent pass">
+                            <i class="fa-solid fa-paper-plane" style="font-size: 9px;"></i> RUN COMMAND
                         </button>
                     </div>
+
+
+                    <details style="margin-top: 10px; border-top: 1px solid #444; padding-top: 10px;">
+                        <summary style="cursor: pointer; font-size: 11px; font-weight: bold; opacity: 0.8; color: #aaa;">Modular Repertoire (Prompt Rules)</summary>
+                        <div style="padding-top: 10px;">
+                            <div style="margin-bottom: 5px; font-weight: bold; opacity: 0.8; font-size: 11px;">Enabled Modules (Stock):</div>
+                            <div id="rt-agent-stock-modules-list" style="margin-bottom: 10px;"></div>
+
+                            <div style="margin-bottom: 5px; font-weight: bold; opacity: 0.8; font-size: 11px;">Custom Tags (Basic Mode):</div>
+                            <div id="rt-agent-custom-tags-list"></div>
+                            <button id="rt-agent-add-custom-tag" style="width: 100%; background: #333; border: 1px solid #444; color: #ddd; font-size: 10px; padding: 2px; border-radius: 3px; cursor: pointer; margin-top: 4px;">+ Add Custom Tag</button>
+                        </div>
+                    </details>
+
+                    <details style="margin-top: 10px; border-top: 1px solid #444; padding-top: 10px;">
+                        <summary style="cursor: pointer; font-size: 11px; font-weight: bold; opacity: 0.8; color: #aaa;">Lorebook Agent Connection</summary>
+                        <div style="padding-top: 10px;">
+                            <div style="margin-bottom: 5px; font-weight: bold; opacity: 0.8; font-size: 11px;">Connection Source:</div>
+                            <select id="rt-agent-router-source" style="width: 100%; margin-bottom: 5px; background: #222; color: #ddd; border: 1px solid #444; border-radius: 3px; padding: 2px;">
+                                <option value="default" ${settings.routerConnectionSource === 'default' ? 'selected' : ''}>Main API</option>
+                                <option value="profile" ${settings.routerConnectionSource === 'profile' ? 'selected' : ''}>SillyTavern Profile</option>
+                                <option value="ollama" ${settings.routerConnectionSource === 'ollama' ? 'selected' : ''}>Ollama (Local)</option>
+                                <option value="openai" ${settings.routerConnectionSource === 'openai' ? 'selected' : ''}>OpenAI Compatible</option>
+                            </select>
+
+                            <div id="rt-agent-router-profile-group" style="display: ${settings.routerConnectionSource === 'profile' ? 'block' : 'none'};">
+                                <select id="rt-agent-router-profile" style="width: 100%; margin-bottom: 5px; background: #222; color: #ddd; border: 1px solid #444; border-radius: 3px; padding: 2px;">
+                                    <option value="">-- No Profile Selected --</option>
+                                </select>
+                            </div>
+
+                            <div id="rt-agent-router-ollama-group" style="display: ${settings.routerConnectionSource === 'ollama' ? 'block' : 'none'};">
+                                <input type="text" id="rt-agent-router-ollama-url" placeholder="Ollama URL" value="${settings.routerOllamaUrl || 'http://localhost:11434'}" style="width: 100%; margin-bottom: 5px; background: #222; color: #ddd; border: 1px solid #444; border-radius: 3px; padding: 2px;">
+                                <div style="display: flex; gap: 4px; margin-bottom: 5px;">
+                                    <select id="rt-agent-router-ollama-model" style="flex: 1; background: #222; color: #ddd; border: 1px solid #444; border-radius: 3px; padding: 2px;">
+                                        <option value="">-- Select Model --</option>
+                                    </select>
+                                    <button id="rt-agent-router-ollama-refresh" style="background: #333; border: 1px solid #444; color: #ddd; border-radius: 3px; padding: 0 8px; cursor: pointer;" title="Refresh Models"><i class="fa-solid fa-arrows-rotate"></i></button>
+                                </div>
+                            </div>
+
+                            <div id="rt-agent-router-openai-group" style="display: ${settings.routerConnectionSource === 'openai' ? 'block' : 'none'};">
+                                <input type="text" id="rt-agent-router-openai-url" placeholder="Endpoint URL" value="${settings.routerOpenaiUrl || ''}" style="width: 100%; margin-bottom: 5px; background: #222; color: #ddd; border: 1px solid #444; border-radius: 3px; padding: 2px;">
+                                <input type="password" id="rt-agent-router-openai-key" placeholder="API Key (Optional)" value="${settings.routerOpenaiKey || ''}" style="width: 100%; margin-bottom: 5px; background: #222; color: #ddd; border: 1px solid #444; border-radius: 3px; padding: 2px;">
+                                <div style="display: flex; gap: 4px; margin-bottom: 5px;">
+                                    <select id="rt-agent-router-openai-model" style="flex: 1; background: #222; color: #ddd; border: 1px solid #444; border-radius: 3px; padding: 2px;">
+                                        <option value="">-- Select Model --</option>
+                                    </select>
+                                    <button id="rt-agent-router-openai-refresh" style="background: #333; border: 1px solid #444; color: #ddd; border-radius: 3px; padding: 0 8px; cursor: pointer;" title="Refresh Models"><i class="fa-solid fa-arrows-rotate"></i></button>
+                                </div>
+                                <input type="text" id="rt-agent-router-openai-model-manual" placeholder="Or type model name manually" value="${settings.routerOpenaiModel || ''}" style="width: 100%; margin-bottom: 5px; background: #222; color: #ddd; border: 1px solid #444; border-radius: 3px; padding: 2px;">
+                            </div>
+
+                            <div style="margin-bottom: 5px; opacity: 0.8; font-size: 11px;">Generation Preset:</div>
+                            <select id="rt-agent-router-preset" style="width: 100%; margin-bottom: 5px; background: #222; color: #ddd; border: 1px solid #444; border-radius: 3px; padding: 2px;">
+                                <option value="">-- Use Current Settings --</option>
+                            </select>
+                        </div>
+                    </details>
+
+                    <details style="margin-top: 15px; border-top: 1px solid #444; padding-top: 10px;">
+                        <summary style="cursor: pointer; font-size: 11px; font-weight: bold; opacity: 0.8; color: #aaa;">Debug: Last Request Context</summary>
+                        <div id="rt-agent-debug-drawer" style="font-family: monospace; font-size: 10px; background: rgba(0,0,0,0.5); padding: 5px; margin-top: 5px; border-radius: 4px; color: #0f0; max-height: 200px; overflow-y: auto;">
+                            No request sent yet.
+                        </div>
+                    </details>
+                    
 
                     <hr style="border-color: #333; margin: 10px 0;">
 
@@ -2075,13 +2132,22 @@ Rules:
                         <div style="font-weight: bold; opacity: 0.8; font-size: 11px;">Lorebook Terminal:</div>
                         <button id="rt-agent-router-terminal-clear" style="background: transparent; border: none; color: #ff5555; font-size: 9px; cursor: pointer; opacity: 0.7;">Clear</button>
                     </div>
-                    <div id="rt-agent-router-terminal" style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 8px; min-height: 80px; max-height: 200px; overflow-y: auto; margin-bottom: 10px;">
-                        <div style="opacity: 0.4; font-size: 10px; font-style: italic;">Waiting for agent activity...</div>
+                    <div id="rt-agent-router-terminal" style="background: var(--rt-card-bg); border: var(--rt-border); border-radius: 4px; padding: 8px; min-height: 80px; max-height: 200px; overflow-y: auto; margin-bottom: 10px; font-family: var(--rt-font-mono);">
+                        <div style="opacity: 0.4; font-size: 10px; font-style: italic; color: var(--rt-text-muted);">Waiting for agent activity...</div>
                     </div>
 
-                    <hr style="border-color: #333; margin: 10px 0;">
-                    <div style="margin-bottom: 5px; font-weight: bold; opacity: 0.8; font-size: 11px;">Decision Log:</div>
-                    <div id="rt-agent-router-log" style="display: flex; flex-direction: column; gap: 5px;">
+                    <hr style="border-color: rgba(255,255,255,0.05); margin: 10px 0;">
+                    <div id="rt-agent-router-log" style="display: flex; flex-direction: column; gap: 5px; margin-bottom: 15px;">
+                    </div>
+
+                    <div style="margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                            <div style="font-weight: bold; opacity: 0.8; font-size: 11px;">CAMPAIGN RECORDS</div>
+                            <button class="rpg-tracker-icon-btn" id="rt-agent-manifest-refresh" title="Refresh Manifest" style="font-size: 10px; opacity: 0.5;"><i class="fa-solid fa-arrows-rotate"></i></button>
+                        </div>
+                        <div id="rt-agent-manifest-list" style="max-height: 400px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px;">
+                            <div style="text-align: center; opacity: 0.5; font-size: 10px; padding: 10px;">Click refresh to load lore...</div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -2107,6 +2173,7 @@ Rules:
                 <div class="flex-container gap-1 alignitemscenter rt-rng-footer-group" style="display:none;">
                     <!-- Removed inline RNG toggles, now located in extension settings -->
                 </div>
+                <div id="rt-footer-location" style="font-size: 10px; color: var(--rt-accent); flex: 1; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: 0.9; cursor: help;" title="Current Location (Main, Sub)"></div>
                 <div class="flex-container gap-1 alignitemscenter rt-utility-footer-group">
                     <span id="rpg-tracker-count">~${Math.round(settings.currentMemo.length / 2.62)} tokens</span>
                     <button class="rpg-tracker-nav-btn" id="rpg-tracker-memo-clear" style="padding: 1px 5px; font-size: 9px; opacity: 0.8; margin-left: 5px;" title="Clear memo and history">CLEAR</button>
@@ -2323,11 +2390,237 @@ Rules:
             agentCloseBtn.addEventListener('click', () => {
                 (/** @type {HTMLElement} */ (agentPanel)).style.display = 'none';
             });
+            const helpBtn = agentPanel.querySelector('#rt-agent-help-btn');
+            if (helpBtn) {
+                helpBtn.addEventListener('click', () => {
+                    const content = `
+                        <div style="text-align: left; font-size: 14px; line-height: 1.4;">
+                            <h3 style="margin-top: 0; color: var(--rt-custom-accent, #3498db);">The Lorebook Agent</h3>
+                            <p>The Lorebook Agent is an autonomous narrative researcher. It scans your chat history to ensure your Lorebook stays updated with new NPCs, locations, and world events without you having to lift a finger.</p>
+                            
+                            <h4 style="margin-bottom: 5px;">🤖 Memory Modes</h4>
+                            <ul style="padding-left: 20px; margin-top: 0;">
+                                <li><b>Basic Mode (Tags)</b>: Uses simple text tags like <code>[[NPC: Name | Desc]]</code>. Perfect for smaller models (Mistral Small, Gemma 4, smaller Qwen models, etc, local stuff).</li>
+                                <li><b>Advanced Mode (Tools)</b>: Uses a complex ReAct loop (Thought/Action/Observation). Best for large models like <b>Claude Sonnet</b> or <b>GPT-5</b>, though some smaller models can work quite well! (e.g. Qwen 3.6 running on mid-range hardware like an RTX 5060 Ti).</li>
+                            </ul>
+
+                            <h4 style="margin-bottom: 5px;">🧠 Attention-Based Memory</h4>
+                            <p>To save tokens, the Agent only has "Full Vision" of <b>Active</b> entries. Everything else is stored in the <b>Archive</b> (visible only as a name/keyword index). The Agent must use <code>[[ACTIVATE]]</code> to read or update an archived entry.</p>
+
+                            <h4 style="margin-bottom: 5px;">🛠️ Modular Repertoire</h4>
+                            <p>You can toggle which entity types the Agent tracks (NPCs, Quests, etc.) and even add <b>Custom Tags</b>. Every module's instructions can be edited to control how the AI records data.</p>
+
+                            <h4 style="margin-bottom: 5px;">🕹️ Universal Controls</h4>
+                            <ul style="padding-left: 20px; margin-top: 0;">
+                                <li><b>Main Lookback</b>: How far the agent looks back during automatic turns.</li>
+                                <li><b>Direct Command</b>: Ask the agent specific questions like <i>"Summarize the history of this city"</i>.</li>
+                                <li><b>Max Active</b>: Limits how many entities stay in "Full Vision" to prevent token bloat.</li>
+                            </ul>
+                        </div>
+                    `;
+                    const { Popup } = SillyTavern.getContext();
+                    Popup.show.confirm('📖 Lorebook Agent Documentation', content, { okButton: 'Got it', cancelButton: false });
+                });
+            }
+
             const enableCheck = agentPanel.querySelector('#rt-agent-router-enable');
             if (enableCheck) {
                 enableCheck.addEventListener('change', (e) => {
                     const s = getSettings();
                     s.routerEnabled = (/** @type {HTMLInputElement} */ (e.target)).checked;
+                    saveSettings();
+                });
+            }
+
+            const basicCheck = agentPanel.querySelector('#rt-agent-router-basic');
+            if (basicCheck) {
+                basicCheck.addEventListener('change', (e) => {
+                    const s = getSettings();
+                    s.routerBasicMode = (/** @type {HTMLInputElement} */ (e.target)).checked;
+                    saveSettings();
+                });
+            }
+
+            const refreshManifest = async () => {
+                const list = agentPanel.querySelector('#rt-agent-manifest-list');
+                if (!list) return;
+                
+                list.innerHTML = '<div style="text-align: center; opacity: 0.5; font-size: 10px; padding: 10px;">Loading...</div>';
+                
+                try {
+                    const manifest = await getLorebookManifest();
+                    if (!manifest.length) {
+                        list.innerHTML = '<div style="text-align: center; opacity: 0.5; font-size: 10px; padding: 10px;">No records found.</div>';
+                        return;
+                    }
+                    
+                    list.innerHTML = '';
+                    manifest.forEach(item => {
+                        const card = document.createElement('div');
+                        card.className = 'rt-section-card';
+                        card.style.cssText = `
+                            padding: 6px;
+                            font-size: 11px;
+                            position: relative;
+                        `;
+                        
+                        const statusColor = item.is_active ? 'var(--rt-accent)' : 'var(--rt-text-muted)';
+                        const statusTitle = item.is_active ? 'Active (Visible to Agent)' : 'Archived (Hidden from Agent)';
+                        
+                        card.innerHTML = `
+                            <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
+                                <div style="width: 6px; height: 6px; border-radius: 50%; background: ${statusColor}; box-shadow: 0 0 4px ${statusColor};" title="${statusTitle}"></div>
+                                <div style="font-weight: bold; color: var(--rt-text); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-family: var(--rt-font);">${escapeHtml(item.label)}</div>
+                                <button class="rt-agent-entry-delete" data-id="${item.id}" style="background: none; border: none; color: var(--rt-text-muted); cursor: pointer; font-size: 10px; padding: 2px;" title="Delete Entry"><i class="fa-solid fa-trash"></i></button>
+                            </div>
+                            <div style="font-size: 9px; opacity: 0.5; margin-bottom: 4px; color: var(--rt-text-muted); font-family: var(--rt-font-mono);">[${item.keys.join(', ')}]</div>
+                            <div style="font-size: 10px; opacity: 0.8; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; color: var(--rt-text);">${escapeHtml(item.content)}</div>
+                        `;
+                        
+                        card.querySelector('.rt-agent-entry-delete').addEventListener('click', async (e) => {
+                            e.stopPropagation();
+                            if (confirm(`Delete lore entry "${item.label}"?`)) {
+                                const success = await deleteLorebookEntry(item.id);
+                                if (success) {
+                                    refreshManifest();
+                                    // @ts-ignore
+                                    toastr.success(`Deleted ${item.label}`, 'Lorebook Agent');
+                                }
+                            }
+                        });
+                        
+                        list.appendChild(card);
+                    });
+                } catch (e) {
+                    list.innerHTML = '<div style="text-align: center; color: #ff5555; font-size: 10px; padding: 10px;">Error loading manifest.</div>';
+                }
+            };
+
+            const refreshBtn = agentPanel.querySelector('#rt-agent-manifest-refresh');
+            if (refreshBtn) refreshBtn.addEventListener('click', refreshManifest);
+
+            // Auto-refresh manifest when agent finishes a pass or updates happen
+            document.addEventListener('rt_lore_agent_step', (e) => {
+                // @ts-ignore
+                if (e.detail?.type === 'end' || e.detail?.type === 'commit') {
+                    refreshManifest();
+                }
+            });
+
+            const renderAgentModules = () => {
+                const s = getSettings();
+                const list = agentPanel.querySelector('#rt-agent-stock-modules-list');
+                if (!list) return;
+                list.innerHTML = '';
+                Object.entries(s.routerModules || {}).forEach(([id, config]) => {
+                    const row = document.createElement('div');
+                    row.style.cssText = 'display: flex; gap: 4px; margin-bottom: 4px; align-items: center;';
+                    row.innerHTML = `
+                        <input type="checkbox" class="rt-agent-module-check" data-id="${id}" ${config.enabled ? 'checked' : ''} style="cursor: pointer;">
+                        <div style="flex: 1;">
+                            <div style="font-size: 10px; font-weight: bold; opacity: 0.7;">${config.tag}</div>
+                            <input type="text" value="${config.instruction}" class="rt-agent-module-inst" data-id="${id}" style="width: 100%; background: #111; color: #ddd; border: 1px solid #333; font-size: 10px; padding: 1px;">
+                        </div>
+                    `;
+                    list.appendChild(row);
+                });
+
+                list.querySelectorAll('.rt-agent-module-check').forEach(cb => {
+                    cb.addEventListener('change', (e) => {
+                        const id = (/** @type {HTMLInputElement} */ (e.target)).dataset.id;
+                        const val = (/** @type {HTMLInputElement} */ (e.target)).checked;
+                        const s = getSettings();
+                        s.routerModules[id].enabled = val;
+                        saveSettings();
+                    });
+                });
+                list.querySelectorAll('.rt-agent-module-inst').forEach(input => {
+                    input.addEventListener('change', (e) => {
+                        const target = /** @type {HTMLInputElement} */ (e.target);
+                        const id = target.dataset.id;
+                        const s = getSettings();
+                        s.routerModules[id].instruction = target.value;
+                        saveSettings();
+                    });
+                });
+            };
+            renderAgentModules();
+
+            const renderAgentCustomTags = () => {
+                const s = getSettings();
+                const list = agentPanel.querySelector('#rt-agent-custom-tags-list');
+                if (!list) return;
+                list.innerHTML = '';
+                (s.routerCustomTags || []).forEach((tag, idx) => {
+                    const row = document.createElement('div');
+                    row.style.cssText = 'display: flex; gap: 2px; margin-bottom: 2px; align-items: center;';
+                    row.innerHTML = `
+                        <input type="text" value="${tag.tag}" class="rt-custom-tag-name" data-idx="${idx}" placeholder="TAG" style="width: 60px; background: #111; color: #ddd; border: 1px solid #333; font-size: 10px; padding: 1px;">
+                        <input type="text" value="${tag.instruction}" class="rt-custom-tag-inst" data-idx="${idx}" placeholder="Instructions..." style="flex: 1; background: #111; color: #ddd; border: 1px solid #333; font-size: 10px; padding: 1px;">
+                        <button class="rt-custom-tag-del" data-idx="${idx}" style="background: #422; color: #f99; border: none; font-size: 10px; cursor: pointer; padding: 1px 4px;">✕</button>
+                    `;
+                    list.appendChild(row);
+                });
+
+                list.querySelectorAll('input').forEach(input => {
+                    input.addEventListener('change', (e) => {
+                        const target = /** @type {HTMLInputElement} */ (e.target);
+                        const idx = parseInt(target.dataset.idx);
+                        const s = getSettings();
+                        if (target.classList.contains('rt-custom-tag-name')) s.routerCustomTags[idx].tag = target.value.toUpperCase();
+                        else s.routerCustomTags[idx].instruction = target.value;
+                        saveSettings();
+                    });
+                });
+                list.querySelectorAll('.rt-custom-tag-del').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const idx = parseInt((/** @type {HTMLElement} */ (e.currentTarget)).dataset.idx);
+                        const s = getSettings();
+                        s.routerCustomTags.splice(idx, 1);
+                        saveSettings();
+                        renderAgentCustomTags();
+                    });
+                });
+            };
+
+            const addTagBtn = agentPanel.querySelector('#rt-agent-add-custom-tag');
+            if (addTagBtn) {
+                addTagBtn.addEventListener('click', () => {
+                    const s = getSettings();
+                    if (!s.routerCustomTags) s.routerCustomTags = [];
+                    s.routerCustomTags.push({ tag: 'NEW_TAG', instruction: 'New instructions...' });
+                    saveSettings();
+                    renderAgentCustomTags();
+                });
+            }
+            renderAgentCustomTags();
+            renderAgentDebug();
+
+
+
+            const lookbackInput = /** @type {HTMLInputElement} */ (agentPanel.querySelector('#rt-agent-router-lookback'));
+            if (lookbackInput) {
+                lookbackInput.addEventListener('change', (e) => {
+                    const s = getSettings();
+                    s.routerLookback = parseInt((/** @type {HTMLInputElement} */ (e.target)).value);
+                    saveSettings();
+                });
+            }
+
+            const directLookbackInput = /** @type {HTMLInputElement} */ (agentPanel.querySelector('#rt-agent-router-direct-lookback'));
+            if (directLookbackInput) {
+                directLookbackInput.addEventListener('change', (e) => {
+                    const s = getSettings();
+                    s.routerDirectLookback = parseInt((/** @type {HTMLInputElement} */ (e.target)).value);
+                    saveSettings();
+                });
+            }
+
+            const maxAct = /** @type {HTMLInputElement} */ (agentPanel.querySelector('#rt-agent-router-max-activations'));
+            if (maxAct) {
+                maxAct.addEventListener('change', () => {
+                    const s = getSettings();
+                    s.routerMaxActivations = parseInt(maxAct.value) || 5;
                     saveSettings();
                 });
             }
@@ -2403,7 +2696,9 @@ Rules:
                     e.stopPropagation();
                     const s = getSettings();
                     const prompt = s.routerDirectPrompt?.trim() || null;
-                    const lookback = s.routerLookback || 3;
+                    
+                    const dlInput = /** @type {HTMLInputElement} */ (agentPanel.querySelector('#rt-agent-router-direct-lookback'));
+                    const lookback = dlInput ? parseInt(dlInput.value) : (s.routerDirectLookback || 10);
                     
                     const { chat } = SillyTavern.getContext();
                     const combinedNarrative = getNarrativeBlocks(chat, -1);
@@ -2437,7 +2732,7 @@ Rules:
                     agentPanel.style.display = 'flex'; // Force visibility if detached
                     document.body.appendChild(agentPanel);
                     renderRouterUI(); // Ensure it's populated
-                    const header = agentPanel.querySelector('.rpg-tracker-delta-toolbar');
+                    const header = agentPanel.querySelector('.rpg-tracker-header');
                     if (header instanceof HTMLElement) {
                         makeDraggable(agentPanel, header, GEO_KEY);
                     }
@@ -2644,7 +2939,10 @@ Rules:
             }
         }
         
-        document.addEventListener('rt_lore_agent_updated', renderRouterUI);
+        document.addEventListener('rt_lore_agent_updated', () => {
+            renderRouterUI();
+            renderAgentDebug();
+        });
 
         // ── Lorebook Terminal Logic ──
         let _routerSteps = [];
@@ -3881,6 +4179,27 @@ Rules:
                 }
             };
 
+            // Reset Button (Stock only)
+            let resetBtn = null;
+            if (isStock) {
+                resetBtn = document.createElement('button');
+                resetBtn.className = 'menu_button interactable rt-order-btn';
+                resetBtn.style.padding = '2px 6px';
+                resetBtn.title = 'Reset Prompt to Default';
+                resetBtn.innerHTML = '<i class="fa-solid fa-rotate-left"></i>';
+                resetBtn.onclick = () => {
+                    let mod = tag.toLowerCase();
+                    if (tag === 'QUESTS' && s.questLegacyMode) mod = 'quests_legacy';
+                    
+                    if (confirm(`Reset [${tag}] prompt to default? This will lose any custom changes.`)) {
+                        if (!s.stockPrompts) s.stockPrompts = { ...DEFAULT_STOCK_PROMPTS };
+                        s.stockPrompts[mod] = DEFAULT_STOCK_PROMPTS[mod];
+                        saveSettings();
+                        toastr['success'](`[${tag}] prompt reset.`, 'RPG Tracker');
+                    }
+                };
+            }
+
             // Up/Down Arrows
             const upBtn = document.createElement('button');
             upBtn.className = 'menu_button interactable rt-order-btn';
@@ -3913,6 +4232,7 @@ Rules:
             item.appendChild(cb);
             item.appendChild(label);
             btnGroup.appendChild(editBtn);
+            if (resetBtn) btnGroup.appendChild(resetBtn);
             btnGroup.appendChild(upBtn);
             btnGroup.appendChild(downBtn);
             item.appendChild(btnGroup);
@@ -4440,8 +4760,10 @@ Rules:
                     panel.className = `rpg-tracker-panel ${newTheme}`;
                     if (!settings.enabled) panel.classList.add('is-disabled');
                 }
-                document.querySelectorAll('.rpg-tracker-detached-panel').forEach(dp => {
-                    dp.className = `rpg-tracker-panel rpg-tracker-detached-panel ${newTheme}`;
+                document.querySelectorAll('.rpg-tracker-detached-panel, .rpg-tracker-agent-panel').forEach(dp => {
+                    dp.className = dp.classList.contains('rpg-tracker-agent-panel') 
+                        ? `rpg-tracker-panel rpg-tracker-agent-panel ${newTheme}`
+                        : `rpg-tracker-panel rpg-tracker-detached-panel ${newTheme}`;
                 });
             });
 
@@ -5319,4 +5641,33 @@ Your primary focus is narrative consistency and preventing the AI Narrator from 
     };
 
     })();
+
+/**
+ * Renders the debug info into the Agent panel's debug drawer.
+ */
+export function renderAgentDebug() {
+    const s = getSettings();
+    const drawer = document.getElementById('rt-agent-debug-drawer');
+    if (!drawer || !s.routerLastRequest) return;
+    
+    const req = s.routerLastRequest;
+    const esc = (str) => {
+        if (!str) return '';
+        return str.replace(/[&<>"']/g, m => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;'
+        }[m]));
+    };
+
+    drawer.innerHTML = `
+        <div style="color: #0f0; margin-bottom: 5px; border-bottom: 1px solid #040;">EST. TOKENS: ${req.estTokens} (${req.chars} chars)</div>
+        <div style="color: #888; font-weight: bold;">[SYSTEM]</div>
+        <div style="white-space: pre-wrap; margin-bottom: 10px;">${esc(req.system)}</div>
+        <div style="color: #888; font-weight: bold;">[USER]</div>
+        <div style="white-space: pre-wrap;">${esc(req.user)}</div>
+    `;
+}
 

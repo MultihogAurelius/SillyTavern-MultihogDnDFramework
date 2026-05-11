@@ -148,9 +148,20 @@ You may be asked to use Markers: ((PLS)), ((B)), ((XB)), ((BDG)), ((HGT)). These
         routerCompletionPresetId: "",
         routerMaxTokens: 0,
         routerMaxTurns: 5,
+        routerMaxActivations: 5,
         routerCampaignPrefix: "",
         routerLookback: 3,
+        routerDirectLookback: 10,
         routerDirectPrompt: "",
+        routerBasicMode: false,
+        routerModules: {
+            npc: { enabled: true, tag: 'NPC', format: 'Name | Description | Keywords', instruction: 'Use for NEW NPCs or updating ACTIVE ones.' },
+            loc: { enabled: true, tag: 'LOC', format: 'Name | Parent Location | Description | Keywords', instruction: 'Use for NEW Locations. ALWAYS specify the Parent Location (e.g., City if it is a building, Region if it is a city).' },
+            fac: { enabled: true, tag: 'FAC', format: 'Name | Status | Keywords', instruction: 'Track faction reputation and standing.' },
+            quest: { enabled: true, tag: 'QUEST', format: 'Name | Location | Description | Keywords', instruction: 'Record quests and where they were received.' },
+            event: { enabled: true, tag: 'EVENT', format: 'Name | Details | Keywords', instruction: 'Record significant narrative events. ALWAYS include a timestamp (e.g., [Day 1, 14:00]) in the details so the chronology is preserved.' }
+        },
+        routerCustomTags: [], 
         routerSystemPromptTemplate: `<basic_instructions>
 You are the Researcher Agent, a specialized Dungeon Master's Assistant. Your goal is to maintain the narrative's "Active Context" by managing lorebook entries.
 
@@ -177,7 +188,13 @@ When you log a quest, describe the location and the quest giver in a single para
 
 <updating_entities>
 When an entity (location, NPC, etc) changes in a meaningful way, change the associated lorebook entry to keep everything up to date.
-</updating_entities>`,
+</updating_entities>
+
+<timestamps>
+You have access to the CURRENT STATE memo. Always check the [TIME] block to see the current world date/time. 
+When recording an EVENT or any time-sensitive entry, include the timestamp at the beginning of the content. 
+Example: "DAY 1, 14:30: Character signed the contract with Brodrik."
+</timestamps>`,
         categoryRenderOptions: {},
     };
 
@@ -198,6 +215,20 @@ When an entity (location, NPC, etc) changes in a meaningful way, change the asso
             }
         }
     }
+    
+    // ── MIGRATION: routerModules (v1.8.35+) ───────────────────────────────────
+    const s = extensionSettings[MODULE_NAME];
+    if (s.routerModules && typeof s.routerModules.npc === 'boolean') {
+        const old = s.routerModules;
+        s.routerModules = {
+            npc: { enabled: !!old.npc, tag: 'NPC', format: 'Name | Description | Keywords', instruction: 'Use for NEW NPCs or updating ACTIVE ones.' },
+            loc: { enabled: !!old.loc, tag: 'LOC', format: 'Name | Description | Keywords', instruction: 'Use for NEW Locations or updating ACTIVE ones.' },
+            fac: { enabled: !!old.fac, tag: 'FAC', format: 'Name | Status | Keywords', instruction: 'Track faction reputation and standing.' },
+            quest: { enabled: !!old.quest, tag: 'QUEST', format: 'Name | Location | Description | Keywords', instruction: 'Record quests and where they were received.' },
+            event: { enabled: !!old.event, tag: 'EVENT', format: 'Name | Details | Keywords', instruction: 'Record significant narrative events.' }
+        };
+    }
+
     return extensionSettings[MODULE_NAME];
 }
 

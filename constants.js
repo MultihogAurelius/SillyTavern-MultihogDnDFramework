@@ -304,7 +304,7 @@ CHARACTER VOICE:
 
 <end_of_output_footer>
 END OF EACH OUTPUT (required):
-*(Status: [HP]) | (XP: [current]/[next level]) | (Vibe: [X])*
+*(Status: [HP]) | (XP: [current]/[next level]) | (Location: [Main, Sub])*
 *Level [X] | [HH:MM AM/PM], Day [X]*
 </end_of_output_footer>
 
