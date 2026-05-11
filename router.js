@@ -531,7 +531,8 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
         }
 
         // If the book doesn't exist in ST's registry, create it properly via the API first
-        if (!knownBookNames.includes(targetBook)) {\n            const success = await createWorldInfoBook(targetBook);
+        if (!knownBookNames.includes(targetBook)) {
+            const success = await createWorldInfoBook(targetBook);
             if (success) {
                 knownBookNames.push(targetBook);
                 if (settings.debugMode) console.log(`[RPG Tracker] Registered new lorebook: ${targetBook}`);
