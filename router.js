@@ -184,7 +184,7 @@ ${(settings.routerCustomTags || []).map(m => `- ${m.tag}: ${m.instruction}`).joi
                 openaiUrl: settings.routerOpenaiUrl,
                 openaiKey: settings.routerOpenaiKey,
                 openaiModel: settings.routerOpenaiModel,
-                maxTokens: settings.routerMaxTokens || 1000,
+                maxTokens: (settings.routerMaxTokens !== undefined && settings.routerMaxTokens !== null && settings.routerMaxTokens !== '') ? Number(settings.routerMaxTokens) : 1000,
             };
 
             broadcastStep('thought', `Thinking (Turn ${turns}/${maxTurns})...`);
