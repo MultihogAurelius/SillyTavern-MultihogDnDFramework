@@ -464,6 +464,19 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
     }
 
     // -- Phase B: For each book, load (or create) it, append all entries, save once --
+    async function createWorldInfoBook(name) {
+        try {
+            const res = await fetch('/api/worldinfo/create', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name })
+            });
+            return res.ok;
+        } catch (e) {
+            return false;
+        }
+    }
+
     const knownBookNames = Object.keys(allBooks);
     for (const [targetBook, recs] of bookQueue.entries()) {
         if (settings.debugMode) console.log(`[RPG Tracker] Writing ${recs.length} entries to: ${targetBook}`);
@@ -515,6 +528,23 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
                 recordedIds.push(fullId);
             }
             changed = true;
+        }
+
+        // If the book doesn't exist in ST's registry, create it properly via the API first
+        if (!knownBookNames.includes(targetBook)) {\n            const success = await createWorldInfoBook(targetBook);
+            if (success) {
+                knownBookNames.push(targetBook);
+                if (settings.debugMode) console.log(`[RPG Tracker] Registered new lorebook: ${targetBook}`);
+                // Reload the freshly created (empty) book from server to get correct structure
+                const fresh = await ctx.loadWorldInfo(targetBook);
+                if (fresh) {
+                    // Merge our in-memory entries into the server's fresh structure
+                    Object.assign(fresh.entries, bookData.entries);
+                    bookData = fresh;
+                }
+            } else {
+                console.warn(`[RPG Tracker] Could not register ${targetBook} via API. Will attempt direct save.`);
+            }
         }
 
         // Save the entire book once
@@ -781,7 +811,7 @@ export async function getLorebookManifest() {
                 id: `${n}::${uid}`,
                 book: n,
                 uid: uid,
-                label: entry.comment || entry.key?.[0] || 'Unnamed',
+                label: entry.comment || (entry.key?.[0]) || uid,
                 keys: entry.key || [],
                 content: entry.content,
                 is_active: settings.activeRouterKeys?.includes(`${n}::${uid}`)

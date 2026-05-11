@@ -2347,7 +2347,8 @@ Rules:
                 const [bookName, uid] = k.split('::');
                 const entry = books[bookName]?.entries?.[uid];
                 
-                let label = uid;
+                const shortBook = bookName.split('_').pop() || bookName;
+                let label = `${shortBook}/${uid}`;
                 let title = "No entry found.";
                 if (entry) {
                     label = entry.comment || (entry.key?.[0]) || uid;
