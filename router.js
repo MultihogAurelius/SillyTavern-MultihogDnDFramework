@@ -506,7 +506,7 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
             }
             rec.keys = cleanKeys(rec.keys || []);
 
-            const newId = await addLorebookEntry(targetBook, rec, Object.keys(allBooks));
+            const newId = await addLorebookEntry(targetBook, rec, allBookNames);
             if (!newActive.includes(newId)) {
                 newActive.push(newId);
             }
@@ -591,7 +591,7 @@ function parseBasicTags(text, archiveBooks) {
     };
 
     // Generic tag parser: [[TAG: ...]]
-    const tagRegex = /\[\[(\w+):\s*([^\]]+?)\s*\]\]/gi;
+    const tagRegex = /\[\[(\w+):\s*((?:(?!\]\]).)+?)\]\]/gi;
     let match;
 
     while ((match = tagRegex.exec(text)) !== null) {
@@ -649,10 +649,14 @@ async function addLorebookEntry(lorebookName, entryData, allNames) {
         };
     }
 
-    const existingUids = Object.keys(bookData.entries).map(Number).filter(n => !isNaN(n));
+    // Always reload fresh from disk to get accurate existing UIDs
+    // (avoids uid:0 collision when multiple entries are written to a new book in one pass)
+    const freshData = allNames.includes(lorebookName) ? await ctx.loadWorldInfo(lorebookName) : bookData;
+    const existingUids = Object.keys(freshData?.entries || {}).map(Number).filter(n => !isNaN(n));
     const nextUid = existingUids.length > 0 ? Math.max(...existingUids) + 1 : 0;
     
-    bookData.entries[nextUid] = {
+    const writeTarget = freshData || bookData;
+    writeTarget.entries[nextUid] = {
         uid: nextUid,
         key: entryData.keys || [entryData.label || entryData.id],
         keysecondary: [],
@@ -673,7 +677,10 @@ async function addLorebookEntry(lorebookName, entryData, allNames) {
         groupWeight: 100,
     };
     
-    await ctx.saveWorldInfo(lorebookName, bookData);
+    await ctx.saveWorldInfo(lorebookName, writeTarget);
+    
+    // Update allNames cache so subsequent calls know this book now exists
+    if (!allNames.includes(lorebookName)) allNames.push(lorebookName);
     
     // Trigger SillyTavern UI/Internal refresh
     if (ctx.reloadWorldInfoEditor) ctx.reloadWorldInfoEditor(lorebookName);
