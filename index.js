@@ -158,13 +158,11 @@ import { runRouterPass, getLorebookManifest, deleteLorebookEntry } from './route
         s.quests = [];
         s.historyIndex = saved.historyIndex ?? -1;
         
-        if (saved.activeRouterKeys) s.activeRouterKeys = JSON.parse(JSON.stringify(saved.activeRouterKeys));
-        if (saved.routerLog) s.routerLog = JSON.parse(JSON.stringify(saved.routerLog));
-        if (saved.routerCampaignPrefix !== undefined) {
-            s.routerCampaignPrefix = saved.routerCampaignPrefix;
-            const prefixInput = /** @type {HTMLInputElement} */ (document.getElementById('rpg_tracker_router_campaign_prefix'));
-            if (prefixInput) prefixInput.value = s.routerCampaignPrefix;
-        }
+        s.activeRouterKeys = JSON.parse(JSON.stringify(saved.activeRouterKeys || []));
+        s.routerLog        = JSON.parse(JSON.stringify(saved.routerLog || []));
+        s.routerCampaignPrefix = saved.routerCampaignPrefix || '';
+        const prefixInput = /** @type {HTMLInputElement} */ (document.getElementById('rpg_tracker_router_campaign_prefix'));
+        if (prefixInput) prefixInput.value = s.routerCampaignPrefix;
 
         _historyViewIndex = -1;
         
@@ -2961,6 +2959,7 @@ Rules:
         }
         
         document.addEventListener('rt_lore_agent_updated', () => {
+            saveSettings();
             renderRouterUI();
             renderAgentDebug();
         });
