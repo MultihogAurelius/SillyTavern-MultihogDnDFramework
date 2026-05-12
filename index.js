@@ -6,7 +6,7 @@ import { deduplicateMemo, mergeMemo, computeDelta, escapeHtml, escapeRegex, high
 import { renderSubFieldByRule, tryRenderMarker, renderCustomBlockLine, stripMemoHtml, escapeHtmlWithColor, parseMemoBlocks, getPageSize, loadCollapsed, saveCollapsed, loadDetached, saveDetached, blockToItems, renderMemoAsCards, renderQuestLog, renderLorebookTerminal } from './renderer.js';
 import { registerLogQuestTool, checkQuestDeadlines } from './quests.js';
 import { initializeDebugViewer, toggleDebugViewer } from './debug-viewer.js';
-import { runRouterPass, getLorebookManifest, deleteLorebookEntry } from './router.js';
+import { runRouterPass, rollbackRouterPass, getLorebookManifest, deleteLorebookEntry } from './router.js';
 
     // Capture the folder name dynamically from the module URL so it works regardless of what the user names the folder
     const FOLDER_NAME = (function () {
@@ -2146,7 +2146,10 @@ Rules:
 
                     <hr style="border-color: #333; margin: 10px 0;">
 
-                    <div style="margin-bottom: 5px; font-weight: bold; opacity: 0.8; font-size: 11px;">Active Lore Keys:</div>
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px;">
+                        <div style="font-weight: bold; opacity: 0.8; font-size: 11px;">Active Lore Keys:</div>
+                        <button id="rt-agent-router-undo" title="Undo last agent pass" style="background: rgba(255,100,100,0.1); border: 1px solid rgba(255,100,100,0.25); color: #ff8888; font-size: 10px; border-radius: 4px; padding: 2px 8px; cursor: pointer; opacity: 0.8; display: flex; align-items: center; gap: 4px;"><i class="fa-solid fa-rotate-left"></i> <span id="rt-agent-undo-label">Undo</span></button>
+                    </div>
                     <div id="rt-agent-router-active-keys" style="margin-bottom: 10px; display: flex; flex-wrap: wrap; gap: 4px; min-height: 24px;">
                     </div>
                     <hr style="border-color: #333; margin: 10px 0;">
@@ -2993,10 +2996,42 @@ Rules:
             }
         }
         
+        // ── Lorebook Undo Button ─────────────────────────────────────────────
+        const undoBtn = /** @type {HTMLElement} */ (agentPanel.querySelector('#rt-agent-router-undo'));
+        const undoLabel = /** @type {HTMLElement} */ (agentPanel.querySelector('#rt-agent-undo-label'));
+
+        const updateUndoLabel = () => {
+            const s = getSettings();
+            const count = (s.routerHistory || []).length;
+            if (undoLabel) undoLabel.textContent = count > 0 ? `Undo (${count})` : 'Undo';
+            if (undoBtn) undoBtn.style.opacity = count > 0 ? '1' : '0.35';
+        };
+
+        if (undoBtn) {
+            undoBtn.addEventListener('click', async () => {
+                const s = getSettings();
+                if (!(s.routerHistory || []).length) return;
+                undoBtn.style.opacity = '0.5';
+                undoBtn.style.pointerEvents = 'none';
+                undoBtn.querySelector('i')?.classList.add('fa-spin');
+                const ok = await rollbackRouterPass(0);
+                undoBtn.querySelector('i')?.classList.remove('fa-spin');
+                undoBtn.style.pointerEvents = '';
+                if (ok) {
+                    toastr['success']('Lorebook state rolled back.', 'Lorebook Agent');
+                } else {
+                    toastr['error']('Rollback failed. Check console.', 'Lorebook Agent');
+                }
+                updateUndoLabel();
+            });
+        }
+        updateUndoLabel();
+
         document.addEventListener('rt_lore_agent_updated', () => {
             saveSettings();
             renderRouterUI();
             renderAgentDebug();
+            updateUndoLabel();
         });
 
         // ── Lorebook Terminal Logic ──

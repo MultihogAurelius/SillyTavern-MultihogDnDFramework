@@ -1,4 +1,4 @@
-import { getSettings } from './state-manager.js';
+﻿import { getSettings } from './state-manager.js';
 import { sendStateRequest } from './llm-client.js';
 import { getRequestHeaders } from '../../../../script.js';
 
@@ -74,6 +74,22 @@ export async function runRouterPass(narrativeOutput, manualPrompt = null, custom
         }
 
         let archiveBooks = await fetchArchiveBooks();
+
+        // â”€â”€ Snapshot state BEFORE this pass (for rollback) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        {
+            const snapshot = {
+                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                activeRouterKeys: JSON.parse(JSON.stringify(settings.activeRouterKeys || [])),
+                bookSnapshots: {}
+            };
+            for (const [name, book] of Object.entries(archiveBooks)) {
+                snapshot.bookSnapshots[name] = JSON.parse(JSON.stringify(book));
+            }
+            if (!settings.routerHistory) settings.routerHistory = [];
+            settings.routerHistory.unshift(snapshot);
+            if (settings.routerHistory.length > 5) settings.routerHistory.length = 5;
+            ctx.saveSettingsDebounced();
+        }
         let activeEntriesFull = [];
 
         function updateActiveEntries() {
@@ -344,7 +360,7 @@ Thought: I see a new NPC named Barnaby. I will record him.
         }
 
         const totalTime = ((Date.now() - startTime) / 1000).toFixed(1);
-        const finishMsg = basicSummary ? `Finished in ${totalTime}s — ${basicSummary}` : `Finished in ${totalTime}s`;
+        const finishMsg = basicSummary ? `Finished in ${totalTime}s â€” ${basicSummary}` : `Finished in ${totalTime}s`;
         broadcastStep('finish', finishMsg, { time: totalTime, turns });
 
         // Final application for Basic Mode
@@ -550,8 +566,8 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
             // Force SillyTavern to re-index its list of world info books
             if (typeof ctx.updateWorldInfoList === 'function') await ctx.updateWorldInfoList();
             
-            // ── Cache bust: write bookData into ST's in-memory registry so that the
-            // subsequent renderRouterUI → loadWorldInfo call sees fresh entries immediately
+            // â”€â”€ Cache bust: write bookData into ST's in-memory registry so that the
+            // subsequent renderRouterUI â†’ loadWorldInfo call sees fresh entries immediately
             // (the raw HTTP API bypasses the in-memory cache; this syncs them up).
             if (typeof ctx.saveWorldInfo === 'function') {
                 try { await ctx.saveWorldInfo(targetBook, bookData); } catch (_) { /* non-fatal */ }
@@ -608,6 +624,58 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
 
     return { success: true, errors, recordedIds };
 }
+
+/**
+ * Restores a past lorebook snapshot from routerHistory.
+ * @param {number} index - 0 = most recent pre-pass snapshot.
+ * @returns {Promise<boolean>}
+ */
+export async function rollbackRouterPass(index = 0) {
+    const settings = getSettings();
+    const ctx = SillyTavern.getContext();
+    const history = settings.routerHistory || [];
+
+    if (index < 0 || index >= history.length) {
+        console.warn('[RPG Tracker] Rollback: invalid index', index);
+        return false;
+    }
+
+    const snapshot = history[index];
+    if (!snapshot) return false;
+
+    try {
+        // 1. Restore each lorebook to its snapshotted state
+        for (const [bookName, bookData] of Object.entries(snapshot.bookSnapshots || {})) {
+            const saveRes = await fetch('/api/worldinfo/edit', {
+                method: 'POST',
+                headers: getRequestHeaders(),
+                body: JSON.stringify({ name: bookName, data: bookData })
+            });
+            if (!saveRes.ok) {
+                console.error(`[RPG Tracker] Rollback: failed to restore ${bookName}: HTTP ${saveRes.status}`);
+                continue;
+            }
+            // Bust ST in-memory cache
+            if (typeof ctx.saveWorldInfo === 'function') {
+                try { await ctx.saveWorldInfo(bookName, bookData); } catch (_) { /* non-fatal */ }
+            }
+        }
+
+        // 2. Restore active keys
+        settings.activeRouterKeys = JSON.parse(JSON.stringify(snapshot.activeRouterKeys || []));
+
+        // 3. Trim snapshots newer than the restored point
+        settings.routerHistory = history.slice(index + 1);
+
+        ctx.saveSettingsDebounced();
+        document.dispatchEvent(new CustomEvent('rt_lore_agent_updated'));
+        return true;
+    } catch (e) {
+        console.error('[RPG Tracker] Rollback failed:', e);
+        return false;
+    }
+}
+
 
 /**
  * Parses basic narrative tags [[TAG: ...]]
