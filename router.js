@@ -431,7 +431,8 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
         const [bookName, uid] = up.id.split('::');
         const book = await ctx.loadWorldInfo(bookName);
         if (book?.entries?.[uid]) {
-            let delta = (up.content || '').replace(/^\[ID:[^\]]+\]\n?/i, '').trim();
+            // Strip [ID:] stamp from anywhere in the delta (model sometimes echoes it)
+            let delta = (up.content || '').replace(/\[ID:[^\]]+\]\n?/gi, '').trim();
             if (timePrefix && !delta.includes('[Day')) {
                 delta = timePrefix.trim() + ' ' + delta;
             }
@@ -516,7 +517,8 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
             if (existingUid) {
                 // Append delta to existing chronicle (dedup path)
                 const fullId = `${targetBook}::${existingUid}`;
-                let delta = (rec.content || '').replace(/^\[ID:[^\]]+\]\n?/i, '').trim();
+                // Strip [ID:] stamp from anywhere in the delta (model sometimes echoes it)
+                let delta = (rec.content || '').replace(/\[ID:[^\]]+\]\n?/gi, '').trim();
                 const existing = (bookData.entries[existingUid].content || '').replace(/^\[ID:[^\]]+\]\n?/i, '').trimEnd();
                 bookData.entries[existingUid].content = `[ID: ${fullId}]\n${existing}\n${delta}`;
                 const keys = bookData.entries[existingUid].key || [];
@@ -924,15 +926,30 @@ export async function getLorebookManifest() {
     const ctx = SillyTavern.getContext();
     const prefix = settings.routerCampaignPrefix || '';
     
+    // Always flush ST's registry from disk first so books written via HTTP API are visible
+    if (typeof ctx.updateWorldInfoList === 'function') {
+        try { await ctx.updateWorldInfoList(); } catch (_) {}
+    }
+
     const names = await getWorldInfoNamesSafe();
     const scoped = prefix ? names.filter(n => n.startsWith(prefix)) : names;
     
-    // Also include any books referenced in activeRouterKeys that aren't in the registry
-    // (books created by us via saveWorldInfo but not formally registered with ST)
+    // Fallback 1: books referenced in activeRouterKeys (not yet in registry)
     const activeBookNames = (settings.activeRouterKeys || [])
         .map(k => k.split('::')[0])
         .filter(Boolean);
     for (const n of activeBookNames) {
+        if (!scoped.includes(n) && (!prefix || n.startsWith(prefix))) {
+            scoped.push(n);
+        }
+    }
+    
+    // Fallback 2: books referenced in routerLog records (catches deactivated entries
+    // whose books are no longer in activeRouterKeys nor in ST's registry yet)
+    const logBookNames = (settings.routerLog || [])
+        .flatMap(e => [...(e.record || []), ...(e.activate || [])].map(id => id.split('::')[0]))
+        .filter(Boolean);
+    for (const n of logBookNames) {
         if (!scoped.includes(n) && (!prefix || n.startsWith(prefix))) {
             scoped.push(n);
         }
