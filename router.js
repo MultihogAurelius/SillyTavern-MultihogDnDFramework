@@ -233,6 +233,20 @@ export async function runRouterPass(narrativeOutput, manualPrompt = null, custom
 Use these tags in your response:
 ${formatLines.join('\n')}
 
+## HIERARCHY CONVENTION (CRITICAL FOR LOCATIONS)
+For LOC entries, the Name field MUST be the FULL hierarchical path using " :: " (space, colon, colon, space) as the separator.
+The current scene's location stack is shown above as "CURRENT LOCATION". Prepend it to any sub-location you record.
+
+Examples:
+  CURRENT LOCATION: Khelt :: Rust-Lantern District
+  --> [[LOC: Khelt :: Rust-Lantern District :: Marrow-Deep Mines Office | A squat iron building managing mining contracts. | mines, contracts, Khelt, Rust-Lantern]]
+  --> [[LOC: Khelt :: Rust-Lantern District :: The Guilded Anvil Tavern | A noisy tavern with a job bulletin board. | tavern, jobs, Khelt, Rust-Lantern]]
+
+Also include each ancestor name (Khelt, Rust-Lantern District) as a plain keyword in the Keywords field.
+
+NPC / FAC / QUEST / EVENT labels: Name only — NO " :: " hierarchy, NO tag prefix.
+Example: [[FAC: Iron Syndicate | ...]]  NOT  [[FAC: Khelt :: Iron Syndicate | ...]]  and  NOT  [[FAC: FAC: Iron Syndicate | ...]]
+
 ## ATTENTION & MEMORY
 1. **ACTIVE MEMORY**: You can see the full details of these entities. You can update them at any time.
 2. **ARCHIVE INDEX**: You only see names and keywords. You CANNOT see their full biography.
@@ -247,8 +261,9 @@ ${formatLines.join('\n')}
 5. Output your thoughts first, then the tags.
 
 Example:
-Thought: I see a new NPC named Barnaby. I will record him.
-[[NPC: Barnaby | A retired blacksmith with a scar on his cheek. | Barnaby, blacksmith, ally]]`;
+Thought: I see a new NPC named Barnaby in Khelt's Rust-Lantern District. I will record him and the tavern.
+[[NPC: Barnaby | A retired blacksmith with a scar on his cheek. | Barnaby, blacksmith, ally]]
+[[LOC: Khelt :: Rust-Lantern District :: Barnaby's Forge | Barnaby's old workshop, still smelling of soot. | forge, Khelt, Rust-Lantern]]`;
 
             const questMatchB = settings.currentMemo?.match(/\[QUESTS\]([\s\S]*?)\[\/QUESTS\]/i);
             const questBlockB = questMatchB ? `[QUESTS]${questMatchB[1].trim()}[/QUESTS]` : 'None';
