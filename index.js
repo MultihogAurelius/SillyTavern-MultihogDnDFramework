@@ -2578,7 +2578,7 @@ Rules:
                                 <div style="font-size: 10px; font-weight: bold; opacity: 0.7;">${config.tag}</div>
                                 <button class="rt-agent-module-reset" data-id="${id}" style="background: transparent; border: none; color: var(--rt-accent); cursor: pointer; font-size: 10px; padding: 0 4px; opacity: 0.6; height: 14px;" title="Reset to Default"><i class="fa-solid fa-arrow-rotate-left"></i></button>
                             </div>
-                            <input type="text" value="${config.instruction}" class="rt-agent-module-inst" data-id="${id}" style="width: 100%; background: rgba(0,0,0,0.3); color: var(--rt-text); border: 1px solid rgba(255,255,255,0.1); border-radius: 3px; font-size: 10px; padding: 2px 4px; box-sizing: border-box;">
+                            <input type="text" value="${escapeHtml(config.instruction)}" class="rt-agent-module-inst" data-id="${id}" style="width: 100%; background: rgba(0,0,0,0.3); color: var(--rt-text); border: 1px solid rgba(255,255,255,0.1); border-radius: 3px; font-size: 10px; padding: 2px 4px; box-sizing: border-box;">
                         </div>
                     `;
                     list.appendChild(row);
@@ -5563,28 +5563,27 @@ Rules:
             });
             $('#rpg_tracker_router_btn_reset_prompt').on('click', function () {
                 if (!confirm('Reset Router Agent prompt to default?')) return;
-                
-                const researcherPrompt = `You are the Researcher Agent, a specialized Dungeon Master's Assistant. Your goal is to maintain the narrative's "Active Context" by managing lorebook entries.
 
-You have the authority to browse the campaign's archive, search for relevant history, and update {{campaignRoot}} to reflect new developments.
-
-When you identify a gap in the active context, use your tools to find the missing information. When new NPCs or locations are introduced, record them immediately.
-
-Your primary focus is narrative consistency and preventing the AI Narrator from forgetting established facts.`;
+                // Delete the stored key so getSettings() falls back to the canonical default in state-manager.js
+                const { extensionSettings } = SillyTavern.getContext();
+                if (extensionSettings[MODULE_NAME]) {
+                    delete extensionSettings[MODULE_NAME].routerSystemPromptTemplate;
+                }
+                const freshDefault = getSettings().routerSystemPromptTemplate;
 
                 const s = getSettings();
-                s.routerSystemPromptTemplate = researcherPrompt;
-                
+                s.routerSystemPromptTemplate = freshDefault;
+
                 const $el = $('#rpg_tracker_router_prompt');
-                $el.val(researcherPrompt);
-                $el.trigger('input'); 
-                
+                $el.val(freshDefault);
+                $el.trigger('input');
+
                 if (typeof (/** @type {any} */ ($el)).trigger === 'function') {
                     (/** @type {any} */ ($el)).trigger('autosize.resize');
                 }
-                
+
                 saveSettings();
-                toastr['success']('Router prompt reset to Researcher Agent (with {{campaignRoot}} macro).', 'RPG Tracker');
+                toastr['success']('Router prompt reset to default.', 'RPG Tracker');
             });
 
             $('#rpg_tracker_btn_apply_sysprompt').on('click', async function () {
