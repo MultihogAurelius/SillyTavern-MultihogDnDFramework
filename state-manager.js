@@ -202,9 +202,9 @@ IMPORTANT: Never include the [ID:] line in the content field you write. It is ma
 </updating_entities>
 
 <timestamps>
-You have access to the current world date/time in the ## CURRENT TIME block.
-When recording an EVENT or any time-sensitive entry, include the timestamp at the beginning of the content. 
-Example: "[Day 1, 14:30] Character signed the contract with Brodrik."
+The current world date/time is visible in the ## NARRATIVE section — look for the status footer in recent messages (e.g. "11:52 AM, Day 1").
+When recording an EVENT or any time-sensitive entry, include the timestamp at the beginning of the content.
+Example: "[Day 1, 11:52] Character signed the contract with Brodrik."
 </timestamps>`,
         categoryRenderOptions: {},
     };
