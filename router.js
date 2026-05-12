@@ -1,4 +1,4 @@
-﻿import { getSettings } from './state-manager.js';
+import { getSettings } from './state-manager.js';
 import { sendStateRequest, sendAgentTurn } from './llm-client.js';
 import { getRequestHeaders } from '../../../../script.js';
 

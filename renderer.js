@@ -1,4 +1,4 @@
-﻿import { getSettings, getBarBackground } from './state-manager.js';
+import { getSettings, getBarBackground } from './state-manager.js';
 import { escapeHtml, highlightParens, parseInWorldTime, formatTimeDiff } from './memo-processor.js';
 import { BLOCK_ICONS, BLOCK_ORDER, PAGE_SIZE, NO_PAGINATE } from './constants.js';
 

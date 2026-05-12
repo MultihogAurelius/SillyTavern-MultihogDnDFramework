@@ -2118,6 +2118,7 @@ Rules:
                     <div class="rpg-tracker-header-center" id="rt-agent-pause-banner" style="color:#ffa500; font-size:0.7em; font-weight:bold; letter-spacing:0.04em;">${settings.routerPaused ? 'AGENT PAUSED' : ''}</div>
                     <div class="rpg-tracker-header-right">
                         <button class="rpg-tracker-icon-btn" id="rt-agent-router-manual-run" title="Run Research Now" style="color: var(--rt-accent);"><i class="fa-solid fa-play"></i></button>
+                        <button class="rpg-tracker-icon-btn" id="rt-agent-router-enable-btn" title="${settings.routerEnabled ? 'Disable Lorebook Agent' : 'Enable Lorebook Agent'}" style="${settings.routerEnabled ? '' : 'opacity:0.35;'}">⏻</button>
                         <button class="rpg-tracker-icon-btn" id="rt-agent-router-pause-btn" title="${settings.routerPaused ? 'Resume Agent (auto-runs paused)' : 'Pause Agent (skip auto-runs)'}" style="${settings.routerPaused ? 'color:#ffa500;' : ''}">${settings.routerPaused ? '▶' : '⏸'}</button>
                         <button class="rpg-tracker-icon-btn" id="rt-agent-router-detach" title="Detach Lorebook Agent">⧉</button>
                         <button class="rpg-tracker-icon-btn" id="rpg-tracker-agent-close" title="Close">✕</button>
@@ -2132,11 +2133,6 @@ Rules:
                     <div style="background: rgba(255, 165, 0, 0.1); border: 1px solid rgba(255, 165, 0, 0.3); color: #ffa500; padding: 6px; border-radius: 4px; font-size: 0.769em; text-align: center; font-weight: bold; margin-bottom: 15px;">
                         ⚠️ UNDER CONSTRUCTION, NEEDS TESTING
                     </div>
-
-                    <label style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; cursor: pointer; opacity: 0.8; font-size: 0.846em;" title="Enable the Lorebook Agent to automatically research and record world lore.">
-                        Enable Lorebook Agent
-                        <input type="checkbox" id="rt-agent-router-enable" ${settings.routerEnabled ? 'checked' : ''}>
-                    </label>
 
                     <label style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; cursor: pointer; opacity: 0.8; font-size: 0.846em;" title="Use simple text tags [[NPC: Name | Desc]] instead of complex tools. Better for small models.">
                         Basic Mode (tag-based, no tool calls)
@@ -2624,16 +2620,24 @@ Rules:
                 // Keep settings sidebar toggle in sync
                 const sidebarCheck = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_tracker_router_enabled'));
                 if (sidebarCheck) sidebarCheck.checked = !!s.routerEnabled;
+                // Keep header ⏻ button in sync
+                const agentEnableBtn = /** @type {HTMLElement|null} */ (agentPanel.querySelector('#rt-agent-router-enable-btn'));
+                if (agentEnableBtn) {
+                    agentEnableBtn.style.opacity = s.routerEnabled ? '' : '0.35';
+                    agentEnableBtn.title = s.routerEnabled ? 'Disable Lorebook Agent' : 'Enable Lorebook Agent';
+                }
             }
 
             // Apply on open
             updateAgentPanelDisabled();
 
-            const enableCheck = agentPanel.querySelector('#rt-agent-router-enable');
-            if (enableCheck) {
-                enableCheck.addEventListener('change', (e) => {
+            // ── Agent enable button (header ⏻) ──
+            const agentEnableBtn = agentPanel.querySelector('#rt-agent-router-enable-btn');
+            if (agentEnableBtn) {
+                agentEnableBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
                     const s = getSettings();
-                    s.routerEnabled = (/** @type {HTMLInputElement} */ (e.target)).checked;
+                    s.routerEnabled = !s.routerEnabled;
                     saveSettings();
                     updateAgentPanelDisabled();
                 });
