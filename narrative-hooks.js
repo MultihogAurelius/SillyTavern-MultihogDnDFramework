@@ -241,7 +241,10 @@ function stripMemoHtml(text) {
 export function installInterceptor() {
     globalThis.rpgTrackerInterceptor = async function (chat, contextSize, abort, type) {
         const settings = getSettings();
-        if (!settings.enabled || settings.paused) return;
+        // `paused` only suppresses automatic state tracker / lorebook runs (see onGenerationEnded).
+        // Do not skip this hook when paused: RNG queue, memo, and quest context must still inject
+        // into the outgoing user message or combat RNG breaks while updates are paused.
+        if (!settings.enabled) return;
 
         let idx = -1;
         for (let i = chat.length - 1; i >= 0; i--) {

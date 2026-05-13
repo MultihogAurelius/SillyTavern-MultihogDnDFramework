@@ -324,23 +324,53 @@ export async function sendStateRequest(settings, systemPrompt, userPrompt, signa
             ];
 
             const maxTokens = settings.maxTokens && settings.maxTokens > 0 ? settings.maxTokens : undefined;
+            const requestedPreset = String(settings.completionPresetId || '').trim();
+            const profile = (typeof service.getProfile === 'function')
+                ? service.getProfile(settings.connectionProfileId)
+                : null;
+            const profilePreset = String(profile?.preset || '').trim();
+            const shouldOverrideProfilePreset = !!requestedPreset && !!profile;
 
             // Use the canonical ST service path. This correctly handles secret_id
             // lookup, prompt formatting for text-completion backends (instruct
             // template), and preset loading for all API types.
-            const raw = await service.sendRequest(
-                settings.connectionProfileId,
-                messages,
-                maxTokens,
-                {
-                    stream: false,
-                    extractData: true,
-                    includePreset: true,
-                    includeInstruct: true,
-                    presetName: settings.completionPresetId || undefined,
-                    signal,
-                },
-            );
+            let raw;
+            let profileOriginalPreset = null;
+            try {
+                if (shouldOverrideProfilePreset) {
+                    profileOriginalPreset = profilePreset;
+                    profile.preset = requestedPreset;
+                    raw = await service.sendRequest(
+                        settings.connectionProfileId,
+                        messages,
+                        maxTokens,
+                        {
+                            stream: false,
+                            extractData: true,
+                            includePreset: true,
+                            includeInstruct: true,
+                            signal,
+                        },
+                    );
+                } else {
+                    raw = await service.sendRequest(
+                        settings.connectionProfileId,
+                        messages,
+                        maxTokens,
+                        {
+                            stream: false,
+                            extractData: true,
+                            includePreset: true,
+                            includeInstruct: true,
+                            signal,
+                        },
+                    );
+                }
+            } finally {
+                if (shouldOverrideProfilePreset && profile && profileOriginalPreset !== null && profile.preset !== profileOriginalPreset) {
+                    profile.preset = profileOriginalPreset;
+                }
+            }
 
             if (typeof raw === 'string') return raw;
             const r = /** @type {any} */ (raw);
@@ -567,17 +597,40 @@ export async function sendAgentTurn(settings, messages, tools = null, signal = n
         const service = context.ConnectionManagerRequestService;
         if (service && typeof service.sendRequest === 'function') {
             const maxTokens = settings.maxTokens > 0 ? settings.maxTokens : undefined;
+            const requestedPreset = String(settings.completionPresetId || '').trim();
+            const profile = (typeof service.getProfile === 'function')
+                ? service.getProfile(settings.connectionProfileId)
+                : null;
+            const profilePreset = String(profile?.preset || '').trim();
+            const shouldOverrideProfilePreset = !!requestedPreset && !!profile;
             // Do NOT pass tools to the profile service — ConnectionManagerRequestService
             // does not reliably forward them to all API backends, causing MALFORMED_FUNCTION_CALL
             // errors. The router uses a text-format fallback for profile connections.
-            const raw = await service.sendRequest(
-                settings.connectionProfileId,
-                messages,
-                maxTokens,
-                { stream: false, extractData: true, includePreset: true, includeInstruct: true,
-                  presetName: settings.completionPresetId || undefined,
-                  signal }
-            );
+            let raw;
+            let profileOriginalPreset = null;
+            try {
+                if (shouldOverrideProfilePreset) {
+                    profileOriginalPreset = profilePreset;
+                    profile.preset = requestedPreset;
+                    raw = await service.sendRequest(
+                        settings.connectionProfileId,
+                        messages,
+                        maxTokens,
+                        { stream: false, extractData: true, includePreset: true, includeInstruct: true, signal }
+                    );
+                } else {
+                    raw = await service.sendRequest(
+                        settings.connectionProfileId,
+                        messages,
+                        maxTokens,
+                        { stream: false, extractData: true, includePreset: true, includeInstruct: true, signal }
+                    );
+                }
+            } finally {
+                if (shouldOverrideProfilePreset && profile && profileOriginalPreset !== null && profile.preset !== profileOriginalPreset) {
+                    profile.preset = profileOriginalPreset;
+                }
+            }
             if (typeof raw === 'string') return { content: raw, toolCall: null };
             const r = /** @type {any} */ (raw);
             // Check for native tool_calls first
