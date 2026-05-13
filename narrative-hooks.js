@@ -14,7 +14,7 @@
 
 import { getSettings } from './state-manager.js';
 import { parseQuestsFromMemo } from './memo-processor.js';
-import { runRouterPass, saveSceneToLorebook } from './router.js';
+import { runRouterPass, saveSceneToLorebook, scanAssistantOutputForKeywords } from './router.js';
 import { logTransaction } from './debug-viewer.js';
 
 // ── Dice naming helpers ────────────────────────────────────────────────────────
@@ -369,17 +369,31 @@ export async function onGenerationEnded() {
     const combinedNarrative = getNarrativeBlocks(chat, -1, !!settings.routerIncludeHidden);
     if (!combinedNarrative) return;
 
-    if (settings.debugMode) console.log("[RPG Tracker] Assistant generation ended. Triggering State Model pass...", combinedNarrative);
+    if (settings.debugMode) console.log("[RPG Tracker] Assistant generation ended. Running keyword scanner...");
 
+    // Step 1: Scan assistant output for entry keywords and activate matches immediately.
+    // Must run before the state model pass so the agent sees the full active set.
+    let newlyTriggered = [];
+    if (settings.routerEnabled) {
+        newlyTriggered = await scanAssistantOutputForKeywords(combinedNarrative);
+        if (settings.debugMode && newlyTriggered.length > 0) {
+            console.log("[RPG Tracker] Keyword scanner activated entries:", newlyTriggered);
+        }
+    }
+
+    if (settings.debugMode) console.log("[RPG Tracker] Triggering State Model pass...", combinedNarrative);
+
+    // Step 2: State Tracker pass.
     if (typeof globalThis._rpgRunStateModelPass === 'function') {
         await globalThis._rpgRunStateModelPass(combinedNarrative);
     }
 
-    // Run-every throttle: only fire the agent every N auto-generations
+    // Step 3: Run-every throttle — only fire the Lorebook Agent every N auto-generations.
     _routerAutoTick++;
     const runEvery = settings.routerRunEvery || 1;
     if (_routerAutoTick < runEvery) return;
     _routerAutoTick = 0;
 
-    await runRouterPass(combinedNarrative);
+    // Step 4: Lorebook Agent pass — receives the newly triggered list so it can flag them.
+    await runRouterPass(combinedNarrative, null, null, false, newlyTriggered);
 }

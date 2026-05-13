@@ -2,6 +2,15 @@
 
 All notable changes to the **Fatbody D&D Framework** will be documented in this file.
 
+## [2.2.0] - 2026-05-14
+
+### Changed
+- **Lorebook Agent pipeline**: Managed campaign lorebook entries are stored inactive (`disable: true`) and patched on init/chat switch so SillyTavern’s native keyword activation does not run one turn behind narrator output.
+- **Assistant-output keyword scan** (`onGenerationEnded`): Before the State Tracker and Lorebook Agent, the last assistant-side narrative is scanned; inactive entries whose `key[]` match (case-insensitive) are appended to `activeRouterKeys` immediately so the same agent pass sees full bodies.
+- **Agent context**: Budget block plus optional overflow instruction; **NEWLY ACTIVATED THIS TURN** for scanner hits; archive index excludes already-active entries; FIFO auto-trim of active keys removed — overflow must be resolved via **deactivate** in **commit**.
+- **Prompts**: Built-in agent/basic memory-limit copy and bundled default Lorebook Agent system prompt updated for the new budget and activation model; **Reset Agent Prompt** now restores that canonical default.
+- **Defaults / UX**: Lorebook context lookback default **4**; UI labels clarify lookback is **last N chat messages (user/assistant)**; optional visual hint for keyword-triggered active keys for one turn.
+
 ## [2.1.6] - 2026-05-13
 > ⚠️ **Pre-fucking change that will likely need 2 years of debugging.**
 > The lorebook prefix system has been gutted and rebuilt from scratch.

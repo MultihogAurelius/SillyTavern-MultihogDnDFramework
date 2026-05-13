@@ -146,7 +146,7 @@ You may be asked to use Markers: ((PLS)), ((B)), ((XB)), ((BDG)), ((HGT)). These
             questsFrustration: false,
             questsDifficulty: false
         },
-        routerEnabled: false,
+        routerEnabled: true,
         routerLog: [],
         activeRouterKeys: [],
         routerConnectionSource: "default",
@@ -161,14 +161,13 @@ You may be asked to use Markers: ((PLS)), ((B)), ((XB)), ((BDG)), ((HGT)). These
         routerMaxTurns: 5,
         routerMaxActivations: 5,
         routerCampaignPrefix: "",
-        routerLookback: 3,
+        routerLookback: 4,
         routerDirectLookback: 10,
         routerDirectPrompt: "",
         routerBasicMode: false,
         routerPaused: false,
         routerRunEvery: 1,
         routerIncludeHidden: false,
-        routerAutoActivateBooks: true,
         routerPromptForPrefix: false,
         routerModules: JSON.parse(JSON.stringify(DEFAULT_MODULES)),
         routerCustomTags: [], 
@@ -184,8 +183,8 @@ Your primary focus is narrative consistency and preventing the AI Narrator from 
 
 Make multiple entries per turn if necessary and relevant.
 <memory_limits>
-You have a limited budget for "Active Context" (entities in Full Vision). If you exceed this limit, the system will automatically archive the oldest entries.
-To maintain control, proactively use [[DEACTIVATE]] on entities that are no longer immediate relevant to the current scene.
+You have a limited budget for "Active Context" (entities in Full Vision). Nothing is archived automatically. If you exceed the limit, you will see a **BUDGET VIOLATION** notice in your context (Active entries: N / MAX) — you must deactivate entries until within budget. In tool-calling mode, list those Book::UID IDs in deactivate inside the same commit call; in tag mode, use [[DEACTIVATE: Name]] on the least relevant entries. Keywords in the narrator's latest output may pre-activate matching archive entries — they appear under **NEWLY ACTIVATED THIS TURN** with full content.
+To maintain control, proactively deactivate entries that are no longer immediately relevant to the current scene.
 </memory_limits>
 </basic_instructions>
 
@@ -357,7 +356,7 @@ export function saveChatState(chatId) {
         activeRouterKeys: JSON.parse(JSON.stringify(s.activeRouterKeys || [])),
         routerLog:    JSON.parse(JSON.stringify(s.routerLog || [])),
         routerCampaignPrefix: s.routerCampaignPrefix || '',
-        routerLookback: s.routerLookback || 3,
+        routerLookback: s.routerLookback || 4,
         routerDirectPrompt: s.routerDirectPrompt || '',
         // Preserve lorebook stack link — written by Link button and router, not by normal state saves
         campaignBooks: existing.campaignBooks || [],
@@ -388,7 +387,7 @@ export function saveProfile(name) {
         activeRouterKeys: JSON.parse(JSON.stringify(s.activeRouterKeys || [])),
         routerLog:    JSON.parse(JSON.stringify(s.routerLog || [])),
         routerCampaignPrefix: s.routerCampaignPrefix || '',
-        routerLookback: s.routerLookback || 3,
+        routerLookback: s.routerLookback || 4,
         routerDirectPrompt: s.routerDirectPrompt || '',
     };
     s.activeProfile = name;

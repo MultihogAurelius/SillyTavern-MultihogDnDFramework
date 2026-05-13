@@ -6,7 +6,7 @@ import { deduplicateMemo, mergeMemo, computeDelta, escapeHtml, escapeRegex, high
 import { renderSubFieldByRule, tryRenderMarker, renderCustomBlockLine, stripMemoHtml, escapeHtmlWithColor, parseMemoBlocks, getPageSize, loadCollapsed, saveCollapsed, loadDetached, saveDetached, blockToItems, renderMemoAsCards, renderQuestLog, renderLorebookTerminal } from './renderer.js';
 import { registerLogQuestTool, checkQuestDeadlines } from './quests.js';
 import { initializeDebugViewer, toggleDebugViewer } from './debug-viewer.js';
-import { runRouterPass, rollbackRouterPass, reapplyRouterPass, getLorebookManifest, deleteLorebookEntry } from './router.js';
+import { runRouterPass, rollbackRouterPass, reapplyRouterPass, getLorebookManifest, deleteLorebookEntry, disableManagedEntries } from './router.js';
 
     // Capture the folder name dynamically from the module URL so it works regardless of what the user names the folder
     const FOLDER_NAME = (function () {
@@ -260,7 +260,13 @@ import { runRouterPass, rollbackRouterPass, reapplyRouterPass, getLorebookManife
         if (typeof renderRouterUI === 'function') {
             renderRouterUI();
         }
-        
+
+        // Patch any managed entries that don't yet have disable:true so ST's
+        // native keyword scanner cannot inject them on user-message send.
+        if (s.routerEnabled) {
+            disableManagedEntries().catch(e => console.warn('[RPG Tracker] disableManagedEntries on chat change failed:', e));
+        }
+
         return true;
     }
 
@@ -2174,9 +2180,9 @@ Rules:
                     </label>
 
                     <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
-                        <div style="display: flex; align-items: center; gap: 6px; flex: 1;" title="Main Lookback: How many recent messages the agent analyzes during automatic passes.">
-                            <span style="font-size: 0.769em; opacity: 0.7;">Lookback:</span>
-                            <input type="number" id="rt-agent-router-lookback" value="${settings.routerLookback || 3}" min="1" max="100" style="width: 40px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); color: white; border-radius: 3px; text-align: center; font-size: 0.769em; padding: 1px;">
+                        <div style="display: flex; align-items: center; gap: 6px; flex: 1;" title="Main lookback: last N chat messages (user and assistant, in order) included in the agent context during automatic passes.">
+                            <span style="font-size: 0.769em; opacity: 0.7;">Lookback (user/assistant):</span>
+                            <input type="number" id="rt-agent-router-lookback" value="${settings.routerLookback || 4}" min="1" max="100" style="width: 40px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); color: white; border-radius: 3px; text-align: center; font-size: 0.769em; padding: 1px;">
                             <span style="font-size: 0.769em; opacity: 0.5;">msgs</span>
                         </div>
                         <div style="display: flex; align-items: center; gap: 6px; flex: 1;" title="Run every N messages: The agent only fires an auto-pass once per N AI responses. Higher = fewer runs, fewer tokens. Manual runs always fire immediately.">
@@ -2209,8 +2215,8 @@ Rules:
                     <textarea id="rt-agent-router-direct-prompt" placeholder="Ask the agent to find or record something specific..." style="width: 100% !important; min-height: 60px !important; height: 60px !important; background: var(--rt-card-bg) !important; color: var(--rt-text) !important; border: var(--rt-border) !important; border-radius: 4px !important; padding: 6px !important; font-size: 0.846em !important; margin-bottom: 6px !important; resize: vertical !important; display: block !important; box-sizing: border-box !important; line-height: 1.3 !important;">${settings.routerDirectPrompt || ''}</textarea>
 
                     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; background: var(--rt-header-bg); padding: 4px 8px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.05); box-sizing: border-box; min-height: 32px;">
-                        <div style="display: flex; align-items: center; gap: 6px;" title="Direct Lookback: How many recent messages to analyze for this specific command.">
-                            <span style="font-size: 0.769em; opacity: 0.7; color: var(--rt-text-muted);">Lookback:</span>
+                        <div style="display: flex; align-items: center; gap: 6px;" title="Direct lookback: last N chat messages (user and assistant) for this manual run.">
+                            <span style="font-size: 0.769em; opacity: 0.7; color: var(--rt-text-muted);">Lookback (user/assistant):</span>
                             <input type="number" id="rt-agent-router-direct-lookback" value="${settings.routerDirectLookback || 10}" min="1" max="100" style="width: 38px; background: var(--rt-card-bg); border: 1px solid var(--rt-accent-dim); color: var(--rt-accent); border-radius: 3px; text-align: center; font-size: 0.769em; padding: 1px; box-sizing: border-box; height: 20px;">
                             <span style="font-size: 0.769em; opacity: 0.5; color: var(--rt-text-muted);">msgs</span>
                         </div>
@@ -2310,11 +2316,6 @@ Rules:
                         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
                             <div style="font-weight: bold; opacity: 0.8; font-size: 0.846em;">CAMPAIGN RECORDS</div>
                             <div style="display: flex; align-items: center; gap: 6px;">
-                                <label style="display:flex; align-items:center; gap:3px; font-size:9px; opacity:0.55; cursor:pointer; margin:0; user-select:none;" title="Automatically re-activate campaign lorebooks in SillyTavern when switching chats">
-                                    <input type="checkbox" id="rt-agent-auto-activate" style="margin:0; cursor:pointer; width:10px; height:10px;">
-                                    <span>Auto-link</span>
-                                </label>
-                                <button class="rpg-tracker-icon-btn" id="rt-agent-manifest-activate" title="Activate all campaign lorebooks in SillyTavern now" style="font-size: 0.769em; opacity: 0.6; color: var(--rt-accent);"><i class="fa-solid fa-bolt"></i></button>
                                 <button class="rpg-tracker-icon-btn" id="rt-agent-manifest-refresh" title="Refresh Manifest" style="font-size: 0.769em; opacity: 0.5;"><i class="fa-solid fa-arrows-rotate"></i></button>
                             </div>
                         </div>
@@ -2531,6 +2532,8 @@ Rules:
                 books[bookName] = await ctx.loadWorldInfo(bookName);
             }
 
+            const keywordTriggeredSet = new Set(s.lastKeywordTriggeredKeys || []);
+
             keysContainer.innerHTML = activeKeys.map(k => {
                 const [bookName, uid] = k.split('::');
                 const entry = books[bookName]?.entries?.[uid];
@@ -2543,7 +2546,13 @@ Rules:
                     title = `[${bookName}] ${entry.key?.join(', ')}\n\n${(entry.content || '').substring(0, 500)}${entry.content?.length > 500 ? '...' : ''}`;
                 }
 
-                return `<span class="rt-router-pill" style="background: rgba(42, 42, 53, 0.8); padding: 2px 8px; border-radius: 12px; font-size: 0.769em; border: 1px solid rgba(255,255,255,0.1); display: inline-flex; align-items: center; gap: 6px; cursor: help; max-width: 120px;" title="${escapeHtml(title)}">
+                const isKeywordTriggered = keywordTriggeredSet.has(k);
+                const pillBg    = isKeywordTriggered ? 'rgba(58, 46, 14, 0.9)'          : 'rgba(42, 42, 53, 0.8)';
+                const pillBorder = isKeywordTriggered ? '1px solid rgba(210, 160, 40, 0.6)' : '1px solid rgba(255,255,255,0.1)';
+                const tooltipPrefix = isKeywordTriggered ? '⌂ Keyword-triggered this turn\n\n' : '';
+
+                return `<span class="rt-router-pill" style="background: ${pillBg}; padding: 2px 8px; border-radius: 12px; font-size: 0.769em; border: ${pillBorder}; display: inline-flex; align-items: center; gap: 6px; cursor: help; max-width: 120px;" title="${escapeHtml(tooltipPrefix + title)}">
+                    ${isKeywordTriggered ? '<span style="color: #d4a028; font-size: 0.9em; flex-shrink: 0;" title="Keyword-triggered this turn">⌂</span>' : ''}
                     <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;">${escapeHtml(label)}</span>
                     <span class="rt-router-kill-key" data-key="${k}" style="cursor:pointer; color: #ff5555; font-weight: bold; padding: 0 2px;" title="Deactivate">✕</span>
                 </span>`;
@@ -2572,6 +2581,9 @@ Rules:
                     const st = getSettings();
                     if (st.activeRouterKeys) {
                         st.activeRouterKeys = st.activeRouterKeys.filter(k => k !== key);
+                        if (st.lastKeywordTriggeredKeys) {
+                            st.lastKeywordTriggeredKeys = st.lastKeywordTriggeredKeys.filter(k => k !== key);
+                        }
                         saveSettings();
                         renderRouterUI();
                     }
@@ -2629,7 +2641,7 @@ Rules:
                             <p style="margin-top:4px;"><b>Max Active</b> caps how many entries can be active simultaneously (FIFO pruning keeps token cost predictable).</p>
 
                             <h4 style="margin-bottom: 5px;">📂 Campaign Records</h4>
-                            <p>All lorebooks created by the Agent for the current campaign are shown grouped by book. Click any folder to expand it; click any entry to read its full content. The <b>⚡ button</b> re-activates all campaign lorebooks in SillyTavern instantly. Enable <b>Auto-link</b> to do this automatically whenever you switch chats.</p>
+                            <p>All lorebooks created by the Agent for the current campaign are shown grouped by book. Click any folder to expand it; click any entry to read its full content. Books are automatically activated and deactivated based on the current chat — no manual action needed.</p>
 
                             <h4 style="margin-bottom: 5px;">↩ History Navigation</h4>
                             <p>The <b>← [ LIVE ] →</b> bar at the bottom lets you step back through lorebook snapshots and redo steps you've undone — just like the State Tracker's memo history. Each agent pass is snapshotted before it runs (up to 5 saved). A new pass clears the redo stack.</p>
@@ -2820,30 +2832,6 @@ Rules:
             const refreshBtn = agentPanel.querySelector('#rt-agent-manifest-refresh');
             if (refreshBtn) refreshBtn.addEventListener('click', () => refreshManifest('manual-button'));
 
-            // ⚡ Manual "Activate All Books" button
-            const activateBtn = agentPanel.querySelector('#rt-agent-manifest-activate');
-            if (activateBtn) {
-                activateBtn.addEventListener('click', async () => {
-                    activateBtn.querySelector('i')?.classList.add('fa-spin');
-                    const count = await activateCampaignBooks();
-                    activateBtn.querySelector('i')?.classList.remove('fa-spin');
-                    count > 0
-                        ? toastr['success'](`Activated ${count} lorebook${count > 1 ? 's' : ''}.`, 'Campaign Records')
-                        : toastr['info']('No campaign lorebooks found to activate.', 'Campaign Records');
-                });
-            }
-
-            // Auto-link toggle (in-panel)
-            const autoActivateCheck = /** @type {HTMLInputElement|null} */ (agentPanel.querySelector('#rt-agent-auto-activate'));
-            if (autoActivateCheck) {
-                autoActivateCheck.checked = !!getSettings().routerAutoActivateBooks;
-                autoActivateCheck.addEventListener('change', () => {
-                    const s = getSettings();
-                    s.routerAutoActivateBooks = autoActivateCheck.checked;
-                    saveSettings();
-                });
-            }
-
             // Initial load so the list is populated without needing a manual click
             refreshManifest();
 
@@ -2959,7 +2947,7 @@ Rules:
             if (lookbackInput) {
                 lookbackInput.addEventListener('change', (e) => {
                     const s = getSettings();
-                    s.routerLookback = parseInt((/** @type {HTMLInputElement} */ (e.target)).value);
+                    s.routerLookback = parseInt((/** @type {HTMLInputElement} */ (e.target)).value) || 4;
                     saveSettings();
                 });
             }
@@ -3032,7 +3020,7 @@ Rules:
             if (lookbackInp) {
                 lookbackInp.addEventListener('input', (e) => {
                     const s = getSettings();
-                    s.routerLookback = parseInt((/** @type {HTMLInputElement} */ (e.target)).value) || 3;
+                    s.routerLookback = parseInt((/** @type {HTMLInputElement} */ (e.target)).value) || 4;
                     $('#rpg_tracker_router_lookback').val(s.routerLookback);
                     saveSettings();
                 });
@@ -3101,7 +3089,7 @@ Rules:
                     const { chat } = SillyTavern.getContext();
                     const combinedNarrative = getNarrativeBlocks(chat, -1, !!s.routerIncludeHidden);
                     toastr['info']("Starting manual research pass...");
-                    await runRouterPass(combinedNarrative, null, s.routerLookback || 3, true);
+                    await runRouterPass(combinedNarrative, null, s.routerLookback || 4, true);
                 });
             }
 
@@ -5059,6 +5047,12 @@ Rules:
             // ─── Dice System ───
             installInterceptor();
             installRouterInterceptor();
+
+            // Ensure managed lorebook entries have disable:true so ST's native keyword
+            // scanner never injects them. Fire-and-forget — non-blocking on startup.
+            const s = getSettings();
+            if (s.routerEnabled) disableManagedEntries().catch(e => console.warn('[RPG Tracker] disableManagedEntries on init failed:', e));
+
             registerDiceFunctionTool();
             registerDiceSlashCommand();
 
@@ -6049,7 +6043,7 @@ Rules:
                 saveSettings();
             });
             $('#rpg_tracker_router_lookback').val(settings.routerLookback).on('input', function () {
-                settings.routerLookback = parseInt(String($(this).val() || '')) || 3;
+                settings.routerLookback = parseInt(String($(this).val() || '')) || 4;
                 $('#rt-agent-router-lookback').val(settings.routerLookback);
                 saveSettings();
             });

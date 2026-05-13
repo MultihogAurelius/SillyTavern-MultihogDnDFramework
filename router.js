@@ -119,13 +119,18 @@ async function getWorldInfoNamesSafe() {
 }
 
 /**
- * Builds the summary "Keyring" text for archive entries.
+ * Builds the summary "Keyring" text for archive (inactive) entries only.
+ * Active entries are excluded to avoid double-listing them in the agent context.
+ * @param {object} allBooks
+ * @param {string[]} activeKeys - IDs currently in activeRouterKeys (Book::uid format).
  */
-function buildKeyringText(allBooks) {
+function buildKeyringText(allBooks, activeKeys = []) {
+    const activeSet = new Set(activeKeys);
     let lines = [];
     for (const [bookName, bookData] of Object.entries(allBooks)) {
         if (!bookData || !bookData.entries) continue;
         for (const [uid, entry] of Object.entries(bookData.entries)) {
+            if (activeSet.has(`${bookName}::${uid}`)) continue; // shown in ACTIVE MEMORY
             const keys = (entry.key || []).join(', ');
             lines.push(`[ARCHIVE] Label: ${entry.comment || entry.key?.[0] || 'Unnamed'} | Keys: [${keys}]`);
         }
@@ -136,7 +141,7 @@ function buildKeyringText(allBooks) {
 /**
  * The core Researcher Agent loop.
  */
-export async function runRouterPass(narrativeOutput, manualPrompt = null, customLookback = null, isManual = false) {
+export async function runRouterPass(narrativeOutput, manualPrompt = null, customLookback = null, isManual = false, newlyTriggeredIds = []) {
     const settings = getSettings();
     if (!settings.routerEnabled || _routerRunning) return;
     // routerPaused blocks auto-runs only; manual UI runs always go through
@@ -201,23 +206,34 @@ export async function runRouterPass(narrativeOutput, manualPrompt = null, custom
             ctx.saveSettingsDebounced();
         }
         let activeEntriesFull = [];
+        let newlyTriggeredFull = [];
+
+        const triggeredSet = new Set(newlyTriggeredIds);
 
         function updateActiveEntries() {
             activeEntriesFull = [];
+            newlyTriggeredFull = [];
             for (const [name, book] of Object.entries(archiveBooks)) {
                 for (const [uid, entry] of Object.entries(book.entries)) {
-                    if (settings.activeRouterKeys?.includes(`${name}::${uid}`)) {
-                        activeEntriesFull.push(`### [ACTIVE] ${entry.comment || entry.key?.[0] || `${name}::${uid}`}\nID: ${name}::${uid}\nContent: ${entry.content}`);
+                    const fullId = `${name}::${uid}`;
+                    if (settings.activeRouterKeys?.includes(fullId)) {
+                        const label = entry.comment || entry.key?.[0] || fullId;
+                        const block = `### [ACTIVE] ${label}\nID: ${fullId}\nContent: ${entry.content}`;
+                        if (triggeredSet.has(fullId)) {
+                            newlyTriggeredFull.push(block);
+                        } else {
+                            activeEntriesFull.push(block);
+                        }
                     }
                 }
             }
         }
         updateActiveEntries();
 
-        let keyringText = buildKeyringText(archiveBooks);
+        let keyringText = buildKeyringText(archiveBooks, settings.activeRouterKeys);
         const { chat } = ctx;
         
-        const N = customLookback !== null ? customLookback : (settings.routerLookback || 3);
+        const N = customLookback !== null ? customLookback : (settings.routerLookback || 4);
         const recentChat = chat.slice(-N).map(m => {
             const name = (/** @type {any} */ (m)).is_user ? 'Player' : ((/** @type {any} */ (m)).name || 'Narrator');
             const content = (/** @type {any} */ (m)).mes || (/** @type {any} */ (m)).content || '';
@@ -253,6 +269,18 @@ export async function runRouterPass(narrativeOutput, manualPrompt = null, custom
             openaiModel: settings.routerOpenaiModel,
             maxTokens: (settings.routerMaxTokens !== undefined && settings.routerMaxTokens !== null && settings.routerMaxTokens !== '') ? Number(settings.routerMaxTokens) : 1000,
         };
+
+        // Budget status — computed once and reused in both basic and agent context
+        const activeCount = settings.activeRouterKeys?.length || 0;
+        const maxActive = settings.routerMaxActivations || 5;
+        const overflow = activeCount - maxActive;
+        const budgetLine = `Active entries: ${activeCount} / ${maxActive}`;
+        const overflowInstruction = overflow > 0
+            ? `\nBUDGET VIOLATION: ${activeCount} entr${activeCount !== 1 ? 'ies' : 'y'} active, limit is ${maxActive}. ` +
+              `You MUST deactivate at least ${overflow} entr${overflow > 1 ? 'ies' : 'y'} ` +
+              `before this pass ends. Eliminate the narratively least relevant entries first. ` +
+              `Justify each deactivation.`
+            : '';
 
         const basePrompt = (settings.routerSystemPromptTemplate || 'You are the Lorebook Agent. Maintain narrative consistency and manage lorebooks.')
             .replace(/\{\{campaignRoot\}\}/g, prefix || 'World Chronicle')
@@ -294,10 +322,11 @@ NPC / FAC / QUEST / EVENT labels: Name only ? NO " :: " hierarchy, NO tag prefix
 Example: [[FAC: Iron Syndicate | ...]]  NOT  [[FAC: Khelt :: Iron Syndicate | ...]]  and  NOT  [[FAC: FAC: Iron Syndicate | ...]]
 
 ## ATTENTION & MEMORY
-1. **ACTIVE MEMORY**: You can see the full details of these entities. You can update them at any time.
-2. **ARCHIVE INDEX**: You only see names and keywords. You CANNOT see their full biography.
-3. **RECALL**: To "read" or "update" an archive entry, you MUST first use [[ACTIVATE: Name]]. It will become visible in the next turn.
-4. **LIMIT**: You are limited to **${settings.routerMaxActivations || 5} active entries**. If you need to activate a new one but are at the limit, you MUST use [[DEACTIVATE: Name]] on the least relevant active entry to make room. Prioritize currently present characters and locations.
+1. **NEWLY ACTIVATED THIS TURN**: Entries whose keywords appeared in the latest narrator output are pre-loaded here with full content. You do not need to activate them again — they are already active.
+2. **ACTIVE MEMORY**: Full details of all other currently active entities. You can update them at any time.
+3. **ARCHIVE INDEX**: Inactive entries — labels and keywords only. You CANNOT see their full biography.
+4. **RECALL**: To read or update an archive entry, use [[ACTIVATE: Name]]. Its full content becomes visible next turn.
+5. **LIMIT**: You are limited to **${settings.routerMaxActivations || 5} active entries**. Nothing is archived automatically. If you exceed this limit you will see a **BUDGET VIOLATION** line and you MUST use [[DEACTIVATE: Name]] on the least relevant active entries to return within budget before this pass ends.
 
 ## RULES
 1. Only record persistent or significant entities/events.
@@ -313,7 +342,7 @@ Thought: I see a new NPC named Barnaby in Khelt's Rust-Lantern District. I will 
 
             const questMatchB = settings.currentMemo?.match(/\[QUESTS\]([\s\S]*?)\[\/QUESTS\]/i);
             const questBlockB = questMatchB ? `[QUESTS]${questMatchB[1].trim()}[/QUESTS]` : 'None';
-            const basicUserPrompt = `## CURRENT LOCATION\n${currentHierarchy || 'Unknown'}\n\n## ACTIVE QUESTS\n${questBlockB}\n\n## ACTIVE MEMORY (Lore)\n${activeEntriesFull.join('\n\n') || 'None'}\n\n## ARCHIVE INDEX\n${keyringText}\n\n## NARRATIVE\n${recentChat}\n\n${manualPrompt ? `## INSTRUCTION\n${manualPrompt}\n\n` : ''}`;
+            const basicUserPrompt = `## BUDGET STATUS\n${budgetLine}${overflowInstruction}\n\n## NEWLY ACTIVATED THIS TURN\n${newlyTriggeredFull.join('\n\n') || 'None.'}\n\n## ACTIVE MEMORY (Lore)\n${activeEntriesFull.join('\n\n') || 'None.'}\n\n## ARCHIVE INDEX\n${keyringText || 'Empty.'}\n\n## CURRENT LOCATION\n${currentHierarchy || 'Unknown'}\n\n## ACTIVE QUESTS\n${questBlockB}\n\n## NARRATIVE\n${recentChat}\n\n${manualPrompt ? `## INSTRUCTION\n${manualPrompt}\n\n` : ''}`;
 
             broadcastStep('thought', 'Thinking...');
             const basicResp = await sendStateRequest(routerSettings, basicSystemPrompt, basicUserPrompt);
@@ -436,7 +465,8 @@ Thought: I see a new NPC named Barnaby in Khelt's Rust-Lantern District. I will 
 ## MEMORY LIMIT
 Maximum Active Entities: **${settings.routerMaxActivations || 5}**.
 - Entries you record are ACTIVATED AUTOMATICALLY. Do NOT also include them in activate.
-- If at the limit and need space, use deactivate in the same commit call.
+- Nothing is archived automatically. If you exceed the limit you will receive a **BUDGET VIOLATION** in the context and you MUST deactivate enough entries in that same commit call to return within budget. Choose the narratively least relevant entries.
+- Entries whose keywords appeared in the latest narrator output may already appear under **NEWLY ACTIVATED THIS TURN** with full content — you do not need to activate those again.
 - Always use exact Book::UID format (e.g. "Eldoria_NPCs::0") for activate/update/deactivate/delete_ids.
 
 ## CAMPAIGN CONTEXT
@@ -486,7 +516,7 @@ ${sharedContext}`;
 
             const questMatchA = settings.currentMemo?.match(/\[QUESTS\]([\s\S]*?)\[\/QUESTS\]/i);
             const questBlockA = questMatchA ? `[QUESTS]${questMatchA[1].trim()}[/QUESTS]` : 'None';
-            const contextMessage = `## CURRENT LOCATION\n${currentHierarchy || 'Unknown'}\n\n## ACTIVE QUESTS\n${questBlockA}\n\n## ACTIVE MEMORY (Lore)\n${activeEntriesFull.join('\n\n') || 'None yet.'}\n\n## ARCHIVE INDEX\n${keyringText || 'Empty.'}\n\n## NARRATIVE\n${recentChat}${manualPrompt ? `\n\n## INSTRUCTION\n${manualPrompt}` : ''}`;
+            const contextMessage = `## BUDGET STATUS\n${budgetLine}${overflowInstruction}\n\n## NEWLY ACTIVATED THIS TURN\n${newlyTriggeredFull.join('\n\n') || 'None.'}\n\n## ACTIVE MEMORY (Lore)\n${activeEntriesFull.join('\n\n') || 'None yet.'}\n\n## ARCHIVE INDEX\n${keyringText || 'Empty.'}\n\n## CURRENT LOCATION\n${currentHierarchy || 'Unknown'}\n\n## ACTIVE QUESTS\n${questBlockA}\n\n## NARRATIVE\n${recentChat}${manualPrompt ? `\n\n## INSTRUCTION\n${manualPrompt}` : ''}`;
 
             /** @type {Array<{role:string, content:string|null, tool_calls?:any[], tool_call_id?:string}>} */
             const messages = [
@@ -541,7 +571,7 @@ ${sharedContext}`;
                 if (toolName === 'commit') {
                     const commitResult = await applyAction(args, archiveBooks, currentTime, breadcrumb);
                     archiveBooks = await fetchArchiveBooks();
-                    keyringText = buildKeyringText(archiveBooks);
+                    keyringText = buildKeyringText(archiveBooks, settings.activeRouterKeys);
                     updateActiveEntries();
                     if (commitResult.errors.length > 0) {
                         observation = `Committed with warnings: ${commitResult.errors.join(', ')}`;
@@ -781,7 +811,7 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
                     comment: rec.label || 'LORE_GEN',
                     content: rec.content || '',
                     constant: false, selective: false, selectiveLogic: 0, addMemo: true,
-                    order: 100, position: 0, disable: false,
+                    order: 100, position: 0, disable: true,
                     probability: 100, useProbability: false,
                     depth: 4, group: '', groupOverride: false, groupWeight: 100,
                 };
@@ -827,14 +857,8 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
         if (settings.debugMode) console.log(`[RPG Tracker] Activated books: ${[...booksWritten].join(', ')}`);
     }
 
-    // 4. Enforce Max Activations (FIFO Pruning)
-    const maxActive = settings.routerMaxActivations || 5;
-    if (newActive.length > maxActive) {
-        const countBefore = newActive.length;
-        newActive = newActive.slice(newActive.length - maxActive);
-        if (newActive.length !== countBefore) changed = true;
-    }
-    
+    // Budget enforcement is handled by the agent via overflow instruction in context.
+    // No FIFO pruning here — the agent must explicitly deactivate entries.
     settings.activeRouterKeys = newActive;
 
     // 4. Delete
@@ -1305,6 +1329,118 @@ export async function deleteLorebookEntry(id) {
     }
     
     return true;
+}
+
+/**
+ * Scans the assistant's narrative output for entry keywords across all scoped
+ * lorebooks. Entries whose keys appear in the text are immediately added to
+ * activeRouterKeys so the Lorebook Agent sees their full content this turn.
+ *
+ * Must be called BEFORE runRouterPass on each generation.
+ *
+ * @param {string} narrativeText - The assistant message that just generated.
+ * @returns {Promise<string[]>} IDs (Book::uid) of entries newly activated this pass.
+ */
+export async function scanAssistantOutputForKeywords(narrativeText) {
+    if (!narrativeText) return [];
+    const settings = getSettings();
+    if (!settings.routerEnabled) return [];
+
+    const ctx = SillyTavern.getContext();
+    const prefix = getLivePrefix();
+    if (!prefix) return [];
+
+    // Flush ST's registry so books saved in prior passes are visible
+    if (typeof ctx.updateWorldInfoList === 'function') {
+        try { await ctx.updateWorldInfoList(); } catch (_) {}
+    }
+
+    const allNames = await getWorldInfoNamesSafe();
+    const inScope = (n) => bookBelongsToPrefix(n, prefix);
+    const scoped = allNames.filter(inScope);
+
+    // Also sweep books referenced in routerLog (catches books not yet re-indexed)
+    const logBookNames = (settings.routerLog || [])
+        .flatMap(e => [...(e.record || []), ...(e.activate || [])].map(id => id.split('::')[0]))
+        .filter(Boolean);
+    const scopedSet = new Set(scoped);
+    for (const n of logBookNames) {
+        if (inScope(n)) scopedSet.add(n);
+    }
+
+    const lowerText = narrativeText.toLowerCase();
+    const currentActive = new Set(settings.activeRouterKeys || []);
+    const newlyTriggered = [];
+
+    for (const bookName of scopedSet) {
+        const book = await ctx.loadWorldInfo(bookName);
+        if (!book?.entries) continue;
+        for (const [uid, entry] of Object.entries(book.entries)) {
+            const fullId = `${bookName}::${uid}`;
+            if (currentActive.has(fullId)) continue; // already active
+
+            const keywords = Array.isArray(entry.key) ? entry.key : [];
+            const matched = keywords.some(kw =>
+                typeof kw === 'string' && kw.length > 0 &&
+                lowerText.includes(kw.toLowerCase())
+            );
+
+            if (matched) {
+                currentActive.add(fullId);
+                newlyTriggered.push(fullId);
+            }
+        }
+    }
+
+    // Always reset the field so stale IDs from a prior turn are cleared,
+    // even when nothing new matched this pass.
+    settings.lastKeywordTriggeredKeys = newlyTriggered;
+
+    if (newlyTriggered.length > 0) {
+        settings.activeRouterKeys = [...currentActive];
+        ctx.saveSettingsDebounced();
+        if (settings.debugMode) {
+            console.log('[RPG Tracker] Keyword scanner activated:', newlyTriggered);
+        }
+    } else {
+        ctx.saveSettingsDebounced();
+    }
+
+    return newlyTriggered;
+}
+
+/**
+ * Sets disable: true on every entry in all scoped lorebooks so ST's native
+ * keyword scanner never injects managed entries on user-message send.
+ * Idempotent — safe to call on every init / chat-change.
+ */
+export async function disableManagedEntries() {
+    const settings = getSettings();
+    if (!settings.routerEnabled) return;
+    const ctx = SillyTavern.getContext();
+    const prefix = getLivePrefix();
+    if (!prefix) return;
+
+    try {
+        const allNames = await getWorldInfoNamesSafe();
+        const scoped = allNames.filter(n => bookBelongsToPrefix(n, prefix));
+        for (const bookName of scoped) {
+            const book = await ctx.loadWorldInfo(bookName);
+            if (!book?.entries) continue;
+            let changed = false;
+            for (const entry of Object.values(book.entries)) {
+                if (!entry.disable) {
+                    entry.disable = true;
+                    changed = true;
+                }
+            }
+            if (changed) {
+                try { await ctx.saveWorldInfo(bookName, book); } catch (_) {}
+            }
+        }
+    } catch (e) {
+        console.warn('[RPG Tracker] disableManagedEntries failed:', e);
+    }
 }
 
 /**
