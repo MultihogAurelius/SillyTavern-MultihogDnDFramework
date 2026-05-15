@@ -2567,6 +2567,11 @@ Rules:
                         <input type="checkbox" id="rt-agent-router-basic" ${settings.routerBasicMode ? 'checked' : ''}>
                     </label>
 
+                    <label style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; cursor: pointer; opacity: 0.8; font-size: 0.846em;" title="When enabled, the extension's keyword scanner is fully disabled. SillyTavern's native lorebook keyword system handles all keyword-based entry activation. The agent will not auto-activate or auto-expire entries based on keywords.">
+                        Native Keyword Activation
+                        <input type="checkbox" id="rt-agent-router-native-kw" ${settings.routerNativeKeywordActivation ? 'checked' : ''}>
+                    </label>
+
                     <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
                         <div style="display: flex; align-items: center; gap: 6px; flex: 1;" title="Main lookback: last N chat messages (user and assistant, in order) included in the agent context during automatic passes.">
                             <span style="font-size: 0.769em; opacity: 0.7;">Lookback (user/assistant):</span>
@@ -3092,6 +3097,15 @@ Rules:
                 basicCheck.addEventListener('change', (e) => {
                     const s = getSettings();
                     s.routerBasicMode = (/** @type {HTMLInputElement} */ (e.target)).checked;
+                    saveSettings();
+                });
+            }
+
+            const nativeKwCheck = agentPanel.querySelector('#rt-agent-router-native-kw');
+            if (nativeKwCheck) {
+                nativeKwCheck.addEventListener('change', (e) => {
+                    const s = getSettings();
+                    s.routerNativeKeywordActivation = (/** @type {HTMLInputElement} */ (e.target)).checked;
                     saveSettings();
                 });
             }

@@ -291,7 +291,8 @@ export function installInterceptor() {
         // activeRouterKeys is always one turn late on that path.
         // Fix: entries activated THIS scan are injected directly into the user message —
         // the same pattern as state memo and quests — guaranteeing same-turn presence.
-        if (settings.routerEnabled) {
+        // Skipped when routerNativeKeywordActivation is enabled (native ST system handles keywords).
+        if (settings.routerEnabled && !settings.routerNativeKeywordActivation) {
             if (content) {
                 const t0 = performance.now().toFixed(1);
                 console.group(`[RPG|INTERCEPT] rpgTrackerInterceptor keyword pre-scan @ ${t0}ms`);
@@ -429,7 +430,8 @@ export async function onGenerationEnded() {
     // Step 1: Scan assistant output for entry keywords and activate matches immediately.
     // Must run before the state model pass and on EVERY generation, regardless of throttle,
     // so entries are never one turn behind the narrator even when the agent is skipped.
-    if (settings.routerEnabled) {
+    // Skipped when routerNativeKeywordActivation is enabled (native ST system handles keywords).
+    if (settings.routerEnabled && !settings.routerNativeKeywordActivation) {
         const thisGenTriggered = await scanAssistantOutputForKeywords(combinedNarrative);
         if (thisGenTriggered.length > 0) {
             // Accumulate across throttled turns — deduplicate so IDs are not repeated.

@@ -169,6 +169,7 @@ You may be asked to use Markers: ((PLS)), ((B)), ((XB)), ((BDG)), ((HGT)). These
         routerDirectLookback: 10,
         routerDirectPrompt: "",
         routerBasicMode: false,
+        routerNativeKeywordActivation: false,
         routerPaused: false,
         routerRunEvery: 1,
         routerIncludeHidden: false,
