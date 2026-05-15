@@ -161,6 +161,9 @@ You may be asked to use Markers: ((PLS)), ((B)), ((XB)), ((BDG)), ((HGT)). These
         routerMaxTurns: 5,
         routerMaxActivations: 8,
         routerCampaignPrefix: "",
+        routerCampaignPrefixOverride: "",
+        /** ST chat id for which `routerCampaignPrefixOverride` applies; empty = legacy (override only when chatId === active ctx chat id). */
+        routerCampaignPrefixOverrideAnchorChatId: "",
         routerLookback: 4,
         routerDirectLookback: 10,
         routerDirectPrompt: "",
@@ -320,6 +323,28 @@ export function getBarBackground(barId, defaultBackground, pct = null) {
         default:
             return cfg.color;
     }
+}
+
+/**
+ * Sanitizes a string into a lorebook-safe campaign prefix (same rules as chat-id derive).
+ * @param {string} raw
+ * @returns {string}
+ */
+export function sanitizeCampaignPrefixString(raw) {
+    if (!raw) return '';
+    return String(raw).replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+}
+
+/**
+ * Prefix used for world activation and router: optional user override, else from chat id.
+ * @param {string} chatId
+ * @returns {string}
+ */
+export function getEffectiveRouterCampaignPrefix(chatId) {
+    const s = getSettings();
+    const ov = (s.routerCampaignPrefixOverride || '').trim();
+    if (ov) return sanitizeCampaignPrefixString(ov);
+    return sanitizeCampaignPrefixString(chatId || '');
 }
 
 // ── One-time data migrations ───────────────────────────────────────────────────

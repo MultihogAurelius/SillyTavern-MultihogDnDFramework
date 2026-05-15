@@ -1,4 +1,4 @@
-import { getSettings } from './state-manager.js';
+import { getSettings, getEffectiveRouterCampaignPrefix } from './state-manager.js';
 import { sendStateRequest, sendAgentTurn } from './llm-client.js';
 import { getRequestHeaders } from '../../../../script.js';
 
@@ -8,26 +8,12 @@ let _routerRunning = false;
 export function isRouterRunning() { return _routerRunning; }
 
 /**
- * Sanitizes any ST chat ID into a filesystem/lorebook-safe prefix.
- * The chat ID is already unique per session (whether ST's default
- * "Name - 2026-05-13@..." format or a user-renamed value like "324325345"),
- * so we use it AS the prefix verbatim ? only converting unsafe characters
- * to underscores.
- * @param {string} chatId
- * @returns {string}
- */
-function derivePrefixFromChatId(chatId) {
-    if (!chatId) return '';
-    return String(chatId).replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
-}
-
-/**
- * Returns the current campaign prefix derived live from ST's ctx.chatId.
- * Returns '' only if there is no active chat at all.
+ * Returns the current campaign prefix (user override in settings, else chat id).
+ * Returns '' only if there is no usable prefix.
  */
 function getLivePrefix() {
     const ctx = SillyTavern.getContext();
-    return derivePrefixFromChatId(ctx.chatId || '');
+    return getEffectiveRouterCampaignPrefix(ctx.chatId || '');
 }
 
 /**

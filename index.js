@@ -1,5 +1,5 @@
 import { EXAMPLES, COLOR_EXAMPLES, DEFAULT_STOCK_PROMPTS, RT_PROMPTS, BLOCK_ICONS, BLOCK_ORDER, PAGE_SIZE, NO_PAGINATE, QUESTS_NARRATOR_MODERN, QUESTS_NARRATOR_LEGACY } from './constants.js';
-import { MODULE_NAME, DEFAULT_MODULES, getSettings, getBarBackground, migrateCustomFields, saveChatState, saveProfile, deleteProfile } from './state-manager.js';
+import { MODULE_NAME, DEFAULT_MODULES, getSettings, getBarBackground, migrateCustomFields, saveChatState, saveProfile, deleteProfile, getEffectiveRouterCampaignPrefix, sanitizeCampaignPrefixString } from './state-manager.js';
 import { sendStateRequest, fetchOllamaModels, fetchOpenAIModels, testOpenAIConnection, getConnectionProfiles, getCurrentCompletionPreset, setCompletionPreset } from './llm-client.js';
 import { getDiceToolName, getDiceCommandName, getDiceCommandAliases, doDiceRoll, registerDiceFunctionTool, registerDiceSlashCommand, installInterceptor, getNarrativeBlocks, onGenerationEnded, resetRouterTick } from './narrative-hooks.js';
 import { deduplicateMemo, mergeMemo, computeDelta, escapeHtml, escapeRegex, highlightParens, cleanToolCallMessage, getLastUserAction, buildLorebookContext, buildModulesInstructionText, buildModuleFormatInstruction, parseQuestsFromMemo, syncQuestsFromMemo, syncQuestsToMemo, writeQuestsToMemo, getQuestMood } from './memo-processor.js';
@@ -7,6 +7,7 @@ import { renderSubFieldByRule, tryRenderMarker, renderCustomBlockLine, stripMemo
 import { registerLogQuestTool, checkQuestDeadlines } from './quests.js';
 import { initializeDebugViewer, toggleDebugViewer } from './debug-viewer.js';
 import { runRouterPass, rollbackRouterPass, reapplyRouterPass, getLorebookManifest, deleteLorebookEntry, updateLorebookEntry, disableManagedEntries, isRouterRunning } from './router.js';
+import { getRequestHeaders } from '../../../../script.js';
 
     // Capture the folder name dynamically from the module URL so it works regardless of what the user names the folder
     const FOLDER_NAME = (function () {
@@ -51,6 +52,131 @@ import { runRouterPass, rollbackRouterPass, reapplyRouterPass, getLorebookManife
         }
     }
 
+    function sleepMs(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    /**
+     * POST /api/settings/get — returns world_names from JSON (diagnostic + fallback when ST client cache is empty).
+     */
+    async function probeSettingsWorldNamesApi() {
+        try {
+            const result = await fetch('/api/settings/get', {
+                method: 'POST',
+                headers: getRequestHeaders(),
+                body: JSON.stringify({}),
+            });
+            const status = result.status;
+            const ok = result.ok;
+            let names = [];
+            if (ok) {
+                try {
+                    const data = await result.json();
+                    if (Array.isArray(data?.world_names)) names = [...data.world_names];
+                } catch (_) { /* ignore */ }
+            }
+            return { ok, status, count: names.length, names };
+        } catch (e) {
+            return { ok: false, status: 0, count: 0, names: [], fetchError: String(e?.message || e) };
+        }
+    }
+
+    /**
+     * Retries updateWorldInfoList, then compares client getWorldInfoNames vs API world_names.
+     * @param {{ maxAttempts?: number, delayMs?: number }} [opts]
+     */
+    async function refreshWorldInfoRegistry(opts = {}) {
+        const maxAttempts = opts.maxAttempts ?? 3;
+        const delayMs = opts.delayMs ?? 160;
+        const ctx = SillyTavern.getContext();
+        const attempts = [];
+        let clientCount = 0;
+        for (let i = 0; i < maxAttempts; i++) {
+            let stError = null;
+            if (typeof ctx.updateWorldInfoList === 'function') {
+                try {
+                    await ctx.updateWorldInfoList();
+                } catch (e) {
+                    stError = String(e?.message || e);
+                }
+            } else {
+                stError = 'updateWorldInfoList missing';
+            }
+            let lastNames = [];
+            if (typeof ctx.getWorldInfoNames === 'function') {
+                try {
+                    lastNames = ctx.getWorldInfoNames();
+                } catch (e) {
+                    stError = stError || String(e?.message || e);
+                }
+            }
+            clientCount = Array.isArray(lastNames) ? lastNames.length : 0;
+            attempts.push({ attempt: i + 1, clientWorldNameCount: clientCount, stError });
+            if (clientCount > 0) break;
+            if (i < maxAttempts - 1) await sleepMs(delayMs);
+        }
+        const apiProbe = await probeSettingsWorldNamesApi();
+        const usedApiNameFallback = clientCount === 0 && apiProbe.ok && apiProbe.count > 0 && Array.isArray(apiProbe.names) && apiProbe.names.length > 0;
+        return {
+            clientWorldNameCount: clientCount,
+            attempts,
+            apiProbe,
+            usedApiNameFallback,
+        };
+    }
+
+    /**
+     * @param {any} ctx
+     * @param {{ clientWorldNameCount: number, apiProbe: { ok: boolean, names: string[] }, usedApiNameFallback: boolean }} reg
+     */
+    function resolveAllWorldNames(ctx, reg) {
+        if (reg.clientWorldNameCount > 0 && typeof ctx.getWorldInfoNames === 'function') {
+            const n = ctx.getWorldInfoNames();
+            return Array.isArray(n) ? [...n] : [];
+        }
+        if (reg.usedApiNameFallback && Array.isArray(reg.apiProbe.names)) return [...reg.apiProbe.names];
+        if (typeof ctx.getWorldInfoNames === 'function') {
+            const n = ctx.getWorldInfoNames();
+            return Array.isArray(n) ? [...n] : [];
+        }
+        return [];
+    }
+
+    /**
+     * @param {string[]} allNames
+     * @param {string} currentPrefix
+     * @param {string[]} bookNames
+     * @param {Record<string, any>} s
+     * @returns {{ toDeactivate: string[], otherPrefixes: string[], managedOffCount: number, crossChatMatchCount: number }}
+     */
+    function computeWorldsToDeactivate(allNames, currentPrefix, bookNames, s) {
+        const currentSet = new Set(bookNames);
+        const allKnownManagedBooks = new Set(
+            Object.values(s.chatStates || {}).flatMap(cs => cs.campaignBooks || [])
+        );
+        const managedOff = [...allKnownManagedBooks].filter(n => !currentSet.has(n));
+
+        const otherPrefixes = [...new Set(
+            Object.keys(s.chatStates || {})
+                .map(cid => getEffectiveRouterCampaignPrefix(cid))
+                .filter(p => p && p !== currentPrefix)
+        )];
+        const otherSet = new Set(otherPrefixes);
+        const crossChatOff = allNames.filter(n =>
+            [...otherSet].some(op => bookBelongsToPrefix(n, op))
+        );
+        const combined = [...managedOff, ...crossChatOff].filter(n => !currentSet.has(n));
+        const toDeactivate = [...new Set(combined)];
+        const managedSet = new Set(managedOff);
+        const crossChatOnlyCount = crossChatOff.filter(n => !managedSet.has(n)).length;
+        return {
+            toDeactivate,
+            otherPrefixes,
+            managedOffCount: managedOff.length,
+            crossChatMatchCount: crossChatOnlyCount,
+        };
+    }
+
     /**
      * Read-only snapshot of chat id, prefixes, ST APIs, and which books would match (no slash commands).
      * @param {string} source
@@ -61,26 +187,17 @@ import { runRouterPass, rollbackRouterPass, reapplyRouterPass, getLorebookManife
         const s = getSettings();
         const paramChatId = _currentChatId || ctx.chatId || '';
         const ctxChatId = ctx.chatId || '';
-        const derivedPrefix = derivePrefixFromChatId(paramChatId);
+        const derivedFromChatOnly = sanitizeCampaignPrefixString(paramChatId);
+        const overrideRaw = (s.routerCampaignPrefixOverride || '').trim();
+        const effectivePrefix = getEffectiveRouterCampaignPrefix(paramChatId);
         const storedPrefix = (s.routerCampaignPrefix || '').trim();
-        let allNames = [];
-        if (typeof ctx.updateWorldInfoList === 'function') {
-            try { await ctx.updateWorldInfoList(); } catch (e) { /* ignore */ }
-        }
-        if (typeof ctx.getWorldInfoNames === 'function') {
-            try { allNames = await ctx.getWorldInfoNames(); } catch (e) {
-                return {
-                    ts: new Date().toISOString(),
-                    source,
-                    error: 'getWorldInfoNames threw',
-                    message: String(e?.message || e),
-                    paramChatId,
-                    ctxChatId,
-                };
-            }
-        }
-        const matchingForDerived = derivedPrefix ? allNames.filter(n => bookBelongsToPrefix(n, derivedPrefix)) : [];
+
+        const reg = await refreshWorldInfoRegistry();
+        const allNames = resolveAllWorldNames(ctx, reg);
+
+        const matchingEffective = effectivePrefix ? allNames.filter(n => bookBelongsToPrefix(n, effectivePrefix)) : [];
         const matchingForStored = storedPrefix ? allNames.filter(n => bookBelongsToPrefix(n, storedPrefix)) : [];
+        const matchingDerivedOnly = derivedFromChatOnly ? allNames.filter(n => bookBelongsToPrefix(n, derivedFromChatOnly)) : [];
         const allKnownManagedBooks = new Set(
             Object.values(s.chatStates || {}).flatMap(cs => cs.campaignBooks || [])
         );
@@ -95,9 +212,10 @@ import { runRouterPass, rollbackRouterPass, reapplyRouterPass, getLorebookManife
             paramChatId,
             ctxChatId,
             chatIdMismatch: paramChatId !== ctxChatId,
-            derivedPrefix: derivedPrefix || '(empty)',
+            overrideRaw: overrideRaw || '(none)',
+            derivedFromChatIdOnly: derivedFromChatOnly || '(empty)',
+            effectivePrefix: effectivePrefix || '(empty)',
             storedPrefix: storedPrefix || '(empty)',
-            prefixesMatch: derivedPrefix === storedPrefix,
             bookMatchRule: 'Book matches if name === prefix OR name === prefix + "_" + single segment (no extra underscores in suffix).',
             apis: {
                 executeSlashCommandsWithOptions: typeof ctx.executeSlashCommandsWithOptions,
@@ -105,9 +223,11 @@ import { runRouterPass, rollbackRouterPass, reapplyRouterPass, getLorebookManife
                 getWorldInfoNames: typeof ctx.getWorldInfoNames,
                 addPromptManagerInterceptor: typeof ctx.addPromptManagerInterceptor,
             },
+            worldRegistry: reg,
             allWorldNamesCount: allNames.length,
-            matchingForDerivedPrefix: matchingForDerived,
+            matchingForEffectivePrefix: matchingEffective,
             matchingForStoredPrefix: matchingForStored,
+            matchingForDerivedFromChatOnly: matchingDerivedOnly,
             managedBooksInChatStates: [...allKnownManagedBooks],
             wouldDeactivateForStoredPrefix: toDeactivateForStored,
             priorSlashLog: _loreActivationDebugLast?.slashLog ?? null,
@@ -141,7 +261,7 @@ import { runRouterPass, rollbackRouterPass, reapplyRouterPass, getLorebookManife
             renderLoreActivationDebugPanel();
             return;
         }
-        const prefix = derivePrefixFromChatId(newChatId);
+        const prefix = getEffectiveRouterCampaignPrefix(newChatId);
         if (!prefix) {
             s2.routerCampaignPrefix = '';
             syncRouterPrefixDisplays('');
@@ -160,11 +280,8 @@ import { runRouterPass, rollbackRouterPass, reapplyRouterPass, getLorebookManife
         syncRouterPrefixDisplays(prefix);
 
         const ctx = SillyTavern.getContext();
-        if (typeof ctx.updateWorldInfoList === 'function') await ctx.updateWorldInfoList().catch(() => {});
-        let allNames = [];
-        if (typeof ctx.getWorldInfoNames === 'function') {
-            try { allNames = await ctx.getWorldInfoNames(); } catch (_) {}
-        }
+        const reg = await refreshWorldInfoRegistry();
+        const allNames = resolveAllWorldNames(ctx, reg);
         const matchingBooks = allNames.filter(n => bookBelongsToPrefix(n, prefix));
 
         if (!s2.chatStates) s2.chatStates = {};
@@ -182,6 +299,14 @@ import { runRouterPass, rollbackRouterPass, reapplyRouterPass, getLorebookManife
                 syncError: String(e?.message || e),
             };
             renderLoreActivationDebugPanel();
+        }
+        // If ST's in-memory world list was empty but the server had names, run one silent follow-up
+        // so updateWorldInfoList can repopulate the client after our /world pass (avoids needing manual resync).
+        if (reg.usedApiNameFallback && reg.clientWorldNameCount === 0 && matchingBooks.length > 0 && !String(source).includes('registry-followup')) {
+            setTimeout(() => {
+                if (newChatId !== _currentChatId) return;
+                void syncCampaignPrefixAndWorldsForChat(newChatId, `${source}(registry-followup)`).catch(() => {});
+            }, 450);
         }
         void refreshAgentManifest().catch(() => {});
     }
@@ -331,21 +456,16 @@ import { runRouterPass, rollbackRouterPass, reapplyRouterPass, getLorebookManife
             return 0;
         }
 
-        if (typeof ctx.updateWorldInfoList === 'function') {
-            try { await ctx.updateWorldInfoList(); } catch (_) {}
-        }
-
-        let allNames = [];
-        if (typeof ctx.getWorldInfoNames === 'function') {
-            try { allNames = await ctx.getWorldInfoNames(); } catch (_) {}
-        }
+        const reg = await refreshWorldInfoRegistry();
+        const allNames = resolveAllWorldNames(ctx, reg);
 
         const bookNames = allNames.filter(n => bookBelongsToPrefix(n, prefix));
 
+        const deact = computeWorldsToDeactivate(allNames, prefix, bookNames, s);
+        const toDeactivate = deact.toDeactivate;
         const allKnownManagedBooks = new Set(
             Object.values(s.chatStates || {}).flatMap(cs => cs.campaignBooks || [])
         );
-        const toDeactivate = [...allKnownManagedBooks].filter(n => !bookNames.includes(n));
 
         /** @type {{ cmd: string, ok?: boolean, isError?: boolean, errorMessage?: string, isAborted?: boolean, abortReason?: string, thrown?: string }[]} */
         const slashLog = [];
@@ -384,10 +504,16 @@ import { runRouterPass, rollbackRouterPass, reapplyRouterPass, getLorebookManife
         _loreActivationDebugLast = {
             ...baseDebug,
             storedPrefix: prefix,
+            worldRegistry: reg,
             allWorldNamesCount: allNames.length,
             matchingBookNames: bookNames,
             matchingCount: bookNames.length,
             managedBooksUnion: [...allKnownManagedBooks],
+            deactivateDetail: {
+                otherChatPrefixes: deact.otherPrefixes,
+                managedOffCount: deact.managedOffCount,
+                crossChatMatchCount: deact.crossChatMatchCount,
+            },
             toDeactivate,
             slashCommandsRun: slashLog.length,
             slashLog,
@@ -587,8 +713,7 @@ import { runRouterPass, rollbackRouterPass, reapplyRouterPass, getLorebookManife
      * @returns {string}
      */
     function derivePrefixFromChatId(chatId) {
-        if (!chatId) return '';
-        return String(chatId).replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+        return sanitizeCampaignPrefixString(chatId);
     }
 
     /**
@@ -621,7 +746,45 @@ import { runRouterPass, rollbackRouterPass, reapplyRouterPass, getLorebookManife
         // Auto-activate and prefix logic run regardless of chatLinkEnabled.
         // Always re-derive the prefix from the chat ID so stale saved data never
         // causes the wrong session's lorebooks to activate.
-        if (s.routerEnabled && newChatId) {
+        const chatBooks = s.chatStates?.[newChatId]?.campaignBooks;
+
+        if (chatBooks?.length) {
+            // Fast Path: This chat has a linked stack already recorded.
+            // Swap stacks instantly without the 800ms delay or the slow registry scan.
+            if (typeof SillyTavern.getContext().executeSlashCommandsWithOptions === 'function') {
+                (async () => {
+                    const ctx = SillyTavern.getContext();
+                    // 1. Turn OFF departing chat's books
+                    const oldBooks = s.chatStates?.[oldChatId]?.campaignBooks || [];
+                    for (const name of oldBooks) {
+                        await ctx.executeSlashCommandsWithOptions(`/world state=off silent=true "${name}"`).catch(() => {});
+                    }
+                    // 2. Restore prefix and turn ON arriving chat's books
+                    const prefix = getEffectiveRouterCampaignPrefix(newChatId);
+                    if (prefix) {
+                        s.routerCampaignPrefix = prefix;
+                        syncRouterPrefixDisplays(prefix);
+                    }
+                    for (const name of chatBooks) {
+                        await ctx.executeSlashCommandsWithOptions(`/world state=on silent=true "${name}"`).catch(() => {});
+                    }
+                })();
+            }
+        } else if (s.routerEnabled && newChatId) {
+            // Auto-Prefix Path: No linked stack yet.
+            // Immediately kill the old stack so it doesn't bleed into the new context during the 800ms wait.
+            if (oldChatId) {
+                const _oldBooksB = s.chatStates?.[oldChatId]?.campaignBooks || [];
+                if (_oldBooksB.length && typeof SillyTavern.getContext().executeSlashCommandsWithOptions === 'function') {
+                    (async () => {
+                        const _ctxB = SillyTavern.getContext();
+                        for (const name of _oldBooksB) {
+                            await _ctxB.executeSlashCommandsWithOptions(`/world state=off silent=true "${name}"`).catch(() => {});
+                        }
+                    })();
+                }
+            }
+
             // Cancel any pending prefix-derivation from a previous CHAT_CHANGED
             // so a transient chat ID (e.g. mid-rename) can't sneak through.
             if (_prefixDeriveTimer) clearTimeout(_prefixDeriveTimer);
@@ -1501,7 +1664,7 @@ Rules:
     globalThis._rpgStateModelRunning = () => _stateModelRunning;
     globalThis._rpgCurrentChatId = () => _currentChatId;
     // Expose live prefix derivation for any module that needs the current prefix.
-    globalThis._rpgGetCurrentPrefix = () => derivePrefixFromChatId(SillyTavern.getContext().chatId || '');
+    globalThis._rpgGetCurrentPrefix = () => getEffectiveRouterCampaignPrefix(SillyTavern.getContext().chatId || '');
 
     function handleLevelUp() {
         const { sendSystemMessage } = SillyTavern.getContext();
@@ -5606,6 +5769,22 @@ Rules:
             if (bootChatId && settings.chatLinkEnabled) {
                 loadChatState(bootChatId);
             }
+            // Always run activation when routerEnabled — regardless of chatLinkEnabled —
+            // so the correct lorebook stack is live from the very first message.
+            if (settings.routerEnabled && bootChatId) {
+                const bootBooks = settings.chatStates?.[bootChatId]?.campaignBooks;
+                if (bootBooks?.length && typeof ctx.executeSlashCommandsWithOptions === 'function') {
+                    // Fast path: exact book list known — skip the slow registry scan.
+                    (async () => {
+                        for (const name of bootBooks) {
+                            await ctx.executeSlashCommandsWithOptions(`/world state=on silent=true "${name}"`).catch(() => {});
+                        }
+                    })();
+                } else {
+                    // Fallback for first-time chats where no saved book list exists yet.
+                    syncCampaignPrefixAndWorldsForChat(bootChatId, 'BOOTSTRAP');
+                }
+            }
 
             // ─── Dice System ───
             installInterceptor();
@@ -6491,9 +6670,22 @@ Rules:
             });
             setTimeout(updateRouterConnectionPanels, 100); // Ensure DOM is ready for toggle
 
-            // Prefix display (read-only — auto-derived from chat name)
-            const prefixDisplayEl = document.getElementById('rpg_tracker_router_prefix_display');
-            if (prefixDisplayEl) prefixDisplayEl.textContent = settings.routerCampaignPrefix || '—';
+            // Prefix display: effective value (override or chat id), not only last saved routerCampaignPrefix
+            function updateSettingsLorePrefixReadout() {
+                const ctx = SillyTavern.getContext();
+                const el = document.getElementById('rpg_tracker_router_prefix_display');
+                if (el) {
+                    const eff = getEffectiveRouterCampaignPrefix(ctx.chatId || '');
+                    el.textContent = eff || '—';
+                }
+            }
+            updateSettingsLorePrefixReadout();
+
+            $('#rpg_tracker_router_prefix_override').val(settings.routerCampaignPrefixOverride || '').on('input', function () {
+                settings.routerCampaignPrefixOverride = String($(this).val() || '');
+                saveSettings();
+                updateSettingsLorePrefixReadout();
+            });
 
             $('#rpg_tracker_activate_books_btn').on('click', async function () {
                 const btn = $(this);
