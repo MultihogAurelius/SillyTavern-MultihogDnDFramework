@@ -286,6 +286,17 @@ export function installInterceptor() {
 
 
 
+        // Pre-generation keyword scan: scan the user's outgoing message NOW so any
+        // keyword matches update activeRouterKeys before the prompt manager injects lore.
+        // Runs regardless of whether there are other injections — must fire on EVERY send.
+        // sweepEnabled=false: skip the auto-expiry sweep here — that runs onGenerationEnded.
+        if (settings.routerEnabled) {
+            // content is the raw user message — injections haven't been applied yet.
+            if (content) {
+                await scanAssistantOutputForKeywords(content, { sweepEnabled: false }).catch(() => {});
+            }
+        }
+
         if (!injections) return;
 
         const originalContent = msg.content || msg.mes || '';

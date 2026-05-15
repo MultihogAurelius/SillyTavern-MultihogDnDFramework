@@ -1370,10 +1370,12 @@ export async function updateLorebookEntry(id, fields) {
  * Must be called BEFORE runRouterPass on each generation.
  *
  * @param {string} narrativeText - The assistant message that just generated.
+ * @param {{ sweepEnabled?: boolean }} [opts]
  * @returns {Promise<string[]>} IDs (Book::uid) of entries newly activated this pass.
  */
-export async function scanAssistantOutputForKeywords(narrativeText) {
+export async function scanAssistantOutputForKeywords(narrativeText, opts = {}) {
     if (!narrativeText) return [];
+    const sweepEnabled = opts.sweepEnabled !== false; // default true
     const settings = getSettings();
     if (!settings.routerEnabled) return [];
 
@@ -1445,55 +1447,49 @@ export async function scanAssistantOutputForKeywords(narrativeText) {
 
     // ── Reverse sweep: auto-expire keyword-activated entries whose keywords ──────
     // ── are no longer present in the last `entry.depth` messages.          ──────
-    // This matches native ST's scan_depth window expiry exactly:
-    // if the keyword leaves the sliding context window, the entry drops out.
-    const chat = ctx.chat || [];
-    const recentMessages = chat.filter(m => !m.is_system); // exclude system messages
-    const autoExpired = [];
+    // Only runs on the full onGenerationEnded pass (sweepEnabled=true), not on the
+    // lightweight user-message pre-scan from the interceptor.
+    if (sweepEnabled) {
+        const chat = ctx.chat || [];
+        const recentMessages = chat.filter(m => !m.is_system);
+        const autoExpired = [];
 
-    for (const id of currentKeyword) {
-        // Skip entries that were JUST activated this turn — they're guaranteed to be
-        // in the window (they matched the current narrative text).
-        if (newlyTriggered.includes(id)) continue;
+        for (const id of currentKeyword) {
+            if (newlyTriggered.includes(id)) continue;
 
-        const [bookName, uid] = id.split('::');
-        if (!bookName || uid === undefined) { autoExpired.push(id); continue; }
+            const [bookName, uid] = id.split('::');
+            if (!bookName || uid === undefined) { autoExpired.push(id); continue; }
 
-        // Load from cache if available, else fetch
-        let book = bookCache.get(bookName);
-        if (!book) {
-            book = await ctx.loadWorldInfo(bookName);
-            if (book) bookCache.set(bookName, book);
+            let book = bookCache.get(bookName);
+            if (!book) {
+                book = await ctx.loadWorldInfo(bookName);
+                if (book) bookCache.set(bookName, book);
+            }
+            const entry = book?.entries?.[uid];
+            if (!entry) { autoExpired.push(id); continue; }
+
+            const keywords = Array.isArray(entry.key) ? entry.key : [];
+            if (keywords.length === 0) continue;
+
+            const depth = (typeof entry.depth === 'number' && entry.depth > 0) ? entry.depth : (book.scan_depth ?? 4);
+            const window = recentMessages.slice(-depth);
+            const windowText = window.map(m => (m.mes || m.content || '')).join(' ').toLowerCase();
+
+            const stillPresent = keywords.some(kw =>
+                typeof kw === 'string' && kw.length > 0 && windowText.includes(kw.toLowerCase())
+            );
+
+            if (!stillPresent) autoExpired.push(id);
         }
-        const entry = book?.entries?.[uid];
-        if (!entry) { autoExpired.push(id); continue; } // entry deleted — expire it
 
-        const keywords = Array.isArray(entry.key) ? entry.key : [];
-        if (keywords.length === 0) continue; // no keywords — can't expire
-
-        // Use the entry's own scan depth (ST default is 4 if not set)
-        const depth = (typeof entry.depth === 'number' && entry.depth > 0) ? entry.depth : (book.scan_depth ?? 4);
-        const window = recentMessages.slice(-depth);
-        const windowText = window.map(m => (m.mes || m.content || '')).join(' ').toLowerCase();
-
-        const stillPresent = keywords.some(kw =>
-            typeof kw === 'string' && kw.length > 0 && windowText.includes(kw.toLowerCase())
-        );
-
-        if (!stillPresent) {
-            autoExpired.push(id);
-        }
-    }
-
-    // Apply expirations
-    if (autoExpired.length > 0) {
-        const expiredSet = new Set(autoExpired);
-        for (const id of autoExpired) {
-            currentActive.delete(id);
-            currentKeyword.delete(id);
-        }
-        if (settings.debugMode) {
-            console.log('[RPG Tracker] Keyword scanner auto-expired:', autoExpired);
+        if (autoExpired.length > 0) {
+            for (const id of autoExpired) {
+                currentActive.delete(id);
+                currentKeyword.delete(id);
+            }
+            if (settings.debugMode) {
+                console.log('[RPG Tracker] Keyword scanner auto-expired:', autoExpired);
+            }
         }
     }
 
