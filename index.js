@@ -755,8 +755,11 @@ import { getRequestHeaders } from '../../../../script.js';
         const oldChatId = _currentChatId;
         _currentChatId  = newChatId || null;
 
-        // Reset the run-every tick so the agent fires promptly on the first generation of each chat
-        resetRouterTick();
+        // Reset the run-every tick so the agent fires promptly on the first generation of each chat.
+        // Only clear keyword-activated lore when actually switching to a different chat.
+        // Same-chat reloads (swipe, regenerate) must preserve the keyword pool.
+        const isActualChange = oldChatId !== newChatId;
+        resetRouterTick(isActualChange);
 
         // Auto-activate and prefix logic run regardless of chatLinkEnabled.
         // Always re-derive the prefix from the chat ID so stale saved data never

@@ -431,15 +431,19 @@ let _routerAutoTick = 0;
  */
 let _pendingKeywordTriggered = [];
 
-/** Call this whenever the active chat changes so the interval counter and accumulator restart. */
-export function resetRouterTick() {
+/** Call this whenever the active chat changes so the interval counter and accumulator restart.
+ * @param {boolean} [clearKeywordPool] - Pass true only when actually switching to a different chat.
+ */
+export function resetRouterTick(clearKeywordPool = false) {
     _routerAutoTick = 0;
     _pendingKeywordTriggered = [];
     // Keyword-activated entries are transient (they expire when the keyword leaves the scan window).
-    // Clear them on chat change so the new chat starts with a clean slate.
-    const s = getSettings();
-    if (s.keywordActivatedKeys?.length) {
-        s.keywordActivatedKeys = [];
+    // Only clear on a real chat change, not on same-chat reloads (swipe, regenerate).
+    if (clearKeywordPool) {
+        const s = getSettings();
+        if (s.keywordActivatedKeys?.length) {
+            s.keywordActivatedKeys = [];
+        }
     }
 }
 
