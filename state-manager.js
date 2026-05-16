@@ -39,6 +39,8 @@ export function getSettings() {
         memoHistory: [],
         lastDelta: "",
         enabled: true,
+        trackerCollapsed: false,
+        agentCollapsed: false,
         debugMode: true,
         connectionSource: "default",
         connectionProfileId: "",

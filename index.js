@@ -1834,9 +1834,17 @@ Rules:
      */
     function savePanelGeometry(panel) {
         const rect = panel.getBoundingClientRect();
+        const isCollapsed = panel.classList.contains('rt-panel-collapsed');
+        let savedGeo = {};
+        try {
+            const savedStr = localStorage.getItem(GEOMETRY_KEY);
+            if (savedStr) savedGeo = JSON.parse(savedStr) || {};
+        } catch {}
+
         localStorage.setItem(GEOMETRY_KEY, JSON.stringify({
             left: rect.left, top: rect.top,
-            width: rect.width, height: rect.height
+            width: isCollapsed ? (savedGeo.width || rect.width) : rect.width,
+            height: isCollapsed ? (savedGeo.height || rect.height) : rect.height
         }));
     }
 
@@ -2520,7 +2528,7 @@ Rules:
 
         const panel = document.createElement('div');
         panel.id = 'rpg-tracker-panel';
-        panel.className = `rpg-tracker-panel ${settings.trackerTheme || 'rt-theme-native'}`;
+        panel.className = `rpg-tracker-panel ${settings.trackerCollapsed ? 'rt-panel-collapsed ' : ''}${settings.trackerTheme || 'rt-theme-native'}`;
         panel.style.setProperty('--rt-base-size', (settings.fontSize || 13) + 'px');
         panel.innerHTML = `
             <div class="rt-resizer-tr" id="rt-resizer-tr" title="Resize from top-right"></div>
@@ -2541,6 +2549,7 @@ Rules:
                     <button class="rpg-tracker-icon-btn" id="rpg-tracker-delta-btn" title="Toggle change log">δ</button>
                     <button class="rpg-tracker-icon-btn" id="rpg-tracker-agent-btn" title="Lorebook Agent">🤖</button>
                     <button class="rpg-tracker-icon-btn" id="rpg-tracker-debug-btn" title="Context Debugger" style="display:none;">🛠️</button>
+                    <button class="rpg-tracker-icon-btn" id="rpg-tracker-collapse-btn" title="Collapse Panel"><i class="fa-solid ${settings.trackerCollapsed ? 'fa-chevron-down' : 'fa-chevron-up'}"></i></button>
                     <button class="rpg-tracker-icon-btn" id="rpg-tracker-close-btn" title="Hide panel">✕</button>
                 </div>
             </div>
@@ -2556,7 +2565,7 @@ Rules:
                 </div>
                 <div id="rpg-tracker-delta-content">${settings.lastDelta || '<span class="delta-empty">No changes yet.</span>'}</div>
             </div>
-            <div class="rpg-tracker-panel rpg-tracker-agent-panel ${settings.trackerTheme || 'rt-theme-native'}" id="rpg-tracker-agent" style="display:none; position: absolute; right: 0; top: 30px; width: 300px; max-height: calc(100% - 30px); z-index: 1000; flex-direction: column;">
+            <div class="rpg-tracker-panel rpg-tracker-agent-panel ${settings.agentCollapsed ? 'rt-panel-collapsed ' : ''}${settings.trackerTheme || 'rt-theme-native'}" id="rpg-tracker-agent" style="display:none; position: absolute; right: 0; top: 30px; width: 300px; max-height: calc(100% - 30px); z-index: 1000; flex-direction: column;">
                 <div class="rpg-tracker-header" style="cursor: default;">
                     <span class="rpg-tracker-header-left"><i class="fa-solid fa-robot"></i> Lorebook Agent</span>
                     <div class="rpg-tracker-header-center" id="rt-agent-pause-banner" style="color:#ffa500; font-size:0.7em; font-weight:bold; letter-spacing:0.04em;">${settings.routerPaused ? 'AGENT PAUSED' : ''}</div>
@@ -2565,6 +2574,7 @@ Rules:
                         <button class="rpg-tracker-icon-btn" id="rt-agent-router-enable-btn" title="${settings.routerEnabled ? 'Disable Lorebook Agent' : 'Enable Lorebook Agent'}" style="${settings.routerEnabled ? '' : 'opacity:0.35;'}">⏻</button>
                         <button class="rpg-tracker-icon-btn" id="rt-agent-router-pause-btn" title="${settings.routerPaused ? 'Resume Agent (auto-runs paused)' : 'Pause Agent (skip auto-runs)'}" style="${settings.routerPaused ? 'color:#ffa500;' : ''}">${settings.routerPaused ? '▶' : '⏸'}</button>
                         <button class="rpg-tracker-icon-btn" id="rt-agent-router-detach" title="Detach Lorebook Agent">⧉</button>
+                        <button class="rpg-tracker-icon-btn" id="rt-agent-router-collapse-btn" title="Collapse Panel"><i class="fa-solid ${settings.agentCollapsed ? 'fa-chevron-down' : 'fa-chevron-up'}"></i></button>
                         <button class="rpg-tracker-icon-btn" id="rpg-tracker-agent-close" title="Close">✕</button>
                     </div>
                 </div>
@@ -3088,6 +3098,40 @@ Rules:
 
             // Apply on open
             updateAgentPanelDisabled();
+
+            // ── Agent collapse/expand ──
+            const toggleAgentCollapse = () => {
+                const s = getSettings();
+                s.agentCollapsed = !s.agentCollapsed;
+                saveSettings();
+                
+                if (s.agentCollapsed) {
+                    agentPanel.classList.add('rt-panel-collapsed');
+                } else {
+                    agentPanel.classList.remove('rt-panel-collapsed');
+                }
+                
+                const icon = agentPanel.querySelector('#rt-agent-router-collapse-btn i');
+                if (icon) {
+                    icon.className = s.agentCollapsed ? 'fa-solid fa-chevron-down' : 'fa-solid fa-chevron-up';
+                }
+            };
+
+            const agentCollapseBtn = agentPanel.querySelector('#rt-agent-router-collapse-btn');
+            if (agentCollapseBtn) {
+                agentCollapseBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    toggleAgentCollapse();
+                });
+            }
+
+            const agentHeader = agentPanel.querySelector('.rpg-tracker-header');
+            if (agentHeader) {
+                agentHeader.addEventListener('dblclick', (e) => {
+                    if (e.target instanceof Element && e.target.closest('button, input, select, textarea')) return;
+                    toggleAgentCollapse();
+                });
+            }
 
             // ── Agent enable button (header ⏻) ──
             const agentEnableBtn = agentPanel.querySelector('#rt-agent-router-enable-btn');
@@ -4331,6 +4375,34 @@ Rules:
         // Delta resize handle drag
         setupDeltaResize(/** @type {HTMLElement} */(panel));
 
+        // Collapse panel
+        const toggleTrackerCollapse = () => {
+            const s = getSettings();
+            s.trackerCollapsed = !s.trackerCollapsed;
+            saveSettings();
+            
+            if (s.trackerCollapsed) {
+                panel.classList.add('rt-panel-collapsed');
+            } else {
+                panel.classList.remove('rt-panel-collapsed');
+            }
+            
+            const icon = panel.querySelector('#rpg-tracker-collapse-btn i');
+            if (icon) {
+                icon.className = s.trackerCollapsed ? 'fa-solid fa-chevron-down' : 'fa-solid fa-chevron-up';
+            }
+        };
+
+        panel.querySelector('#rpg-tracker-collapse-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleTrackerCollapse();
+        });
+
+        panel.querySelector('#rpg-tracker-header').addEventListener('dblclick', (e) => {
+            if (e.target instanceof Element && e.target.closest('button, input, select, textarea')) return;
+            toggleTrackerCollapse();
+        });
+
         // Close panel
         panel.querySelector('#rpg-tracker-close-btn').addEventListener('click', () => {
             panel.style.display = 'none';
@@ -4628,9 +4700,17 @@ Rules:
                 isDragging = false;
                 if (customKey) {
                     const rect = panel.getBoundingClientRect();
+                    const isCollapsed = panel.classList.contains('rt-panel-collapsed');
+                    let savedGeo = {};
+                    try {
+                        const savedStr = localStorage.getItem(customKey);
+                        if (savedStr) savedGeo = JSON.parse(savedStr) || {};
+                    } catch {}
+
                     localStorage.setItem(customKey, JSON.stringify({
                         left: rect.left, top: rect.top,
-                        width: rect.width, height: rect.height
+                        width: isCollapsed ? (savedGeo.width || rect.width) : rect.width,
+                        height: isCollapsed ? (savedGeo.height || rect.height) : rect.height
                     }));
                 } else {
                     savePanelGeometry(panel);
@@ -6130,13 +6210,15 @@ Rules:
                 showHideWizard(newTheme);
                 const panel = document.getElementById('rpg-tracker-panel');
                 if (panel) {
-                    panel.className = `rpg-tracker-panel ${newTheme}`;
+                    const isCollapsed = panel.classList.contains('rt-panel-collapsed');
+                    panel.className = `rpg-tracker-panel ${isCollapsed ? 'rt-panel-collapsed ' : ''}${newTheme}`;
                     if (!settings.enabled) panel.classList.add('is-disabled');
                 }
                 document.querySelectorAll('.rpg-tracker-detached-panel, .rpg-tracker-agent-panel').forEach(dp => {
+                    const isCollapsed = dp.classList.contains('rt-panel-collapsed');
                     dp.className = dp.classList.contains('rpg-tracker-agent-panel') 
-                        ? `rpg-tracker-panel rpg-tracker-agent-panel ${newTheme}`
-                        : `rpg-tracker-panel rpg-tracker-detached-panel ${newTheme}`;
+                        ? `rpg-tracker-panel rpg-tracker-agent-panel ${isCollapsed ? 'rt-panel-collapsed ' : ''}${newTheme}`
+                        : `rpg-tracker-panel rpg-tracker-detached-panel ${isCollapsed ? 'rt-panel-collapsed ' : ''}${newTheme}`;
                 });
             });
 

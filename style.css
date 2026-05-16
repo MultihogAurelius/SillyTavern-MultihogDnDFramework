@@ -2136,3 +2136,26 @@
 .rpg-tracker-settings .inline-drawer-icon.down {
     transform: rotate(-180deg);
 }
+
+/* ── Panel Collapsed State (Immersion Mode) ─────────────────────────────────── */
+.rpg-tracker-panel.rt-panel-collapsed {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    resize: none !important;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
+}
+
+.rpg-tracker-panel.rt-panel-collapsed .rpg-tracker-header {
+    border-bottom: none !important;
+    border-radius: 8px !important;
+}
+
+.rpg-tracker-panel.rt-panel-collapsed .rpg-tracker-content,
+.rpg-tracker-panel.rt-panel-collapsed .rpg-tracker-delta-panel,
+.rpg-tracker-panel.rt-panel-collapsed .rpg-tracker-delta-resize-handle,
+.rpg-tracker-panel.rt-panel-collapsed .rt-resizer-tr,
+.rpg-tracker-panel.rt-panel-collapsed .rpg-tracker-footer {
+    display: none !important;
+}
+
