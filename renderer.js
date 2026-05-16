@@ -502,8 +502,16 @@ const DEFAULT_XP_COLOR = 'linear-gradient(90deg, #0088ff, #00d4ff)';
                     if (h < 18) return '🌤️'; // afternoon
                     if (h < 20) return '🌇'; // sunset
                     return '🌃';             // night
+                const todColor = (h) => {
+                    if (h < 0) return 'inherit';
+                    if (h < 5)  return '#9999ff'; // late night (cool blue)
+                    if (h < 7)  return '#ffccaa'; // dawn (peach)
+                    if (h < 12) return '#ffffbb'; // morning (pale yellow)
+                    if (h < 14) return '#ffffff'; // midday (white)
+                    if (h < 18) return '#fff2cc'; // afternoon (warm cream)
+                    if (h < 20) return '#ffaa55'; // sunset (orange)
+                    return '#7777ee';             // night (indigo)
                 };
-
 
                 for (let line of lines) {
                     if (line.toLowerCase().startsWith('last rest:')) continue;
@@ -516,27 +524,32 @@ const DEFAULT_XP_COLOR = 'linear-gradient(90deg, #0088ff, #00d4ff)';
                     }
                 }
 
-                    return lines.map(line => {
-                        if (line.toLowerCase().startsWith('last rest:')) {
-                            const restVal = line.substring(line.indexOf(':') + 1).trim();
-                            let append = "";
-                            if (parsedCurrent) {
-                                const restMins = parseInWorldTime(restVal);
-                                if (restMins !== null) {
-                                    const diff = currentTotalMins - restMins;
-                                    if (diff >= 0) {
-                                        append = `&nbsp;<span style="opacity: 0.7; font-size: 1em;">(${formatTimeDiff(diff, false)})</span>`;
-                                    }
+                return lines.map(line => {
+                    if (line.toLowerCase().startsWith('last rest:')) {
+                        const restVal = line.substring(line.indexOf(':') + 1).trim();
+                        let append = "";
+                        if (parsedCurrent) {
+                            const restMins = parseInWorldTime(restVal);
+                            if (restMins !== null) {
+                                const diff = currentTotalMins - restMins;
+                                if (diff >= 0) {
+                                    append = `&nbsp;<span style="opacity: 0.7; font-size: 1em;">(${formatTimeDiff(diff, false)})</span>`;
                                 }
                             }
-                            return `<div class="rt-card-line"><b>Last Rest:</b>&nbsp;${escapeHtmlWithColor(restVal)}${append}</div>`;
                         }
-                        const asMarker = tryRenderMarker(line, tag);
-                        if (asMarker !== null) return asMarker;
-                        const lineEmoji = todEmoji(hourOfLine(line));
-                        const linePrefix = lineEmoji ? `<span class="rt-tod-emoji" style="margin-right:4px;">${lineEmoji}</span>` : '';
-                        return `<div class="rt-card-line">${linePrefix}${escapeHtmlWithColor(line)}</div>`;
-                    });
+                        return `<div class="rt-card-line"><b>Last Rest:</b>&nbsp;${escapeHtmlWithColor(restVal)}${append}</div>`;
+                    }
+                    const asMarker = tryRenderMarker(line, tag);
+                    if (asMarker !== null) return asMarker;
+                    const h = hourOfLine(line);
+                    const lineEmoji = todEmoji(h);
+                    const linePrefix = lineEmoji ? `<span class="rt-tod-emoji" style="margin-right:4px;">${lineEmoji}</span>` : '';
+                    const color = todColor(h);
+                    const content = (color !== 'inherit') 
+                        ? `<span style="color: ${color};">${escapeHtmlWithColor(line)}</span>`
+                        : escapeHtmlWithColor(line);
+                    return `<div class="rt-card-line">${linePrefix}${content}</div>`;
+                });
             }
             case 'XP':
                 return lines.map(line => {
