@@ -2584,11 +2584,6 @@ Rules:
                         <input type="checkbox" id="rt-agent-router-native-kw" ${settings.routerNativeKeywordActivation ? 'checked' : ''}>
                     </label>
 
-                    <label style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; cursor: pointer; opacity: 0.8; font-size: 0.846em;" title="Automatically roll back both the State Tracker memo and Lorebook Agent lore to their pre-generation snapshots when you swipe right (regenerate the last AI message).">
-                        Auto-Rollback on Swipe (State Tracker & Lorebook Agent)
-                        <input type="checkbox" id="rt-agent-router-auto-rollback" ${settings.routerAutoRollbackOnSwipe ? 'checked' : ''}>
-                    </label>
-
                     <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
                         <div style="display: flex; align-items: center; gap: 6px; flex: 1;" title="Main lookback: last N chat messages (user and assistant, in order) included in the agent context during automatic passes.">
                             <span style="font-size: 0.769em; opacity: 0.7;">Lookback (user/assistant):</span>
@@ -3121,18 +3116,6 @@ Rules:
                     const s = getSettings();
                     s.routerNativeKeywordActivation = (/** @type {HTMLInputElement} */ (e.target)).checked;
                     saveSettings();
-                });
-            }
-
-            const autoRollbackCheck = agentPanel.querySelector('#rt-agent-router-auto-rollback');
-            if (autoRollbackCheck) {
-                autoRollbackCheck.addEventListener('change', (e) => {
-                    const s = getSettings();
-                    s.routerAutoRollbackOnSwipe = (/** @type {HTMLInputElement} */ (e.target)).checked;
-                    saveSettings();
-                    // Keep settings drawer in sync
-                    const drawerCheck = document.getElementById('rpg_tracker_router_auto_rollback');
-                    if (drawerCheck) (/** @type {HTMLInputElement} */ (drawerCheck)).checked = s.routerAutoRollbackOnSwipe;
                 });
             }
 
@@ -4602,8 +4585,6 @@ Rules:
 
         refreshRenderedView();
     }
-    // Expose for cross-module use (narrative-hooks swipe rollback)
-    globalThis._rpgSyncMemoView = syncMemoView;
 
     /**
      * @param {HTMLElement} panel
@@ -5829,42 +5810,6 @@ Rules:
             eventSource.on(event_types.GENERATION_ENDED, onGenerationEnded);
             eventSource.on(event_types.GENERATION_STOPPED, onGenerationEnded);
 
-            // ─── Real-time Event Instrumentation ───
-            const debugEvents = [
-                'GENERATION_STARTED',
-                'GENERATION_ENDED',
-                'GENERATION_STOPPED',
-                'MESSAGE_SWIPED',
-                'MESSAGE_SENT',
-                'MESSAGE_RECEIVED',
-                'MESSAGE_UPDATED',
-                'MESSAGE_DELETED',
-                'MESSAGE_SWIPE_DELETED'
-            ];
-            for (const evtName of debugEvents) {
-                const typeKey = event_types[evtName];
-                if (typeKey) {
-                    eventSource.on(typeKey, (...args) => {
-                        const s = getSettings();
-                        const chatObj = ctx.chat || [];
-                        const lastMsg = chatObj[chatObj.length - 1] || null;
-                        console.log(
-                            `%c[RPG Tracker Debug] EVENT: ${evtName}%c\n` +
-                            `Arguments: ${JSON.stringify(args)}\n` +
-                            `Chat Length: ${chatObj.length}\n` +
-                            `Auto-Rollback Toggle: ${s.routerAutoRollbackOnSwipe}\n` +
-                            `Last Msg Swipe ID: ${lastMsg ? lastMsg.swipe_id : 'n/a'}\n` +
-                            `Last Msg Swipes Count: ${lastMsg && lastMsg.swipes ? lastMsg.swipes.length : 'n/a'}\n` +
-                            `Last Msg Text Preview: ${lastMsg ? String(lastMsg.mes).slice(0, 60) + '...' : 'n/a'}\n` +
-                            `Memo History Length: ${s.memoHistory ? s.memoHistory.length : 0}\n` +
-                            `Router History Length: ${s.routerHistory ? s.routerHistory.length : 0}`,
-                            'color: #00ffcc; font-weight: bold; background: #111; padding: 2px 5px; border-radius: 3px;',
-                            'color: inherit;'
-                        );
-                    });
-                }
-            }
-
             // ─── Chat Link ───
             eventSource.on(event_types.CHAT_CHANGED, onChatChanged);
             // Bootstrap: restore state for whichever chat is already open
@@ -6748,14 +6693,6 @@ Rules:
                     if (settings.routerEnabled) ap.classList.remove('is-agent-disabled');
                     else ap.classList.add('is-agent-disabled');
                 }
-            });
-
-            $('#rpg_tracker_router_auto_rollback').prop('checked', !!settings.routerAutoRollbackOnSwipe).on('change', function () {
-                settings.routerAutoRollbackOnSwipe = !!$(this).prop('checked');
-                saveSettings();
-                // Sync agent panel checkbox
-                const panelCheck = /** @type {HTMLInputElement|null} */ (document.getElementById('rt-agent-router-auto-rollback'));
-                if (panelCheck) panelCheck.checked = settings.routerAutoRollbackOnSwipe;
             });
 
             const routerSourceSelect = $('#rpg_tracker_router_source');
