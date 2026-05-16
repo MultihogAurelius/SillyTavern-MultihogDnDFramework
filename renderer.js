@@ -529,13 +529,13 @@ const DEFAULT_XP_COLOR = 'linear-gradient(90deg, #0088ff, #00d4ff)';
                                     }
                                 }
                             }
-                            return `<div class="rt-card-item"><b>Last Rest:</b>&nbsp;${escapeHtmlWithColor(restVal)}${append}</div>`;
+                            return `<div class="rt-card-line"><b>Last Rest:</b>&nbsp;${escapeHtmlWithColor(restVal)}${append}</div>`;
                         }
                         const asMarker = tryRenderMarker(line, tag);
                         if (asMarker !== null) return asMarker;
                         const lineEmoji = todEmoji(hourOfLine(line));
                         const linePrefix = lineEmoji ? `<span class="rt-tod-emoji" style="margin-right:4px;">${lineEmoji}</span>` : '';
-                        return `<div class="rt-card-item">${linePrefix}${escapeHtmlWithColor(line)}</div>`;
+                        return `<div class="rt-card-line">${linePrefix}${escapeHtmlWithColor(line)}</div>`;
                     });
             }
             case 'XP':
