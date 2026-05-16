@@ -502,6 +502,7 @@ const DEFAULT_XP_COLOR = 'linear-gradient(90deg, #0088ff, #00d4ff)';
                     if (h < 18) return '🌤️'; // afternoon
                     if (h < 20) return '🌇'; // sunset
                     return '🌃';             // night
+                };
                 const todColor = (h) => {
                     if (h < 0) return 'inherit';
                     if (h < 5)  return '#9999ff'; // late night (cool blue)
