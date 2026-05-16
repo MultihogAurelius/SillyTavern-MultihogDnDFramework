@@ -5829,6 +5829,42 @@ Rules:
             eventSource.on(event_types.GENERATION_ENDED, onGenerationEnded);
             eventSource.on(event_types.GENERATION_STOPPED, onGenerationEnded);
 
+            // ─── Real-time Event Instrumentation ───
+            const debugEvents = [
+                'GENERATION_STARTED',
+                'GENERATION_ENDED',
+                'GENERATION_STOPPED',
+                'MESSAGE_SWIPED',
+                'MESSAGE_SENT',
+                'MESSAGE_RECEIVED',
+                'MESSAGE_UPDATED',
+                'MESSAGE_DELETED',
+                'MESSAGE_SWIPE_DELETED'
+            ];
+            for (const evtName of debugEvents) {
+                const typeKey = event_types[evtName];
+                if (typeKey) {
+                    eventSource.on(typeKey, (...args) => {
+                        const s = getSettings();
+                        const chatObj = ctx.chat || [];
+                        const lastMsg = chatObj[chatObj.length - 1] || null;
+                        console.log(
+                            `%c[RPG Tracker Debug] EVENT: ${evtName}%c\n` +
+                            `Arguments: ${JSON.stringify(args)}\n` +
+                            `Chat Length: ${chatObj.length}\n` +
+                            `Auto-Rollback Toggle: ${s.routerAutoRollbackOnSwipe}\n` +
+                            `Last Msg Swipe ID: ${lastMsg ? lastMsg.swipe_id : 'n/a'}\n` +
+                            `Last Msg Swipes Count: ${lastMsg && lastMsg.swipes ? lastMsg.swipes.length : 'n/a'}\n` +
+                            `Last Msg Text Preview: ${lastMsg ? String(lastMsg.mes).slice(0, 60) + '...' : 'n/a'}\n` +
+                            `Memo History Length: ${s.memoHistory ? s.memoHistory.length : 0}\n` +
+                            `Router History Length: ${s.routerHistory ? s.routerHistory.length : 0}`,
+                            'color: #00ffcc; font-weight: bold; background: #111; padding: 2px 5px; border-radius: 3px;',
+                            'color: inherit;'
+                        );
+                    });
+                }
+            }
+
             // ─── Chat Link ───
             eventSource.on(event_types.CHAT_CHANGED, onChatChanged);
             // Bootstrap: restore state for whichever chat is already open
