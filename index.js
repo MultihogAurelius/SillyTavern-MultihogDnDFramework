@@ -744,9 +744,8 @@ import { getRequestHeaders } from '../../../../script.js';
     }
 
     /**
-     * Called on CHAT_CHANGED. Saves the departing chat's state,
-     * then loads the arriving chat's state — or resets the memo if
-     * this is a new/unseen chat (no saved state).
+     * Called on CHAT_CHANGED. When chat linking is enabled, snapshots the departing chat first
+     * (before shared router pools are reset), then loads the arriving chat or resets for a new chat.
      * @param {string} newChatId
      */
     function onChatChanged(newChatId) {
@@ -754,6 +753,13 @@ import { getRequestHeaders } from '../../../../script.js';
 
         const oldChatId = _currentChatId;
         _currentChatId  = newChatId || null;
+
+        // Persist the departing chat BEFORE resetRouterTick clears shared pools (keywordActivatedKeys).
+        // Otherwise the save captures an already-empty keyword pool and returning to that chat loses
+        // yellow-pill / keyword re-inject state.
+        if (s.chatLinkEnabled && oldChatId) {
+            saveChatState(oldChatId);
+        }
 
         // Reset the run-every tick so the agent fires promptly on the first generation of each chat.
         // Only clear keyword-activated lore when actually switching to a different chat.
@@ -828,8 +834,6 @@ import { getRequestHeaders } from '../../../../script.js';
             updateChatLinkUI();
             return;
         }
-
-        if (oldChatId) saveChatState(oldChatId);
 
         const found = loadChatState(newChatId);
         if (!found) {
