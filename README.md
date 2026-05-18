@@ -96,9 +96,10 @@ For the state pass, I use Gemini 3 Flash with low reasoning.
   </figure>
 </div>
 
+
 <div align="center">
   <figure>
-    <img width="700" height="..." alt="image" src="https://github.com/user-attachments/assets/bd7debe0-b97d-4aa0-a8ec-49cd0fc527f3" />
+    <img width="700" height="auto" alt="image" src="https://github.com/user-attachments/assets/bd7debe0-b97d-4aa0-a8ec-49cd0fc527f3" />
     <figcaption>Lorebook Agent</figcaption>
   </figure>
 </div>
