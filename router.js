@@ -4,6 +4,8 @@ import { getRequestHeaders } from '../../../../script.js';
 
 let _routerRunning = false;
 let _routerNormalRunCount = 0; // tracks completed normal (non-cleanup) passes for auto-cleanup interval
+/** True after one successful `updateWorldInfoList` from the keyword-scanner fallback (empty campaignBooks). */
+let _routerScannerWorldInfoListPrimed = false;
 
 /** Returns true while a router pass is actively running. */
 export function isRouterRunning() { return _routerRunning; }
@@ -1865,14 +1867,15 @@ export async function scanAssistantOutputForKeywords(narrativeText, opts = {}) {
         // We know exactly which books belong to this campaign — no registry scan needed.
         booksToScan = [...knownBooks];
     } else {
-        // Fallback for first-time chats: discover books via in-memory registry.
-        // updateWorldInfoList() is intentionally NOT called here — it triggers a
-        // full disk re-index on every message send, causing multi-second latency
-        // for users whose chatStates.campaignBooks is empty (new campaigns, no
-        // lorebook entries yet). The routerLog fallback below already catches any
-        // books not yet visible in the in-memory registry at zero I/O cost.
-        // runRouterPass calls updateWorldInfoList() after actual book writes (line ~1298),
-        // so the registry is already current by the time the next scan fires.
+        // Fallback when `campaignBooks` is not populated yet: names come from ST's
+        // in-memory world-info list, which can omit books that exist on disk until
+        // `updateWorldInfoList()` runs. Calling it on every message caused multi-
+        // second stalls (v2.4.2). Prime once per extension load so the first
+        // fallback scan sees the full library; later scans stay in-memory-only.
+        if (!_routerScannerWorldInfoListPrimed && typeof ctx.updateWorldInfoList === 'function') {
+            try { await ctx.updateWorldInfoList(); } catch (_) { /* non-fatal */ }
+            _routerScannerWorldInfoListPrimed = true;
+        }
         const allNames = await getWorldInfoNamesSafe();
         const scoped = allNames.filter(n => bookBelongsToPrefix(n, prefix));
 

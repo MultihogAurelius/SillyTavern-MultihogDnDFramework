@@ -2,6 +2,11 @@
 
 All notable changes to the **Fatbody D&D Framework** will be documented in this file.
 
+## [2.4.3] - 2026-05-22
+
+### Fixed
+- **Keyword scanner cold registry (2.4.2 follow-up)**: When `campaignBooks` was still empty, the scanner relied solely on `getWorldInfoNames()` without ever re-indexing world info, so SillyTavern’s in-memory list could omit lorebooks that already existed on disk. Keywords in those books were never activated and same-turn lore injection could silently miss until another subsystem refreshed the registry. The fallback path now calls `updateWorldInfoList()` **once per extension load** before reading names, keeping per-message scans fast while restoring a complete book list.
+
 ## [2.4.2] - 2026-05-18
 
 ### Fixed
