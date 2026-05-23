@@ -4523,6 +4523,7 @@ Rules:
             }
             return {
                 timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                campaignPrefix: getEffectiveRouterCampaignPrefix(ctx.chatId || ''),
                 activeRouterKeys: JSON.parse(JSON.stringify(s.activeRouterKeys || [])),
                 bookSnapshots,
             };

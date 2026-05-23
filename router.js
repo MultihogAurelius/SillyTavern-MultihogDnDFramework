@@ -33,6 +33,33 @@ function bookBelongsToPrefix(bookName, prefix) {
 }
 
 /**
+ * Ensures a router history snapshot targets the same campaign as `livePrefix`.
+ * `routerHistory` is global; without this check, undo after switching chats can
+ * delete the current chat's lorebooks as "new" vs another chat's snapshot and
+ * restore the wrong campaign's files.
+ *
+ * @param {{ campaignPrefix?: string, bookSnapshots?: Record<string, unknown> }} snapshot
+ * @param {string} livePrefix
+ * @param {string} [contextLabel]
+ * @returns {boolean}
+ */
+function snapshotMatchesLiveCampaign(snapshot, livePrefix, contextLabel = 'Rollback') {
+    if (!snapshot) return false;
+    if (!livePrefix) return true;
+    const snapPrefix = snapshot.campaignPrefix;
+    if (snapPrefix && snapPrefix !== livePrefix) {
+        console.warn(`[RPG Tracker] ${contextLabel}: snapshot is for campaign "${snapPrefix}" but active chat is "${livePrefix}" — refusing.`);
+        return false;
+    }
+    const keys = Object.keys(snapshot.bookSnapshots || {});
+    if (!snapPrefix && keys.some((n) => !bookBelongsToPrefix(n, livePrefix))) {
+        console.warn(`[RPG Tracker] ${contextLabel}: snapshot lorebooks are not confined to the active campaign "${livePrefix}" — refusing.`);
+        return false;
+    }
+    return true;
+}
+
+/**
  * Parses a single Action: toolname({...}) call from a text response.
  * Used as a fallback for profile/default connections that don't support native tool calling.
  * Safe because the caller always passes a single-turn response (multi-turn messages mean
@@ -184,6 +211,7 @@ export async function runRouterPass(narrativeOutput, manualPrompt = null, custom
         {
             const snapshot = {
                 timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                campaignPrefix: prefix,
                 activeRouterKeys: JSON.parse(JSON.stringify(settings.activeRouterKeys || [])),
                 bookSnapshots: {}
             };
@@ -1379,8 +1407,12 @@ export async function rollbackRouterPass(index = 0) {
     if (!snapshot) return false;
 
     try {
-        const prePassBooks = new Set(Object.keys(snapshot.bookSnapshots || {}));
         const prefix = getLivePrefix();
+        if (!snapshotMatchesLiveCampaign(snapshot, prefix, 'Rollback')) {
+            return false;
+        }
+
+        const prePassBooks = new Set(Object.keys(snapshot.bookSnapshots || {}));
 
         // -- Step 1: Delete lorebooks that were CREATED during the pass --------
         // Only consider books under the live campaign prefix. If the prefix is missing,
@@ -1470,6 +1502,14 @@ export async function reapplyRouterPass(prePassSnapshot, postPassState) {
     const ctx = SillyTavern.getContext();
 
     try {
+        const livePrefix = getLivePrefix();
+        if (!snapshotMatchesLiveCampaign(prePassSnapshot, livePrefix, 'Redo')) {
+            return false;
+        }
+        if (!snapshotMatchesLiveCampaign(postPassState, livePrefix, 'Redo')) {
+            return false;
+        }
+
         // Step 1: Put the pre-pass snapshot back so the user can undo again
         if (!settings.routerHistory) settings.routerHistory = [];
         settings.routerHistory.unshift(prePassSnapshot);

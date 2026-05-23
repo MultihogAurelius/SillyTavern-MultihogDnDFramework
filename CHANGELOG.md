@@ -2,6 +2,11 @@
 
 All notable changes to the **Fatbody D&D Framework** will be documented in this file.
 
+## [2.4.3] - 2026-05-23
+
+### Fixed
+- **Cross-chat lore rollback**: `routerHistory` is stored globally. Refusing undo/redo when the snapshot’s campaign prefix (or legacy lorebook names) does not match the active chat prevents wiping the current chat’s lorebooks as “new” versus another session’s snapshot and blocks restoring the wrong campaign’s files.
+
 ## [2.4.2] - 2026-05-18
 
 ### Fixed
