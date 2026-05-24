@@ -27,8 +27,10 @@ function getLivePrefix() {
  */
 function bookBelongsToPrefix(bookName, prefix) {
     if (!prefix) return false;
-    if (bookName === prefix) return true;
-    const rest = bookName.startsWith(prefix + '_') ? bookName.slice(prefix.length + 1) : null;
+    const lowerBook = String(bookName).toLowerCase();
+    const lowerPref = String(prefix).toLowerCase();
+    if (lowerBook === lowerPref) return true;
+    const rest = lowerBook.startsWith(lowerPref + '_') ? lowerBook.slice(lowerPref.length + 1) : null;
     return rest !== null && !rest.includes('_');
 }
 
@@ -94,18 +96,50 @@ function broadcastStep(type, content, metadata = {}) {
 
 /**
  * Compatibility helper for older SillyTavern versions.
+ * Probes both the frontend cache AND the backend API for ground truth,
+ * so that cloned/renamed lorebooks are always discovered.
  */
 async function getWorldInfoNamesSafe() {
     const ctx = SillyTavern.getContext();
+    const namesSet = new Set();
+    
+    // 1. Check frontend registry (may be stale or incomplete if books aren't linked yet)
     if (typeof ctx.getWorldInfoNames === 'function') {
-        return await ctx.getWorldInfoNames();
+        const res = await ctx.getWorldInfoNames();
+        if (Array.isArray(res)) res.forEach(n => namesSet.add(n));
+    } else if (typeof ctx.getLorebookList === 'function') {
+        const res = await ctx.getLorebookList();
+        if (Array.isArray(res)) res.forEach(n => namesSet.add(n));
     }
-    // Fallback for older versions
-    if (typeof ctx.getLorebookList === 'function') {
-        return await ctx.getLorebookList();
-    }
-    // Deep fallback
-    return [];
+
+    // 2. Unconditionally probe the backend API (ground truth of what exists on disk).
+    // This prevents the agent from missing newly cloned books if the frontend hasn't refreshed.
+    try {
+        const r = await fetch('/api/settings/get', { 
+            method: 'POST', 
+            headers: getRequestHeaders(),
+            body: JSON.stringify({})
+        });
+        if (r.ok) {
+            const j = await r.json();
+            if (Array.isArray(j?.world_names)) {
+                j.world_names.forEach(n => namesSet.add(n));
+            }
+        }
+    } catch (_) {}
+
+    // 3. Fallback for older ST versions
+    try {
+        const r = await fetch('/api/worldinfo/get', { method: 'POST', headers: getRequestHeaders() });
+        if (r.ok) {
+            const j = await r.json();
+            if (typeof j === 'object' && j !== null && !j.error) {
+                Object.keys(j).forEach(n => namesSet.add(n));
+            }
+        }
+    } catch (_) {}
+
+    return [...namesSet];
 }
 
 /**
@@ -1165,10 +1199,20 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
     /** @type {Map<string, Array>} */
     const bookQueue = new Map();
 
+    const knownBookNames = Object.keys(allBooks);
     for (const rec of records) {
         const cat = (rec.category || rec.comment || '').toUpperCase();
         const catName = Object.keys(catMap).find(k => cat.includes(k));
-        const targetBook = catName ? (prefix ? `${prefix}_${catMap[catName]}` : catMap[catName]) : baseBook;
+        const idealTargetBook = catName ? (prefix ? `${prefix}_${catMap[catName]}` : catMap[catName]) : baseBook;
+        
+        let targetBook = idealTargetBook;
+        const idealLower = idealTargetBook.toLowerCase();
+        for (const known of knownBookNames) {
+            if (known.toLowerCase() === idealLower) {
+                targetBook = known;
+                break;
+            }
+        }
 
         // Strip any accidental "TAG: " prefix the model may have included in the label
         // e.g. "FAC: Iron Syndicate" ? "Iron Syndicate", "STATS: Thalric Thorne" ? "Thalric Thorne"
@@ -1208,16 +1252,32 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
 
 
     // -- Phase B: For each book, load existing entries, append new ones, save to disk via HTTP API --
-    const knownBookNames = Object.keys(allBooks);
     /** @type {Set<string>} books written this pass that need activation */
     const booksWritten = new Set();
     for (const [targetBook, recs] of bookQueue.entries()) {
         if (settings.debugMode) console.log(`[RPG Tracker] Writing ${recs.length} entries to: ${targetBook}`);
 
-        // Load existing book or initialize a new one
-        let bookData = knownBookNames.includes(targetBook)
-            ? await ctx.loadWorldInfo(targetBook)
-            : null;
+        // Attempt to load existing book directly from backend (prevents wiping un-cached books)
+        let bookData = null;
+        try {
+            bookData = await ctx.loadWorldInfo(targetBook);
+        } catch (_) { }
+
+        if (!bookData) {
+            try {
+                const res = await fetch('/api/worldinfo/get', {
+                    method: 'POST',
+                    headers: getRequestHeaders(),
+                    body: JSON.stringify({ name: targetBook })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data && typeof data === 'object' && data.entries) {
+                        bookData = data;
+                    }
+                }
+            } catch (_) {}
+        }
 
         if (!bookData) {
             bookData = { entries: {}, name: targetBook, scan_depth: 4, token_budget: 400, recursive: false, extensions: {} };
@@ -1559,7 +1619,7 @@ function parseBasicTags(text, archiveBooks) {
     };
 
     // Generic tag parser: [[TAG: ...]]
-    const tagRegex = /\[\[(\w+):\s*((?:(?!\]\]).)+?)\]\]/gi;
+    const tagRegex = /\[\[(\w+):\s*([\s\S]*?)\]\]/gi;
     let match;
 
     while ((match = tagRegex.exec(text)) !== null) {
@@ -1603,10 +1663,29 @@ function parseBasicTags(text, archiveBooks) {
 async function addLorebookEntry(lorebookName, entryData, allNames) {
     const ctx = SillyTavern.getContext();
     if (!allNames) allNames = await getWorldInfoNamesSafe();
+    
     let bookData = null;
     if (allNames.includes(lorebookName)) {
-        bookData = await ctx.loadWorldInfo(lorebookName);
-    } else {
+        try { bookData = await ctx.loadWorldInfo(lorebookName); } catch (_) {}
+    }
+    
+    if (!bookData) {
+        try {
+            const res = await fetch('/api/worldinfo/get', {
+                method: 'POST',
+                headers: getRequestHeaders(),
+                body: JSON.stringify({ name: lorebookName })
+            });
+            if (res.ok) {
+                const data = await res.json();
+                if (data && typeof data === 'object' && data.entries) {
+                    bookData = data;
+                }
+            }
+        } catch (_) {}
+    }
+
+    if (!bookData) {
         if (getSettings().debugMode) console.log(`[RPG Tracker] Initializing new lorebook: ${lorebookName}`);
         bookData = { 
             entries: {},
@@ -1620,7 +1699,7 @@ async function addLorebookEntry(lorebookName, entryData, allNames) {
 
     // Always reload fresh from disk to get accurate existing UIDs
     // (avoids uid:0 collision when multiple entries are written to a new book in one pass)
-    const freshData = allNames.includes(lorebookName) ? await ctx.loadWorldInfo(lorebookName) : bookData;
+    const freshData = bookData;
     const existingUids = Object.keys(freshData?.entries || {}).map(Number).filter(n => !isNaN(n));
     const nextUid = existingUids.length > 0 ? Math.max(...existingUids) + 1 : 0;
     
