@@ -2,6 +2,11 @@
 
 All notable changes to the **Fatbody D&D Framework** will be documented in this file.
 
+## [2.4.4] - 2026-05-25
+
+### Fixed
+- **Scene save persistence**: `addLorebookEntry` (used by `/router save`) now writes through `/api/worldinfo/edit` before syncing ST's cache, matching the Lorebook Agent commit path. Previously, saving a scene into a lorebook that did not yet exist in SillyTavern's in-memory registry could be dropped by `saveWorldInfo` alone, causing silent data loss on first save.
+
 ## [2.4.2] - 2026-05-18
 
 ### Fixed

@@ -1724,9 +1724,22 @@ async function addLorebookEntry(lorebookName, entryData, allNames) {
         groupOverride: false,
         groupWeight: 100,
     };
-    
-    await ctx.saveWorldInfo(lorebookName, writeTarget);
-    
+
+    // Same persistence path as applyAction Phase B: ctx.saveWorldInfo alone can drop
+    // books that are not yet in ST's in-memory registry (new or API-only books).
+    const saveRes = await fetch('/api/worldinfo/edit', {
+        method: 'POST',
+        headers: getRequestHeaders(),
+        body: JSON.stringify({ name: lorebookName, data: writeTarget })
+    });
+    if (!saveRes.ok) {
+        console.error(`[RPG Tracker] Failed to save ${lorebookName}: HTTP ${saveRes.status}`);
+        throw new Error(`Lorebook save failed (HTTP ${saveRes.status})`);
+    }
+    if (typeof ctx.saveWorldInfo === 'function') {
+        try { await ctx.saveWorldInfo(lorebookName, writeTarget); } catch (_) { /* non-fatal cache sync */ }
+    }
+
     // Update allNames cache so subsequent calls know this book now exists
     if (!allNames.includes(lorebookName)) allNames.push(lorebookName);
     
