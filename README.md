@@ -10,20 +10,49 @@ I wasn't satisfied with any of the commercial offerings available (AI Realm, AI 
 
 ---
 
-## 🌟 What's New in 2.6.0+
+## 🚀 What's New in v3.0.0
 
-This fork has been significantly upgraded with powerful new features that redefine the roleplaying experience:
+The biggest update yet — a complete overhaul of the rendering engine, AI-assisted configuration tools, and combat balancing.
 
-*   🧪 **Experimental Features Tab**: A new dedicated settings drawer for experimental, cutting-edge features that may increase token usage or change model behavior. Currently includes **Full Review Mode**.
-*   🔬 **Full Review Mode** *(Experimental)*: Replaces the delta-only State Tracker logic with a full review pass. The model reviews and outputs **every** section on each update, preventing it from forgetting to update fields like Status, Time, etc. Higher token cost but significantly more accurate for models that struggle with "output only changes" instructions.
-*   ⏱️ **State Tracker Run Frequency**: Control how often the State Tracker fires with a new "Run Every N Messages" setting. Set to 2 or 3 to reduce API costs on fast-moving chats.
-*   🔧 **RNG Queue Fix**: Fixed a critical bug where the RNG Queue was silently dropped with certain chat completion presets that use array-format content (common with vision/multimodal presets).
-*   🌍 **Automated World Engine**: A comprehensive simulation block in the Lorebook Agent. The agent now tracks the passage of time and automatically generates missing daily background reports for off-screen NPC actions and faction events, creating a persistent, living world that evolves independently of the player.
-*   ⚙️ **Editable Modular Agent Instructions**: All Lorebook Agent formatting rules and module-specific logic (LOC, FAC, WORLD, Custom Tags) are exposed into a single, unified text area in the settings UI. You can now fully customize or rewrite the internal logic and formatting rules of the Lorebook Agent.
-*   🔍 **Full Audit Chunking**: Both the RPG State Tracker and the Lorebook Agent can now process massive chat histories that exceed your model's context limit. The history is automatically split into token-managed chunks that are processed sequentially — each chunk fully commits its results before the next begins, with live UI updates after every chunk.
-*   💾 **Bulletproof Lorebook Agent**: Fixed a critical data loss bug where the Lorebook Agent would fail to recognize manually cloned or renamed campaign lorebooks. The agent now proactively probes the backend server before initializing a new book, completely preventing accidental overwriting and deletion of existing lorebook files.
-*   🧩 **Tag Parsing Robustness**: The generic tag parser now safely captures tags spanning across newlines, ensuring multi-paragraph entries (like the new verbose WORLD reports) are never truncated.
-*   🛡️ **Legacy Constraints**: Backported the `<world_engine>` narrative constraint to prevent NPCs from spontaneously blurting out background world events that your character shouldn't know about.
+### 🎨 Universal Inline Rendering Engine
+The rendering system has been rebuilt from the ground up. **20+ rendering tags** are now available and work **inline anywhere** — no longer restricted to the start of a line. Use them freely across stock fields, custom fields, and quest logs.
+
+- **Color Bars**: `((BAR))`, `((BARRED))`, `((BARBLUE))`, `((BARGREEN))`, `((BARYELLOW))`, `((BARPURPLE))`, `((BARORANGE))`, `((XPBAR))`
+- **Status Pills**: `((PILLS))`, `((PILLRED))`, `((PILLGREEN))`, `((PILLBLUE))` — with optional tooltip descriptions via parentheses (e.g. `Bleeding (1d4 dmg)`)
+- **Alert Badges**: `((WARNING))`, `((DANGER))`, `((SUCCESS))`, `((INFO))`, `((BADGE))`
+- **Economy Coins**: `((GOLD))`, `((SILVER))`, `((BRONZE))`, `((DOLLAR))`
+- **Creative Tags**: `((HEART))`, `((SKULL))`, `((SOUL))`, `((ROLL))`, `((HIGHLIGHT))`
+- **Quest Tags**: `((OBJ))`, `((REWARD))`, `((DIFFICULTY))`, `((PROGRESS))`
+
+### 📚 Rendering Tags Library
+A new interactive popup accessible from settings that renders **live, pixel-perfect previews** of every available tag using your active theme. No more guessing what a tag looks like — see it exactly as it appears in the tracker.
+
+### 🪄 AI Custom Field Creator
+Press **"Add Custom (AI)"** and describe what you want to track in plain language. The AI generates a fully configured field complete with:
+- Field name, icon, and tracking instructions
+- `FORMAT:` and `EXAMPLE:` sections so the gameplay AI knows exactly how to render it
+- Automatic rendering tag selection from the full library
+- Full system prompt awareness — if the mechanic already exists in your sysprompt, the AI bases its field off that system
+
+### 🛠️ AI Section Builder
+Describe a new game mechanic in plain text and the AI generates a complete XML-tagged sysprompt section. It reads your **entire current system prompt** first to ensure seamless, non-redundant integration. Preview before approving.
+
+### ⚔️ Dynamic Enemy HP Scaling
+Enemy difficulty now scales intelligently based on quest context:
+- **Very Easy / Easy**: Enemies below or near player level
+- **Normal**: Roughly at player level
+- **Hard / Very Hard**: Brutal — Hard rewards smart play, Very Hard demands perfection
+- **No quest active**: Pure narrative context, no hand-holding
+
+### 🏆 Inventory & Combat Upgrades
+- **Rarity Classification**: All inventory items now display `[Common]`, `[Uncommon]`, `[Rare]`, `[Epic]`, `[Legendary]`, or `[Artifact]` tags with emojis and estimated worth
+- **Worth Tooltips**: Item value is hidden from display and revealed on hover
+- **Legendary NPC Tier**: New world-threat tier with HP 150–500+, AC 19–22, ATK +11 to +15
+- **Emergent Quest System**: No more formal NPC acceptance required — pursue a goal through action and it's automatically tracked
+
+### 🔬 State Tracker Full Review Modes
+- **Half Review Mode**: Medium-intensity — adjusts prompts to request complete output with balanced token usage
+- **Full Review Mode — Aggressive**: Completely rewrites the system prompt to forcefully demand every single field is updated. Nothing gets missed.
 
 ---
 
@@ -33,7 +62,7 @@ This fork has been significantly upgraded with powerful new features that redefi
 2. 🎲 **Hybrid RNG System** — A dual-engine approach to tabletop physics. 
    - **RNG Queue (Combat)**: Pre-seeded deterministic dice injected into every turn for high-speed, zero-latency combat resolution, neatly within a single output. Sidesteps the unreliability and massive input token costs of tool chains.
    - **Tool Call RNG (Narrative)**: A proactive AI-driven rolling system for non-combat skill checks. Features a "Waterproof" commitment logic where the AI must declare a DC before seeing the result, preventing narrative sycophancy and cheating.
-3. 🤖 **The Lorebook Agent** — This is a fully autonomous lorebook manager that creates, updates, activates, and deactivates lorebooks for you in the background. Handles the macroscopic consistency of your adventure. Also includes cleanup tools (consolidation, rewriting entries) that can be set to automatically run periodically.
+3. 🤖 **The Lorebook Agent** — A fully autonomous lorebook manager that creates, updates, activates, and deactivates lorebooks for you in the background. Handles the macroscopic consistency of your adventure. Includes cleanup tools, full audit chunking, and an automated World Engine that generates daily background reports for off-screen NPC actions and faction events.
 
 Together they solve the three core problems of LLM tabletop RP: the AI forgetting your inventory/spells, the AI forgetting long-term context, and you always winning (aka. plot armor). I have high confidence in the system's reliability—you can just play and not worry about tinkering with much of anything.
 
@@ -41,13 +70,16 @@ Together they solve the three core problems of LLM tabletop RP: the AI forgettin
 
 ## Highlights
 
+- **20+ Rendering Tags** with universal inline support and live preview library.
+- **AI-Powered Configuration** — generate custom fields and sysprompt sections from plain language descriptions.
 - **Dual-Engine Physics**: Deterministic queue for instant combat, and interactive tool calls for narrative skill checks.
-- **Draggable HUD** with HP bars, spell pips, etc.
+- **Draggable HUD** with HP bars, spell pips, colored status pills, alert badges, and economy coins.
 - **Automatic spell slot tracking** via 🔵 pips in the UI; never worry about remembering how many you have left.
 - **Buff/debuff temporal decay** via [TIME] delta tracking; statuses expire automatically over time based on time elapsed.
+- **Dynamic enemy scaling** — enemies adapt to quest difficulty and player level contextually.
 - **Snapshot history + delta log** - easy rollback, and see at a glance what was changed in the state.
 - **Auto model-switching** so that you can use a different model for tracking the state.
-- **Full-context audit mode** in case you lose your state.
+- **Full-context audit mode** with automatic chunking for massive chat histories.
 - **Custom fields, themes, reorderable sections**; track whatever you want beyond the stock fields and customize the visuals to your liking.
 - **Automatic D&D wikidot spell links** - look up spells by clicking on them without awkward googling.
 - **Mobile support** (open from the wand menu).
@@ -55,7 +87,7 @@ Together they solve the three core problems of LLM tabletop RP: the AI forgettin
 - **Onboarding system** - roll up a random character or describe one to the model.
 - **Profile saving** - switch between multiple campaigns without losing your state.
 - **Homebrew-friendly** and flexible in general, relying on AI to do a lot of the lifting.
-- **Automatic Long-Context Tracking** via the Lorebook Agent.
+- **Automatic Long-Context Tracking** via the Lorebook Agent with World Engine simulation.
 
 <div align="center">
   <figure>
