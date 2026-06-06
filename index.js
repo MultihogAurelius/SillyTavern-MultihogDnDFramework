@@ -6959,6 +6959,7 @@ Return ONLY a valid JSON object with these fields:
 RULES:
 - 'tag' (the field ID) must be UPPERCASE, no spaces, use underscores
 - 'tag' (the field ID) must NOT conflict with the Existing Field IDs listed above
+- NEVER use asterisks (*) anywhere. Do not use them in the tag, prompt, template, or anywhere else. The * symbol is completely BANNED as it breaks rendering. Use ((HIGHLIGHT)) instead if you need emphasis.
 - You are ENCOURAGED to use any of the available rendering tags, even if they are used by other fields
 - icon must be a single emoji
 - prompt should start with 1-3 sentences of clear and specific instructions
@@ -6966,7 +6967,6 @@ RULES:
 - prompt MUST include a newline, then 'EXAMPLE:', then a realistic made up example of how it should look
 - The AI during gameplay only sees 'prompt', it does NOT see 'template'
 - template MUST use rendering tags — this is just the UI preview for the user. It should match the EXAMPLE you provided in the prompt.
-- NEVER use asterisks (**) for bolding, highlighting, or emphasis. They have no rendering support and break the output. Use ((HIGHLIGHT)) or rendering tags instead.
 - Return ONLY the JSON. No explanation, no markdown fences.`;
 
             toastr['info']('Generating custom field with AI...', 'AI Field Creator', { timeOut: 3000 });
