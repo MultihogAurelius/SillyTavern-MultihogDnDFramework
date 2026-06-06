@@ -262,24 +262,34 @@
     position: absolute;
     bottom: 0;
     right: 0;
-    width: 16px;
-    height: 16px;
+    width: 24px;
+    height: 24px;
     cursor: se-resize;
     z-index: 2005;
-    background-image: repeating-linear-gradient(
-        -45deg,
-        transparent,
-        transparent 2px,
-        rgba(255, 255, 255, 0.4) 2px,
-        rgba(255, 255, 255, 0.4) 3px
-    );
-    clip-path: polygon(100% 0, 100% 100%, 0 100%);
-    opacity: 0.45;
-    transition: opacity 0.2s;
+    background: rgba(255, 0, 0, 0.6);
+    opacity: 1;
 }
 
 .rt-resizer-br:hover {
     opacity: 1;
+    background: rgba(255, 0, 0, 0.9);
+}
+
+.rt-resizer-bl {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 24px;
+    height: 24px;
+    cursor: sw-resize;
+    z-index: 2005;
+    background: rgba(0, 100, 255, 0.6);
+    opacity: 1;
+}
+
+.rt-resizer-bl:hover {
+    opacity: 1;
+    background: rgba(0, 100, 255, 0.9);
 }
 
 /* Disabled via the settings checkbox — full transparency */
@@ -2334,9 +2344,10 @@
     display: none !important;
 }
 
-/* When collapsed, both resizers stay visible but signal horizontal-only resize */
+/* When collapsed, all resizers stay visible but signal horizontal-only resize */
 .rpg-tracker-panel.rt-panel-collapsed .rt-resizer-tr,
-.rpg-tracker-panel.rt-panel-collapsed .rt-resizer-br {
+.rpg-tracker-panel.rt-panel-collapsed .rt-resizer-br,
+.rpg-tracker-panel.rt-panel-collapsed .rt-resizer-bl {
     cursor: ew-resize;
 }
 
@@ -2355,6 +2366,23 @@
 }
 
 .rpg-tracker-panel.rt-panel-collapsed .rt-resizer-br:hover {
+    opacity: 1;
+    border-color: var(--rt-accent);
+}
+
+.rpg-tracker-panel.rt-panel-collapsed .rt-resizer-bl {
+    width: 12px;
+    height: 12px;
+    background-image: none;
+    clip-path: none;
+    border-bottom: 2px solid var(--rt-accent-dim);
+    border-left: 2px solid var(--rt-accent-dim);
+    border-bottom-left-radius: 6px;
+    opacity: 0.4;
+    transition: opacity 0.2s, border-color 0.2s;
+}
+
+.rpg-tracker-panel.rt-panel-collapsed .rt-resizer-bl:hover {
     opacity: 1;
     border-color: var(--rt-accent);
 }

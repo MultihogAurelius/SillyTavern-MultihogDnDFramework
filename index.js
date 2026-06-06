@@ -3044,7 +3044,8 @@ function createPanel() {
                         <button class="rpg-tracker-nav-btn" id="rt-agent-nav-fwd" title="Redo lorebook pass">→</button>
                     </div>
                 </div>
-                <div class="rt-resizer-br" id="rt-agent-resizer-br" title="Resize from bottom-right"></div>
+                <div class="rt-resizer-br" id="rt-agent-resizer-br" title="Resize from bottom-right" style="position:absolute;bottom:0;right:0;width:24px;height:24px;cursor:se-resize;z-index:9999;background:rgba(255,0,0,0.6);"></div>
+                <div class="rt-resizer-bl" id="rt-agent-resizer-bl" title="Resize from bottom-left" style="position:absolute;bottom:0;left:0;width:24px;height:24px;cursor:sw-resize;z-index:9999;background:rgba(0,100,255,0.6);"></div>
             </div>
             <div class="rpg-tracker-prompt-bar" id="rpg-tracker-prompt-bar" style="display:none;">
                 <textarea class="rpg-tracker-prompt-input" id="rpg-tracker-prompt-input" rows="2" placeholder="Instruct the tracker model… (Enter to send, Shift+Enter for newline)"></textarea>
@@ -3074,6 +3075,8 @@ function createPanel() {
                     <button class="rpg-tracker-nav-btn" id="rpg-tracker-memo-clear" style="padding: 1px 5px; font-size: 0.692em; opacity: 0.8; margin-left: 5px;" title="Clear memo and history">CLEAR</button>
                 </div>
             </div>
+            <div class="rt-resizer-br" id="rt-resizer-br" title="Resize from bottom-right" style="position:absolute;bottom:0;right:0;width:24px;height:24px;cursor:se-resize;z-index:9999;background:rgba(255,0,0,0.6);"></div>
+            <div class="rt-resizer-bl" id="rt-resizer-bl" title="Resize from bottom-left" style="position:absolute;bottom:0;left:0;width:24px;height:24px;cursor:sw-resize;z-index:9999;background:rgba(0,100,255,0.6);"></div>
         `;
 
     document.body.appendChild(panel);
@@ -3090,11 +3093,29 @@ function createPanel() {
         makeResizableTR(/** @type {HTMLElement} */(panel), resizerTR);
     }
 
+    // State tracker bottom-right resizer
+    const resizerBR = panel.querySelector('#rt-resizer-br');
+    if (resizerBR instanceof HTMLElement) {
+        makeResizableBR(/** @type {HTMLElement} */(panel), resizerBR);
+    }
+
+    // State tracker bottom-left resizer
+    const resizerBL = panel.querySelector('#rt-resizer-bl');
+    if (resizerBL instanceof HTMLElement) {
+        makeResizableBL(/** @type {HTMLElement} */(panel), resizerBL);
+    }
+
     // Agent panel bottom-right resizer
+    const agentPanelEl = /** @type {HTMLElement} */(panel.querySelector('#rpg-tracker-agent'));
     const agentResizerBR = panel.querySelector('#rt-agent-resizer-br');
-    if (agentResizerBR instanceof HTMLElement) {
-        const agentPanelEl = /** @type {HTMLElement} */(panel.querySelector('#rpg-tracker-agent'));
-        if (agentPanelEl) makeResizableBR(agentPanelEl, agentResizerBR);
+    if (agentResizerBR instanceof HTMLElement && agentPanelEl) {
+        makeResizableBR(agentPanelEl, agentResizerBR);
+    }
+
+    // Agent panel bottom-left resizer
+    const agentResizerBL = panel.querySelector('#rt-agent-resizer-bl');
+    if (agentResizerBL instanceof HTMLElement && agentPanelEl) {
+        makeResizableBL(agentPanelEl, agentResizerBL);
     }
 
     const stopBtn = panel.querySelector('#rpg-tracker-stop-btn');
@@ -5193,9 +5214,10 @@ function makeDraggable(panel, handle, customKey = null) {
         panel.style.top = boundedTop + 'px';
     };
 
-    const onPointerUp = () => {
+    const onPointerUp = (e) => {
         if (isDragging) {
             isDragging = false;
+            try { handle.releasePointerCapture(e.pointerId); } catch(err){}
             if (customKey) {
                 const rect = panel.getBoundingClientRect();
                 const isCollapsed = panel.classList.contains('rt-panel-collapsed');
@@ -5219,7 +5241,10 @@ function makeDraggable(panel, handle, customKey = null) {
     handle.addEventListener('pointerdown', onPointerDown);
     handle.addEventListener('pointermove', onPointerMove);
     handle.addEventListener('pointerup', onPointerUp);
-    handle.addEventListener('pointercancel', () => { isDragging = false; });
+    handle.addEventListener('pointercancel', (e) => {
+        isDragging = false;
+        try { handle.releasePointerCapture(e.pointerId); } catch(err){}
+    });
 
     return () => {
         isDragging = false;
@@ -5278,52 +5303,112 @@ function makeResizableTR(panel, handle) {
         savePanelGeometry(panel);
     });
 
-    handle.addEventListener('pointercancel', () => { });
+    handle.addEventListener('pointercancel', (e) => {
+        try { handle.releasePointerCapture(e.pointerId); } catch(err){}
+    });
 }
 
 /**
- * Bottom-Right corner resizer logic (used by agent panel)
- * Uses document-level mouse events for reliable cross-browser behavior.
+ * Bottom-Right corner resizer logic.
+ * Same pointer-capture pattern as makeResizableTR.
  * @param {HTMLElement} panel
  * @param {HTMLElement} handle
  */
 function makeResizableBR(panel, handle) {
-    let startX, startY, startWidth, startHeight;
+    let startX, startY, startWidth, startHeight, startTop, startLeft;
 
-    const onMouseMove = (e) => {
-        const newWidth = Math.max(250, startWidth + (e.clientX - startX));
-        const newHeight = Math.max(200, startHeight + (e.clientY - startY));
-        panel.style.width = newWidth + 'px';
-        panel.style.height = newHeight + 'px';
-        panel.style.maxHeight = 'none';
-    };
-
-    const onMouseUp = () => {
-        document.removeEventListener('mousemove', onMouseMove);
-        document.removeEventListener('mouseup', onMouseUp);
-        const geoKey = 'rpg_tracker_geometry_lorebook_agent';
-        if (panel.classList.contains('rt-detached-panel')) {
-            const rect = panel.getBoundingClientRect();
-            localStorage.setItem(geoKey, JSON.stringify({
-                left: rect.left, top: rect.top,
-                width: rect.width, height: rect.height
-            }));
-        }
-    };
-
-    handle.addEventListener('mousedown', (e) => {
+    handle.addEventListener('pointerdown', (e) => {
         if (e.button !== 0) return;
+        handle.setPointerCapture(e.pointerId);
         const rect = panel.getBoundingClientRect();
         startX = e.clientX;
         startY = e.clientY;
         startWidth = rect.width;
         startHeight = rect.height;
+        startTop = rect.top;
+        startLeft = rect.left;
 
-        document.addEventListener('mousemove', onMouseMove);
-        document.addEventListener('mouseup', onMouseUp);
+        panel.style.left = startLeft + 'px';
+        panel.style.top = startTop + 'px';
+        panel.style.right = 'auto';
+        panel.style.bottom = 'auto';
+        panel.style.maxHeight = 'none';
 
         e.preventDefault();
         e.stopPropagation();
+    });
+
+    handle.addEventListener('pointermove', (e) => {
+        if (!handle.hasPointerCapture(e.pointerId)) return;
+        const dx = e.clientX - startX;
+        const dy = e.clientY - startY;
+
+        panel.style.width = Math.max(220, startWidth + dx) + 'px';
+        panel.style.height = Math.max(200, startHeight + dy) + 'px';
+    });
+
+    handle.addEventListener('pointerup', (e) => {
+        try { handle.releasePointerCapture(e.pointerId); } catch(err){}
+        savePanelGeometry(panel);
+    });
+
+    handle.addEventListener('pointercancel', (e) => {
+        try { handle.releasePointerCapture(e.pointerId); } catch(err){}
+    });
+}
+
+/**
+ * Bottom-Left corner resizer logic.
+ * Same pointer-capture pattern as makeResizableTR.
+ * @param {HTMLElement} panel
+ * @param {HTMLElement} handle
+ */
+function makeResizableBL(panel, handle) {
+    let startX, startY, startWidth, startHeight, startTop, startLeft;
+
+    handle.addEventListener('pointerdown', (e) => {
+        if (e.button !== 0) return;
+        handle.setPointerCapture(e.pointerId);
+        const rect = panel.getBoundingClientRect();
+        startX = e.clientX;
+        startY = e.clientY;
+        startWidth = rect.width;
+        startHeight = rect.height;
+        startTop = rect.top;
+        startLeft = rect.left;
+
+        panel.style.left = startLeft + 'px';
+        panel.style.top = startTop + 'px';
+        panel.style.right = 'auto';
+        panel.style.bottom = 'auto';
+        panel.style.maxHeight = 'none';
+
+        e.preventDefault();
+        e.stopPropagation();
+    });
+
+    handle.addEventListener('pointermove', (e) => {
+        if (!handle.hasPointerCapture(e.pointerId)) return;
+        const dx = e.clientX - startX;
+        const dy = e.clientY - startY;
+
+        const newWidth = Math.max(220, startWidth - dx);
+        const newLeft = startLeft + dx;
+
+        if (newWidth > 220) {
+            panel.style.width = newWidth + 'px';
+            panel.style.left = newLeft + 'px';
+        }
+        panel.style.height = Math.max(200, startHeight + dy) + 'px';
+    });
+
+    handle.addEventListener('pointerup', (e) => {
+        try { handle.releasePointerCapture(e.pointerId); } catch(err){}
+        savePanelGeometry(panel);
+    });
+
+    handle.addEventListener('pointercancel', (e) => {
+        try { handle.releasePointerCapture(e.pointerId); } catch(err){}
     });
 }
 
