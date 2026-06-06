@@ -5228,11 +5228,9 @@ function makeDraggable(panel, handle, customKey = null) {
  */
 function makeResizableTR(panel, handle) {
     let startX, startY, startWidth, startHeight, startTop, startLeft;
-    let isResizing = false;
 
     handle.addEventListener('pointerdown', (e) => {
         if (e.button !== 0) return;
-        isResizing = true;
         handle.setPointerCapture(e.pointerId);
         const rect = panel.getBoundingClientRect();
         startX = e.clientX;
@@ -5252,7 +5250,7 @@ function makeResizableTR(panel, handle) {
     });
 
     handle.addEventListener('pointermove', (e) => {
-        if (!isResizing) return;
+        if (!handle.hasPointerCapture(e.pointerId)) return;
         const dx = e.clientX - startX;
         const dy = e.clientY - startY;
 
@@ -5268,17 +5266,12 @@ function makeResizableTR(panel, handle) {
     });
 
     handle.addEventListener('pointerup', (e) => {
-        if (isResizing) {
-            isResizing = false;
-            handle.releasePointerCapture(e.pointerId);
+        if (handle.hasPointerCapture(e.pointerId)) {
             savePanelGeometry(panel);
         }
     });
 
-    handle.addEventListener('pointercancel', (e) => {
-        isResizing = false;
-        try { handle.releasePointerCapture(e.pointerId); } catch(err){}
-    });
+    handle.addEventListener('pointercancel', () => { });
 }
 
 function setupResizeObserver(panel) {
@@ -5295,11 +5288,8 @@ function setupDeltaResize(panel) {
     const handle = /** @type {HTMLElement} */ (panel.querySelector('#rpg-tracker-delta-handle'));
     const deltaEl = /** @type {HTMLElement} */ (panel.querySelector('#rpg-tracker-delta'));
     let startY, startH;
-    let isResizing = false;
 
     handle.addEventListener('pointerdown', (e) => {
-        if (e.button !== 0) return;
-        isResizing = true;
         startY = e.clientY;
         startH = deltaEl.offsetHeight;
         handle.setPointerCapture(e.pointerId);
@@ -5307,23 +5297,18 @@ function setupDeltaResize(panel) {
     });
 
     handle.addEventListener('pointermove', (e) => {
-        if (!isResizing) return;
+        if (!handle.hasPointerCapture(e.pointerId)) return;
         const newH = Math.max(40, startH - (e.clientY - startY));
         deltaEl.style.height = newH + 'px';
     });
 
     handle.addEventListener('pointerup', (e) => {
-        if (isResizing) {
-            isResizing = false;
-            handle.releasePointerCapture(e.pointerId);
+        if (handle.hasPointerCapture(e.pointerId)) {
             saveDeltaHeight(deltaEl.offsetHeight);
         }
     });
 
-    handle.addEventListener('pointercancel', (e) => {
-        isResizing = false;
-        try { handle.releasePointerCapture(e.pointerId); } catch(err){}
-    });
+    handle.addEventListener('pointercancel', () => { });
 }
 
 function updateUIMemo(text) {
