@@ -262,34 +262,48 @@
     position: absolute;
     bottom: 0;
     right: 0;
-    width: 24px;
-    height: 24px;
+    width: 16px;
+    height: 16px;
     cursor: se-resize;
     z-index: 2005;
-    background: rgba(255, 0, 0, 0.6);
-    opacity: 1;
+    background-image: repeating-linear-gradient(
+        -45deg,
+        transparent,
+        transparent 2px,
+        rgba(255, 255, 255, 0.4) 2px,
+        rgba(255, 255, 255, 0.4) 3px
+    );
+    clip-path: polygon(100% 0, 100% 100%, 0 100%);
+    opacity: 0.45;
+    transition: opacity 0.2s;
 }
 
 .rt-resizer-br:hover {
     opacity: 1;
-    background: rgba(255, 0, 0, 0.9);
 }
 
 .rt-resizer-bl {
     position: absolute;
     bottom: 0;
     left: 0;
-    width: 24px;
-    height: 24px;
+    width: 16px;
+    height: 16px;
     cursor: sw-resize;
     z-index: 2005;
-    background: rgba(0, 100, 255, 0.6);
-    opacity: 1;
+    background-image: repeating-linear-gradient(
+        45deg,
+        transparent,
+        transparent 2px,
+        rgba(255, 255, 255, 0.4) 2px,
+        rgba(255, 255, 255, 0.4) 3px
+    );
+    clip-path: polygon(0 0, 100% 100%, 0 100%);
+    opacity: 0.45;
+    transition: opacity 0.2s;
 }
 
 .rt-resizer-bl:hover {
     opacity: 1;
-    background: rgba(0, 100, 255, 0.9);
 }
 
 /* Disabled via the settings checkbox — full transparency */

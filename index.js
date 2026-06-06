@@ -3094,24 +3094,16 @@ function createPanel() {
     // State tracker bottom-right resizer (created via JS for guaranteed rendering)
     const resizerBR = document.createElement('div');
     resizerBR.id = 'rt-resizer-br';
+    resizerBR.className = 'rt-resizer-br';
     resizerBR.title = 'Resize from bottom-right';
-    Object.assign(resizerBR.style, {
-        position: 'absolute', bottom: '0', right: '0',
-        width: '24px', height: '24px', cursor: 'se-resize',
-        zIndex: '9999', background: 'rgba(255,0,0,0.6)'
-    });
     panel.appendChild(resizerBR);
     makeResizableBR(/** @type {HTMLElement} */(panel), resizerBR);
 
     // State tracker bottom-left resizer
     const resizerBL = document.createElement('div');
     resizerBL.id = 'rt-resizer-bl';
+    resizerBL.className = 'rt-resizer-bl';
     resizerBL.title = 'Resize from bottom-left';
-    Object.assign(resizerBL.style, {
-        position: 'absolute', bottom: '0', left: '0',
-        width: '24px', height: '24px', cursor: 'sw-resize',
-        zIndex: '9999', background: 'rgba(0,100,255,0.6)'
-    });
     panel.appendChild(resizerBL);
     makeResizableBL(/** @type {HTMLElement} */(panel), resizerBL);
 
