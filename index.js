@@ -3044,6 +3044,7 @@ function createPanel() {
                         <button class="rpg-tracker-nav-btn" id="rt-agent-nav-fwd" title="Redo lorebook pass">→</button>
                     </div>
                 </div>
+                <div class="rt-resizer-br" id="rt-agent-resizer-br" title="Resize from bottom-right"></div>
             </div>
             <div class="rpg-tracker-prompt-bar" id="rpg-tracker-prompt-bar" style="display:none;">
                 <textarea class="rpg-tracker-prompt-input" id="rpg-tracker-prompt-input" rows="2" placeholder="Instruct the tracker model… (Enter to send, Shift+Enter for newline)"></textarea>
@@ -3087,6 +3088,13 @@ function createPanel() {
     const resizerTR = panel.querySelector('#rt-resizer-tr');
     if (resizerTR instanceof HTMLElement) {
         makeResizableTR(/** @type {HTMLElement} */(panel), resizerTR);
+    }
+
+    // Agent panel bottom-right resizer
+    const agentResizerBR = panel.querySelector('#rt-agent-resizer-br');
+    if (agentResizerBR instanceof HTMLElement) {
+        const agentPanelEl = /** @type {HTMLElement} */(panel.querySelector('#rpg-tracker-agent'));
+        if (agentPanelEl) makeResizableBR(agentPanelEl, agentResizerBR);
     }
 
     const stopBtn = panel.querySelector('#rpg-tracker-stop-btn');
@@ -5271,6 +5279,52 @@ function makeResizableTR(panel, handle) {
     });
 
     handle.addEventListener('pointercancel', () => { });
+}
+
+/**
+ * Bottom-Right corner resizer logic (used by agent panel)
+ * Uses document-level mouse events for reliable cross-browser behavior.
+ * @param {HTMLElement} panel
+ * @param {HTMLElement} handle
+ */
+function makeResizableBR(panel, handle) {
+    let startX, startY, startWidth, startHeight;
+
+    const onMouseMove = (e) => {
+        const newWidth = Math.max(250, startWidth + (e.clientX - startX));
+        const newHeight = Math.max(200, startHeight + (e.clientY - startY));
+        panel.style.width = newWidth + 'px';
+        panel.style.height = newHeight + 'px';
+        panel.style.maxHeight = 'none';
+    };
+
+    const onMouseUp = () => {
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+        const geoKey = 'rpg_tracker_geometry_lorebook_agent';
+        if (panel.classList.contains('rt-detached-panel')) {
+            const rect = panel.getBoundingClientRect();
+            localStorage.setItem(geoKey, JSON.stringify({
+                left: rect.left, top: rect.top,
+                width: rect.width, height: rect.height
+            }));
+        }
+    };
+
+    handle.addEventListener('mousedown', (e) => {
+        if (e.button !== 0) return;
+        const rect = panel.getBoundingClientRect();
+        startX = e.clientX;
+        startY = e.clientY;
+        startWidth = rect.width;
+        startHeight = rect.height;
+
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+
+        e.preventDefault();
+        e.stopPropagation();
+    });
 }
 
 function setupResizeObserver(panel) {
