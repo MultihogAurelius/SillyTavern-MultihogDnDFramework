@@ -7079,7 +7079,12 @@ The user's current system prompt is provided below for reference. If the user's 
 ${document.getElementById('main_prompt_quick_edit_textarea')?.value || settings.systemPromptTemplate || ''}
 </current_prompt>
 
-The user wants to create a custom tracking field. Their description:
+Here are the user's CURRENTLY ENABLED custom tracking fields. Use these for inspiration on formatting, depth, and style, and ensure your new field complements them without duplicating functionality:
+<existing_custom_fields>
+${settings.customFields.filter(f => f.enabled !== false).map(f => `[${f.tag}] ${f.label}\nPrompt: ${f.prompt}\nTemplate: ${f.template}`).join('\n\n') || "No custom fields exist yet."}
+</existing_custom_fields>
+
+The user wants to create a new custom tracking field. Their description:
 "${description}"
 
 Available rendering tags (MUST use at least one in the template). Tags can be placed inline (e.g., 'Health: ((BAR)) 50/100'). Pill tags optionally support parenthesis text for descriptions (e.g. 'Status: ((PILLS)) Sleeping (Unconscious)'):
@@ -7134,18 +7139,45 @@ RULES:
 
                 // Show preview for approval
                 const previewContent = `
-                        <div style="display:flex; flex-direction:column; gap:10px; width:100%; box-sizing:border-box;">
+                        <div style="display:flex; flex-direction:column; gap:10px; width:100%; box-sizing:border-box; max-height:80vh;">
                             <div style="font-size:13px; font-weight:bold;">🪄 AI Generated Custom Field</div>
-                            <div style="border: 1px solid rgba(255,255,255,0.15); border-radius:8px; padding:12px; background:rgba(255,255,255,0.03);">
+                            <div style="border: 1px solid rgba(255,255,255,0.15); border-radius:8px; padding:12px; background:rgba(255,255,255,0.03); overflow-y:auto;">
                                 <div><b>Tag:</b> [${escapeHtml(parsed.tag)}]</div>
                                 <div><b>Label:</b> ${escapeHtml(parsed.icon)} ${escapeHtml(parsed.label)}</div>
                                 <div style="margin-top:6px;"><b>AI Prompt:</b></div>
                                 <div style="font-size:11px; opacity:0.8; white-space:pre-wrap; padding:6px 8px; background:rgba(0,0,0,0.2); border-radius:4px; margin-top:2px;">${escapeHtml(parsed.prompt)}</div>
                                 <div style="margin-top:6px;"><b>Example Template:</b></div>
                                 <div style="font-size:11px; opacity:0.8; white-space:pre-wrap; padding:6px 8px; background:rgba(0,0,0,0.2); border-radius:4px; margin-top:2px; font-family:monospace;">${escapeHtml(parsed.template)}</div>
+                                <div style="margin-top:12px; font-weight:bold; font-size:12px;">Live Preview:</div>
+                                <div id="rt_ai_cfe_preview_view" class="rpg-tracker-render-view" style="margin-top:4px; border:1px solid rgba(255,255,255,0.1); border-radius:6px; background:rgba(0,0,0,0.2); padding:4px;"></div>
                             </div>
                         </div>
                     `;
+
+                setTimeout(() => {
+                    const renderView = document.getElementById('rt_ai_cfe_preview_view');
+                    if (!renderView) return;
+
+                    const previewTag = parsed.tag;
+                    const fakeMemo = `[${previewTag}]\n${parsed.template}\n[/${previewTag}]`;
+                    const ghostField = {
+                        tag: previewTag,
+                        label: parsed.label,
+                        icon: parsed.icon,
+                        template: parsed.template,
+                        prompt: '',
+                        enabled: true
+                    };
+                    const savedCustomFields = settings.customFields;
+                    settings.customFields = [...savedCustomFields, ghostField];
+                    try {
+                        // We use an empty object for pagination state since this is just a quick preview
+                        renderView.innerHTML = renderMemoAsCards(fakeMemo, previewTag, {});
+                        bindRenderedCardEvents(renderView, fakeMemo, true, null);
+                    } finally {
+                        settings.customFields = savedCustomFields;
+                    }
+                }, 150);
 
                 const approved = await Popup.show.confirm('Accept Custom Field?', previewContent);
                 if (!approved) {
