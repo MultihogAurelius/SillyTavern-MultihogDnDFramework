@@ -169,6 +169,7 @@ You may be asked to use Markers: ((PLS)), ((B)), ((XB)), ((BDG)), ((HGT)). These
         routerMaxTokens: 0,
         routerMaxTurns: 5,
         routerMaxActivations: 8,
+        routerMaxKeywordOverflow: 0,   // 0 = unlimited; N = max extra keyword-activated entries above routerMaxActivations
         routerCampaignPrefix: "",
         routerCampaignPrefixOverride: "",
         /** ST chat id for which `routerCampaignPrefixOverride` applies; empty = legacy (override only when chatId === active ctx chat id). */

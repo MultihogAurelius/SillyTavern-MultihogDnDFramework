@@ -6,7 +6,7 @@ import { deduplicateMemo, mergeMemo, computeDelta, escapeHtml, escapeRegex, high
 import { renderSubFieldByRule, tryRenderMarker, renderCustomBlockLine, stripMemoHtml, escapeHtmlWithColor, parseMemoBlocks, getPageSize, loadCollapsed, saveCollapsed, loadDetached, saveDetached, blockToItems, renderMemoAsCards, renderQuestLog, renderLorebookTerminal } from './renderer.js';
 import { registerLogQuestTool, checkQuestDeadlines } from './quests.js';
 import { initializeDebugViewer, toggleDebugViewer } from './debug-viewer.js';
-import { runRouterPass, rollbackRouterPass, reapplyRouterPass, getLorebookManifest, deleteLorebookEntry, updateLorebookEntry, disableManagedEntries, isRouterRunning } from './router.js';
+import { runRouterPass, rollbackRouterPass, reapplyRouterPass, getLorebookManifest, deleteLorebookEntry, updateLorebookEntry, disableManagedEntries, isRouterRunning, stopRouterPass } from './router.js';
 import { getRequestHeaders } from '../../../../script.js';
 
 export const RENDERING_TAGS_LIBRARY = [
@@ -2847,6 +2847,7 @@ function createPanel() {
                     <div class="rpg-tracker-header-center" id="rt-agent-pause-banner" style="color:#ffa500; font-size:0.7em; font-weight:bold; letter-spacing:0.04em;">${settings.routerPaused ? 'AGENT PAUSED' : ''}</div>
                     <div class="rpg-tracker-header-right">
                         <button class="rpg-tracker-icon-btn" id="rt-agent-router-manual-run" title="Run Research Now" style="color: var(--rt-accent);"><i class="fa-solid fa-play"></i></button>
+                        <button class="rpg-tracker-stop-btn" id="rt-agent-stop-btn" title="Stop Agent" style="display:none;">■</button>
                         <button class="rpg-tracker-icon-btn" id="rt-agent-router-full-audit-panel" title="Run Full Audit (Chunked)" style="color: #ff5555;"><i class="fa-solid fa-book-journal-whills"></i></button>
                          <div id="rt-cleanup-menu-wrap" style="position:relative; display:inline-flex;">
                              <button class="rpg-tracker-icon-btn" id="rt-agent-router-cleanup" title="Cleanup Menu" style="color: #e67e22;"><i class="fa-solid fa-broom"></i></button>
@@ -2917,6 +2918,10 @@ function createPanel() {
                         <div style="flex: 1;" title="Max Active Keys: The maximum number of lore entries the agent can keep in Active Memory. Once reached, it must deactivate old entries to add new ones.">
                             <div style="margin-bottom: 5px; opacity: 0.8; font-size: 0.846em; color: var(--rt-text-muted);">Max Active Keys:</div>
                             <input type="text" inputmode="numeric" pattern="[0-9]*" id="rt-agent-router-max-activations" value="${settings.routerMaxActivations || 8}" min="1" max="20" style="width: 100%; background: var(--rt-card-bg); color: var(--rt-text); border: var(--rt-border); border-radius: 4px; padding: 4px; font-size: 0.846em; box-sizing: border-box;">
+                        </div>
+                        <div style="flex: 1;" title="Keyword Overflow Cap: max keyword-triggered entries allowed above Max Active Keys (0 = no cap). When exceeded, the oldest keyword entries are evicted first. Example: Max Active=8, Cap=4 → hard ceiling of 12 total.">
+                            <div style="margin-bottom: 5px; opacity: 0.8; font-size: 0.846em; color: var(--rt-text-muted);">KW Overflow Cap:</div>
+                            <input type="text" inputmode="numeric" pattern="[0-9]*" id="rt-agent-router-kw-overflow-cap" value="${settings.routerMaxKeywordOverflow ?? 0}" min="0" max="50" style="width: 100%; background: var(--rt-card-bg); color: var(--rt-text); border: var(--rt-border); border-radius: 4px; padding: 4px; font-size: 0.846em; box-sizing: border-box;">
                         </div>
                     </div>
                     
@@ -4194,6 +4199,15 @@ function createPanel() {
             });
         }
 
+        const kwOverflowInp = /** @type {HTMLInputElement} */ (agentPanel.querySelector('#rt-agent-router-kw-overflow-cap'));
+        if (kwOverflowInp) {
+            kwOverflowInp.addEventListener('change', () => {
+                const s = getSettings();
+                s.routerMaxKeywordOverflow = parseInt(kwOverflowInp.value) || 0;
+                saveSettings();
+            });
+        }
+
         // Prefix is auto-derived from chat id — sync settings + agent footer readouts
         syncRouterPrefixDisplays(settings.routerCampaignPrefix || '');
 
@@ -4313,6 +4327,14 @@ function createPanel() {
                 const combinedNarrative = getNarrativeBlocks(chat, -1, !!s.routerIncludeHidden);
                 toastr['info']("Starting manual research pass...");
                 await runRouterPass(combinedNarrative, null, s.routerLookback || 4, true);
+            });
+        }
+
+        const agentStopBtn = agentPanel.querySelector('#rt-agent-stop-btn');
+        if (agentStopBtn) {
+            agentStopBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                stopRouterPass();
             });
         }
 
@@ -4782,6 +4804,7 @@ function createPanel() {
             _routerSteps = [];
             _loreRedoStack = [];
             syncAgentNav();
+            updateAgentStatusIndicator(true);
         }
         _routerSteps.push(step);
 
@@ -4792,6 +4815,7 @@ function createPanel() {
         // all applyAction writes and saveWorldInfo cache-busts are guaranteed done.
         if (step.type === 'finish' || step.type === 'error') {
             refreshManifest();
+            updateAgentStatusIndicator(false);
         }
     });
 
@@ -5457,6 +5481,13 @@ function updateUIMemo(text) {
     if (textarea) textarea.value = text;
     const counter = document.getElementById('rpg-tracker-count');
     if (counter) counter.textContent = `~${Math.round(text.length / 2.62)} tokens`;
+}
+
+function updateAgentStatusIndicator(running) {
+    const stopBtn = /** @type {HTMLElement} */ (document.getElementById('rt-agent-stop-btn'));
+    const playBtn = /** @type {HTMLElement} */ (document.getElementById('rt-agent-router-manual-run'));
+    if (stopBtn) stopBtn.style.display = running ? 'flex' : 'none';
+    if (playBtn) playBtn.style.opacity = running ? '0.3' : '';
 }
 
 function updateStatusIndicator(state) {

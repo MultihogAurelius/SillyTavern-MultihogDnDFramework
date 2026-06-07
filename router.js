@@ -4,9 +4,21 @@ import { getRequestHeaders } from '../../../../script.js';
 
 let _routerRunning = false;
 let _routerNormalRunCount = 0; // tracks completed normal (non-cleanup) passes for auto-cleanup interval
+let _routerController = null; // AbortController for the active router pass
 
 /** Returns true while a router pass is actively running. */
 export function isRouterRunning() { return _routerRunning; }
+
+/**
+ * Aborts the currently-running Lorebook Agent pass, if any.
+ * Equivalent to the State Tracker's stop button: kills the in-flight LLM request.
+ */
+export function stopRouterPass() {
+    if (_routerController) {
+        _routerController.abort();
+        _routerController = null;
+    }
+}
 
 /**
  * Returns the current campaign prefix (user override in settings, else chat id).
@@ -176,6 +188,9 @@ export async function runRouterPass(narrativeOutput, manualPrompt = null, custom
 
     try {
         _routerRunning = true;
+        if (_routerController) _routerController.abort();
+        _routerController = new AbortController();
+        const _routerSignal = _routerController.signal;
         broadcastStep('start', 'Initializing Lorebook Agent...');
 
         const startTime = Date.now();
@@ -471,7 +486,7 @@ Action: commit({"rewrite": [{"id": "Eldoria_Events::3", "content": "Compressed v
             if (settings.routerBasicMode) {
                 const cleanupUserPrompt = cleanupContext;
                 broadcastStep('thought', 'Thinking...');
-                const basicResp = await sendStateRequest(routerSettings, cleanupSystemPrompt, cleanupUserPrompt);
+                const basicResp = await sendStateRequest(routerSettings, cleanupSystemPrompt, cleanupUserPrompt, _routerSignal);
                 const thoughtMatchC = basicResp.match(/(?:Thought|Reasoning):\s*([\s\S]*?)(?=\[\[|$)/i);
                 if (thoughtMatchC) broadcastStep('thought', thoughtMatchC[1].trim().substring(0, 300));
                 broadcastStep('thought', 'Parsing cleanup tags...');
@@ -572,7 +587,7 @@ Action: commit({"rewrite": [{"id": "Eldoria_Events::3", "content": "Compressed v
             while (cleanupTurns < maxTurns) {
                 cleanupTurns++;
                 broadcastStep('thought', `Cleanup thinking (Turn ${cleanupTurns}/${maxTurns})...`);
-                const result = await sendAgentTurn(routerSettings, cleanupMessages, usesNativeTools ? cleanupAgentTools : null);
+                const result = await sendAgentTurn(routerSettings, cleanupMessages, usesNativeTools ? cleanupAgentTools : null, _routerSignal);
 
                 if (result.content) {
                     const thoughtLine = result.content.match(/(?:Thought|Reasoning):\s*(.*)/i)?.[1]?.trim()
@@ -721,7 +736,7 @@ Thought: I see a new NPC named Barnaby in Khelt's Rust-Lantern District. I will 
             const basicUserPrompt = `## BUDGET STATUS\n${budgetLine}${overflowInstruction}\n\n## NEWLY ACTIVATED THIS TURN\n${newlyTriggeredFull.join('\n\n') || 'None.'}\n\n## ACTIVE MEMORY (Lore)\n${activeEntriesFull.join('\n\n') || 'None.'}\n\n## ARCHIVE INDEX\n${keyringText || 'Empty.'}\n\n## CURRENT LOCATION\n${currentHierarchy || 'Unknown'}\n\n## ACTIVE QUESTS\n${questBlockB}\n\n## NARRATIVE\n${recentChatString}\n\n${manualPrompt ? `## INSTRUCTION\n${manualPrompt}\n\n` : ''}`;
 
             broadcastStep('thought', 'Thinking...');
-            const basicResp = await sendStateRequest(routerSettings, finalBasicSystemPrompt, basicUserPrompt);
+            const basicResp = await sendStateRequest(routerSettings, finalBasicSystemPrompt, basicUserPrompt, _routerSignal);
 
             const thoughtMatchB = basicResp.match(/Thought:\s*([\s\S]*?)(?=\[\[|$)/i);
             if (thoughtMatchB) broadcastStep('thought', thoughtMatchB[1].trim());
@@ -935,7 +950,7 @@ ${sharedContext}`;
 
                 // Only pass tool schemas to connections that support native tool calling.
                 // Profile/default connections ignore or mishandle the tools parameter.
-                const result = await sendAgentTurn(routerSettings, messages, usesNativeTools ? agentTools : null);
+                const result = await sendAgentTurn(routerSettings, messages, usesNativeTools ? agentTools : null, _routerSignal);
 
                 // Show any inline thought the model included alongside the tool call
                 if (result.content) {
@@ -1055,11 +1070,17 @@ ${sharedContext}`;
 
         return true;
     } catch (e) {
-        console.error("[Lorebook Agent] Run failed:", e);
-        broadcastStep('error', e.message);
+        if (e?.name === 'AbortError') {
+            console.log('[Lorebook Agent] Pass aborted by user.');
+            broadcastStep('error', 'Stopped by user.');
+        } else {
+            console.error("[Lorebook Agent] Run failed:", e);
+            broadcastStep('error', e.message);
+        }
         return false;
     } finally {
         _routerRunning = false;
+        _routerController = null;
     }
 }
 
@@ -2021,6 +2042,34 @@ export async function scanAssistantOutputForKeywords(narrativeText, opts = {}) {
                 currentActive.add(fullId);
                 currentKeyword.add(fullId);
                 newlyTriggered.push(fullId);
+            }
+        }
+    }
+
+    // ── Keyword overflow cap ───────────────────────────────────────────────────────
+    // If routerMaxKeywordOverflow > 0, evict the oldest keyword-activated entries so
+    // that the total number of active entries (agent-owned + keyword) never exceeds
+    // routerMaxActivations + routerMaxKeywordOverflow.
+    // Agent-owned entries (not in keywordActivatedKeys) are never touched.
+    {
+        const kwOverflowCap = settings.routerMaxKeywordOverflow || 0;
+        if (kwOverflowCap > 0) {
+            const maxActive   = settings.routerMaxActivations || 8;
+            const hardCeiling = maxActive + kwOverflowCap;
+            const totalActive = currentActive.size;
+            if (totalActive > hardCeiling) {
+                const toEvict = totalActive - hardCeiling;
+                // currentKeyword preserves Set insertion order (oldest first)
+                let evicted = 0;
+                for (const id of currentKeyword) {
+                    if (evicted >= toEvict) break;
+                    currentActive.delete(id);
+                    currentKeyword.delete(id);
+                    evicted++;
+                }
+                if (settings.debugMode && evicted > 0) {
+                    console.log(`[RPG Tracker] Keyword overflow cap: evicted ${evicted} entr${evicted !== 1 ? 'ies' : 'y'} (ceiling: ${hardCeiling}, was: ${totalActive})`);
+                }
             }
         }
     }
