@@ -7044,7 +7044,7 @@ function buildSysprompt(rawText) {
             if (!settings.customFields) settings.customFields = [];
 
             const inputContent = `
-                    <div style="display:flex; flex-direction:column; gap:10px; min-width:min(500px, 90vw);">
+                    <div style="display:flex; flex-direction:column; gap:10px; width:100%; box-sizing:border-box;">
                         <div style="font-size:13px; opacity:0.9; font-weight:bold;">🪄 AI Custom Field Creator</div>
                         <div style="font-size:11px; opacity:0.7; line-height:1.4;">
                             Describe what you want to track in plain language. The AI will generate a field name, icon, prompt instruction, and rendering template.
@@ -7134,7 +7134,7 @@ RULES:
 
                 // Show preview for approval
                 const previewContent = `
-                        <div style="display:flex; flex-direction:column; gap:10px; min-width:min(500px, 90vw);">
+                        <div style="display:flex; flex-direction:column; gap:10px; width:100%; box-sizing:border-box;">
                             <div style="font-size:13px; font-weight:bold;">🪄 AI Generated Custom Field</div>
                             <div style="border: 1px solid rgba(255,255,255,0.15); border-radius:8px; padding:12px; background:rgba(255,255,255,0.03);">
                                 <div><b>Tag:</b> [${escapeHtml(parsed.tag)}]</div>
@@ -7192,7 +7192,7 @@ RULES:
             document.body.appendChild(fileInput);
 
             const content = `
-                    <div style="display:flex; flex-direction:column; gap:8px; min-width:min(500px, 90vw);">
+                    <div style="display:flex; flex-direction:column; gap:8px; width:100%; box-sizing:border-box;">
                         <p style="margin:0; font-size:12px; opacity:0.7;">
                             Paste the module export code (JSON) below or load it from a file.
                         </p>
@@ -7463,8 +7463,9 @@ RULES:
                                     <div style="font-size:11px; opacity:0.7; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(item.description || 'Custom Section')}</div>
                                 </div>
                                 <div style="display:flex; align-items:center; gap:10px;">
-                                    <label style="display:flex; align-items:center; gap:4px; cursor:pointer; font-size:11px;">
-                                        <input type="checkbox" class="rt-lib-toggle" data-index="${index}" ${item.enabled ? 'checked' : ''} style="margin:0; cursor:pointer;"> Enable
+                                    <label class="checkbox_label" style="margin:0; font-size:11px;">
+                                        <input type="checkbox" class="rt-lib-toggle" data-index="${index}" ${item.enabled ? 'checked' : ''}>
+                                        <span>Enable</span>
                                     </label>
                                     <button class="rt-lib-delete" data-index="${index}" style="background:none; border:none; color:#ff5555; cursor:pointer; padding:4px;" title="Delete Section"><i class="fa-solid fa-trash-can"></i></button>
                                 </div>
@@ -7477,7 +7478,7 @@ RULES:
             };
 
             let html = `
-                <div id="rt-library-container" style="display:flex; flex-direction:column; gap:12px; min-width:min(600px, 90vw); max-height:70vh;">
+                <div id="rt-library-container" style="display:flex; flex-direction:column; gap:12px; width:100%; box-sizing:border-box; max-height:70vh;">
                     <div style="font-size:11px; opacity:0.8; line-height:1.4;">Manage your custom system prompt sections. Enabling a section will inject it into your main prompt when you click Apply.</div>
                     <div id="rt-library-list-wrap" style="overflow-y:auto; padding-right:10px; flex:1;">
                         ${generateListHtml()}
@@ -7533,7 +7534,7 @@ RULES:
             const settings = getSettings();
 
             const inputContent = `
-                    <div style="display:flex; flex-direction:column; gap:10px; min-width:min(520px, 90vw);">
+                    <div style="display:flex; flex-direction:column; gap:10px; width:100%; box-sizing:border-box;">
                         <div style="font-size:13px; opacity:0.9; font-weight:bold;">✨ AI Section Builder</div>
                         <div style="font-size:11px; opacity:0.7; line-height:1.4;">
                             Describe a new system, mechanic, or rule you want added to your D&D system prompt. The AI will generate a properly formatted XML section (e.g. &lt;corruption&gt;...&lt;/corruption&gt;) ready to be appended.
@@ -7596,7 +7597,7 @@ Return ONLY the XML section. No explanation, no other text.`;
 
                 // Show preview with save options
                 const previewContent = `
-                        <div style="display:flex; flex-direction:column; gap:10px; min-width:min(520px, 90vw);">
+                        <div style="display:flex; flex-direction:column; gap:10px; width:100%; box-sizing:border-box;">
                             <div style="font-size:13px; font-weight:bold;">✨ Generated Section Preview</div>
                             <pre style="white-space:pre-wrap; word-break:break-word; font-size:11px; padding:12px; background:rgba(0,0,0,0.25); border:1px solid rgba(255,255,255,0.15); border-radius:8px; max-height:400px; overflow-y:auto; font-family:monospace;">${escapeHtml(section)}</pre>
                             
