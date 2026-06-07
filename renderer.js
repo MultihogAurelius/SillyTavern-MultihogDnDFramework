@@ -133,7 +133,7 @@ const DEFAULT_XP_COLOR = 'linear-gradient(90deg, #0088ff, #00d4ff)';
             }
             case 'pill_colored': {
                 const pClass = rule.pillClass || '';
-                const pillHtml = value.split(',').map(p => {
+                const pillHtml = splitSmart(value).map(p => {
                     p = p.trim();
                     const descMatch = p.match(/^(.*?)\s*\((.*?)\)$/);
                     const name = descMatch ? descMatch[1].trim() : p;
