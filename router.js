@@ -1,6 +1,7 @@
 import { getSettings, getEffectiveRouterCampaignPrefix } from './state-manager.js';
 import { sendStateRequest, sendAgentTurn } from './llm-client.js';
 import { getRequestHeaders } from '../../../../script.js';
+import { extractCurrentTimeStr } from './memo-processor.js';
 
 let _routerRunning = false;
 let _routerNormalRunCount = 0; // tracks completed normal (non-cleanup) passes for auto-cleanup interval
@@ -288,7 +289,7 @@ export async function runRouterPass(narrativeOutput, manualPrompt = null, custom
         const timeRegex = /([0-9]{1,2}:[0-9]{2}\s*[AP]M,\s*Day\s*[0-9]+)/i;
         const narrativeTimeMatch = recentChatString.match(timeRegex);
         const memoTimeMatch = settings.currentMemo?.match(/\[TIME\]([\s\S]*?)\[\/TIME\]/i);
-        const cleanMemoTime = memoTimeMatch ? memoTimeMatch[1].split('\n')[0].trim() : '';
+        const cleanMemoTime = memoTimeMatch ? extractCurrentTimeStr(memoTimeMatch[1]) : '';
         const currentTime = narrativeTimeMatch ? narrativeTimeMatch[1] : cleanMemoTime;
 
         const locationRegex = /\(Location:\s*([^)]+)\)/i;
@@ -1321,20 +1322,23 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
         // Auto-prepending the current breadcrumb causes corruption when recording parent/sibling
         // locations that are not children of the current scene.
 
+        const isWorld = targetBook.toLowerCase().endsWith('_world') || targetBook.toLowerCase() === 'world';
+
         if (cat.includes('EVENT')) {
             if (currentTime && !rec.label.includes('[Day')) {
                 rec.label = `[${currentTime}] ${rec.label}`;
             }
         }
 
-        if (timePrefix && !rec.content.includes('[Day')) {
-            rec.content = timePrefix + rec.content;
-        }
-
-        const isWorld = targetBook.toLowerCase().endsWith('_world') || targetBook.toLowerCase() === 'world';
         if (isWorld) {
+            if (rec.label && !rec.content.includes('[Day') && !rec.content.startsWith('[')) {
+                rec.content = `[${rec.label}] ` + rec.content;
+            }
             rec.keys = [];
         } else {
+            if (timePrefix && !rec.content.includes('[Day')) {
+                rec.content = timePrefix + rec.content;
+            }
             // Add location hierarchy keywords (plain fragments, no 'In:' prefix)
             // Matches status footer tokens for native ST keyword triggering.
             {
@@ -1395,22 +1399,30 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
 
             const isWorldBook = targetBook.toLowerCase().endsWith('_world') || targetBook.toLowerCase() === 'world';
             if (existingUid) {
-                // Append delta to existing chronicle (dedup path)
                 const fullId = `${targetBook}::${existingUid}`;
                 // Strip [ID:] stamp from anywhere in the delta (model sometimes echoes it)
                 let delta = (rec.content || '').replace(/\[ID:[^\]]+\]\n?/gi, '').trim();
-                const existing = (bookData.entries[existingUid].content || '').replace(/^\[ID:[^\]]+\]\n?/i, '').trimEnd();
-                delta = deduplicateContent(existing, delta);
-                bookData.entries[existingUid].content = existing && delta ? `${existing}\n${delta}` : (existing || delta);
                 
                 if (isWorldBook) {
+                    // Overwrite instead of appending for World Progression reports
+                    bookData.entries[existingUid].content = delta;
                     bookData.entries[existingUid].key = [];
                     bookData.entries[existingUid].constant = true;
                     bookData.entries[existingUid].disable = false;
                 } else {
+                    // Append delta to existing chronicle (dedup path)
+                    const existing = (bookData.entries[existingUid].content || '').replace(/^\[ID:[^\]]+\]\n?/i, '').trimEnd();
+                    delta = deduplicateContent(existing, delta);
+                    bookData.entries[existingUid].content = existing && delta ? `${existing}\n${delta}` : (existing || delta);
+
                     const keys = bookData.entries[existingUid].key || [];
                     (rec.keys || []).forEach(k => { if (!keys.includes(k)) keys.push(k); });
                     bookData.entries[existingUid].key = cleanKeys(keys);
+                }
+
+                // Update comment/title to the latest label (keeps event timestamps up-to-date)
+                if (rec.label) {
+                    bookData.entries[existingUid].comment = rec.label;
                 }
                 
                 if (!newActive.includes(fullId)) newActive.push(fullId);
@@ -1710,11 +1722,13 @@ function parseBasicTags(text, archiveBooks) {
         content = content.trim();
         const keys = (keywords || '').split(',').map(k => k.trim());
 
-        // Check for existing by name
+        // Check for existing by name (stripping bracketed prefixes to match applyAction's matching logic)
         let existingId = null;
+        const cleanName = name.replace(/^\[.*?\]\s*/i, '').toLowerCase().trim();
         for (const [bookName, book] of Object.entries(archiveBooks)) {
             for (const [uid, entry] of Object.entries(book.entries)) {
-                if ((entry.comment || '').toLowerCase() === name.toLowerCase()) {
+                const entryComment = (entry.comment || '').replace(/^\[.*?\]\s*/i, '').toLowerCase().trim();
+                if (entryComment === cleanName) {
                     existingId = `${bookName}::${uid}`;
                     break;
                 }

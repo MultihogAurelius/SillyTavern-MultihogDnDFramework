@@ -13,7 +13,7 @@
  */
 
 import { getSettings } from './state-manager.js';
-import { parseQuestsFromMemo } from './memo-processor.js';
+import { parseQuestsFromMemo, extractCurrentTimeStr } from './memo-processor.js';
 import { runRouterPass, saveSceneToLorebook, scanAssistantOutputForKeywords, parseInWorldMinutes, runWorldProgressionPass } from './router.js';
 import { logTransaction } from './debug-viewer.js';
 
@@ -344,7 +344,7 @@ export function installInterceptor() {
 
                 // Inject active quests as plain text into narrative context
                 const timeMatch = (settings.currentMemo || '').match(/\[TIME\]([\s\S]*?)\[\/TIME\]/i);
-                const currentTime = timeMatch ? timeMatch[1].split('\n').filter(Boolean)[0]?.trim() || '' : '';
+                const currentTime = timeMatch ? extractCurrentTimeStr(timeMatch[1]) : '';
                 // Re-parse after checkQuestDeadlines may have mutated the memo
                 const freshQuests = parseQuestsFromMemo(settings.currentMemo);
                 const questText = renderQuestsAsPlainText(freshQuests, currentTime);
@@ -644,7 +644,7 @@ async function maybeRunWorldProgression() {
 
     // Extract time string from the [TIME] block
     const timeMatch = settings.currentMemo.match(/\[TIME\]([\s\S]*?)\[\/TIME\]/i);
-    const timeStr = timeMatch?.[1]?.split('\n').filter(Boolean)[0]?.trim();
+    const timeStr = timeMatch ? extractCurrentTimeStr(timeMatch[1]) : '';
     const currentMinutes = parseInWorldMinutes(timeStr);
     if (currentMinutes < 0) return; // can't parse time → skip
 

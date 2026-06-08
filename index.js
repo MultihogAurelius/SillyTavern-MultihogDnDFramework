@@ -2,7 +2,7 @@ import { EXAMPLES, COLOR_EXAMPLES, DEFAULT_STOCK_PROMPTS, RT_PROMPTS, BLOCK_ICON
 import { MODULE_NAME, DEFAULT_MODULES, getSettings, getBarBackground, migrateCustomFields, saveChatState, saveProfile, deleteProfile, getEffectiveRouterCampaignPrefix, sanitizeCampaignPrefixString } from './state-manager.js';
 import { sendStateRequest, fetchOllamaModels, fetchOpenAIModels, testOpenAIConnection, getConnectionProfiles, getCurrentCompletionPreset, setCompletionPreset } from './llm-client.js';
 import { getDiceToolName, getDiceCommandName, getDiceCommandAliases, doDiceRoll, registerDiceFunctionTool, registerDiceSlashCommand, installInterceptor, getNarrativeBlocks, onGenerationEnded, resetRouterTick } from './narrative-hooks.js';
-import { deduplicateMemo, mergeMemo, computeDelta, escapeHtml, escapeRegex, highlightParens, cleanToolCallMessage, getLastUserAction, buildLorebookContext, buildModulesInstructionText, buildModuleFormatInstruction, parseQuestsFromMemo, syncQuestsFromMemo, syncQuestsToMemo, writeQuestsToMemo, getQuestMood } from './memo-processor.js';
+import { deduplicateMemo, mergeMemo, computeDelta, escapeHtml, escapeRegex, highlightParens, cleanToolCallMessage, getLastUserAction, buildLorebookContext, buildModulesInstructionText, buildModuleFormatInstruction, parseQuestsFromMemo, syncQuestsFromMemo, syncQuestsToMemo, writeQuestsToMemo, getQuestMood, extractCurrentTimeStr } from './memo-processor.js';
 import { renderSubFieldByRule, tryRenderMarker, renderCustomBlockLine, stripMemoHtml, escapeHtmlWithColor, parseMemoBlocks, getPageSize, loadCollapsed, saveCollapsed, loadDetached, saveDetached, blockToItems, renderMemoAsCards, renderQuestLog, renderLorebookTerminal } from './renderer.js';
 import { registerLogQuestTool, checkQuestDeadlines } from './quests.js';
 import { initializeDebugViewer, toggleDebugViewer } from './debug-viewer.js';
@@ -319,7 +319,15 @@ async function syncCampaignPrefixAndWorldsForChat(newChatId, source) {
     const ctx = SillyTavern.getContext();
     const reg = await refreshWorldInfoRegistry();
     const allNames = resolveAllWorldNames(ctx, reg);
-    const matchingBooks = allNames.filter(n => bookBelongsToPrefix(n, prefix));
+    const worldBookName = prefix ? `${prefix}_World` : 'World';
+    let matchingBooks = allNames.filter(n => bookBelongsToPrefix(n, prefix));
+    if (s2.worldProgressionEnabled) {
+        if (allNames.includes(worldBookName) && !matchingBooks.includes(worldBookName)) {
+            matchingBooks.push(worldBookName);
+        }
+    } else {
+        matchingBooks = matchingBooks.filter(n => n !== worldBookName);
+    }
 
     if (!s2.chatStates) s2.chatStates = {};
     if (!s2.chatStates[newChatId]) s2.chatStates[newChatId] = {};
@@ -484,6 +492,17 @@ async function activateCampaignBooks(opts = {}) {
 
     const prefix = s.routerCampaignPrefix || '';
     if (!prefix) {
+        if (typeof ctx.executeSlashCommandsWithOptions === 'function') {
+            const reg = await refreshWorldInfoRegistry();
+            const allNames = resolveAllWorldNames(ctx, reg);
+            if (allNames.includes('World')) {
+                if (s.worldProgressionEnabled) {
+                    await ctx.executeSlashCommandsWithOptions('/world state=on silent=true "World"').catch(() => {});
+                } else {
+                    await ctx.executeSlashCommandsWithOptions('/world state=off silent=true "World"').catch(() => {});
+                }
+            }
+        }
         _loreActivationDebugLast = {
             ...baseDebug,
             stopped: 'no routerCampaignPrefix (derive failed earlier or chat id empty)',
@@ -496,10 +515,23 @@ async function activateCampaignBooks(opts = {}) {
     const reg = await refreshWorldInfoRegistry();
     const allNames = resolveAllWorldNames(ctx, reg);
 
-    const bookNames = allNames.filter(n => bookBelongsToPrefix(n, prefix));
+    const worldBookName = prefix ? `${prefix}_World` : 'World';
+    let bookNames = allNames.filter(n => bookBelongsToPrefix(n, prefix));
+    if (s.worldProgressionEnabled) {
+        if (allNames.includes(worldBookName) && !bookNames.includes(worldBookName)) {
+            bookNames.push(worldBookName);
+        }
+    } else {
+        bookNames = bookNames.filter(n => n !== worldBookName);
+    }
 
     const deact = computeWorldsToDeactivate(allNames, prefix, bookNames, s);
     const toDeactivate = deact.toDeactivate;
+    if (!s.worldProgressionEnabled) {
+        if (allNames.includes(worldBookName) && !toDeactivate.includes(worldBookName)) {
+            toDeactivate.push(worldBookName);
+        }
+    }
     const allKnownManagedBooks = new Set(
         Object.values(s.chatStates || {}).flatMap(cs => cs.campaignBooks || [])
     );
@@ -751,6 +783,11 @@ function loadChatState(chatId) {
     s.activeRouterKeys = JSON.parse(JSON.stringify(saved.activeRouterKeys || []));
     s.keywordActivatedKeys = JSON.parse(JSON.stringify(saved.keywordActivatedKeys || []));
     s.routerLog = JSON.parse(JSON.stringify(saved.routerLog || []));
+    s.routerLookback = saved.routerLookback || 4;
+    s.routerDirectPrompt = saved.routerDirectPrompt || '';
+    s.worldProgressionLookback = saved.worldProgressionLookback ?? 20;
+    s.worldProgressionLastFiredAtMinutes = saved.worldProgressionLastFiredAtMinutes ?? -1;
+    s.worldProgressionLastFiredPeriodLabel = saved.worldProgressionLastFiredPeriodLabel || '';
     // Don't restore routerCampaignPrefix from per-chat saved state — the prefix
     // is fully derivable from the chat ID and must be re-derived live by
     // onChatChanged. Restoring a stale value (e.g. a bare "Assistant" from
@@ -797,7 +834,7 @@ async function refreshExtensionPrompt() {
     if (typeof setExtensionPrompt !== 'function') return;
 
     const s = getSettings();
-    if (!s.routerEnabled || !s.activeRouterKeys?.length) {
+    if (!s.routerEnabled || (!s.activeRouterKeys?.length && !s.worldProgressionEnabled)) {
         setExtensionPrompt('rpg_tracker_lore', '', 0, 0); // Clear if disabled
         return;
     }
@@ -822,8 +859,31 @@ async function refreshExtensionPrompt() {
             }
         }
 
-        if (injectedContext) {
-            const routerBlock = `## ROUTER ACTIVE LORE\n${injectedContext.trim()}`;
+        let worldBlock = "";
+        if (s.worldProgressionEnabled) {
+            const prefix = s.routerCampaignPrefix || '';
+            const worldBookName = prefix ? `${prefix}_World` : 'World';
+            const worldBook = await ctx.loadWorldInfo(worldBookName);
+            if (worldBook?.entries) {
+                const sortedWorld = Object.entries(worldBook.entries)
+                    .sort(([a], [b]) => Number(a) - Number(b));
+                for (const [, entry] of sortedWorld) {
+                    if (entry && entry.content && entry.disable !== true) {
+                        worldBlock += `### [${entry.key?.[0] || entry.comment || 'World Report'}]\n${entry.content}\n\n`;
+                    }
+                }
+            }
+        }
+
+        if (injectedContext || worldBlock) {
+            let routerBlock = "";
+            if (injectedContext) {
+                routerBlock += `## ROUTER ACTIVE LORE\n${injectedContext.trim()}\n\n`;
+            }
+            if (worldBlock) {
+                routerBlock += `## WORLD PROGRESSION REPORTS\n${worldBlock.trim()}\n\n`;
+            }
+            routerBlock = routerBlock.trim();
             // Set as an extension prompt at the end of the system block (Position 0, but ST handles placement)
             setExtensionPrompt('rpg_tracker_lore', routerBlock, 0, 0);
         } else {
@@ -845,7 +905,7 @@ function installRouterInterceptor() {
             const t = performance.now().toFixed(1);
             console.group(`[RPG|LORE-INJECT] promptManagerInterceptor fired @ ${t}ms`);
             console.log('activeRouterKeys at inject time:', JSON.stringify(s.activeRouterKeys || []));
-            if (!s.routerEnabled || !s.activeRouterKeys?.length) {
+            if (!s.routerEnabled || (!s.activeRouterKeys?.length && !s.worldProgressionEnabled)) {
                 console.log('→ Skipped (disabled or empty)');
                 console.groupEnd();
                 return;
@@ -866,12 +926,36 @@ function installRouterInterceptor() {
                 const entry = books[bookName]?.entries?.[uid];
                 if (entry && entry.content) injectedContext += `### [${entry.key?.[0] || entry.comment || uid}]\n${entry.content}\n\n`;
             }
-            if (injectedContext) {
-                const routerBlock = `\n## ROUTER ACTIVE LORE\n${injectedContext.trim()}\n`;
+
+            let worldBlock = "";
+            if (s.worldProgressionEnabled) {
+                const prefix = s.routerCampaignPrefix || '';
+                const worldBookName = prefix ? `${prefix}_World` : 'World';
+                const worldBook = await ctx.loadWorldInfo(worldBookName);
+                if (worldBook?.entries) {
+                    const sortedWorld = Object.entries(worldBook.entries)
+                        .sort(([a], [b]) => Number(a) - Number(b));
+                    for (const [, entry] of sortedWorld) {
+                        if (entry && entry.content && entry.disable !== true) {
+                            worldBlock += `### [${entry.key?.[0] || entry.comment || 'World Report'}]\n${entry.content}\n\n`;
+                        }
+                    }
+                }
+            }
+
+            if (injectedContext || worldBlock) {
+                let routerBlock = "\n";
+                if (injectedContext) {
+                    routerBlock += `## ROUTER ACTIVE LORE\n${injectedContext.trim()}\n\n`;
+                }
+                if (worldBlock) {
+                    routerBlock += `## WORLD PROGRESSION REPORTS\n${worldBlock.trim()}\n\n`;
+                }
+                routerBlock = routerBlock.trim() + "\n";
                 const sysPart = prompt.find(p => p.role === 'system');
                 if (sysPart) sysPart.content += routerBlock;
                 else prompt.unshift({ role: 'system', content: routerBlock });
-                console.log(`→ Injected ${s.activeRouterKeys.length} entries into prompt`);
+                console.log(`→ Injected active lore and world reports into prompt`);
             } else {
                 console.log('→ No content to inject (entries empty?)');
             }
@@ -957,6 +1041,11 @@ function onChatChanged(newChatId) {
                 for (const name of oldBooks) {
                     await ctx.executeSlashCommandsWithOptions(`/world state=off silent=true "${name}"`).catch(() => { });
                 }
+                // Also turn off departing chat's world book explicitly
+                const oldPrefix = getEffectiveRouterCampaignPrefix(oldChatId);
+                const oldWorldBookName = oldPrefix ? `${oldPrefix}_World` : 'World';
+                await ctx.executeSlashCommandsWithOptions(`/world state=off silent=true "${oldWorldBookName}"`).catch(() => { });
+
                 // 2. Restore prefix and turn ON arriving chat's books
                 const prefix = getEffectiveRouterCampaignPrefix(newChatId);
                 if (prefix) {
@@ -965,6 +1054,13 @@ function onChatChanged(newChatId) {
                 }
                 for (const name of chatBooks) {
                     await ctx.executeSlashCommandsWithOptions(`/world state=on silent=true "${name}"`).catch(() => { });
+                }
+                // Turn ON arriving chat's world book explicitly if World Progression is enabled
+                const newWorldBookName = prefix ? `${prefix}_World` : 'World';
+                if (s.worldProgressionEnabled) {
+                    await ctx.executeSlashCommandsWithOptions(`/world state=on silent=true "${newWorldBookName}"`).catch(() => { });
+                } else {
+                    await ctx.executeSlashCommandsWithOptions(`/world state=off silent=true "${newWorldBookName}"`).catch(() => { });
                 }
             })();
         }
@@ -975,12 +1071,17 @@ function onChatChanged(newChatId) {
 
         // Helper: turn off the old books using only the known list — no registry scan.
         const _deactivateOldBooks = async () => {
-            if (!_oldBooksDeferred.length) return;
             const _ctx = SillyTavern.getContext();
             if (typeof _ctx.executeSlashCommandsWithOptions !== 'function') return;
-            for (const name of _oldBooksDeferred) {
-                await _ctx.executeSlashCommandsWithOptions(`/world state=off silent=true "${name}"`).catch(() => { });
+            if (_oldBooksDeferred.length) {
+                for (const name of _oldBooksDeferred) {
+                    await _ctx.executeSlashCommandsWithOptions(`/world state=off silent=true "${name}"`).catch(() => { });
+                }
             }
+            // Also explicitly turn off departing chat's world book
+            const oldPrefix = getEffectiveRouterCampaignPrefix(oldChatId);
+            const oldWorldBookName = oldPrefix ? `${oldPrefix}_World` : 'World';
+            await _ctx.executeSlashCommandsWithOptions(`/world state=off silent=true "${oldWorldBookName}"`).catch(() => { });
         };
 
         // Cancel any pending derivation from a previous CHAT_CHANGED.
@@ -2177,6 +2278,11 @@ function loadProfile(name) {
     s.quests = [];
     syncQuestsFromMemo(s.currentMemo);
     s.lastDelta = p.lastDelta ?? '';
+    s.routerLookback = p.routerLookback || 4;
+    s.routerDirectPrompt = p.routerDirectPrompt || '';
+    s.worldProgressionLookback = p.worldProgressionLookback ?? 20;
+    s.worldProgressionLastFiredAtMinutes = p.worldProgressionLastFiredAtMinutes ?? -1;
+    s.worldProgressionLastFiredPeriodLabel = p.worldProgressionLastFiredPeriodLabel || '';
     s.activeProfile = name;
     _historyViewIndex = -1;
 
@@ -2649,7 +2755,7 @@ function refreshRenderedView() {
 
     // Extract world time from THIS snapshot for frustration computation
     const timeMatch = (memo || '').match(/\[TIME\]([\s\S]*?)\[\/TIME\]/i);
-    const currentTime = timeMatch ? timeMatch[1].split('\n').filter(Boolean)[0]?.trim() || '' : '';
+    const currentTime = timeMatch ? extractCurrentTimeStr(timeMatch[1]) : '';
 
     const el = document.getElementById('rpg-tracker-render');
     if (el) {
@@ -8389,9 +8495,12 @@ Return ONLY the XML section. No explanation, no other text.`;
             $wpNextReportVal.text(formatInWorldMinutes(nextMins));
         }
 
-        $wpEnabled.prop('checked', !!settings.worldProgressionEnabled).on('change', function () {
+        $wpEnabled.prop('checked', !!settings.worldProgressionEnabled).on('change', async function () {
             getSettings().worldProgressionEnabled = !!$(this).prop('checked');
             saveSettings();
+            if (_currentChatId) {
+                await syncCampaignPrefixAndWorldsForChat(_currentChatId, 'toggle-world-progression');
+            }
         });
         $wpInterval.val(settings.worldProgressionIntervalHours || 24).on('input', function () {
             getSettings().worldProgressionIntervalHours = parseInt(String($(this).val() || '')) || 24;
@@ -8432,7 +8541,7 @@ Return ONLY the XML section. No explanation, no other text.`;
             const { parseInWorldMinutes: piw, runWorldProgressionPass: rwp } = await import('./router.js');
             const s = getSettings();
             const timeMatch = (s.currentMemo || '').match(/\[TIME\]([\s\S]*?)\[\/TIME\]/i);
-            const timeStr = timeMatch?.[1]?.split('\n').filter(Boolean)[0]?.trim() || '';
+            const timeStr = timeMatch ? extractCurrentTimeStr(timeMatch[1]) : '';
             const currentMinutes = piw(timeStr);
             if (currentMinutes < 0) {
                 toastr['warning']('Cannot parse in-world time from State Memo. Make sure the State Tracker has run at least once.', 'World Progression');

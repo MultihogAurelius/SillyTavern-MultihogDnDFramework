@@ -80,6 +80,20 @@ export function highlightParens(text) {
 }
 
 /**
+ * Extracts the current time string from a [TIME] block content.
+ * Ignores any 'Last Rest:' lines and strips optional 'Current Time:' prefixes.
+ * @param {string} timeBlockContent
+ * @returns {string}
+ */
+export function extractCurrentTimeStr(timeBlockContent) {
+    if (!timeBlockContent) return '';
+    const lines = timeBlockContent.split('\n').map(l => l.trim()).filter(Boolean);
+    const timeLine = lines.find(line => !line.toLowerCase().startsWith('last rest:'));
+    if (!timeLine) return '';
+    return timeLine.replace(/^(?:current\s+)?time:\s*/i, '').trim();
+}
+
+/**
  * Converts in-world time strings to a comparable numeric value (minutes since Day 1, 00:00).
  * Expected formats: "08:00 AM, Day 1", "Day 4", "10:00 PM"
  * @param {string} str 
@@ -87,6 +101,9 @@ export function highlightParens(text) {
  */
 export function parseInWorldTime(str) {
     if (!str) return 0;
+    if (str.includes('\n')) {
+        str = extractCurrentTimeStr(str);
+    }
     const dayMatch = str.match(/(?:Day|D)\s*(\d+)/i);
     const timeMatch = str.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
     
@@ -106,6 +123,7 @@ export function parseInWorldTime(str) {
     if (!dayMatch && !timeMatch) return 0;
     return (d - 1) * 1440 + h * 60 + m;
 }
+
 
 /**
  * Formats a minute difference into a human-readable "X days Y hours Z minutes" string.

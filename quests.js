@@ -4,7 +4,7 @@
  */
 
 import { getSettings } from './state-manager.js';
-import { parseQuestsFromMemo, writeQuestsToMemo, parseInWorldTime } from './memo-processor.js';
+import { parseQuestsFromMemo, writeQuestsToMemo, parseInWorldTime, extractCurrentTimeStr } from './memo-processor.js';
 
 export function getQuestToolName() {
     return 'LogQuest';
@@ -324,9 +324,9 @@ export function registerLogQuestTool() {
                 const tMatch = s.currentMemo?.match(/\[TIME\]([\s\S]*?)\[\/TIME\]/i);
                 let acceptedTime = "08:00 AM, Day 1"; // Fallback
                 if (tMatch) {
-                    const timeLines = tMatch[1].split('\n').filter(Boolean);
-                    if (timeLines.length > 0 && timeLines[0].includes('Day')) {
-                        acceptedTime = timeLines[0].trim();
+                    const timeStr = extractCurrentTimeStr(tMatch[1]);
+                    if (timeStr) {
+                        acceptedTime = timeStr;
                     }
                 }
 
