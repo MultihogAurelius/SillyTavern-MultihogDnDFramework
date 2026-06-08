@@ -3796,6 +3796,7 @@ function createPanel() {
                 /** @type {Map<string, typeof manifest>} */
                 const byBook = new Map();
                 for (const item of manifest) {
+                    if (item.book.endsWith('_Skeleton')) continue;
                     if (!byBook.has(item.book)) byBook.set(item.book, []);
                     byBook.get(item.book).push(item);
                 }

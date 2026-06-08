@@ -2679,7 +2679,7 @@ export async function runSkeletonGenerationPass(theme) {
     for (const rec of records) {
         skeletonBook.entries[uid] = {
             uid,
-            key: [rec.label.toLowerCase()],
+            key: [], // No keywords to prevent narrative activation
             keysecondary: [],
             comment: rec.label,
             content: `[Day 0 Baseline]\n${rec.content}`,
