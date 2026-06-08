@@ -961,6 +961,7 @@ function installRouterInterceptor() {
             }
             console.groupEnd();
         });
+        globalThis._rpgPromptManagerInterceptorActive = true;
         console.debug('[RPG Tracker] Lore injection: addPromptManagerInterceptor path active.');
     } else {
         // Fallback to the persistent extension prompt system
