@@ -8441,6 +8441,8 @@ Return ONLY the XML section. No explanation, no other text.`;
 
         // ── World Skeleton wiring ───────────────────────────────────────────────
         const $wpSkeletonTheme = $('#rpg_world_progression_skeleton_theme');
+        const $wpSkeletonPrompt = $('#rpg_world_progression_skeleton_system_prompt');
+        const $wpResetSkeletonPrompt = $('#rpg_world_progression_btn_reset_skeleton_prompt');
         const $wpGenerateSkeleton = $('#rpg_world_progression_btn_generate_skeleton');
         const $wpSkeletonStatus = $('#rpg_world_progression_skeleton_status');
 
@@ -8461,6 +8463,24 @@ Return ONLY the XML section. No explanation, no other text.`;
         $wpSkeletonTheme.val(settings.worldProgressionSkeletonTheme || '').on('input', function () {
             getSettings().worldProgressionSkeletonTheme = String($(this).val() || '');
             saveSettings();
+        });
+
+        $wpSkeletonPrompt.val(settings.worldProgressionSkeletonSystemPrompt || '').on('input', function () {
+            getSettings().worldProgressionSkeletonSystemPrompt = String($(this).val() || '');
+            saveSettings();
+        });
+
+        $wpResetSkeletonPrompt.on('click', function () {
+            if (!confirm('Reset World Skeleton system prompt to default?')) return;
+            const { extensionSettings } = SillyTavern.getContext();
+            if (extensionSettings[MODULE_NAME]) {
+                delete extensionSettings[MODULE_NAME].worldProgressionSkeletonSystemPrompt;
+            }
+            const freshDefault = getSettings().worldProgressionSkeletonSystemPrompt;
+            getSettings().worldProgressionSkeletonSystemPrompt = freshDefault;
+            $wpSkeletonPrompt.val(freshDefault);
+            saveSettings();
+            toastr['success']('World Skeleton prompt reset to default.', 'World Skeleton');
         });
 
         $wpGenerateSkeleton.on('click', async function () {

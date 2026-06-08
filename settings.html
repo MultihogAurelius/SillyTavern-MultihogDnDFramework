@@ -432,6 +432,16 @@
                         <label style="font-size: 0.85em; font-weight: bold; opacity: 0.8;">World Theme / Seed</label>
                         <textarea id="rpg_world_progression_skeleton_theme" class="text_pole" rows="4" style="width:100%; font-size:0.8em; resize:vertical; background:rgba(0,0,0,0.3); color:var(--SmartThemeBodyColor); border:1px solid rgba(255,255,255,0.1); border-radius:4px; padding:6px; box-sizing:border-box; margin-bottom: 6px;" placeholder="e.g. 'A dark fantasy empire on the brink of civil war. Magic is forbidden. Three rival noble houses are scheming for the throne. The player starts as a low-level mercenary in the capital.'"></textarea>
 
+                        <div style="display:flex; align-items:center; gap:6px; margin-top: 4px; margin-bottom: 2px;">
+                            <label style="font-size: 0.85em; font-weight: bold; opacity: 0.8; flex:1; margin:0;">Skeleton System Prompt
+                                <i class="fa-solid fa-circle-question interactable" style="font-size: 0.85em; opacity: 0.7; margin-left: 4px;" title="The system prompt sent to the LLM for generating the foundational World Skeleton."></i>
+                            </label>
+                            <button id="rpg_world_progression_btn_reset_skeleton_prompt" class="menu_button interactable" style="font-size:0.75em; padding:2px 8px;" title="Reset to default prompt">
+                                <i class="fa-solid fa-arrow-rotate-left"></i> Reset
+                            </button>
+                        </div>
+                        <textarea id="rpg_world_progression_skeleton_system_prompt" class="text_pole" rows="10" style="width:100%; font-size:0.78em; font-family:monospace; resize:vertical; background:rgba(0,0,0,0.3); color:var(--SmartThemeBodyColor); border:1px solid rgba(255,255,255,0.1); border-radius:4px; padding:6px; box-sizing:border-box; margin-bottom: 6px;" placeholder="System prompt for generating the World Skeleton…"></textarea>
+
                         <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                             <button id="rpg_world_progression_btn_generate_skeleton" class="menu_button interactable" style="background: rgba(180, 100, 255, 0.15); border-color: rgba(180, 100, 255, 0.4);">
                                 <i class="fa-solid fa-wand-magic-sparkles"></i> Generate Skeleton
