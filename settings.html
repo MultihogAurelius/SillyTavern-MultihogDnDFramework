@@ -387,6 +387,12 @@
                         </label>
                         <input id="rpg_world_progression_keep_active" type="text" inputmode="numeric" pattern="[0-9]*" class="text_pole" value="3" style="max-width: 100px;" title="Number of recent World Progression reports kept active in context" />
 
+                        <label style="font-size: 0.85em; font-weight: bold; opacity: 0.8; margin-top: 4px;">Historical Reports Lookback
+                            <i class="fa-solid fa-circle-question interactable" style="font-size: 0.85em; opacity: 0.7; margin-left: 4px;" title="How many of the previous World Progression reports are shown/fed to the LLM when generating a new report. 0 = include all."></i>
+                        </label>
+                        <input id="rpg_world_progression_history_lookback" type="text" inputmode="numeric" pattern="[0-9]*" class="text_pole" value="0" style="max-width: 100px;" title="Number of historical World Progression reports included in generation context (0 = all)" />
+                        <div style="font-size: 0.75em; opacity: 0.55; margin-top: -2px;">0 = include all previous reports</div>
+
                         <label style="font-size: 0.85em; font-weight: bold; opacity: 0.8; margin-top: 4px;">Report Word Target</label>
                         <input id="rpg_world_progression_word_target" type="text" inputmode="numeric" pattern="[0-9]*" class="text_pole" value="600" style="max-width: 100px;" title="Minimum word count to aim for in the generated report. The LLM's own max-token limit is NOT overridden — set that in your preset." />
                         <div style="font-size: 0.75em; opacity: 0.55; margin-top: -2px;">The LLM's max-token limit comes from your preset — this only guides the prompt wording.</div>

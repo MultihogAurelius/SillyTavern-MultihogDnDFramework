@@ -798,6 +798,7 @@ function loadChatState(chatId) {
     s.routerLookback = saved.routerLookback || 4;
     s.routerDirectPrompt = saved.routerDirectPrompt || '';
     s.worldProgressionLookback = saved.worldProgressionLookback ?? 20;
+    s.worldProgressionHistoryLookback = saved.worldProgressionHistoryLookback ?? 0;
     s.worldProgressionLastFiredAtMinutes = saved.worldProgressionLastFiredAtMinutes ?? -1;
     s.worldProgressionLastFiredPeriodLabel = saved.worldProgressionLastFiredPeriodLabel || '';
     // Don't restore routerCampaignPrefix from per-chat saved state — the prefix
@@ -2306,6 +2307,7 @@ function loadProfile(name) {
     s.routerLookback = p.routerLookback || 4;
     s.routerDirectPrompt = p.routerDirectPrompt || '';
     s.worldProgressionLookback = p.worldProgressionLookback ?? 20;
+    s.worldProgressionHistoryLookback = p.worldProgressionHistoryLookback ?? 0;
     s.worldProgressionLastFiredAtMinutes = p.worldProgressionLastFiredAtMinutes ?? -1;
     s.worldProgressionLastFiredPeriodLabel = p.worldProgressionLastFiredPeriodLabel || '';
     s.activeProfile = name;
@@ -8487,6 +8489,7 @@ Return ONLY the XML section. No explanation, no other text.`;
         const $wpEnabled = $('#rpg_world_progression_enabled');
         const $wpInterval = $('#rpg_world_progression_interval');
         const $wpKeepActive = $('#rpg_world_progression_keep_active');
+        const $wpHistoryLookback = $('#rpg_world_progression_history_lookback');
         const $wpWordTarget = $('#rpg_world_progression_word_target');
         const $wpLookback = $('#rpg_world_progression_lookback');
         const $wpSystemPrompt = $('#rpg_world_progression_system_prompt');
@@ -8540,6 +8543,10 @@ Return ONLY the XML section. No explanation, no other text.`;
         });
         $wpKeepActive.val(settings.worldProgressionKeepActive || 3).on('input', function () {
             getSettings().worldProgressionKeepActive = parseInt(String($(this).val() || '')) || 3;
+            saveSettings();
+        });
+        $wpHistoryLookback.val(settings.worldProgressionHistoryLookback ?? 0).on('input', function () {
+            getSettings().worldProgressionHistoryLookback = parseInt(String($(this).val() || '')) || 0;
             saveSettings();
         });
         $wpWordTarget.val(settings.worldProgressionWordTarget || 600).on('input', function () {

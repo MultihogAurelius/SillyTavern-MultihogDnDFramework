@@ -2439,8 +2439,15 @@ export async function runWorldProgressionPass(timeStr, currentMinutes) {
         const isSkeletonBook = nameLower.endsWith('_skeleton');
         const isWorldBook = nameLower.endsWith('_world') || nameLower === 'world';
         // Sort by uid (numeric insertion order ≈ chronological)
-        const sortedEntries = Object.entries(book.entries)
+        let sortedEntries = Object.entries(book.entries)
             .sort(([a], [b]) => Number(a) - Number(b));
+
+        if (isWorldBook) {
+            const historyLookback = settings.worldProgressionHistoryLookback ?? 0;
+            if (historyLookback > 0) {
+                sortedEntries = sortedEntries.slice(-historyLookback);
+            }
+        }
 
         for (const [, entry] of sortedEntries) {
             if (!entry?.content?.trim()) continue;
