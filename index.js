@@ -517,20 +517,16 @@ async function activateCampaignBooks(opts = {}) {
 
     const worldBookName = prefix ? `${prefix}_World` : 'World';
     let bookNames = allNames.filter(n => bookBelongsToPrefix(n, prefix));
-    if (s.worldProgressionEnabled) {
-        if (allNames.includes(worldBookName) && !bookNames.includes(worldBookName)) {
-            bookNames.push(worldBookName);
-        }
-    } else {
-        bookNames = bookNames.filter(n => n !== worldBookName);
-    }
+    // Exclude world progression books from native activation.
+    bookNames = bookNames.filter(n => {
+        const isWorld = n.toLowerCase().endsWith('_world') || n.toLowerCase() === 'world';
+        return !isWorld;
+    });
 
     const deact = computeWorldsToDeactivate(allNames, prefix, bookNames, s);
     const toDeactivate = deact.toDeactivate;
-    if (!s.worldProgressionEnabled) {
-        if (allNames.includes(worldBookName) && !toDeactivate.includes(worldBookName)) {
-            toDeactivate.push(worldBookName);
-        }
+    if (allNames.includes(worldBookName) && !toDeactivate.includes(worldBookName)) {
+        toDeactivate.push(worldBookName);
     }
     const allKnownManagedBooks = new Set(
         Object.values(s.chatStates || {}).flatMap(cs => cs.campaignBooks || [])
@@ -781,6 +777,7 @@ function loadChatState(chatId) {
     s.historyIndex = saved.historyIndex ?? -1;
 
     s.activeRouterKeys = JSON.parse(JSON.stringify(saved.activeRouterKeys || []));
+    s.activeWorldKeys = JSON.parse(JSON.stringify(saved.activeWorldKeys || []));
     s.keywordActivatedKeys = JSON.parse(JSON.stringify(saved.keywordActivatedKeys || []));
     s.routerLog = JSON.parse(JSON.stringify(saved.routerLog || []));
     s.routerLookback = saved.routerLookback || 4;
@@ -834,7 +831,7 @@ async function refreshExtensionPrompt() {
     if (typeof setExtensionPrompt !== 'function') return;
 
     const s = getSettings();
-    if (!s.routerEnabled || !s.activeRouterKeys?.length) {
+    if (!s.routerEnabled || (!s.activeRouterKeys?.length && !s.activeWorldKeys?.length)) {
         setExtensionPrompt('rpg_tracker_lore', '', 0, 0); // Clear if disabled
         return;
     }
@@ -859,8 +856,36 @@ async function refreshExtensionPrompt() {
             }
         }
 
-        if (injectedContext) {
-            let routerBlock = `## ROUTER ACTIVE LORE\n${injectedContext.trim()}`;
+        let worldBlock = "";
+        if (s.worldProgressionEnabled && s.activeWorldKeys?.length) {
+            const worldBooks = {};
+            for (const k of s.activeWorldKeys) {
+                const [bookName] = k.split('::');
+                if (!worldBooks[bookName]) worldBooks[bookName] = await ctx.loadWorldInfo(bookName);
+            }
+            const sortedKeys = [...s.activeWorldKeys].sort((a, b) => {
+                const [, uidA] = a.split('::');
+                const [, uidB] = b.split('::');
+                return Number(uidA) - Number(uidB);
+            });
+            for (const k of sortedKeys) {
+                const [bookName, uid] = k.split('::');
+                const entry = worldBooks[bookName]?.entries?.[uid];
+                if (entry && entry.content) {
+                    worldBlock += `### [${entry.key?.[0] || entry.comment || 'World Report'}]\n${entry.content}\n\n`;
+                }
+            }
+        }
+
+        if (injectedContext || worldBlock) {
+            let routerBlock = "";
+            if (injectedContext) {
+                routerBlock += `## ROUTER ACTIVE LORE\n${injectedContext.trim()}\n\n`;
+            }
+            if (worldBlock) {
+                routerBlock += `## WORLD PROGRESSION REPORTS\n${worldBlock.trim()}\n\n`;
+            }
+            routerBlock = routerBlock.trim();
             // Set as an extension prompt at the end of the system block (Position 0, but ST handles placement)
             setExtensionPrompt('rpg_tracker_lore', routerBlock, 0, 0);
         } else {
@@ -882,7 +907,8 @@ function installRouterInterceptor() {
             const t = performance.now().toFixed(1);
             console.group(`[RPG|LORE-INJECT] promptManagerInterceptor fired @ ${t}ms`);
             console.log('activeRouterKeys at inject time:', JSON.stringify(s.activeRouterKeys || []));
-            if (!s.routerEnabled || !s.activeRouterKeys?.length) {
+            console.log('activeWorldKeys at inject time:', JSON.stringify(s.activeWorldKeys || []));
+            if (!s.routerEnabled || (!s.activeRouterKeys?.length && !s.activeWorldKeys?.length)) {
                 console.log('→ Skipped (disabled or empty)');
                 console.groupEnd();
                 return;
@@ -904,12 +930,40 @@ function installRouterInterceptor() {
                 if (entry && entry.content) injectedContext += `### [${entry.key?.[0] || entry.comment || uid}]\n${entry.content}\n\n`;
             }
 
-            if (injectedContext) {
-                let routerBlock = `\n## ROUTER ACTIVE LORE\n${injectedContext.trim()}\n`;
+            let worldBlock = "";
+            if (s.worldProgressionEnabled && s.activeWorldKeys?.length) {
+                const worldBooks = {};
+                for (const k of s.activeWorldKeys) {
+                    const [bookName] = k.split('::');
+                    if (!worldBooks[bookName]) worldBooks[bookName] = await ctx.loadWorldInfo(bookName);
+                }
+                const sortedKeys = [...s.activeWorldKeys].sort((a, b) => {
+                    const [, uidA] = a.split('::');
+                    const [, uidB] = b.split('::');
+                    return Number(uidA) - Number(uidB);
+                });
+                for (const k of sortedKeys) {
+                    const [bookName, uid] = k.split('::');
+                    const entry = worldBooks[bookName]?.entries?.[uid];
+                    if (entry && entry.content) {
+                        worldBlock += `### [${entry.key?.[0] || entry.comment || 'World Report'}]\n${entry.content}\n\n`;
+                    }
+                }
+            }
+
+            if (injectedContext || worldBlock) {
+                let routerBlock = "\n";
+                if (injectedContext) {
+                    routerBlock += `## ROUTER ACTIVE LORE\n${injectedContext.trim()}\n\n`;
+                }
+                if (worldBlock) {
+                    routerBlock += `## WORLD PROGRESSION REPORTS\n${worldBlock.trim()}\n\n`;
+                }
+                routerBlock = routerBlock.trim() + "\n";
                 const sysPart = prompt.find(p => p.role === 'system');
                 if (sysPart) sysPart.content += routerBlock;
                 else prompt.unshift({ role: 'system', content: routerBlock });
-                console.log(`→ Injected active lore into prompt`);
+                console.log(`→ Injected active lore and world reports into prompt`);
             } else {
                 console.log('→ No content to inject (entries empty?)');
             }
@@ -1073,6 +1127,7 @@ function onChatChanged(newChatId) {
         s.memoHistory = [];
         s.lastDelta = '';
         s.activeRouterKeys = [];
+        s.activeWorldKeys = [];
         s.routerLog = [];
 
         _historyViewIndex = -1;
@@ -4794,6 +4849,7 @@ function createPanel() {
         return {
             timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             activeRouterKeys: JSON.parse(JSON.stringify(s.activeRouterKeys || [])),
+            activeWorldKeys: JSON.parse(JSON.stringify(s.activeWorldKeys || [])),
             bookSnapshots,
         };
     };

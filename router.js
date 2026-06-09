@@ -235,6 +235,7 @@ export async function runRouterPass(narrativeOutput, manualPrompt = null, custom
             const snapshot = {
                 timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                 activeRouterKeys: JSON.parse(JSON.stringify(settings.activeRouterKeys || [])),
+                activeWorldKeys: JSON.parse(JSON.stringify(settings.activeWorldKeys || [])),
                 bookSnapshots: {}
             };
             for (const [name, book] of Object.entries(archiveBooks)) {
@@ -1096,9 +1097,11 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
     const activate = action.activate || [];
     const deactivate = action.deactivate || [];
     let newActive = [...(settings.activeRouterKeys || [])];
+    let newWorldActive = [...(settings.activeWorldKeys || [])];
     
     // Remove deactivations
     newActive = newActive.filter(k => !deactivate.includes(k));
+    newWorldActive = newWorldActive.filter(k => !deactivate.includes(k));
     
     // Add activations
     for (const k of activate) {
@@ -1110,9 +1113,17 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
         const exists = allBooks[bookName]?.entries?.[uid];
         
         if (exists) {
-            if (!newActive.includes(k)) {
-                newActive.push(k);
-                changed = true;
+            const isWorld = bookName.toLowerCase().endsWith('_world') || bookName.toLowerCase() === 'world';
+            if (isWorld) {
+                if (!newWorldActive.includes(k)) {
+                    newWorldActive.push(k);
+                    changed = true;
+                }
+            } else {
+                if (!newActive.includes(k)) {
+                    newActive.push(k);
+                    changed = true;
+                }
             }
         } else {
             errors.push(`Entity not found: ${k}`);
@@ -1120,82 +1131,7 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
     }
     if (deactivate.length > 0) changed = true;
 
-    // 1b. Physical activation/deactivation for _World books
-    if (activate.length > 0 || deactivate.length > 0) {
-        const worldBookUpdates = new Map();
-        for (const k of activate) {
-            if (typeof k === 'string' && k.includes('::')) {
-                const [bookName, uid] = k.split('::');
-                const isWorld = bookName.toLowerCase().endsWith('_world') || bookName.toLowerCase() === 'world';
-                if (isWorld) {
-                    if (!worldBookUpdates.has(bookName)) {
-                        worldBookUpdates.set(bookName, { activateUids: new Set(), deactivateUids: new Set() });
-                    }
-                    worldBookUpdates.get(bookName).activateUids.add(uid);
-                }
-            }
-        }
-        for (const k of deactivate) {
-            if (typeof k === 'string' && k.includes('::')) {
-                const [bookName, uid] = k.split('::');
-                const isWorld = bookName.toLowerCase().endsWith('_world') || bookName.toLowerCase() === 'world';
-                if (isWorld) {
-                    if (!worldBookUpdates.has(bookName)) {
-                        worldBookUpdates.set(bookName, { activateUids: new Set(), deactivateUids: new Set() });
-                    }
-                    worldBookUpdates.get(bookName).deactivateUids.add(uid);
-                }
-            }
-        }
-        for (const [bookName, updates] of worldBookUpdates.entries()) {
-            let bookData = null;
-            try { bookData = await ctx.loadWorldInfo(bookName); } catch (_) {}
-            if (!bookData) {
-                try {
-                    const res = await fetch('/api/worldinfo/get', {
-                        method: 'POST',
-                        headers: getRequestHeaders(),
-                        body: JSON.stringify({ name: bookName })
-                    });
-                    if (res.ok) {
-                        const data = await res.json();
-                        if (data?.entries) bookData = data;
-                    }
-                } catch (_) {}
-            }
-            if (bookData?.entries) {
-                let bookChanged = false;
-                for (const uid of updates.activateUids) {
-                    if (bookData.entries[uid]) {
-                        bookData.entries[uid].constant = true;
-                        bookData.entries[uid].disable = false;
-                        bookData.entries[uid].key = [];
-                        bookChanged = true;
-                    }
-                }
-                for (const uid of updates.deactivateUids) {
-                    if (bookData.entries[uid]) {
-                        bookData.entries[uid].constant = false;
-                        bookData.entries[uid].disable = true;
-                        bookData.entries[uid].key = [];
-                        bookChanged = true;
-                    }
-                }
-                if (bookChanged) {
-                    try {
-                        await fetch('/api/worldinfo/edit', {
-                            method: 'POST',
-                            headers: getRequestHeaders(),
-                            body: JSON.stringify({ name: bookName, data: bookData })
-                        });
-                        if (typeof ctx.saveWorldInfo === 'function') {
-                            await ctx.saveWorldInfo(bookName, bookData);
-                        }
-                    } catch (_) {}
-                }
-            }
-        }
-    }
+    // World books do not use physical activation on disk anymore.
 
     // Sync keywordActivatedKeys: agent ownership trumps keyword-auto tracking.
     // - Explicitly activated: agent owns it now, no longer auto-expires.
@@ -1270,7 +1206,10 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
             }
             settings.activeRouterKeys = (settings.activeRouterKeys || [])
                 .filter(k => k !== targetId);
+            settings.activeWorldKeys = (settings.activeWorldKeys || [])
+                .filter(k => k !== targetId);
             newActive = newActive.filter(k => k !== targetId);
+            newWorldActive = newWorldActive.filter(k => k !== targetId);
             if (Array.isArray(settings.keywordActivatedKeys)) {
                 settings.keywordActivatedKeys = settings.keywordActivatedKeys
                     .filter(k => k !== targetId);
@@ -1407,8 +1346,8 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
                     // Overwrite instead of appending for World Progression reports
                     bookData.entries[existingUid].content = delta;
                     bookData.entries[existingUid].key = [];
-                    bookData.entries[existingUid].constant = true;
-                    bookData.entries[existingUid].disable = false;
+                    bookData.entries[existingUid].constant = false;
+                    bookData.entries[existingUid].disable = true;
                 } else {
                     // Append delta to existing chronicle (dedup path)
                     const existing = (bookData.entries[existingUid].content || '').replace(/^\[ID:[^\]]+\]\n?/i, '').trimEnd();
@@ -1425,7 +1364,11 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
                     bookData.entries[existingUid].comment = rec.label;
                 }
                 
-                if (!newActive.includes(fullId)) newActive.push(fullId);
+                if (isWorldBook) {
+                    if (!newWorldActive.includes(fullId)) newWorldActive.push(fullId);
+                } else {
+                    if (!newActive.includes(fullId)) newActive.push(fullId);
+                }
                 recordedIds.push(`${fullId} (updated)`);
             } else {
                 // Append new entry with the next sequential UID
@@ -1438,13 +1381,17 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
                     keysecondary: [],
                     comment: rec.label || 'LORE_GEN',
                     content: rec.content || '',
-                    constant: isWorldBook ? true : false,
+                    constant: false,
                     selective: false, selectiveLogic: 0, addMemo: true,
-                    order: 100, position: 0, disable: isWorldBook ? false : !settings.routerNativeKeywordActivation,
+                    order: 100, position: 0, disable: isWorldBook ? true : !settings.routerNativeKeywordActivation,
                     probability: 100, useProbability: false,
                     depth: 4, group: '', groupOverride: false, groupWeight: 100,
                 };
-                if (!newActive.includes(fullId)) newActive.push(fullId);
+                if (isWorldBook) {
+                    if (!newWorldActive.includes(fullId)) newWorldActive.push(fullId);
+                } else {
+                    if (!newActive.includes(fullId)) newActive.push(fullId);
+                }
                 recordedIds.push(fullId);
             }
             changed = true;
@@ -1489,6 +1436,7 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
     // Budget enforcement is handled by the agent via overflow instruction in context.
     // No FIFO pruning here — the agent must explicitly deactivate entries.
     settings.activeRouterKeys = newActive;
+    settings.activeWorldKeys = newWorldActive;
 
     // 4. Delete
     const deleteIds = action.delete_ids || [];
@@ -1502,6 +1450,7 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
             await ctx.saveWorldInfo(bookName, book);
             // Also remove from active keys if present
             settings.activeRouterKeys = settings.activeRouterKeys.filter(k => k !== id);
+            settings.activeWorldKeys = (settings.activeWorldKeys || []).filter(k => k !== id);
             changed = true;
         }
     }
@@ -1628,6 +1577,7 @@ export async function rollbackRouterPass(index = 0) {
 
         // -- Step 3: Restore active keys ---------------------------------------
         settings.activeRouterKeys = JSON.parse(JSON.stringify(snapshot.activeRouterKeys || []));
+        settings.activeWorldKeys = JSON.parse(JSON.stringify(snapshot.activeWorldKeys || []));
 
         // -- Step 4: Trim snapshots newer than the restored point --------------
         settings.routerHistory = history.slice(index + 1);
@@ -1680,6 +1630,7 @@ export async function reapplyRouterPass(prePassSnapshot, postPassState) {
 
         // Step 3: Restore active keys to the post-pass state
         settings.activeRouterKeys = JSON.parse(JSON.stringify(postPassState.activeRouterKeys || []));
+        settings.activeWorldKeys = JSON.parse(JSON.stringify(postPassState.activeWorldKeys || []));
 
         ctx.saveSettingsDebounced();
         document.dispatchEvent(new CustomEvent('rt_lore_agent_updated'));
@@ -2254,8 +2205,6 @@ export async function disableManagedEntries() {
         const allNames = await getWorldInfoNamesSafe();
         const scoped = allNames.filter(n => bookBelongsToPrefix(n, prefix));
         for (const bookName of scoped) {
-            const isWorld = bookName.toLowerCase().endsWith('_world') || bookName.toLowerCase() === 'world';
-            if (isWorld) continue;
             const book = await ctx.loadWorldInfo(bookName);
             if (!book?.entries) continue;
             let changed = false;

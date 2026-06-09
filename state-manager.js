@@ -157,6 +157,7 @@ You may be asked to use Markers: ((PLS)), ((B)), ((XB)), ((BDG)), ((HGT)). These
         routerEnabled: true,
         routerLog: [],
         activeRouterKeys: [],
+        activeWorldKeys: [],
         keywordActivatedKeys: [],  // entries activated by keyword scanner — auto-expire when keyword leaves scan window
         routerConnectionSource: "default",
         routerOpenaiUrl: "",
@@ -525,6 +526,7 @@ export function saveChatState(chatId) {
         quests:       [],  // quests are derived from currentMemo on load — not persisted separately
         historyIndex: s.historyIndex ?? -1,
         activeRouterKeys: JSON.parse(JSON.stringify(s.activeRouterKeys || [])),
+        activeWorldKeys:  JSON.parse(JSON.stringify(s.activeWorldKeys || [])),
         keywordActivatedKeys: JSON.parse(JSON.stringify(s.keywordActivatedKeys || [])),
         routerLog:    JSON.parse(JSON.stringify(s.routerLog || [])),
         routerCampaignPrefix: s.routerCampaignPrefix || '',
@@ -561,6 +563,7 @@ export function saveProfile(name) {
         lastDelta: s.lastDelta || '',
         historyIndex: s.historyIndex ?? -1,
         activeRouterKeys: JSON.parse(JSON.stringify(s.activeRouterKeys || [])),
+        activeWorldKeys:  JSON.parse(JSON.stringify(s.activeWorldKeys || [])),
         routerLog:    JSON.parse(JSON.stringify(s.routerLog || [])),
         routerCampaignPrefix: s.routerCampaignPrefix || '',
         routerLookback: s.routerLookback || 4,
