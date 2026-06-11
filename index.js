@@ -2416,7 +2416,9 @@ async function showRngExplanation() {
             <div style="font-size: 0.9em; line-height: 1.5; max-width: 480px; text-align: left;">
                 ${card('🎲', 'Pre-Seeded RNG Queue',
         `Generates a list of pre-rolled dice and injects them directly into the story context. The AI uses the next roll in the queue until it reaches the last one, then wraps about to the start again. Each input injects a fresh set of numbers.<br><br>
-                    This is a highly efficient and robust system that works extremely well for both combat and narrative checks. In combat, it creates a deterministic "grid" that removes any opportunity for the AI to game the outcome. Because it does not require additional tool-calling roundtrips, it reduces token costs, minimizes latency, and is highly reliable due to its reduced structural complexity.`
+                    This is a highly efficient and robust system that works well for both combat and narrative checks. Because it does not require additional tool-calling roundtrips, it reduces token costs, minimizes latency, and is highly reliable due to its reduced structural complexity.<br><br>
+                    The only potential weakness is that the AI sees the numbers beforehand, theoretically making it possible for it to 'game' the system by fitting the check to the roll rather than the other way around, but in my experience this never happens. Rolls are failed all the time.<br><br>
+                    This potential weakness, however, is completely eliminated in combat because it works on a deterministic, turn-based grid.`
     )}
                 ${card('🔧', 'Tool Call RNG',
         `A reactive system where the AI proactively calls a dice tool for a specific narrative action (e.g., picking a lock, persuading a guard). The AI must declare a <b>Difficulty Class (DC)</b> before seeing the result. This ensures it can't "game the system" by lowering the DC to fit a roll or skipping the roll entirely. While Tool Calls guarantee that gaming the roll is technically impossible, they add slightly more latency and structure compared to the queue.`
