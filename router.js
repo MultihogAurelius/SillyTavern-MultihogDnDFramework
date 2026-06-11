@@ -814,7 +814,7 @@ Thought: I see a new NPC named Barnaby in Khelt's Rust-Lantern District. I will 
                                         type: 'object',
                                         properties: {
                                             label: { type: 'string', description: 'Entity name only. NO tag prefix (e.g. "Iron Syndicate", NOT "FAC: Iron Syndicate").' },
-                                            keys:  { type: 'array', items: { type: 'string' }, description: 'Search keywords. Include ancestor location names.' },
+                                            keys:  { type: 'array', items: { type: 'string' }, description: 'Search keywords. Include the entity name/title itself (without timestamps like "[Day 1]") as a keyword, plus any ancestor location names.' },
                                             content:  { type: 'string', description: 'Full description.' },
                                             category: { type: 'string', enum: categoryEnum, description: 'Determines which lorebook the entry goes into.' }
                                         },
@@ -890,7 +890,7 @@ Campaign Root: "${prefix || 'World Archive'}"
   NPCs -> "${prefix ? prefix + '_NPCs' : 'NPCs'}"
   Locations -> "${prefix ? prefix + '_Locations' : 'Locations'}" (etc.)
 Location hierarchy: use " :: " separator in labels (e.g. "Khelt :: Rust-Lantern District :: The Guilded Anvil").
-Include ancestor location names as plain keywords (e.g. keys: ["Khelt", "Rust-Lantern District", "tavern"]).
+Include the entity name/title itself (without timestamps like "[Day 1]") as a keyword, plus any ancestor location names (e.g. keys: ["The Guilded Anvil", "Khelt", "Rust-Lantern District", "tavern"]).
 
 ## FIELD INSTRUCTIONS
 ${Object.values(settings.routerModules || {}).filter(m => m.enabled).map(m => `- ${m.tag}: ${m.instruction}`).join('\n')}${(settings.routerCustomTags || []).length ? '\n\n### CUSTOM CATEGORIES\n' + (settings.routerCustomTags || []).map(m => `- ${m.tag.toUpperCase()}: ${m.instruction}`).join('\n') : ''}`;

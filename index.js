@@ -3785,10 +3785,6 @@ function createPanel() {
             readPane.className = 'rt-agent-manifest-read';
             readPane.style.cssText = 'display:flex; flex-direction:column; gap:4px;';
 
-            const titleRead = document.createElement('div');
-            titleRead.style.cssText = 'font-size:9px; color:var(--rt-text);';
-            titleRead.innerHTML = `<span style="opacity:0.5;">Title:</span> ${escapeHtml(item.label)}`;
-
             const keysRead = document.createElement('div');
             keysRead.style.cssText = 'font-size:9px; opacity:0.55; color:var(--rt-text-muted); font-family:var(--rt-font-mono);';
             keysRead.textContent = '[' + item.keys.join(', ') + ']';
@@ -3817,14 +3813,12 @@ function createPanel() {
             }
             readActions.appendChild(editBtn);
 
-            readPane.appendChild(titleRead);
             readPane.appendChild(keysRead);
             readPane.appendChild(contentRead);
             readPane.appendChild(readActions);
             body.appendChild(readPane);
 
             const syncReadFromItem = () => {
-                titleRead.innerHTML = `<span style="opacity:0.5;">Title:</span> ${escapeHtml(item.label)}`;
                 keysRead.textContent = '[' + item.keys.join(', ') + ']';
                 contentRead.textContent = item.content || '';
             };

@@ -282,14 +282,16 @@ When recording a new entry, keep the lorebook category separate from the entity 
 
 - Use the "category" field for the type (NPC, LOC, FAC, QUEST, EVENT, or a custom tag).
 - Use the "label" field for the entity name only. Do NOT prefix labels with the category tag.
+- **IMPORTANT FOR KEYWORDS (KEYS):** Always include the entity's own name/title (without any timestamps like "Day 1", "Day 2", "12:15 AM", etc.) in the list of keywords. The title itself (stripped of timestamps) is the most reliable trigger, so it must be present as a keyword. For example, if the entry title is "[12:15 AM, Day 2] Defense of Ironbelly's Workshop", the keys list MUST include "Defense of Ironbelly's Workshop".
 
 Correct examples:
-- {"label": "Iron Syndicate", "category": "FAC"}
-- {"label": "Thalric Thorne", "category": "STATS"}
+- {"label": "Iron Syndicate", "category": "FAC", "keys": ["Iron Syndicate", "faction"]}
+- {"label": "Thalric Thorne", "category": "STATS", "keys": ["Thalric Thorne", "stats"]}
+- {"label": "[12:15 AM, Day 2] Defense of Ironbelly's Workshop", "category": "EVENT", "keys": ["Defense of Ironbelly's Workshop", "siege", "workshop"]}
 
 Incorrect examples:
-- {"label": "FAC: Iron Syndicate", "category": "FAC"}
-- {"label": "STATS: Thalric Thorne", "category": "STATS"}
+- {"label": "FAC: Iron Syndicate", "category": "FAC", "keys": ["faction"]} (missing the entity name keyword)
+- {"label": "[12:15 AM, Day 2] Defense of Ironbelly's Workshop", "category": "EVENT", "keys": ["[12:15 AM, Day 2] Defense of Ironbelly's Workshop"]} (includes the timestamp in keyword, which will never trigger reliably)
 </formatting>
 
 <quests>
@@ -330,10 +332,11 @@ The current scene's location stack is shown above as "CURRENT LOCATION". Prepend
 
 Examples:
   CURRENT LOCATION: Khelt :: Rust-Lantern District
-  --> [[LOC: Khelt :: Rust-Lantern District :: Marrow-Deep Mines Office | A squat iron building managing mining contracts. | mines, contracts, Khelt, Rust-Lantern]]
-  --> [[LOC: Khelt :: Rust-Lantern District :: The Guilded Anvil Tavern | A noisy tavern with a job bulletin board. | tavern, jobs, Khelt, Rust-Lantern]]
+  --> [[LOC: Khelt :: Rust-Lantern District :: Marrow-Deep Mines Office | A squat iron building managing mining contracts. | Marrow-Deep Mines Office, mines, contracts, Khelt, Rust-Lantern]]
+  --> [[LOC: Khelt :: Rust-Lantern District :: The Guilded Anvil Tavern | A noisy tavern with a job bulletin board. | The Guilded Anvil Tavern, tavern, jobs, Khelt, Rust-Lantern]]
 
 Also include each ancestor name (Khelt, Rust-Lantern District) as a plain keyword in the Keywords field.
+**IMPORTANT FOR KEYWORDS:** Always include the entry's own title/name (without any timestamps like "Day 1", "Day 2", "12:15 AM", etc.) in the keywords field. The title itself (stripped of timestamps) is the most reliable trigger, so it must be present as a keyword. For example, for a tag representing a "Defense of Ironbelly's Workshop" event, the keywords MUST contain "Defense of Ironbelly's Workshop".
 
 NPC / FAC / QUEST / EVENT labels: Name only — NO " :: " hierarchy, NO tag prefix.
 Example: [[FAC: Iron Syndicate | ...]]  NOT  [[FAC: Khelt :: Iron Syndicate | ...]]  and  NOT  [[FAC: FAC: Iron Syndicate | ...]]
@@ -420,6 +423,24 @@ Example: [[FAC: Iron Syndicate | ...]]  NOT  [[FAC: Khelt :: Iron Syndicate | ..
             ins = ins.replace(/\s*[\u2014\u2013-]\s*their state lives in the State Memo\.?\s*/gi, '. ');
             ins = ins.replace(/\s{2,}/g, ' ').replace(/\.\s*\./g, '.').trim();
             s.routerModules.npc.instruction = ins;
+        }
+    }
+
+    // ── MIGRATION: Update system prompts with keywords instructions (v3.2.3+) ──────
+    if (s.routerSystemPromptTemplate && !s.routerSystemPromptTemplate.includes('IMPORTANT FOR KEYWORDS')) {
+        if (s.routerSystemPromptTemplate.includes('<formatting>')) {
+            s.routerSystemPromptTemplate = s.routerSystemPromptTemplate.replace(
+                'Correct examples:',
+                '- **IMPORTANT FOR KEYWORDS (KEYS):** Always include the entity\'s own name/title (without any timestamps like "Day 1", "Day 2", "12:15 AM", etc.) in the list of keywords. The title itself (stripped of timestamps) is the most reliable trigger, so it must be present as a keyword. For example, if the entry title is "[12:15 AM, Day 2] Defense of Ironbelly\'s Workshop", the keys list MUST include "Defense of Ironbelly\'s Workshop".\n\nCorrect examples:'
+            );
+        }
+    }
+    if (s.routerModularPromptTemplate && !s.routerModularPromptTemplate.includes('IMPORTANT FOR KEYWORDS')) {
+        if (s.routerModularPromptTemplate.includes('NPC / FAC / QUEST / EVENT labels:')) {
+            s.routerModularPromptTemplate = s.routerModularPromptTemplate.replace(
+                'NPC / FAC / QUEST / EVENT labels:',
+                '**IMPORTANT FOR KEYWORDS:** Always include the entry\'s own title/name (without any timestamps like "Day 1", "Day 2", "12:15 AM", etc.) in the keywords field. The title itself (stripped of timestamps) is the most reliable trigger, so it must be present as a keyword. For example, for a tag representing a "Defense of Ironbelly\'s Workshop" event, the keywords MUST contain "Defense of Ironbelly\'s Workshop".\n\nNPC / FAC / QUEST / EVENT labels:'
+            );
         }
     }
 
