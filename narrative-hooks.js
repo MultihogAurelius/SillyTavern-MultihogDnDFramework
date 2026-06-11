@@ -325,6 +325,14 @@ function extractTextContent(msg) {
 export function installInterceptor() {
     globalThis.rpgTrackerInterceptor = async function (chat, contextSize, abort, type) {
         const settings = getSettings();
+
+        // When addPromptManagerInterceptor (Path 1) is active, we do NOT inject anything
+        // into the user message — that would break prefix-cache protection.
+        // However, we MUST still run the keyword pre-scan so that newly triggered entries
+        // are added to activeRouterKeys before Path 1 reads it to build the API payload.
+        // Path 1 fires after this interceptor in the ST pipeline, so a scan here = same-turn lore.
+        const skipInjection = !!globalThis._rpgPromptManagerInterceptorActive;
+
         if (settings.debugMode) {
             console.group("[RPG Tracker] Interceptor Triggered");
             console.log("Settings Enabled:", settings.enabled);
@@ -384,102 +392,111 @@ export function installInterceptor() {
 
         const msg = chat[idx];
         const content = extractTextContent(msg);
-        let injections = "";
+        let injections = "";     // core: RNG Queue + State Memo + Quests (always → user msg)
+        let loreInjections = ""; // lore: keyword/agent entries (configurable depth)
+        let wpInjections = "";   // world progression reports (configurable depth)
         
         if (settings.debugMode) {
             console.log(`Found user message at index ${idx}.`);
             console.log(`Extracted Text Content Length: ${content.length}`);
             console.log(`Content includes RNG tag? ${content.includes("[RNG_QUEUE v6.0_PROPER]")}`);
+            if (skipInjection) console.log("[RPG Tracker] Path 1 active: skipping user-message injection; keyword scan will still run.");
         }
 
-        if (settings.rngEnabled && !content.includes("[RNG_QUEUE v6.0_PROPER]")) {
-            const queue = makeRngQueue(RNG_QUEUE_LEN);
-            injections += buildRngBlock(queue);
-            if (settings.debugMode) console.log("RNG Queue generated for injection.");
-        }
+        // RNG, State Memo, and Quests are only injected into the user message in Path 2.
+        // In Path 1 (addPromptManagerInterceptor), these are built and injected by that interceptor
+        // into a dedicated system message at the configured depth, protecting the prefix cache.
+        if (!skipInjection) {
+            if (settings.rngEnabled && !content.includes("[RNG_QUEUE v6.0_PROPER]")) {
+                const queue = makeRngQueue(RNG_QUEUE_LEN);
+                injections += buildRngBlock(queue);
+                if (settings.debugMode) console.log("RNG Queue generated for injection.");
+            }
 
-        if (settings.currentMemo && !content.includes("### STATE MEMO (DO NOT REPEAT)")) {
-            // Strip the JSON [QUESTS] block from the narrative context to save tokens and avoid redundancy
-            const memoText = stripMemoHtml(settings.currentMemo).replace(/\[QUESTS\][\s\S]*?\[\/QUESTS\]/gi, '').trim();
-            injections += `### STATE MEMO (DO NOT REPEAT)\n${memoText}\n\n`;
-        }
+            if (settings.currentMemo && !content.includes("### STATE MEMO (DO NOT REPEAT)")) {
+                // Strip the JSON [QUESTS] block from the narrative context to save tokens and avoid redundancy
+                const memoText = stripMemoHtml(settings.currentMemo).replace(/\[QUESTS\][\s\S]*?\[\/QUESTS\]/gi, '').trim();
+                injections += `### STATE MEMO (DO NOT REPEAT)\n${memoText}\n\n`;
+            }
 
-        // Quest deadline check — fires before state model pass, deterministically
-        if (settings.modules?.quests) {
-            const memoQuests = parseQuestsFromMemo(settings.currentMemo);
-            if (memoQuests.length) {
-                const { checkQuestDeadlines, renderQuestsAsPlainText } = await import('./quests.js');
-                checkQuestDeadlines();
+            // Quest deadline check — fires before state model pass, deterministically
+            if (settings.modules?.quests) {
+                const memoQuests = parseQuestsFromMemo(settings.currentMemo);
+                if (memoQuests.length) {
+                    const { checkQuestDeadlines, renderQuestsAsPlainText } = await import('./quests.js');
+                    checkQuestDeadlines();
 
-                // Inject active quests as plain text into narrative context
-                const timeMatch = (settings.currentMemo || '').match(/\[TIME\]([\s\S]*?)\[\/TIME\]/i);
-                const currentTime = timeMatch ? extractCurrentTimeStr(timeMatch[1]) : '';
-                // Re-parse after checkQuestDeadlines may have mutated the memo
-                const freshQuests = parseQuestsFromMemo(settings.currentMemo);
-                const questText = renderQuestsAsPlainText(freshQuests, currentTime);
-                if (questText) injections += questText;
+                    // Inject active quests as plain text into narrative context
+                    const timeMatch = (settings.currentMemo || '').match(/\[TIME\]([\s\S]*?)\[\/TIME\]/i);
+                    const currentTime = timeMatch ? extractCurrentTimeStr(timeMatch[1]) : '';
+                    // Re-parse after checkQuestDeadlines may have mutated the memo
+                    const freshQuests = parseQuestsFromMemo(settings.currentMemo);
+                    const questText = renderQuestsAsPlainText(freshQuests, currentTime);
+                    if (questText) injections += questText;
+                }
             }
         }
 
 
 
-        // Pre-generation keyword scan + same-turn lore injection.
-        // The PromptManager builds the prompt BEFORE this interceptor runs, so updating
-        // activeRouterKeys is always one turn late on that path.
-        // Fix: entries activated THIS scan are injected directly into the user message —
-        // the same pattern as state memo and quests — guaranteeing same-turn presence.
-        // Skipped when routerNativeKeywordActivation is enabled (native ST system handles keywords).
+        // Pre-generation keyword scan.
+        // This interceptor (manifest generate_interceptor) fires BEFORE addPromptManagerInterceptor
+        // in the ST pipeline. Running the keyword scan here ensures that any entries activated by
+        // the current user message land in activeRouterKeys before Path 1 reads it.
         //
-        // Deduplication: when addPromptManagerInterceptor is active (Path 1 in index.js),
-        // it already injects ALL activeRouterKeys (persistent keyword + agent-owned) into the
-        // system message on every generation. This interceptor (Path 2) therefore only needs
-        // to inject entries that were triggered by THIS user message scan — they were not in
-        // activeRouterKeys yet when Path 1 ran, so Path 1 missed them. Persistent and
-        // agent-owned re-injection is suppressed here to avoid double-injection.
-        // When Path 1 is not available (old ST build using setExtensionPrompt fallback),
-        // the full re-injection is retained so nothing is lost.
+        // In Path 1 (skipInjection=true): scan runs, activeRouterKeys is updated, text building
+        //   is skipped. Path 1 will pick up all activeRouterKeys (including newly triggered ones)
+        //   and inject them as a single system message at the configured depth.
+        //
+        // In Path 2 (skipInjection=false): scan runs and we also build lore text and inject it
+        //   directly into the user message (legacy path for old ST builds).
+        //
+        // Skipped entirely when routerNativeKeywordActivation is enabled (ST handles keywords).
         if (settings.routerEnabled && !settings.routerNativeKeywordActivation) {
             if (content) {
                 const t0 = performance.now().toFixed(1);
                 console.group(`[RPG|INTERCEPT] rpgTrackerInterceptor keyword pre-scan @ ${t0}ms`);
+                console.log('skipInjection (Path 1 active):', skipInjection);
                 console.log('activeRouterKeys BEFORE scan:', JSON.stringify(settings.activeRouterKeys || []));
                 const triggered = await scanAssistantOutputForKeywords(content, { sweepEnabled: false }).catch(() => []);
                 console.log('activeRouterKeys AFTER scan:', JSON.stringify(settings.activeRouterKeys || []));
                 console.log('newly triggered this scan:', triggered);
                 console.log(`scan finished @ ${performance.now().toFixed(1)}ms`);
 
-                if (triggered.length > 0) {
-                    try {
-                        const ctx = SillyTavern.getContext();
-                        let loreBlock = '';
-                        const bookCache = {};
-                        for (const id of triggered) {
-                            const [bookName, uid] = id.split('::');
-                            if (!bookCache[bookName]) bookCache[bookName] = await ctx.loadWorldInfo(bookName);
-                            const entry = bookCache[bookName]?.entries?.[uid];
-                            if (entry?.content) {
-                                loreBlock += `### [${entry.key?.[0] || entry.comment || uid}]\n${entry.content}\n\n`;
-                            }
-                        }
-                        if (loreBlock) {
-                            injections += `\n<font color="#d4a028">## NEWLY ACTIVATED LORE (KEYWORD MATCH)</font>\n${loreBlock.trim()}\n`;
-                            console.log(`[RPG|INTERCEPT] Same-turn lore injected for ${triggered.length} entries.`);
-                        }
-
-                        // Trigger UI refresh so the Agent Panel updates immediately with yellow pills
-                        if (typeof globalThis._rpgRenderRouterUI === 'function') {
-                            globalThis._rpgRenderRouterUI();
-                        }
-                    } catch (e) {
-                        console.warn('[RPG Tracker] Same-turn lore injection failed:', e);
-                    }
+                // Trigger UI refresh so the Agent Panel updates immediately with yellow pills
+                if (triggered.length > 0 && typeof globalThis._rpgRenderRouterUI === 'function') {
+                    globalThis._rpgRenderRouterUI();
                 }
 
-                // Persistent keyword + agent-owned lore re-injection.
-                // Only needed when addPromptManagerInterceptor (Path 1) is NOT active.
-                // When Path 1 IS active it already injects all activeRouterKeys every generation
-                // via the system message, so re-injecting here would duplicate every entry.
-                if (!globalThis._rpgPromptManagerInterceptorActive) {
+                // In Path 1, the scan above already updated activeRouterKeys.
+                // Path 1's addPromptManagerInterceptor will read activeRouterKeys and inject
+                // all entries (including the newly triggered ones) at the configured depth.
+                // No text building or user-message mutation needed here.
+                if (!skipInjection) {
+                    // Path 2: build lore text to inject directly into the user message.
+                    if (triggered.length > 0) {
+                        try {
+                            const ctx = SillyTavern.getContext();
+                            let loreBlock = '';
+                            const bookCache = {};
+                            for (const id of triggered) {
+                                const [bookName, uid] = id.split('::');
+                                if (!bookCache[bookName]) bookCache[bookName] = await ctx.loadWorldInfo(bookName);
+                                const entry = bookCache[bookName]?.entries?.[uid];
+                                if (entry?.content) {
+                                    loreBlock += `### [${entry.key?.[0] || entry.comment || uid}]\n${entry.content}\n\n`;
+                                }
+                            }
+                            if (loreBlock) {
+                                loreInjections += `\n<font color="#d4a028">## NEWLY ACTIVATED LORE (KEYWORD MATCH)</font>\n${loreBlock.trim()}\n`;
+                                console.log(`[RPG|INTERCEPT] Same-turn lore injected for ${triggered.length} entries.`);
+                            }
+                        } catch (e) {
+                            console.warn('[RPG Tracker] Same-turn lore injection failed:', e);
+                        }
+                    }
+
+                    // Persistent keyword-activated entries
                     const triggeredSet = new Set(triggered);
                     const persistent = (settings.keywordActivatedKeys || []).filter(id => !triggeredSet.has(id));
                     if (persistent.length > 0) {
@@ -496,13 +513,14 @@ export function installInterceptor() {
                                 }
                             }
                             if (persistBlock) {
-                                injections += `\n<font color="#d4a028">## ACTIVE LORE (KEYWORD)</font>\n${persistBlock.trim()}\n`;
+                                loreInjections += `\n<font color="#d4a028">## ACTIVE LORE (KEYWORD)</font>\n${persistBlock.trim()}\n`;
                             }
                         } catch (e) {
                             console.warn('[RPG Tracker] Persistent keyword lore re-injection failed:', e);
                         }
                     }
 
+                    // Agent-owned entries (not keyword-triggered)
                     const alreadyInjected = new Set([...triggered, ...(settings.keywordActivatedKeys || [])]);
                     const agentOwned = (settings.activeRouterKeys || [])
                         .filter(id => !alreadyInjected.has(id))
@@ -525,45 +543,151 @@ export function installInterceptor() {
                                 }
                             }
                             if (agentBlock) {
-                                injections += `\n## ACTIVE LORE (AGENT)\n${agentBlock.trim()}\n`;
+                                loreInjections += `\n## ACTIVE LORE (AGENT)\n${agentBlock.trim()}\n`;
                             }
                         } catch (e) {
                             console.warn('[RPG Tracker] Agent-owned lore injection failed:', e);
                         }
                     }
-                }
 
-                console.groupEnd();
+                // World Progression reports injection
+                if (settings.worldProgressionEnabled && (settings.activeWorldKeys || []).length > 0) {
+                    try {
+                        const ctx = SillyTavern.getContext();
+                        let worldBlock = '';
+                        const bookCache = {};
+                        const sortedKeys = [...settings.activeWorldKeys].sort((a, b) => {
+                            const [, uidA] = a.split('::');
+                            const [, uidB] = b.split('::');
+                            return Number(uidA) - Number(uidB);
+                        });
+                        for (const id of sortedKeys) {
+                            const [bookName, uid] = id.split('::');
+                            if (!bookCache[bookName]) bookCache[bookName] = await ctx.loadWorldInfo(bookName);
+                            const entry = bookCache[bookName]?.entries?.[uid];
+                            if (entry?.content) {
+                                worldBlock += `### [${entry.key?.[0] || entry.comment || 'World Report'}]\n${entry.content}\n\n`;
+                            }
+                        }
+                        if (worldBlock) {
+                            wpInjections = `\n## WORLD PROGRESSION REPORTS\n${worldBlock.trim()}\n`;
+                        }
+                    } catch (e) {
+                        console.warn('[RPG Tracker] World progression injection failed:', e);
+                    }
+                }
+            }
+
+            console.groupEnd();
+        }
+    }
+
+        if (settings.debugMode) console.groupEnd();
+
+        if (skipInjection || (!injections && !loreInjections && !wpInjections)) return;
+
+        // ── Injection dispatch ───────────────────────────────────────────────────
+        //
+        // Two independent streams:
+        //
+        //  1. CORE (injections): RNG Queue + State Memo + Quests
+        //     Always prepended directly into the last user message.
+        //     These are turn-critical operative data the model must act on NOW.
+        //     Maximum salience — the model's attention is highest on its most
+        //     recent input tokens.
+        //
+        //  2. LORE (loreInjections): Keyword Lore + Agent Lore
+        //     Depth-configurable via routerDefaultPosition / routerDefaultDepth.
+        //     When position === 4 ("at Depth"): spliced as a dedicated system
+        //     message at the configured depth before the user message.
+        //     Otherwise: folded into the user message with the core block
+        //     (original legacy behaviour, equivalent salience).
+        //
+        // Cache note: both streams land in the dynamic tail of the context
+        // (message[N-1] or adjacent). The prefix cache break point is identical
+        // regardless of which stream carries which content.
+
+        const useDepthInjection = settings.loreInjectionPosition === 4;
+        const useWpDepthInjection = settings.worldProgressionInjectionPosition === 4;
+
+        // When not using depth injection, fold lore/world progression into the core block so that
+        // the user message receives one cohesive injection (original behaviour).
+        let coreBlock = injections;
+        if (!useDepthInjection && loreInjections) {
+            coreBlock += loreInjections;
+        }
+        if (!useWpDepthInjection && wpInjections) {
+            coreBlock += wpInjections;
+        }
+
+        // ── 1. Core injection → always into user message ─────────────────────────
+        if (coreBlock) {
+            const originalContent = extractTextContent(msg).trim();
+            const displayContent = originalContent ? originalContent : "[Continue the narrative]";
+            const userHeader = `\n### CURRENT USER INPUT\n${displayContent}\n`;
+
+            if (typeof msg.content === 'string') {
+                msg.content = coreBlock + userHeader;
+                if (settings.debugMode) console.log("[Fatbody Framework] Core injection prepended to string msg.content");
+            } else if (Array.isArray(msg.content)) {
+                const nonTextParts = msg.content.filter(p => p && p.type !== 'text');
+                msg.content = [
+                    { type: 'text', text: coreBlock + userHeader },
+                    ...nonTextParts
+                ];
+                if (settings.debugMode) console.log("[Fatbody Framework] Core injection prepended to array msg.content");
+            } else if (typeof msg.mes === 'string') {
+                msg.mes = coreBlock + userHeader;
+                if (settings.debugMode) console.log("[Fatbody Framework] Core injection prepended to msg.mes");
+            } else {
+                if (settings.debugMode) console.log("[Fatbody Framework] Core injection failed — unknown msg structure:", Object.keys(msg));
+            }
+
+            if (settings.debugMode) {
+                const label = (!useDepthInjection && loreInjections) ? 'Core+Lore (User Msg)' : 'Core (User Msg)';
+                logTransaction(label, [{ role: 'user', content: coreBlock }]);
             }
         }
 
-        if (settings.debugMode) console.groupEnd();
-        if (!injections) return;
-
-        const originalContent = extractTextContent(msg).trim();
-        const displayContent = originalContent ? originalContent : "[Continue the narrative]";
-        const userHeader = `\n### CURRENT USER INPUT\n${displayContent}\n`;
-
-        if (typeof msg.content === 'string') {
-            msg.content = injections + userHeader;
-            if (settings.debugMode) console.log("Injected into string msg.content");
-        } else if (Array.isArray(msg.content)) {
-            const nonTextParts = msg.content.filter(p => p && p.type !== 'text');
-            msg.content = [
-                { type: 'text', text: injections + userHeader },
-                ...nonTextParts
-            ];
-            if (settings.debugMode) console.log("Injected into array msg.content");
-        } else if (typeof msg.mes === 'string') {
-            msg.mes = injections + userHeader;
-            if (settings.debugMode) console.log("Injected into string msg.mes");
-        } else {
-            if (settings.debugMode) console.log("Failed to inject! Unknown msg structure:", Object.keys(msg));
+        // ── 2. Lore injection → configurable depth ───────────────────────────────
+        // The `chat` array here is SillyTavern's internal format (.mes / .is_user /
+        // .name / .extra). Setting extra.type = 'narrator' maps to role:'system'
+        // when setOpenAIMessages() converts it to API format.
+        if (useDepthInjection && loreInjections) {
+            const depth = settings.loreInjectionDepth ?? 4;
+            const insertIdx = Math.max(0, chat.length - depth);
+            const roleVal = settings.loreInjectionRole ?? 0;
+            const loreMessage = {
+                name: 'RPG Framework',
+                mes: loreInjections,
+                is_user: roleVal === 1,
+                extra: roleVal === 0 ? { type: 'narrator' } : {},
+            };
+            chat.splice(insertIdx, 0, loreMessage);
+            if (settings.debugMode) {
+                console.log(`[Fatbody Framework] Lore depth injection: spliced at index ${insertIdx} (depth ${depth}), chat now ${chat.length} messages.`);
+                const roleName = roleVal === 1 ? 'user' : roleVal === 2 ? 'assistant' : 'system';
+                logTransaction('Lore (Depth Splice)', [{ role: roleName, content: loreInjections }]);
+            }
         }
 
-        if (settings.debugMode) {
-            console.log("[Fatbody Framework] Injections pushed to request.");
-            logTransaction('Main Chat', [{ role: 'user', content: injections + userHeader }]);
+        // ── 3. World Progression injection → configurable depth ──────────────────
+        if (useWpDepthInjection && wpInjections) {
+            const wpDepth = settings.worldProgressionInjectionDepth ?? 4;
+            const insertIdx = Math.max(0, chat.length - wpDepth);
+            const wpRoleVal = settings.worldProgressionInjectionRole ?? 0;
+            const wpMessage = {
+                name: 'World Progression',
+                mes: wpInjections,
+                is_user: wpRoleVal === 1,
+                extra: wpRoleVal === 0 ? { type: 'narrator' } : {},
+            };
+            chat.splice(insertIdx, 0, wpMessage);
+            if (settings.debugMode) {
+                console.log(`[Fatbody Framework] World Progression depth injection: spliced at index ${insertIdx} (depth ${wpDepth}), chat now ${chat.length} messages.`);
+                const roleName = wpRoleVal === 1 ? 'user' : wpRoleVal === 2 ? 'assistant' : 'system';
+                logTransaction('World Progression (Depth Splice)', [{ role: roleName, content: wpInjections }]);
+            }
         }
     };
 }

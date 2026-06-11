@@ -172,6 +172,13 @@ You may be asked to use Markers: ((PLS)), ((B)), ((XB)), ((BDG)), ((HGT)). These
         routerMaxActivations: 8,
         routerMaxKeywordOverflow: 0,   // 0 = unlimited; N = max extra keyword-activated entries above routerMaxActivations
         routerCampaignPrefix: "",
+        routerDefaultPosition: 4,      // Default to 4 (at Depth) for prompt caching protection
+        routerDefaultDepth: 4,
+        routerDefaultOrder: 100,
+        routerDefaultRole: 0,          // 0 = System, 1 = User, 2 = AI
+        loreInjectionPosition: 4,
+        loreInjectionDepth: 4,
+        loreInjectionRole: 0,
         routerCampaignPrefixOverride: "",
         /** ST chat id for which `routerCampaignPrefixOverride` applies; empty = legacy (override only when chatId === active ctx chat id). */
         routerCampaignPrefixOverrideAnchorChatId: "",
@@ -196,6 +203,9 @@ You may be asked to use Markers: ((PLS)), ((B)), ((XB)), ((BDG)), ((HGT)). These
         worldProgressionKeepActive: 1,            // rolling window of active reports
         worldProgressionLookback: 20,             // number of recent chat messages to include (0 = disabled)
         worldProgressionHistoryLookback: 0,       // number of historical reports to incorporate (0 = include all)
+        worldProgressionInjectionPosition: 4,     // Default to 4 (at Depth)
+        worldProgressionInjectionDepth: 4,
+        worldProgressionInjectionRole: 0,         // System
         worldProgressionRandomizeNPCs: false,      // toggle to randomize NPC pool
         worldProgressionRandomNPCCount: 5,        // number of NPCs to incorporate
         worldProgressionRandomizeLocations: false,  // toggle to randomize locations
@@ -572,8 +582,18 @@ export function saveChatState(chatId) {
         routerCampaignPrefix: s.routerCampaignPrefix || '',
         routerLookback: s.routerLookback || 4,
         routerDirectPrompt: s.routerDirectPrompt || '',
+        routerDefaultPosition: s.routerDefaultPosition ?? 4,
+        routerDefaultDepth: s.routerDefaultDepth ?? 4,
+        routerDefaultOrder: s.routerDefaultOrder ?? 100,
+        routerDefaultRole: s.routerDefaultRole ?? 0,
+        loreInjectionPosition: s.loreInjectionPosition ?? 4,
+        loreInjectionDepth: s.loreInjectionDepth ?? 4,
+        loreInjectionRole: s.loreInjectionRole ?? 0,
         worldProgressionLookback: s.worldProgressionLookback ?? 20,
         worldProgressionHistoryLookback: s.worldProgressionHistoryLookback ?? 0,
+        worldProgressionInjectionPosition: s.worldProgressionInjectionPosition ?? 4,
+        worldProgressionInjectionDepth: s.worldProgressionInjectionDepth ?? 4,
+        worldProgressionInjectionRole: s.worldProgressionInjectionRole ?? 0,
         worldProgressionRandomizeNPCs: s.worldProgressionRandomizeNPCs ?? false,
         worldProgressionRandomNPCCount: s.worldProgressionRandomNPCCount ?? 5,
         worldProgressionRandomizeLocations: s.worldProgressionRandomizeLocations ?? false,
@@ -621,8 +641,18 @@ export function saveProfile(name) {
         routerCampaignPrefix: s.routerCampaignPrefix || '',
         routerLookback: s.routerLookback || 4,
         routerDirectPrompt: s.routerDirectPrompt || '',
+        routerDefaultPosition: s.routerDefaultPosition ?? 4,
+        routerDefaultDepth: s.routerDefaultDepth ?? 4,
+        routerDefaultOrder: s.routerDefaultOrder ?? 100,
+        routerDefaultRole: s.routerDefaultRole ?? 0,
+        loreInjectionPosition: s.loreInjectionPosition ?? 4,
+        loreInjectionDepth: s.loreInjectionDepth ?? 4,
+        loreInjectionRole: s.loreInjectionRole ?? 0,
         worldProgressionLookback: s.worldProgressionLookback ?? 20,
         worldProgressionHistoryLookback: s.worldProgressionHistoryLookback ?? 0,
+        worldProgressionInjectionPosition: s.worldProgressionInjectionPosition ?? 4,
+        worldProgressionInjectionDepth: s.worldProgressionInjectionDepth ?? 4,
+        worldProgressionInjectionRole: s.worldProgressionInjectionRole ?? 0,
         worldProgressionRandomizeNPCs: s.worldProgressionRandomizeNPCs ?? false,
         worldProgressionRandomNPCCount: s.worldProgressionRandomNPCCount ?? 5,
         worldProgressionRandomizeLocations: s.worldProgressionRandomizeLocations ?? false,

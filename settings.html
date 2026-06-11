@@ -323,6 +323,73 @@
                             </div>
                         </div>
 
+                        <!-- Active Lore Injection Settings -->
+                        <div class="inline-drawer">
+                            <div class="inline-drawer-toggle inline-drawer-header">
+                                <b>Active Lore Injection (Extension)</b>
+                                <div class="inline-drawer-icon fa-solid fa-circle-down down"></div>
+                            </div>
+                            <div class="inline-drawer-content">
+                                <div class="flex-container flexFlowColumn gap-1">
+                                    <div style="font-size: 10px; opacity: 0.7; margin-bottom: 5px;">
+                                        Controls prompt injection position and depth when "Native Keyword Activation" is disabled (the extension's custom active lore injection path).
+                                    </div>
+                                    <label>Injection Position</label>
+                                    <select id="rpg_tracker_lore_injection_position" class="text_pole">
+                                        <option value="0" data-role="">Folded into User Message</option>
+                                        <option value="4" data-role="0">@D ⚙️: at Depth (System)</option>
+                                        <option value="4" data-role="1">@D 👤: at Depth (User)</option>
+                                        <option value="4" data-role="2">@D 🤖: at Depth (Assistant)</option>
+                                    </select>
+
+                                    <div id="rpg_tracker_lore_injection_depth_container">
+                                        <label>Injection Depth</label>
+                                        <input id="rpg_tracker_lore_injection_depth" type="text" inputmode="numeric" pattern="[0-9]*" class="text_pole" min="0" max="9999" />
+                                    </div>
+
+                                    <div style="font-size: 9px; opacity: 0.5; line-height: 1.35; margin-top: 5px;">
+                                        💡 <b>Caching tip:</b> Using '@D' (At Depth) at a value of 4 or more allows the chat history prior to that depth to remain completely static and cached. Lower depth values can make active lore more salient to the model but will reduce cache hit rates.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Agent Entry Creation defaults -->
+                        <div class="inline-drawer">
+                            <div class="inline-drawer-toggle inline-drawer-header">
+                                <b>New Entry Defaults (Native Keyword Activation)</b>
+                                <div class="inline-drawer-icon fa-solid fa-circle-down down"></div>
+                            </div>
+                            <div class="inline-drawer-content">
+                                <div class="flex-container flexFlowColumn gap-1">
+                                    <div style="font-size: 10px; opacity: 0.7; margin-bottom: 5px;">
+                                        Metadata written into newly created lorebook entries. When "Native Keyword Activation" is enabled in the Agent Panel, SillyTavern uses these defaults to determine injection position, depth, and order.
+                                    </div>
+                                    <label>Default Position</label>
+                                    <select id="rpg_tracker_router_default_position" class="text_pole">
+                                        <option value="0" data-role="">↑Char: Before Character Definitions</option>
+                                        <option value="1" data-role="">↓Char: After Character Definitions</option>
+                                        <option value="5" data-role="">↑EM: Before Example Messages</option>
+                                        <option value="6" data-role="">↓EM: After Example Messages</option>
+                                        <option value="2" data-role="">↑AN: Before Author's Note</option>
+                                        <option value="3" data-role="">↓AN: After Author's Note</option>
+                                        <option value="4" data-role="0">@D ⚙️: at Depth (System)</option>
+                                        <option value="4" data-role="1">@D 👤: at Depth (User)</option>
+                                        <option value="4" data-role="2">@D 🤖: at Depth (Assistant)</option>
+                                        <option value="7" data-role="">➡️ Outlet</option>
+                                    </select>
+
+                                    <div id="rpg_tracker_router_default_depth_container">
+                                        <label>Default Depth</label>
+                                        <input id="rpg_tracker_router_default_depth" type="text" inputmode="numeric" pattern="[0-9]*" class="text_pole" min="0" max="9999" />
+                                    </div>
+
+                                    <label>Default Order</label>
+                                    <input id="rpg_tracker_router_default_order" type="text" inputmode="numeric" pattern="[0-9]*" class="text_pole" min="0" max="9999" />
+                                </div>
+                            </div>
+                        </div>
+
                         <hr>
                         <b>Agent Instruction</b>
                         <textarea id="rpg_tracker_router_prompt" class="text_pole autoSetHeight" rows="5"></textarea>
@@ -392,6 +459,19 @@
                             <i class="fa-solid fa-circle-question interactable" style="font-size: 0.85em; opacity: 0.7; margin-left: 4px;" title="How many of the most recent World Progression reports remain active (injected into context). Older reports are automatically deactivated."></i>
                         </label>
                         <input id="rpg_world_progression_keep_active" type="text" inputmode="numeric" pattern="[0-9]*" class="text_pole" value="1" style="max-width: 100px;" title="Number of recent World Progression reports kept active in context" />
+
+                        <label style="font-size: 0.85em; font-weight: bold; opacity: 0.8; margin-top: 4px;">Injection Position</label>
+                        <select id="rpg_world_progression_injection_position" class="text_pole">
+                            <option value="0" data-role="">Folded into User Message</option>
+                            <option value="4" data-role="0">@D ⚙️: at Depth (System)</option>
+                            <option value="4" data-role="1">@D 👤: at Depth (User)</option>
+                            <option value="4" data-role="2">@D 🤖: at Depth (Assistant)</option>
+                        </select>
+
+                        <div id="rpg_world_progression_injection_depth_container">
+                            <label style="font-size: 0.85em; font-weight: bold; opacity: 0.8; margin-top: 4px;">Injection Depth</label>
+                            <input id="rpg_world_progression_injection_depth" type="text" inputmode="numeric" pattern="[0-9]*" class="text_pole" min="0" max="9999" />
+                        </div>
 
                         <label style="font-size: 0.85em; font-weight: bold; opacity: 0.8; margin-top: 4px;">Historical Reports Lookback
                             <i class="fa-solid fa-circle-question interactable" style="font-size: 0.85em; opacity: 0.7; margin-left: 4px;" title="How many of the previous World Progression reports are shown/fed to the LLM when generating a new report. 0 = include all."></i>

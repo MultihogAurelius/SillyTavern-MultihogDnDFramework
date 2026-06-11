@@ -1,10 +1,10 @@
 import { EXAMPLES, COLOR_EXAMPLES, DEFAULT_STOCK_PROMPTS, RT_PROMPTS, BLOCK_ICONS, BLOCK_ORDER, PAGE_SIZE, NO_PAGINATE, QUESTS_NARRATOR_MODERN, QUESTS_NARRATOR_LEGACY } from './constants.js';
 import { MODULE_NAME, DEFAULT_MODULES, getSettings, getBarBackground, migrateCustomFields, saveChatState, saveProfile, deleteProfile, getEffectiveRouterCampaignPrefix, sanitizeCampaignPrefixString } from './state-manager.js';
 import { sendStateRequest, fetchOllamaModels, fetchOpenAIModels, testOpenAIConnection, getConnectionProfiles, getCurrentCompletionPreset, setCompletionPreset } from './llm-client.js';
-import { getDiceToolName, getDiceCommandName, getDiceCommandAliases, doDiceRoll, registerDiceFunctionTool, registerDiceSlashCommand, installInterceptor, getNarrativeBlocks, onGenerationEnded, resetRouterTick } from './narrative-hooks.js';
+import { getDiceToolName, getDiceCommandName, getDiceCommandAliases, doDiceRoll, registerDiceFunctionTool, registerDiceSlashCommand, installInterceptor, getNarrativeBlocks, onGenerationEnded, resetRouterTick, makeRngQueue, buildRngBlock, RNG_QUEUE_LEN } from './narrative-hooks.js';
 import { deduplicateMemo, mergeMemo, computeDelta, escapeHtml, escapeRegex, highlightParens, cleanToolCallMessage, getLastUserAction, buildLorebookContext, buildModulesInstructionText, buildModuleFormatInstruction, parseQuestsFromMemo, syncQuestsFromMemo, syncQuestsToMemo, writeQuestsToMemo, getQuestMood, extractCurrentTimeStr } from './memo-processor.js';
 import { renderSubFieldByRule, tryRenderMarker, renderCustomBlockLine, stripMemoHtml, escapeHtmlWithColor, parseMemoBlocks, getPageSize, loadCollapsed, saveCollapsed, loadDetached, saveDetached, blockToItems, renderMemoAsCards, renderQuestLog, renderLorebookTerminal } from './renderer.js';
-import { registerLogQuestTool, checkQuestDeadlines } from './quests.js';
+import { registerLogQuestTool, checkQuestDeadlines, renderQuestsAsPlainText } from './quests.js';
 import { initializeDebugViewer, toggleDebugViewer } from './debug-viewer.js';
 import { runRouterPass, rollbackRouterPass, reapplyRouterPass, getLorebookManifest, deleteLorebookEntry, updateLorebookEntry, disableManagedEntries, isRouterRunning, stopRouterPass } from './router.js';
 import { getRequestHeaders } from '../../../../script.js';
@@ -801,6 +801,9 @@ function loadChatState(chatId) {
     s.routerDirectPrompt = saved.routerDirectPrompt || '';
     s.worldProgressionLookback = saved.worldProgressionLookback ?? 20;
     s.worldProgressionHistoryLookback = saved.worldProgressionHistoryLookback ?? 0;
+    s.worldProgressionInjectionPosition = saved.worldProgressionInjectionPosition ?? 4;
+    s.worldProgressionInjectionDepth = saved.worldProgressionInjectionDepth ?? 4;
+    s.worldProgressionInjectionRole = saved.worldProgressionInjectionRole ?? 0;
     s.worldProgressionRandomizeNPCs = saved.worldProgressionRandomizeNPCs ?? false;
     s.worldProgressionRandomNPCCount = saved.worldProgressionRandomNPCCount ?? 5;
     s.worldProgressionRandomizeLocations = saved.worldProgressionRandomizeLocations ?? false;
@@ -829,6 +832,20 @@ function loadChatState(chatId) {
     $('#rpg_world_progression_skeleton_locations').val(s.worldProgressionSkeletonLocations ?? 4);
     $('#rpg_world_progression_skeleton_npcs').val(s.worldProgressionSkeletonNPCs ?? 0);
     $('#rpg_world_progression_skeleton_conflicts').val(s.worldProgressionSkeletonConflicts ?? 3);
+
+    const wpPosSelect = $('#rpg_world_progression_injection_position');
+    const wpPosition = s.worldProgressionInjectionPosition ?? 4;
+    const wpRole = s.worldProgressionInjectionRole ?? 0;
+    const wpRoleAttr = wpPosition === 4 ? String(wpRole) : '';
+    wpPosSelect.find(`option[value="${wpPosition}"][data-role="${wpRoleAttr}"]`).prop('selected', true);
+
+    $('#rpg_world_progression_injection_depth').val(s.worldProgressionInjectionDepth ?? 4);
+
+    if (wpPosition === 4) {
+        $('#rpg_world_progression_injection_depth_container').show();
+    } else {
+        $('#rpg_world_progression_injection_depth_container').hide();
+    }
 
     // Toggle container visibilities
     if (s.worldProgressionRandomizeNPCs) $('#rpg_world_progression_random_npc_count_container').show();
@@ -940,8 +957,10 @@ async function refreshExtensionPrompt() {
                 routerBlock += `## WORLD PROGRESSION REPORTS\n${worldBlock.trim()}\n\n`;
             }
             routerBlock = routerBlock.trim();
-            // Set as an extension prompt at the end of the system block (Position 0, but ST handles placement)
-            setExtensionPrompt('rpg_tracker_lore', routerBlock, 0, 0);
+            // Set as an extension prompt using default active lore injection position and depth
+            const position = s.loreInjectionPosition ?? 0;
+            const depth = s.loreInjectionDepth ?? 0;
+            setExtensionPrompt('rpg_tracker_lore', routerBlock, position, depth);
         } else {
             setExtensionPrompt('rpg_tracker_lore', '', 0, 0);
         }
@@ -954,91 +973,19 @@ function installRouterInterceptor() {
     const ctx = SillyTavern.getContext();
     const { addPromptManagerInterceptor, addChatInterceptor, addInterceptor } = ctx;
 
-    // Try modern interceptors first
-    if (typeof addPromptManagerInterceptor === 'function') {
-        addPromptManagerInterceptor(async (prompt) => {
-            const s = getSettings();
-            const t = performance.now().toFixed(1);
-            console.group(`[RPG|LORE-INJECT] promptManagerInterceptor fired @ ${t}ms`);
-            console.log('activeRouterKeys at inject time:', JSON.stringify(s.activeRouterKeys || []));
-            console.log('activeWorldKeys at inject time:', JSON.stringify(s.activeWorldKeys || []));
-            if (!s.routerEnabled || (!s.activeRouterKeys?.length && !s.activeWorldKeys?.length)) {
-                console.log('→ Skipped (disabled or empty)');
-                console.groupEnd();
-                return;
-            }
-            // Reuse the same logic but for the prompt object
-            let injectedContext = "";
-            const books = {};
-            for (const k of s.activeRouterKeys) {
-                const [bookName] = k.split('::');
-                const isWorld = bookName.toLowerCase().endsWith('_world') || bookName.toLowerCase() === 'world';
-                if (isWorld) continue;
-                if (!books[bookName]) books[bookName] = await ctx.loadWorldInfo(bookName);
-            }
-            for (const k of s.activeRouterKeys) {
-                const [bookName, uid] = k.split('::');
-                const isWorld = bookName.toLowerCase().endsWith('_world') || bookName.toLowerCase() === 'world';
-                if (isWorld) continue;
-                const entry = books[bookName]?.entries?.[uid];
-                if (entry && entry.content) injectedContext += `### [${entry.key?.[0] || entry.comment || uid}]\n${entry.content}\n\n`;
-            }
-
-            let worldBlock = "";
-            if (s.worldProgressionEnabled && s.activeWorldKeys?.length) {
-                const worldBooks = {};
-                for (const k of s.activeWorldKeys) {
-                    const [bookName] = k.split('::');
-                    if (!worldBooks[bookName]) worldBooks[bookName] = await ctx.loadWorldInfo(bookName);
-                }
-                const sortedKeys = [...s.activeWorldKeys].sort((a, b) => {
-                    const [, uidA] = a.split('::');
-                    const [, uidB] = b.split('::');
-                    return Number(uidA) - Number(uidB);
-                });
-                for (const k of sortedKeys) {
-                    const [bookName, uid] = k.split('::');
-                    const entry = worldBooks[bookName]?.entries?.[uid];
-                    if (entry && entry.content) {
-                        worldBlock += `### [${entry.key?.[0] || entry.comment || 'World Report'}]\n${entry.content}\n\n`;
-                    }
-                }
-            }
-
-            if (injectedContext || worldBlock) {
-                let routerBlock = "\n";
-                if (injectedContext) {
-                    routerBlock += `## ROUTER ACTIVE LORE\n${injectedContext.trim()}\n\n`;
-                }
-                if (worldBlock) {
-                    routerBlock += `## WORLD PROGRESSION REPORTS\n${worldBlock.trim()}\n\n`;
-                }
-                routerBlock = routerBlock.trim() + "\n";
-                const sysPart = prompt.find(p => p.role === 'system');
-                if (sysPart) sysPart.content += routerBlock;
-                else prompt.unshift({ role: 'system', content: routerBlock });
-                console.log(`→ Injected active lore and world reports into prompt`);
-            } else {
-                console.log('→ No content to inject (entries empty?)');
-            }
-            console.groupEnd();
-        });
-        globalThis._rpgPromptManagerInterceptorActive = true;
-        console.debug('[RPG Tracker] Lore injection: addPromptManagerInterceptor path active.');
-    } else {
-        // Fallback to the persistent extension prompt system
-        console.debug('[RPG Tracker] Active lore injection uses setExtensionPrompt (no addPromptManagerInterceptor in this SillyTavern build).');
-        refreshExtensionPrompt();
-
-        const { eventSource, event_types } = ctx;
-        const refresh = () => void refreshExtensionPrompt();
-        if (event_types?.CHAT_CHANGED != null) {
-            eventSource.on(event_types.CHAT_CHANGED, refresh);
-        }
-        if (event_types?.CHARACTER_PAGE_LOADED != null) {
-            eventSource.on(event_types.CHARACTER_PAGE_LOADED, refresh);
-        }
+    // DISABLED: The addPromptManagerInterceptor path was a SECOND injection that
+    // duplicated the work already handled by rpgTrackerInterceptor in narrative-hooks.js
+    // (the manifest generate_interceptor). Having both active caused:
+    //   1. Double-injection of RNG/MEMO/LORE into the prompt
+    //   2. Cache breakage — this path used routerDefaultDepth (sliding), while
+    //      narrative-hooks.js uses a fixed depth=1 for prefix-cache protection
+    // All injection is now exclusively handled by narrative-hooks.js.
+    // Clear any stale extension prompt from previous runs.
+    const { setExtensionPrompt } = ctx;
+    if (typeof setExtensionPrompt === 'function') {
+        setExtensionPrompt('rpg_tracker_lore', '', 0, 0);
     }
+    console.debug('[RPG Tracker] Lore injection handled exclusively by rpgTrackerInterceptor (narrative-hooks.js). setExtensionPrompt cleared.');
 }
 
 /**
@@ -8569,6 +8516,82 @@ Return ONLY the XML section. No explanation, no other text.`;
             saveSettings();
         });
 
+        // New Entry Settings Bindings
+        const defPosSelect = $('#rpg_tracker_router_default_position');
+        const defaultPosition = settings.routerDefaultPosition ?? 4;
+        const defaultRole = settings.routerDefaultRole ?? 0;
+        const roleAttr = defaultPosition === 4 ? String(defaultRole) : '';
+        defPosSelect.find(`option[value="${defaultPosition}"][data-role="${roleAttr}"]`).prop('selected', true);
+
+        $('#rpg_tracker_router_default_depth').val(settings.routerDefaultDepth ?? 4);
+        $('#rpg_tracker_router_default_order').val(settings.routerDefaultOrder ?? 100);
+
+        function updateDefaultPositionFieldsVisibility() {
+            const posVal = parseInt(String(defPosSelect.val() || '4'));
+            const depthInpContainer = $('#rpg_tracker_router_default_depth_container');
+            if (posVal === 4) {
+                depthInpContainer.slideDown(200);
+            } else {
+                depthInpContainer.slideUp(200);
+            }
+        }
+        updateDefaultPositionFieldsVisibility();
+
+        defPosSelect.on('change', function () {
+            const selectedOpt = $(this).find(':selected');
+            const pos = parseInt(String(selectedOpt.val() || '4'));
+            const roleVal = selectedOpt.data('role');
+            settings.routerDefaultPosition = isNaN(pos) ? 4 : pos;
+            settings.routerDefaultRole = roleVal !== undefined && roleVal !== '' ? parseInt(String(roleVal)) : 0;
+            saveSettings();
+            updateDefaultPositionFieldsVisibility();
+        });
+
+        $('#rpg_tracker_router_default_depth').on('input', function () {
+            settings.routerDefaultDepth = parseInt(String($(this).val() || '')) || 0;
+            saveSettings();
+        });
+
+        $('#rpg_tracker_router_default_order').on('input', function () {
+            settings.routerDefaultOrder = parseInt(String($(this).val() || '')) || 0;
+            saveSettings();
+        });
+
+        // Active Lore Injection Settings Bindings
+        const lorePosSelect = $('#rpg_tracker_lore_injection_position');
+        const lorePosition = settings.loreInjectionPosition ?? 4;
+        const loreRole = settings.loreInjectionRole ?? 0;
+        const loreRoleAttr = lorePosition === 4 ? String(loreRole) : '';
+        lorePosSelect.find(`option[value="${lorePosition}"][data-role="${loreRoleAttr}"]`).prop('selected', true);
+
+        $('#rpg_tracker_lore_injection_depth').val(settings.loreInjectionDepth ?? 4);
+
+        function updateLorePositionFieldsVisibility() {
+            const posVal = parseInt(String(lorePosSelect.val() || '4'));
+            const depthInpContainer = $('#rpg_tracker_lore_injection_depth_container');
+            if (posVal === 4) {
+                depthInpContainer.slideDown(200);
+            } else {
+                depthInpContainer.slideUp(200);
+            }
+        }
+        updateLorePositionFieldsVisibility();
+
+        lorePosSelect.on('change', function () {
+            const selectedOpt = $(this).find(':selected');
+            const pos = parseInt(String(selectedOpt.val() || '4'));
+            const roleVal = selectedOpt.data('role');
+            settings.loreInjectionPosition = isNaN(pos) ? 4 : pos;
+            settings.loreInjectionRole = roleVal !== undefined && roleVal !== '' ? parseInt(String(roleVal)) : 0;
+            saveSettings();
+            updateLorePositionFieldsVisibility();
+        });
+
+        $('#rpg_tracker_lore_injection_depth').on('input', function () {
+            settings.loreInjectionDepth = parseInt(String($(this).val() || '')) || 0;
+            saveSettings();
+        });
+
         $('#rpg_tracker_router_prompt').val(settings.routerSystemPromptTemplate).on('input', function () {
             settings.routerSystemPromptTemplate = String($(this).val() || '');
             saveSettings();
@@ -8792,6 +8815,42 @@ Return ONLY the XML section. No explanation, no other text.`;
             saveSettings();
             toastr['success']('World Progression prompt reset to default.', 'World Progression');
         });
+        const $wpInjectionPosition = $('#rpg_world_progression_injection_position');
+        const $wpInjectionDepth = $('#rpg_world_progression_injection_depth');
+        const $wpInjectionDepthContainer = $('#rpg_world_progression_injection_depth_container');
+
+        const wpPositionVal = settings.worldProgressionInjectionPosition ?? 4;
+        const wpRoleVal = settings.worldProgressionInjectionRole ?? 0;
+        const wpRoleAttrVal = wpPositionVal === 4 ? String(wpRoleVal) : '';
+        $wpInjectionPosition.find(`option[value="${wpPositionVal}"][data-role="${wpRoleAttrVal}"]`).prop('selected', true);
+
+        $wpInjectionDepth.val(settings.worldProgressionInjectionDepth ?? 4);
+
+        function updateWpPositionFieldsVisibility() {
+            const posVal = parseInt(String($wpInjectionPosition.val() || '4'));
+            if (posVal === 4) {
+                $wpInjectionDepthContainer.slideDown(200);
+            } else {
+                $wpInjectionDepthContainer.slideUp(200);
+            }
+        }
+        updateWpPositionFieldsVisibility();
+
+        $wpInjectionPosition.on('change', function () {
+            const selectedOpt = $(this).find(':selected');
+            const pos = parseInt(String(selectedOpt.val() || '4'));
+            const roleVal = selectedOpt.data('role');
+            settings.worldProgressionInjectionPosition = isNaN(pos) ? 4 : pos;
+            settings.worldProgressionInjectionRole = roleVal !== undefined && roleVal !== '' ? parseInt(String(roleVal)) : 0;
+            saveSettings();
+            updateWpPositionFieldsVisibility();
+        });
+
+        $wpInjectionDepth.on('input', function () {
+            settings.worldProgressionInjectionDepth = parseInt(String($(this).val() || '')) || 0;
+            saveSettings();
+        });
+
         updateWorldProgressionLastFiredDisplay();
 
         $wpGenerateNow.on('click', async function () {

@@ -1391,9 +1391,13 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
                     content: rec.content || '',
                     constant: false,
                     selective: false, selectiveLogic: 0, addMemo: true,
-                    order: 100, position: 0, disable: isWorldBook ? true : !settings.routerNativeKeywordActivation,
+                    order: settings.routerDefaultOrder ?? 100,
+                    position: settings.routerDefaultPosition ?? 0,
+                    disable: isWorldBook ? true : !settings.routerNativeKeywordActivation,
                     probability: 100, useProbability: false,
-                    depth: 4, group: '', groupOverride: false, groupWeight: 100,
+                    depth: settings.routerDefaultDepth ?? 4,
+                    role: (settings.routerDefaultPosition === 4) ? (settings.routerDefaultRole ?? 0) : null,
+                    group: '', groupOverride: false, groupWeight: 100,
                 };
                 if (isWorldBook) {
                     if (!newWorldActive.includes(fullId)) newWorldActive.push(fullId);
