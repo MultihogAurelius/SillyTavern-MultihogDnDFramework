@@ -7203,14 +7203,6 @@ function buildSysprompt(rawText) {
         }
 
         // ── Experimental Features ──
-        // Migration: old experimentalFullReviewMode → experimentalHalfReviewMode
-        if (settings.experimentalFullReviewMode && !settings.experimentalHalfReviewMode && !settings._reviewModeMigrated) {
-            settings.experimentalHalfReviewMode = true;
-            settings.experimentalFullReviewMode = false;
-            settings._reviewModeMigrated = true;
-            saveSettings();
-            if (settings.debugMode) console.log('[RPG Tracker] Migrated old Full Review Mode → Half Review Mode.');
-        }
 
         $('#rpg_tracker_experimental_half_review').prop('checked', !!settings.experimentalHalfReviewMode).on('change', function () {
             settings.experimentalHalfReviewMode = !!$(this).prop('checked');
