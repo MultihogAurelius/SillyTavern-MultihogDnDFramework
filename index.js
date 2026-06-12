@@ -8010,33 +8010,68 @@ RULES:
                 </div>
             `;
 
-            // Attach regen handler after DOM is ready
-            if (showRegenerate && onRegenerate) {
-                setTimeout(() => {
-                    const regenBtn = document.getElementById('rt-se-regen');
-                    if (!regenBtn) return;
-                    regenBtn.addEventListener('click', async () => {
-                        const descEl = document.getElementById('rt-se-desc');
-                        const contentEl = document.getElementById('rt-se-content');
-                        const tagEl = document.getElementById('rt-se-tag');
-                        const currentDesc = descEl ? descEl.value.trim() : description;
-                        regenBtn.disabled = true;
-                        regenBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Regenerating...';
-                        try {
-                            const newContent = await onRegenerate(currentDesc);
-                            if (contentEl) contentEl.value = newContent;
-                            const extractedTag = newContent.match(/^<(\w+[\w_-]*)/)?.[1];
-                            if (extractedTag && tagEl && !tagEl.value.trim()) tagEl.value = extractedTag;
-                            toastr['success']('Section regenerated!', 'AI Section Builder');
-                        } catch (err) {
-                            toastr['error'](`Regeneration failed: ${err.message}`, 'AI Section Builder');
-                        } finally {
-                            regenBtn.disabled = false;
-                            regenBtn.innerHTML = '<i class="fa-solid fa-rotate"></i> Regenerate with AI';
-                        }
+            let currentTag = tag;
+            let currentDesc = description;
+            let currentContent = content;
+            let currentSaveMode = 'apply';
+
+            // Attach event listeners after DOM is ready
+            setTimeout(() => {
+                const tagEl = document.getElementById('rt-se-tag');
+                const descEl = document.getElementById('rt-se-desc');
+                const contentEl = document.getElementById('rt-se-content');
+
+                if (tagEl) {
+                    tagEl.addEventListener('input', () => { currentTag = tagEl.value; });
+                }
+                if (descEl) {
+                    descEl.addEventListener('input', () => { currentDesc = descEl.value; });
+                }
+                if (contentEl) {
+                    contentEl.addEventListener('input', () => { currentContent = contentEl.value; });
+                }
+
+                // Handle save mode radio buttons
+                const saveModeEls = document.querySelectorAll('input[name="rt_se_save_mode"]');
+                saveModeEls.forEach(el => {
+                    el.addEventListener('change', () => {
+                        const checked = document.querySelector('input[name="rt_se_save_mode"]:checked');
+                        if (checked) currentSaveMode = checked.value;
                     });
-                }, 100);
-            }
+                });
+
+                // Attach regen handler
+                if (showRegenerate && onRegenerate) {
+                    const regenBtn = document.getElementById('rt-se-regen');
+                    if (regenBtn) {
+                        regenBtn.addEventListener('click', async () => {
+                            const currentDescVal = descEl ? descEl.value.trim() : description;
+                            regenBtn.disabled = true;
+                            regenBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Regenerating...';
+                            try {
+                                const newContent = await onRegenerate(currentDescVal);
+                                if (contentEl) {
+                                    contentEl.value = newContent;
+                                    currentContent = newContent;
+                                }
+                                const extractedTag = newContent.match(/^<(\w+[\w_-]*)/)?.[1];
+                                if (extractedTag && tagEl) {
+                                    if (!tagEl.value.trim()) {
+                                        tagEl.value = extractedTag;
+                                        currentTag = extractedTag;
+                                    }
+                                }
+                                toastr['success']('Section regenerated!', 'AI Section Builder');
+                            } catch (err) {
+                                toastr['error'](`Regeneration failed: ${err.message}`, 'AI Section Builder');
+                            } finally {
+                                regenBtn.disabled = false;
+                                regenBtn.innerHTML = '<i class="fa-solid fa-rotate"></i> Regenerate with AI';
+                            }
+                        });
+                    }
+                }
+            }, 100);
 
             const confirmed = await Popup.show.confirm(
                 titleMap[mode] || '📝 Section Editor',
@@ -8045,17 +8080,12 @@ RULES:
             );
             if (!confirmed) return null;
 
-            const tagEl = document.getElementById('rt-se-tag');
-            const descEl = document.getElementById('rt-se-desc');
-            const contentEl = document.getElementById('rt-se-content');
-            const saveModeEl = document.querySelector('input[name="rt_se_save_mode"]:checked');
-
-            let finalContent = contentEl ? contentEl.value.trim() : content;
+            let finalContent = currentContent.trim();
             if (!finalContent) {
                 toastr['warning']('Section content cannot be empty.', 'Section Builder');
                 return null;
             }
-            let finalTag = tagEl ? tagEl.value.trim().replace(/[^\w_-]/g, '') : tag;
+            let finalTag = currentTag.trim().replace(/[^\w_-]/g, '');
 
             // Auto-wrap if the user just pasted plain text without XML tags
             const openTagRe = /^<(\w[\w_-]*)>/;
@@ -8071,9 +8101,9 @@ RULES:
 
             return {
                 tag: finalTag,
-                description: descEl ? descEl.value.trim() : description,
+                description: currentDesc.trim(),
                 content: finalContent,
-                saveMode: saveModeEl ? saveModeEl.value : 'apply',
+                saveMode: currentSaveMode,
             };
         }
 
