@@ -7940,20 +7940,146 @@ RULES:
             return true;
         }
 
+        // ── Unified Section Editor ──────────────────────────────────────────────
+        /**
+         * Show a unified popup for creating or editing a custom sysprompt section.
+         * @param {object} opts
+         * @param {'ai'|'manual'|'edit'} opts.mode
+         * @param {string} [opts.tag]          - Pre-filled tag name (without angle brackets)
+         * @param {string} [opts.description]  - Pre-filled label/description text
+         * @param {string} [opts.content]      - Pre-filled XML content
+         * @param {function} [opts.onRegenerate] - Async fn(desc) -> string; present in 'ai' mode
+         * @returns {Promise<{tag:string, description:string, content:string, saveMode:string}|null>}
+         */
+        async function showSectionEditor({ mode = 'manual', tag = '', description = '', content = '', onRegenerate = null } = {}) {
+            const { Popup } = SillyTavern.getContext();
+
+            const titleMap = {
+                ai: '✨ Review Generated Section',
+                manual: '📝 Add Section Manually',
+                edit: '✏️ Edit Section',
+            };
+
+            const showSaveOptions = mode !== 'edit';
+            const showRegenerate = mode === 'ai';
+
+            const editorHtml = `
+                <div id="rt-section-editor" style="display:flex; flex-direction:column; gap:10px; width:100%; box-sizing:border-box;">
+                    <div style="display:flex; gap:8px;">
+                        <div style="flex:1;">
+                            <div style="font-size:11px; opacity:0.7; margin-bottom:4px;">Tag Name (snake_case)</div>
+                            <input id="rt-se-tag" type="text" class="text_pole" value="${escapeHtml(tag)}"
+                                placeholder="e.g. reputation_system"
+                                style="width:100%; font-size:12px; font-family:monospace;">
+                        </div>
+                        <div style="flex:2;">
+                            <div style="font-size:11px; opacity:0.7; margin-bottom:4px;">Label / Description</div>
+                            <input id="rt-se-desc" type="text" class="text_pole" value="${escapeHtml(description)}"
+                                placeholder="Brief description of this section"
+                                style="width:100%; font-size:12px;">
+                        </div>
+                    </div>
+                    <div>
+                        <div style="font-size:11px; opacity:0.7; margin-bottom:4px;">XML Content — paste or edit freely</div>
+                        <textarea id="rt-se-content" class="text_pole" rows="12"
+                            style="width:100%; font-size:11px; font-family:monospace; resize:vertical; white-space:pre;"
+                            placeholder="&lt;my_mechanic&gt;\n  Rules go here...\n&lt;/my_mechanic&gt;"
+                            >${escapeHtml(content)}</textarea>
+                    </div>
+                    ${showRegenerate ? `<button id="rt-se-regen" class="menu_button interactable" style="background:rgba(180,100,255,0.15); border-color:rgba(180,100,255,0.4); width:100%;"><i class="fa-solid fa-rotate"></i> Regenerate with AI</button>` : ''}
+                    ${showSaveOptions ? `
+                    <div style="padding:10px; border:1px solid rgba(255,255,255,0.1); border-radius:6px; background:rgba(0,0,0,0.2);">
+                        <div style="font-size:11px; font-weight:bold; margin-bottom:6px;">Save Options:</div>
+                        <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin-bottom:4px;">
+                            <input type="radio" name="rt_se_save_mode" id="rt-se-mode-apply" value="apply" checked style="margin:0;">
+                            <span style="font-size:12px;">Save to Library &amp; Apply to Sysprompt</span>
+                        </label>
+                        <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                            <input type="radio" name="rt_se_save_mode" id="rt-se-mode-library" value="library" style="margin:0;">
+                            <span style="font-size:12px;">Save to Library Only</span>
+                        </label>
+                    </div>` : ''}
+                </div>
+            `;
+
+            // Attach regen handler after DOM is ready
+            if (showRegenerate && onRegenerate) {
+                setTimeout(() => {
+                    const regenBtn = document.getElementById('rt-se-regen');
+                    if (!regenBtn) return;
+                    regenBtn.addEventListener('click', async () => {
+                        const descEl = document.getElementById('rt-se-desc');
+                        const contentEl = document.getElementById('rt-se-content');
+                        const tagEl = document.getElementById('rt-se-tag');
+                        const currentDesc = descEl ? descEl.value.trim() : description;
+                        regenBtn.disabled = true;
+                        regenBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Regenerating...';
+                        try {
+                            const newContent = await onRegenerate(currentDesc);
+                            if (contentEl) contentEl.value = newContent;
+                            const extractedTag = newContent.match(/^<(\w+[\w_-]*)/)?.[1];
+                            if (extractedTag && tagEl && !tagEl.value.trim()) tagEl.value = extractedTag;
+                            toastr['success']('Section regenerated!', 'AI Section Builder');
+                        } catch (err) {
+                            toastr['error'](`Regeneration failed: ${err.message}`, 'AI Section Builder');
+                        } finally {
+                            regenBtn.disabled = false;
+                            regenBtn.innerHTML = '<i class="fa-solid fa-rotate"></i> Regenerate with AI';
+                        }
+                    });
+                }, 100);
+            }
+
+            const confirmed = await Popup.show.confirm(
+                titleMap[mode] || '📝 Section Editor',
+                editorHtml,
+                { okButton: mode === 'edit' ? 'Save Changes' : 'Save Section', cancelButton: 'Cancel' }
+            );
+            if (!confirmed) return null;
+
+            const tagEl = document.getElementById('rt-se-tag');
+            const descEl = document.getElementById('rt-se-desc');
+            const contentEl = document.getElementById('rt-se-content');
+            const saveModeEl = document.querySelector('input[name="rt_se_save_mode"]:checked');
+
+            let finalContent = contentEl ? contentEl.value.trim() : content;
+            let finalTag = tagEl ? tagEl.value.trim().replace(/[^\w_-]/g, '') : tag;
+
+            // Auto-wrap if the user just pasted plain text without XML tags
+            const openTagRe = /^<(\w[\w_-]*)>/;
+            const tagMatch = finalContent.match(openTagRe);
+            if (tagMatch) {
+                finalTag = finalTag || tagMatch[1];
+            } else if (finalTag) {
+                finalContent = `<${finalTag}>\n${finalContent}\n</${finalTag}>`;
+            } else {
+                finalTag = 'custom_section';
+                finalContent = `<custom_section>\n${finalContent}\n</custom_section>`;
+            }
+
+            return {
+                tag: finalTag,
+                description: descEl ? descEl.value.trim() : description,
+                content: finalContent,
+                saveMode: saveModeEl ? saveModeEl.value : 'apply',
+            };
+        }
+
+        // ── Custom Sysprompt Library ──
         $('#rpg_tracker_btn_sysprompt_library').on('click', async function () {
             const { Popup } = SillyTavern.getContext();
             const settings = getSettings();
-            
+
             if (!settings.customSyspromptLibrary) {
                 settings.customSyspromptLibrary = [];
             }
-            
+
             // Function to generate the HTML for the library list
             const generateListHtml = () => {
                 if (settings.customSyspromptLibrary.length === 0) {
-                    return `<div style="text-align:center; padding:30px; opacity:0.5; font-style:italic;">Library is empty. Use the AI Builder to generate sections!</div>`;
+                    return `<div style="text-align:center; padding:30px; opacity:0.5; font-style:italic;">Library is empty. Use AI Builder or Add Manually to create sections.</div>`;
                 }
-                
+
                 let listHtml = '<div style="display:flex; flex-direction:column; gap:8px;">';
                 settings.customSyspromptLibrary.forEach((item, index) => {
                     listHtml += `
@@ -7964,11 +8090,12 @@ RULES:
                                     <div style="font-weight:bold; font-size:13px; color:#ffdd88;">&lt;${escapeHtml(item.tag)}&gt;</div>
                                     <div style="font-size:11px; opacity:0.7; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(item.description || 'Custom Section')}</div>
                                 </div>
-                                <div style="display:flex; align-items:center; gap:10px;">
+                                <div style="display:flex; align-items:center; gap:6px;">
                                     <label class="checkbox_label" style="margin:0; font-size:11px;">
                                         <input type="checkbox" class="rt-lib-toggle" data-index="${index}" ${item.enabled ? 'checked' : ''}>
                                         <span>Enable</span>
                                     </label>
+                                    <button class="rt-lib-edit" data-index="${index}" style="background:none; border:none; color:#88bbff; cursor:pointer; padding:4px;" title="Edit Section"><i class="fa-solid fa-pen-to-square"></i></button>
                                     <button class="rt-lib-delete" data-index="${index}" style="background:none; border:none; color:#ff5555; cursor:pointer; padding:4px;" title="Delete Section"><i class="fa-solid fa-trash-can"></i></button>
                                 </div>
                             </div>
@@ -7981,7 +8108,12 @@ RULES:
 
             let html = `
                 <div id="rt-library-container" style="display:flex; flex-direction:column; gap:12px; width:100%; box-sizing:border-box; max-height:70vh;">
-                    <div style="font-size:11px; opacity:0.8; line-height:1.4;">Manage your custom system prompt sections. Enabling a section will inject it into your main prompt when you click Apply.</div>
+                    <div style="display:flex; align-items:center; justify-content:space-between;">
+                        <div style="font-size:11px; opacity:0.8; line-height:1.4;">Manage your custom system prompt sections. Enabling a section injects it into your main prompt when you click Apply.</div>
+                        <button id="rt_lib_btn_add_manual" class="menu_button interactable" style="white-space:nowrap; margin-left:10px; background:rgba(80,180,120,0.15); border-color:rgba(80,180,120,0.4); font-size:11px; padding:4px 8px;">
+                            <i class="fa-solid fa-plus"></i> Add Manually
+                        </button>
+                    </div>
                     <div id="rt-library-list-wrap" style="overflow-y:auto; padding-right:10px; flex:1;">
                         ${generateListHtml()}
                     </div>
@@ -8006,6 +8138,27 @@ RULES:
                         });
                     });
 
+                    // Edit Button
+                    wrap.querySelectorAll('.rt-lib-edit').forEach(el => {
+                        el.addEventListener('click', async (e) => {
+                            const idx = parseInt(e.currentTarget.dataset.index);
+                            const item = settings.customSyspromptLibrary[idx];
+                            const result = await showSectionEditor({
+                                mode: 'edit',
+                                tag: item.tag,
+                                description: item.description || '',
+                                content: item.content,
+                            });
+                            if (!result) return;
+                            settings.customSyspromptLibrary[idx].tag = result.tag;
+                            settings.customSyspromptLibrary[idx].description = result.description;
+                            settings.customSyspromptLibrary[idx].content = result.content;
+                            saveSettings();
+                            wrap.innerHTML = generateListHtml();
+                            bindEvents();
+                        });
+                    });
+
                     // Delete Button
                     wrap.querySelectorAll('.rt-lib-delete').forEach(el => {
                         el.addEventListener('click', async (e) => {
@@ -8014,11 +8167,38 @@ RULES:
                             settings.customSyspromptLibrary.splice(idx, 1);
                             saveSettings();
                             wrap.innerHTML = generateListHtml();
-                            bindEvents(); // rebind after HTML rewrite
+                            bindEvents();
                         });
                     });
                 };
                 bindEvents();
+
+                // Add Manually button inside library
+                const addManualBtn = document.getElementById('rt_lib_btn_add_manual');
+                if (addManualBtn) {
+                    addManualBtn.addEventListener('click', async () => {
+                        const result = await showSectionEditor({ mode: 'manual' });
+                        if (!result) return;
+                        const newItem = {
+                            id: Date.now().toString(),
+                            tag: result.tag,
+                            content: result.content,
+                            enabled: result.saveMode === 'apply',
+                            icon: 'fa-pen-to-square',
+                            description: result.description || 'Custom Section',
+                        };
+                        settings.customSyspromptLibrary.push(newItem);
+                        saveSettings();
+                        const wrap = document.getElementById('rt-library-list-wrap');
+                        if (wrap) { wrap.innerHTML = generateListHtml(); bindEvents(); }
+                        if (result.saveMode === 'apply') {
+                            await applyCustomSysprompts();
+                            toastr['success']('Saved to Library & Applied to Sysprompt! ✅', 'Section Builder');
+                        } else {
+                            toastr['success']('Saved to Library! ✅', 'Section Builder');
+                        }
+                    });
+                }
             }, 100);
 
             const approved = await Popup.show.confirm('📚 Custom Sysprompt Library', html, { okButton: 'Apply Enabled Prompts', cancelButton: 'Close' });
@@ -8032,30 +8212,42 @@ RULES:
 
         // ── AI Section Builder ──
         $('#rpg_tracker_btn_ai_add_section').on('click', async function () {
-            const { Popup } = SillyTavern.getContext();
             const settings = getSettings();
 
+            const buildAiPrompt = (desc) =>
+                `You are a D&D system prompt architect. The user wants a new section added to their existing system prompt.\n\nTheir description: "${desc}"\n\nThe user's current system prompt is provided below for reference so you can seamlessly integrate the new mechanic without duplicating existing rules:\n<current_prompt>\n${document.getElementById('main_prompt_quick_edit_textarea')?.value || settings.systemPromptTemplate || ''}\n</current_prompt>\n\nCreate a new XML-tagged section. Your response MUST:\n1. Start with <tag_name> and end with </tag_name>\n2. Use a unique, descriptive tag name in snake_case (e.g. <reputation_system>, <corruption>, <weather_mechanics>)\n3. Be written as clear DM instructions — telling the AI what rules to follow\n4. Be comprehensive but concise (10-30 lines)\n5. Include specific mechanical rules, not just flavor text\n6. Reference {{user}} for the player character\n\nReturn ONLY the XML section. No explanation, no other text.`;
+
+            const generateSection = async (desc) => {
+                const result = await sendStateRequest(settings, 'You are a D&D system prompt section generator. Return ONLY the XML section.', buildAiPrompt(desc));
+                if (!result) throw new Error('No response from AI');
+                let section = result.trim();
+                const fenceMatch = section.match(/```(?:xml)?\s*([\s\S]*?)```/);
+                if (fenceMatch) section = fenceMatch[1].trim();
+                if (!section.match(/^<\w+[\w_-]*>/)) throw new Error('AI did not return a valid XML section');
+                return section;
+            };
+
+            // Step 1: get description
+            const { Popup } = SillyTavern.getContext();
             const inputContent = `
-                    <div style="display:flex; flex-direction:column; gap:10px; width:100%; box-sizing:border-box;">
-                        <div style="font-size:13px; opacity:0.9; font-weight:bold;">✨ AI Section Builder</div>
-                        <div style="font-size:11px; opacity:0.7; line-height:1.4;">
-                            Describe a new system, mechanic, or rule you want added to your D&D system prompt. The AI will generate a properly formatted XML section (e.g. &lt;corruption&gt;...&lt;/corruption&gt;) ready to be appended.
-                        </div>
-                        <textarea id="rt_ai_section_desc" rows="4" class="text_pole"
-                            style="font-size:12px; resize:vertical; width:100%;"
-                            placeholder="Example: A reputation system where NPCs in different factions track the player's standing. Hostile factions attack on sight, neutral factions are cautious, and allied factions offer discounts and quests."></textarea>
+                <div style="display:flex; flex-direction:column; gap:10px; width:100%; box-sizing:border-box;">
+                    <div style="font-size:13px; opacity:0.9; font-weight:bold;">✨ AI Section Builder</div>
+                    <div style="font-size:11px; opacity:0.7; line-height:1.4;">
+                        Describe a new system, mechanic, or rule you want added to your D&amp;D system prompt. The AI will generate a properly formatted XML section ready to be appended.
                     </div>
-                `;
+                    <textarea id="rt_ai_section_desc" rows="4" class="text_pole"
+                        style="font-size:12px; resize:vertical; width:100%;"
+                        placeholder="Example: A reputation system where NPCs in different factions track the player's standing."></textarea>
+                </div>
+            `;
 
             let description = '';
             setTimeout(() => {
-                const textarea = document.getElementById('rt_ai_section_desc');
-                if (textarea) {
-                    textarea.addEventListener('input', () => { description = textarea.value.trim(); });
-                }
+                const ta = document.getElementById('rt_ai_section_desc');
+                if (ta) ta.addEventListener('input', () => { description = ta.value.trim(); });
             }, 100);
 
-            const inputResult = await Popup.show.confirm('Describe New Section', inputContent, { okButton: 'Generate', cancelButton: 'Cancel' });
+            const inputResult = await Popup.show.confirm('✨ AI Section Builder', inputContent, { okButton: 'Generate', cancelButton: 'Cancel' });
             if (!inputResult) return;
 
             if (!description) {
@@ -8063,95 +8255,74 @@ RULES:
                 return;
             }
 
-            const aiPrompt = `You are a D&D system prompt architect. The user wants a new section added to their existing system prompt.
-
-Their description: "${description}"
-
-The user's current system prompt is provided below for reference so you can seamlessly integrate the new mechanic without duplicating existing rules:
-<current_prompt>
-${document.getElementById('main_prompt_quick_edit_textarea')?.value || settings.systemPromptTemplate || ''}
-</current_prompt>
-
-Create a new XML-tagged section. Your response MUST:
-1. Start with <tag_name> and end with </tag_name>
-2. Use a unique, descriptive tag name in snake_case (e.g. <reputation_system>, <corruption>, <weather_mechanics>)
-3. Be written as clear DM instructions — telling the AI what rules to follow
-4. Be comprehensive but concise (10-30 lines)
-5. Include specific mechanical rules, not just flavor text
-6. Reference {{user}} for the player character
-
-Return ONLY the XML section. No explanation, no other text.`;
-
+            // Step 2: generate
             toastr['info']('Generating section with AI...', 'AI Section Builder', { timeOut: 3000 });
             try {
-                const result = await sendStateRequest(settings, 'You are a D&D system prompt section generator. Return ONLY the XML section.', aiPrompt);
-                if (!result) throw new Error('No response from AI');
+                const section = await generateSection(description);
+                const extractedTag = section.match(/^<(\w+[\w_-]*)/)?.[1] || '';
 
-                let section = result.trim();
-                // Strip markdown fences if present
-                const fenceMatch = section.match(/```(?:xml)?\s*([\s\S]*?)```/);
-                if (fenceMatch) section = fenceMatch[1].trim();
-
-                // Validate it looks like XML
-                if (!section.match(/^<\w+[\w_-]*>/)) {
-                    throw new Error('AI did not return a valid XML section');
-                }
-
-                // Show preview with save options
-                const previewContent = `
-                        <div style="display:flex; flex-direction:column; gap:10px; width:100%; box-sizing:border-box;">
-                            <div style="font-size:13px; font-weight:bold;">✨ Generated Section Preview</div>
-                            <pre style="white-space:pre-wrap; word-break:break-word; font-size:11px; padding:12px; background:rgba(0,0,0,0.25); border:1px solid rgba(255,255,255,0.15); border-radius:8px; max-height:400px; overflow-y:auto; font-family:monospace;">${escapeHtml(section)}</pre>
-                            
-                            <div style="margin-top:8px; padding:10px; border:1px solid rgba(255,255,255,0.1); border-radius:6px; background:rgba(0,0,0,0.2);">
-                                <div style="font-size:11px; font-weight:bold; margin-bottom:6px;">Save Options:</div>
-                                <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin-bottom:4px;">
-                                    <input type="radio" name="rt_ai_save_mode" value="apply" checked style="margin:0; cursor:pointer;">
-                                    <span style="font-size:12px;">Save to Library & Apply to Sysprompt</span>
-                                </label>
-                                <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
-                                    <input type="radio" name="rt_ai_save_mode" value="library" style="margin:0; cursor:pointer;">
-                                    <span style="font-size:12px;">Save to Library Only</span>
-                                </label>
-                            </div>
-                        </div>
-                    `;
-
-                const approved = await Popup.show.confirm('Save New Section?', previewContent);
-                if (!approved) {
+                // Step 3: show unified editor (ai mode)
+                const result = await showSectionEditor({
+                    mode: 'ai',
+                    tag: extractedTag,
+                    description,
+                    content: section,
+                    onRegenerate: generateSection,
+                });
+                if (!result) {
                     toastr['info']('Section builder cancelled.', 'AI Section Builder');
                     return;
                 }
 
-                // Determine save mode
-                const saveModeInput = document.querySelector('input[name="rt_ai_save_mode"]:checked');
-                const isApply = saveModeInput ? saveModeInput.value === 'apply' : true;
-
-                // Create library item
                 const newItem = {
                     id: Date.now().toString(),
-                    tag: section.match(/^<(\w+[\w_-]*)/)?.[1] || 'custom_section',
-                    content: section,
-                    enabled: isApply,
-                    icon: 'fa-puzzle-piece',
-                    description: description
+                    tag: result.tag,
+                    content: result.content,
+                    enabled: result.saveMode === 'apply',
+                    icon: 'fa-wand-magic-sparkles',
+                    description: result.description || description,
                 };
-                
+
                 settings.customSyspromptLibrary = settings.customSyspromptLibrary || [];
                 settings.customSyspromptLibrary.push(newItem);
                 saveSettings();
 
-                if (isApply) {
+                if (result.saveMode === 'apply') {
                     const success = await applyCustomSysprompts();
-                    if (success) {
-                        toastr['success']('Saved to Library & Applied to Sysprompt! \u2705', 'AI Section Builder');
-                    }
+                    if (success) toastr['success']('Saved to Library & Applied to Sysprompt! \u2705', 'AI Section Builder');
                 } else {
                     toastr['success']('Saved to Library! \u2705', 'AI Section Builder');
                 }
             } catch (err) {
                 console.error('[RPG Tracker] AI Section Builder error:', err);
                 toastr['error'](`Failed to generate section: ${err.message}`, 'AI Section Builder');
+            }
+        });
+
+        // ── Manual Section Builder ──
+        $('#rpg_tracker_btn_manual_add_section').on('click', async function () {
+            const settings = getSettings();
+            const result = await showSectionEditor({ mode: 'manual' });
+            if (!result) return;
+
+            const newItem = {
+                id: Date.now().toString(),
+                tag: result.tag,
+                content: result.content,
+                enabled: result.saveMode === 'apply',
+                icon: 'fa-pen-to-square',
+                description: result.description || 'Custom Section',
+            };
+
+            settings.customSyspromptLibrary = settings.customSyspromptLibrary || [];
+            settings.customSyspromptLibrary.push(newItem);
+            saveSettings();
+
+            if (result.saveMode === 'apply') {
+                const success = await applyCustomSysprompts();
+                if (success) toastr['success']('Saved to Library & Applied to Sysprompt! \u2705', 'Section Builder');
+            } else {
+                toastr['success']('Saved to Library! \u2705', 'Section Builder');
             }
         });
 
