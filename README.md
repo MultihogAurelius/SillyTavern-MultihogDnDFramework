@@ -4,7 +4,7 @@
 
 *A D&D-based RPG platform/simulation engine for SillyTavern.*
 
-What this framework does is essentially turn SillyTavern into something like AI Dungeon, but with actual mechanics/consequences. Losing or dying is actually a thing. In Big Rigs, you're always WINNER. Not in Fatbody D&D! That being said, the system works just as well for casual "slice of life" type scenarios or modern settings.
+What this framework does is essentially turn SillyTavern into something like AI Dungeon, but with actual mechanics/consequences. Losing or dying is actually a thing. In Big Rigs, you're always WINNER. Not in Fatbody D&D! That being said, **the system works just as well for casual "slice of life" type scenarios or modern settings, so no need to worry that you're limited to wizards and goblins.**
 
 I wasn't satisfied with any of the commercial offerings available (AI Realm, AI Dungeon, Friends & Fables, etc.), so I made my own D&D platform inside SillyTavern. 
 
