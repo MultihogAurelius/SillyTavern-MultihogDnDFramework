@@ -450,7 +450,12 @@
                             <i class="fa-solid fa-circle-question interactable" style="font-size: 0.85em; opacity: 0.7; margin-left: 4px;" title="When enabled, World Progression fires automatically after State Tracker updates whenever the in-world interval has elapsed. Requires the Lorebook Agent to be enabled and a valid campaign prefix set."></i>
                         </label>
 
-                        <hr style="margin: 4px 0;">
+                        <hr style="margin: 6px 0;">
+
+                        <!-- ── SECTION: TIMING ── -->
+                        <div style="font-size: 0.82em; font-weight: bold; opacity: 0.75; margin-bottom: 2px; letter-spacing: 0.04em; text-transform: uppercase;">
+                            <i class="fa-solid fa-clock" style="opacity: 0.7; margin-right: 5px;"></i>Timing
+                        </div>
 
                         <label style="font-size: 0.85em; font-weight: bold; opacity: 0.8;">Interval (in-world hours)
                             <i class="fa-solid fa-circle-question interactable" style="font-size: 0.85em; opacity: 0.7; margin-left: 4px;" title="How many in-world hours must pass before a new report is generated. 24 = once per day, 12 = twice per day, 8 = three times per day. Sub-day intervals produce entries like 'Day 3, 06:00–12:00'."></i>
@@ -462,7 +467,14 @@
                             <div><b>Next report:</b> <span id="rpg_world_progression_next_report_val">—</span></div>
                         </div>
 
-                        <label style="font-size: 0.85em; font-weight: bold; opacity: 0.8; margin-top: 4px;">Rolling Window (active reports)
+                        <hr style="margin: 6px 0;">
+
+                        <!-- ── SECTION: CONTEXT INJECTION ── -->
+                        <div style="font-size: 0.82em; font-weight: bold; opacity: 0.75; margin-bottom: 2px; letter-spacing: 0.04em; text-transform: uppercase;">
+                            <i class="fa-solid fa-arrow-right-to-bracket" style="opacity: 0.7; margin-right: 5px;"></i>Context Injection
+                        </div>
+
+                        <label style="font-size: 0.85em; font-weight: bold; opacity: 0.8;">Rolling Window (active reports)
                             <i class="fa-solid fa-circle-question interactable" style="font-size: 0.85em; opacity: 0.7; margin-left: 4px;" title="How many of the most recent World Progression reports remain active (injected into context). Older reports are automatically deactivated."></i>
                         </label>
                         <input id="rpg_world_progression_keep_active" type="text" inputmode="numeric" pattern="[0-9]*" class="text_pole" value="1" style="max-width: 100px;" title="Number of recent World Progression reports kept active in context" />
@@ -480,7 +492,14 @@
                             <input id="rpg_world_progression_injection_depth" type="text" inputmode="numeric" pattern="[0-9]*" class="text_pole" min="0" max="9999" />
                         </div>
 
-                        <label style="font-size: 0.85em; font-weight: bold; opacity: 0.8; margin-top: 4px;">Historical Reports Lookback
+                        <hr style="margin: 6px 0;">
+
+                        <!-- ── SECTION: REPORT HISTORY ── -->
+                        <div style="font-size: 0.82em; font-weight: bold; opacity: 0.75; margin-bottom: 2px; letter-spacing: 0.04em; text-transform: uppercase;">
+                            <i class="fa-solid fa-book-open" style="opacity: 0.7; margin-right: 5px;"></i>Report History
+                        </div>
+
+                        <label style="font-size: 0.85em; font-weight: bold; opacity: 0.8;">Historical Reports Lookback
                             <i class="fa-solid fa-circle-question interactable" style="font-size: 0.85em; opacity: 0.7; margin-left: 4px;" title="How many of the previous World Progression reports are shown/fed to the LLM when generating a new report. 0 = include all."></i>
                         </label>
                         <input id="rpg_world_progression_history_lookback" type="text" inputmode="numeric" pattern="[0-9]*" class="text_pole" value="0" style="max-width: 100px;" title="Number of historical World Progression reports included in generation context (0 = all)" />
@@ -500,13 +519,21 @@
                             <div style="font-size: 0.75em; opacity: 0.55; margin-top: -2px;">Batch size is count-based, not time-based — 7 reports at 12h/report ≈ 3.5 in-world days per batch.</div>
                         </div>
 
-                        <label class="checkbox_label" style="margin-top: 6px;">
+                        <hr style="margin: 6px 0;">
+
+                        <!-- ── SECTION: FOCUS RANDOMIZATION ── -->
+                        <div style="font-size: 0.82em; font-weight: bold; opacity: 0.75; margin-bottom: 2px; letter-spacing: 0.04em; text-transform: uppercase;">
+                            <i class="fa-solid fa-shuffle" style="opacity: 0.7; margin-right: 5px;"></i>Focus Randomization
+                        </div>
+                        <div style="font-size: 0.75em; opacity: 0.55; margin-bottom: 4px;">Randomly spotlight a subset of lore entities in each report to prevent repetitive coverage.</div>
+
+                        <label class="checkbox_label">
                             <input id="rpg_world_progression_randomize_npcs" type="checkbox" />
                             <span>Randomize NPC pool selection</span>
                             <i class="fa-solid fa-circle-question interactable" style="font-size: 0.85em; opacity: 0.7; margin-left: 4px;" title="When enabled, World Progression randomly selects a set of NPCs from the active world lore and skeleton to explicitly focus on in the next report."></i>
                         </label>
 
-                        <div id="rpg_world_progression_random_npc_count_container" style="margin-top: 4px;">
+                        <div id="rpg_world_progression_random_npc_count_container" style="margin-top: 4px; margin-left: 20px;">
                             <label style="font-size: 0.85em; font-weight: bold; opacity: 0.8;">NPCs to Incorporate
                                 <i class="fa-solid fa-circle-question interactable" style="font-size: 0.85em; opacity: 0.7; margin-left: 4px;" title="Number of random NPCs to choose and focus on in each World Progression report."></i>
                             </label>
@@ -519,7 +546,7 @@
                             <i class="fa-solid fa-circle-question interactable" style="font-size: 0.85em; opacity: 0.7; margin-left: 4px;" title="When enabled, World Progression randomly selects locations from the active world lore and skeleton to focus on."></i>
                         </label>
 
-                        <div id="rpg_world_progression_random_location_count_container" style="margin-top: 4px;">
+                        <div id="rpg_world_progression_random_location_count_container" style="margin-top: 4px; margin-left: 20px;">
                             <label style="font-size: 0.85em; font-weight: bold; opacity: 0.8;">Locations to Incorporate
                                 <i class="fa-solid fa-circle-question interactable" style="font-size: 0.85em; opacity: 0.7; margin-left: 4px;" title="Number of random locations to choose."></i>
                             </label>
@@ -532,7 +559,7 @@
                             <i class="fa-solid fa-circle-question interactable" style="font-size: 0.85em; opacity: 0.7; margin-left: 4px;" title="When enabled, World Progression randomly selects factions from the active world lore and skeleton to focus on."></i>
                         </label>
 
-                        <div id="rpg_world_progression_random_faction_count_container" style="margin-top: 4px;">
+                        <div id="rpg_world_progression_random_faction_count_container" style="margin-top: 4px; margin-left: 20px;">
                             <label style="font-size: 0.85em; font-weight: bold; opacity: 0.8;">Factions to Incorporate
                                 <i class="fa-solid fa-circle-question interactable" style="font-size: 0.85em; opacity: 0.7; margin-left: 4px;" title="Number of random factions to choose."></i>
                             </label>
@@ -545,16 +572,21 @@
                             <i class="fa-solid fa-circle-question interactable" style="font-size: 0.85em; opacity: 0.7; margin-left: 4px;" title="When enabled, World Progression randomly selects conflicts/events from the active world lore and skeleton to focus on."></i>
                         </label>
 
-                        <div id="rpg_world_progression_random_conflict_count_container" style="margin-top: 4px;">
+                        <div id="rpg_world_progression_random_conflict_count_container" style="margin-top: 4px; margin-left: 20px;">
                             <label style="font-size: 0.85em; font-weight: bold; opacity: 0.8;">Conflicts to Incorporate
                                 <i class="fa-solid fa-circle-question interactable" style="font-size: 0.85em; opacity: 0.7; margin-left: 4px;" title="Number of random conflicts to choose."></i>
                             </label>
                             <input id="rpg_world_progression_random_conflict_count" type="text" inputmode="numeric" pattern="[0-9]*" class="text_pole" value="3" style="max-width: 100px;" title="Number of conflicts to randomly select" />
                         </div>
 
+                        <hr style="margin: 6px 0;">
 
+                        <!-- ── SECTION: NARRATIVE INPUT ── -->
+                        <div style="font-size: 0.82em; font-weight: bold; opacity: 0.75; margin-bottom: 2px; letter-spacing: 0.04em; text-transform: uppercase;">
+                            <i class="fa-solid fa-comments" style="opacity: 0.7; margin-right: 5px;"></i>Narrative Input
+                        </div>
 
-                        <label style="font-size: 0.85em; font-weight: bold; opacity: 0.8; margin-top: 4px;">Recent Narrative Lookback
+                        <label style="font-size: 0.85em; font-weight: bold; opacity: 0.8;">Recent Narrative Lookback
                             <i class="fa-solid fa-circle-question interactable" style="font-size: 0.85em; opacity: 0.7; margin-left: 4px;" title="How many recent chat messages are sent to the World Progression engine. 0 = none. Allows the engine to pick up on recent developments, though player-specific events are ignored."></i>
                         </label>
                         <input id="rpg_world_progression_lookback" type="text" inputmode="numeric" pattern="[0-9]*" class="text_pole" value="20" style="max-width: 100px;" title="Number of recent chat messages to include in World Progression" />
@@ -562,8 +594,13 @@
 
                         <hr style="margin: 6px 0;">
 
+                        <!-- ── SECTION: SYSTEM PROMPT ── -->
+                        <div style="font-size: 0.82em; font-weight: bold; opacity: 0.75; margin-bottom: 2px; letter-spacing: 0.04em; text-transform: uppercase;">
+                            <i class="fa-solid fa-terminal" style="opacity: 0.7; margin-right: 5px;"></i>System Prompt
+                        </div>
+
                         <div style="display:flex; align-items:center; gap:6px; margin-bottom: 2px;">
-                            <label style="font-size: 0.85em; font-weight: bold; opacity: 0.8; flex:1; margin:0;">System Prompt
+                            <label style="font-size: 0.85em; font-weight: bold; opacity: 0.8; flex:1; margin:0;">Report Generation Prompt
                                 <i class="fa-solid fa-circle-question interactable" style="font-size: 0.85em; opacity: 0.7; margin-left: 4px;" title="The system prompt sent to the LLM for every World Progression report. Tokens: {periodLabel} is replaced with the period label (e.g. 'Day 3')."></i>
                             </label>
                             <button id="rpg_world_progression_btn_reset_prompt" class="menu_button interactable" style="font-size:0.75em; padding:2px 8px;" title="Reset to default prompt">
@@ -573,9 +610,7 @@
                         <div style="font-size: 0.72em; opacity: 0.5; margin-bottom: 3px;">Available tokens: <code>{periodLabel}</code> (e.g. "Day 3")</div>
                         <textarea id="rpg_world_progression_system_prompt" class="text_pole" rows="10" style="width:100%; font-size:0.78em; font-family:monospace; resize:vertical; background:rgba(0,0,0,0.3); color:var(--SmartThemeBodyColor); border:1px solid rgba(255,255,255,0.1); border-radius:4px; padding:6px; box-sizing:border-box;" placeholder="System prompt for the World Progression LLM pass…"></textarea>
 
-                        <hr style="margin: 4px 0;">
-
-                        <div style="font-size: 0.8em; opacity: 0.6; line-height: 1.4;">
+                        <div style="font-size: 0.8em; opacity: 0.6; line-height: 1.4; margin-top: 6px;">
                             <b>Last generated:</b>
                             <span id="rpg_world_progression_last_fired" style="font-family: monospace; opacity: 0.9;">—</span>
                         </div>
