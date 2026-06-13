@@ -859,7 +859,11 @@ function wrapEntityHtml(entityName, contentHtml) {
                     1. Use the archetype buttons above to roll a new character, or <b>manually describe a character</b> by clicking 💬.<br><br>
                     2. Create a character card for your "narrator" (e.g. Game Master). <b>Leave the card fields empty</b>, as the framework handles all logic via the system prompt.<br><br>
                     3. Toggle the options below — the system prompt is <b>applied automatically</b> whenever you change a setting.<br><br>
-                    💡 <b>Model Recommendation:</b> I highly recommend using <b>Gemini 3.1 Flash Lite</b>. It is 100% reliable for both ReAct tool-use and standard parsing, and is extremely cheap. You can configure this by clicking the robot icon (🤖) in the header and expanding the <b>Lorebook Agent Connection</b> section.
+                    💡 <b>Model Recommendation:</b> I highly recommend using <b>Gemini 3.1 Flash Lite</b>. It is 100% reliable for both ReAct tool-use and standard parsing, and is extremely cheap. Set it up inside SillyTavern's Extension Settings drawer:
+                    <ul style="margin: 4px 0 0 16px; padding: 0;">
+                        <li><b>State Tracker:</b> <code>State Tracker Model</code> &rarr; <code>Connection Settings</code></li>
+                        <li><b>Lorebook Agent &amp; World Progression:</b> <code>Lorebook Agent</code> &rarr; <code>Connection Settings</code></li>
+                    </ul>
                 </div>
 
                 <!-- Narrator Configuration (Salad Bar) -->
