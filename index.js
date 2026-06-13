@@ -3807,7 +3807,15 @@ function createPanel() {
                             <p style="margin-top:4px;"><b>Max Active</b> caps how many entries can be active simultaneously (FIFO pruning keeps token cost predictable).</p>
 
                             <h4 style="margin-bottom: 5px;">📂 Campaign Records</h4>
-                            <p>All lorebooks created by the Agent for the current campaign are shown grouped by book. Click any folder to expand it; click any entry to read its full content. Books are automatically activated and deactivated based on the current chat — no manual action needed.</p>
+                            <p>All lorebooks created by the Agent for the current campaign are shown grouped by book. Click any folder to expand it; click any entry to read its full content. Books are automatically activated and deactivated based on the current chat — no manual action needed. This includes the <b>World Section</b> (stored in <code>{prefix}_World</code>) created by the World Progression engine, which houses off-screen progression reports.</p>
+
+                            <h4 style="margin-bottom: 5px;">🧹 Cleanup & Compression</h4>
+                            <p>To keep context sizes optimized, the framework uses a two-fold cleanup system:</p>
+                            <ul style="padding-left: 20px; margin-top: 0;">
+                                <li><b>Active Key Pruning:</b> When the active entry count exceeds the configured limit, the oldest activated entries are automatically deactivated (pruned) to make room for new ones.</li>
+                                <li><b>Archivist Compression:</b> You can trigger a cleanup pass globally (via the broom button in the agent header) or on a targeted entry. The <b>Lorebook Archivist</b> will compress bloated entries and consolidate duplicates to save tokens while keeping unique facts and timelines intact.</li>
+                            </ul>
+                            <p style="margin-top:4px;"><i>Note: Standard Agent passes and standard cleanup/pruning do not process the World book reports. Those are managed independently via World Progression settings.</i></p>
 
                             <h4 style="margin-bottom: 5px;">↩ History Navigation</h4>
                             <p>The <b>← [ LIVE ] →</b> bar at the bottom lets you step back through lorebook snapshots and redo steps you've undone — just like the State Tracker's memo history. Each agent pass is snapshotted before it runs (up to 5 saved). A new pass clears the redo stack.</p>
