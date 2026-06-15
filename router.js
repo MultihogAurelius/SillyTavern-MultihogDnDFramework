@@ -2718,6 +2718,11 @@ ${rawDump}`;
             } else if (isWorldBook) {
                 historicalReportLines.push(`### ${label}\n${entry.content.trim()}`);
             } else {
+                const isQuestOrEvent = categoryHeader === 'EVENT' || categoryHeader === 'EVENTS' ||
+                                       categoryHeader === 'QUEST' || categoryHeader === 'QUESTS' ||
+                                       nameLower.includes('event') || nameLower.includes('quest');
+                if (isQuestOrEvent) continue;
+
                 if (!loreGrouped[categoryHeader]) {
                     loreGrouped[categoryHeader] = [];
                 }
@@ -2726,7 +2731,6 @@ ${rawDump}`;
                     if (isNpc) narrativeNpcNames.push(label);
                     else if (isLoc) narrativeLocationNames.push(label);
                     else if (isFac) narrativeFactionNames.push(label);
-                    else if (isConflict) conflictNames.push(label);
                 }
             }
         }
@@ -3320,6 +3324,20 @@ export async function runSkeletonGenerationPass(atmosphereSummary, append = fals
         settings.chatStates[chatId].campaignBooks = [...existing];
         ctx.saveSettingsDebounced();
     }
+
+    // Refresh the SillyTavern UI so it updates immediately without F5
+    setTimeout(async () => {
+        try {
+            if (typeof ctx.updateWorldInfoList === 'function') {
+                await ctx.updateWorldInfoList();
+            }
+            if (typeof ctx.reloadWorldInfoEditor === 'function') {
+                ctx.reloadWorldInfoEditor(skeletonBookName, true);
+            }
+        } catch (uiErr) {
+            console.warn('[RPG Tracker] UI refresh after skeleton generation failed:', uiErr);
+        }
+    }, 200);
 
     broadcastStep('finish', `\uD83D\uDDE6 World Skeleton: ${records.length} entries generated and saved to "${skeletonBookName}".`);
     return records.length;
