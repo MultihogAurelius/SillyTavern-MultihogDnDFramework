@@ -13,7 +13,7 @@ I wasn't satisfied with any of the commercial offerings available (AI Realm, AI 
 ---
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/cde8b1b9-dc31-4089-97dd-ebd16facd3af" width="100%" alt="A basic character sheet" />
+  <img src="https://github.com/user-attachments/assets/cde8b1b9-dc31-4089-97dd-ebd16facd3af" width="50%" alt="A basic character sheet" />
   <br>
   <em>A basic character sheet</em>
 </p>
