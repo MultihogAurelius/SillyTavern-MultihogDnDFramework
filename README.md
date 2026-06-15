@@ -10,11 +10,13 @@ I wasn't satisfied with any of the commercial offerings available (AI Realm, AI 
 
 **Crucially, the system is input-output, not just some glorified stats collector. Every single thing has a backend.**
 
-<div align="center">
-  <figure>
-    <img width="578" height="764" alt="image" src="https://github.com/user-attachments/assets/cde8b1b9-dc31-4089-97dd-ebd16facd3af" />
-  </figure>
-</div>
+---
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/cde8b1b9-dc31-4089-97dd-ebd16facd3af" width="100%" alt="A basic character sheet" />
+  <br>
+  <em>A basic character sheet</em>
+</p>
 
 ---
 
