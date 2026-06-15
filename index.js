@@ -379,8 +379,9 @@ function saveSettings() {
     const s = getSettings();
     const ctx = SillyTavern.getContext();
     ctx.saveSettingsDebounced();
-    if (s.chatLinkEnabled && _currentChatId) {
-        saveChatState(_currentChatId);
+    const activeChatId = _currentChatId || ctx.chatId;
+    if (s.chatLinkEnabled && activeChatId) {
+        saveChatState(activeChatId);
     }
     syncOnboardingUI();
 }
@@ -827,6 +828,8 @@ function loadChatState(chatId) {
     s.worldProgressionAutoExcludeParty = saved.worldProgressionAutoExcludeParty ?? false;
     s.worldProgressionLastFiredAtMinutes = saved.worldProgressionLastFiredAtMinutes ?? -1;
     s.worldProgressionLastFiredPeriodLabel = saved.worldProgressionLastFiredPeriodLabel || '';
+    s.worldProgressionConsolidateEnabled = saved.worldProgressionConsolidateEnabled ?? false;
+    s.worldProgressionConsolidateInterval = saved.worldProgressionConsolidateInterval ?? 7;
 
     // Update settings UI inputs if rendered
     $('#rpg_world_progression_randomize_npcs').prop('checked', !!s.worldProgressionRandomizeNPCs);
@@ -7128,7 +7131,7 @@ function buildSysprompt(rawText) {
         // ─── Chat Link ───
         eventSource.on(event_types.CHAT_CHANGED, onChatChanged);
         // Bootstrap: restore state for whichever chat is already open
-        const bootChatId = ctx.getCurrentChatId?.() || null;
+        const bootChatId = ctx.chatId || ctx.getCurrentChatId?.() || null;
         _currentChatId = bootChatId;
         if (bootChatId && settings.chatLinkEnabled) {
             loadChatState(bootChatId);

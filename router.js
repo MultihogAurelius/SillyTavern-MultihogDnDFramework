@@ -2992,7 +2992,8 @@ function parseSkeletonOutput(rawText) {
 
     const sectionRegex = /^##\s+([A-Z]+)/i;
     const subHeaderRegex = /^###\s+(.+)/;
-    const listRegex = /^\s*(?:[\*\-\d\.\s]*)\s*\*\*(.+?)\*\*[:\-]?\s*(.*)/;
+    const listRegexBold = /^\s*(?:[\*\-\d\.\s]*)\s*\*\*(.+?)\*\*\s*[:\-]?\s*(.*)/;
+    const listRegexPlain = /^\s*(?:[\*\-\d\.\s]*)\s*([^:\-\n]+)\s*[:\-]\s*(.*)/;
 
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
@@ -3025,7 +3026,10 @@ function parseSkeletonOutput(rawText) {
         }
 
         // 3. Check for list items like * **Name**: description
-        const listMatch = line.match(listRegex);
+        let listMatch = line.match(listRegexBold);
+        if (!listMatch) {
+            listMatch = line.match(listRegexPlain);
+        }
         if (listMatch) {
             if (currentItem) {
                 records.push(currentItem);
