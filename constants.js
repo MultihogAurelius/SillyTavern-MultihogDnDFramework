@@ -32,6 +32,7 @@ export const DEFAULT_STOCK_PROMPTS = {
 {{user}} (Class): current/max HP
 Combat: BAB: +X | Ranged: +X | Melee: +X
 Gear: Weapon1 (stats) | Weapon2, if exists, (stats), AC: Z (Armor Name)
+Proficiencies: Category1, Category2
 Attr: STR X (mod), DEX X (mod), CON X (mod), INT X (mod), WIS X (mod), CHA X (mod)
 Saves: Fort +X | Ref +X | Will +X
 Skills: Skill1 +X, Skill2 +X
@@ -45,6 +46,7 @@ Upon LEVEL UP, incorporate attribute changes.`,
 Name (Class): current/max HP
 Combat: BAB: +X | Ranged: +X | Melee: +X
 Gear: Weapon (stats), AC: Z (Armor Name)
+Proficiencies: Category1, Category2
 Attr: STR X (mod), DEX X (mod), CON X (mod), INT X (mod), WIS X (mod), CHA X (mod)
 Saves: Fort +X | Ref +X | Will +X
 Skills: Skill1 +X, Skill2 +X
@@ -64,6 +66,7 @@ PERSISTENCE: If the party changes, you MUST output the ENTIRE [PARTY] block incl
 Example party: [PARTY]Elara (Ranger): 26/45 HP
 Combat: BAB: +3 | Ranged: +6 | Melee: +4
 Gear: Shortbow (1d6+3 P), AC: 15 (Leather Armor)
+Proficiencies: Simple Weapons, Martial Weapons
 Attr: STR 12 (+1), DEX 16 (+3), CON 14 (+2), INT 10 (+0), WIS 14 (+2), CHA 12 (+1)
 Saves: Fort +3 | Ref +5 | Will +2
 Skills: Athletics +3, Perception +5
@@ -233,6 +236,11 @@ If a character or NPC possesses a non-standard, custom, or homebrew class (e.g.,
   - Tactical/trained operators (soldiers, elite operatives): High BAB progression (equal to level or slightly below).
 </homebrew_and_custom_classes>
 
+<weapon_proficiencies>
+If a character attacks with a weapon not covered by their listed "Proficiencies:" categories (judged via your common sense, e.g. "Pistols" covers a Glock but not a sniper rifle), apply disadvantage on the attack roll and omit their attribute modifier from the damage calculation.
+If a character lacks a "Proficiencies:" line entirely, infer proficiency from their class archetype.
+</weapon_proficiencies>
+
 <saving_throws>
 NPC SAVING THROWS:
 Assign thematically. Three saves per NPC: Fortitude / Reflex / Will
@@ -358,6 +366,7 @@ Declare their COMBAT PROFILE immediately:
 - Worn armor, AC, and Max HP.
 - Combat: BAB: +X | Ranged: +X | Melee: +X
 - Primary Weapon: (Attack Bonus / Damage Die + Mod / Damage Type).
+- Proficiencies: Category1, Category2
 - Attr: STR X (mod), DEX X (mod), CON X (mod), INT X (mod), WIS X (mod), CHA X (mod)
 - Saves: Fort +X | Ref +X | Will +X
 - Key Skills: (e.g., Persuasion +4, Stealth +2).
@@ -469,6 +478,11 @@ If a character or NPC possesses a non-standard, custom, or homebrew class (e.g.,
   - Blue-collar/improvised fighters (mechanics, brawlers): Moderate BAB progression.
   - Tactical/trained operators (soldiers, elite operatives): High BAB progression (equal to level or slightly below).
 </homebrew_and_custom_classes>
+
+<weapon_proficiencies>
+If a character attacks with a weapon not covered by their listed "Proficiencies:" categories (judged via your common sense, e.g. "Pistols" covers a Glock but not a sniper rifle), apply disadvantage on the attack roll and omit their attribute modifier from the damage calculation.
+If a character lacks a "Proficiencies:" line entirely, infer proficiency from their class archetype.
+</weapon_proficiencies>
 
 <saving_throws>
 NPC SAVING THROWS:
@@ -595,6 +609,7 @@ Declare their COMBAT PROFILE immediately:
 - Worn armor, AC, and Max HP.
 - Combat: BAB: +X | Ranged: +X | Melee: +X
 - Primary Weapon: (Attack Bonus / Damage Die + Mod / Damage Type).
+- Proficiencies: Category1, Category2
 - Attr: STR X (mod), DEX X (mod), CON X (mod), INT X (mod), WIS X (mod), CHA X (mod)
 - Saves: Fort +X | Ref +X | Will +X
 - Key Skills: (e.g., Persuasion +4, Stealth +2).
