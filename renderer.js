@@ -9,8 +9,10 @@ const DEFAULT_HP_COLOR = '#00ffaa';
 const DEFAULT_XP_COLOR = 'linear-gradient(90deg, #0088ff, #00d4ff)';
 
     export const STOCK_FIELD_RULES = {
-        'attr': 'text',
-        'attributes': 'text',
+        'combat': 'highlight',
+        'gear': 'highlight',
+        'attr': 'highlight',
+        'attributes': 'highlight',
         'skills': 'pills',
         'key skills': 'pills',
         'saves': 'highlight',

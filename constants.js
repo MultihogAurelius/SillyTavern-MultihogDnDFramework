@@ -30,8 +30,9 @@ export const DEFAULT_STOCK_PROMPTS = {
     character: `Main character's core stats. Use this format:
 [CHARACTER]
 {{user}} (Class): current/max HP
-Att/def: Weapon (stats) | Armor (AC: Z)
-Attr: STR X, DEX X, CON X, INT X, WIS X, CHA X
+Combat: BAB: +X | Ranged: +X | Melee: +X
+Gear: Weapon1 (stats) | Weapon2, if exists, (stats), AC: Z (Armor Name)
+Attr: STR X (mod), DEX X (mod), CON X (mod), INT X (mod), WIS X (mod), CHA X (mod)
 Saves: Fort +X | Ref +X | Will +X
 Skills: Skill1 +X, Skill2 +X
 Traits: Trait1 (effect), Trait2 (effect)
@@ -42,8 +43,9 @@ Status: Effect (duration Xh Xm)
 Upon LEVEL UP, incorporate attribute changes.`,
     party: `Companion/Party members. Use this format for each member:
 Name (Class): current/max HP
-Att/def: Weapon (stats) | Armor (AC: Z)
-Attr: STR X, DEX X, CON X, INT X, WIS X, CHA X
+Combat: BAB: +X | Ranged: +X | Melee: +X
+Gear: Weapon (stats), AC: Z (Armor Name)
+Attr: STR X (mod), DEX X (mod), CON X (mod), INT X (mod), WIS X (mod), CHA X (mod)
 Saves: Fort +X | Ref +X | Will +X
 Skills: Skill1 +X, Skill2 +X
 Traits: Trait1 (effect), Trait2 (effect)
@@ -60,8 +62,9 @@ Only remove party members if you see (X leaves the party.)
 PERSISTENCE: If the party changes, you MUST output the ENTIRE [PARTY] block including all existing characters. Never omit a character unless they leave the party.
 
 Example party: [PARTY]Elara (Ranger): 26/45 HP
-Att/def: Shortbow (+5 / 1d6+3 P) | Leather Armor (AC: 15)
-Attr: STR 12, DEX 16, CON 14, INT 10, WIS 14, CHA 12
+Combat: BAB: +3 | Ranged: +6 | Melee: +4
+Gear: Shortbow (1d6+3 P), AC: 15 (Leather Armor)
+Attr: STR 12 (+1), DEX 16 (+3), CON 14 (+2), INT 10 (+0), WIS 14 (+2), CHA 12 (+1)
 Saves: Fort +3 | Ref +5 | Will +2
 Skills: Athletics +3, Perception +5
 Traits: Natural Explorer (ignore difficult terrain)
@@ -180,6 +183,7 @@ When a character's skill level is unknown, use your best judgment based on their
 
 <combat>
 On combat start: declare all previously unknown NPC stats (AC, Saves, HP, Attack Bonus, immunities/resistances/etc), then roll initiative for all participants.
+When introducing a new named NPC in or before combat, also declare their BAB (Base Attack Bonus).
 
 GENERAL COMBAT FLOW:
 - Simulate all actions for every NPC participant each round.
@@ -346,8 +350,9 @@ END OF EACH OUTPUT (required):
 When a character joins/leaves, explicitly state (Name joins/leaves the party).
 Declare their COMBAT PROFILE immediately:
 - Worn armor, AC, and Max HP.
+- Combat: BAB: +X | Ranged: +X | Melee: +X
 - Primary Weapon: (Attack Bonus / Damage Die + Mod / Damage Type).
-- Attr: STR X, DEX X, CON X, INT X, WIS X, CHA X
+- Attr: STR X (mod), DEX X (mod), CON X (mod), INT X (mod), WIS X (mod), CHA X (mod)
 - Saves: Fort +X | Ref +X | Will +X
 - Key Skills: (e.g., Persuasion +4, Stealth +2).
 - Spells: Cantrips, spell slots by level (if applicable).
@@ -409,6 +414,7 @@ When a character's skill level is unknown, use your best judgment based on their
 
 <combat>
 On combat start: declare all previously unknown NPC stats (AC, Saves, HP, Attack Bonus, immunities/resistances/etc), then roll initiative for all participants.
+When introducing a new named NPC in or before combat, also declare their BAB (Base Attack Bonus).
 
 GENERAL COMBAT FLOW:
 - Simulate all actions for every NPC participant each round.
@@ -575,8 +581,9 @@ END OF EACH OUTPUT (required):
 When a character joins/leaves, explicitly state (Name joins/leaves the party).
 Declare their COMBAT PROFILE immediately:
 - Worn armor, AC, and Max HP.
+- Combat: BAB: +X | Ranged: +X | Melee: +X
 - Primary Weapon: (Attack Bonus / Damage Die + Mod / Damage Type).
-- Attr: STR X, DEX X, CON X, INT X, WIS X, CHA X
+- Attr: STR X (mod), DEX X (mod), CON X (mod), INT X (mod), WIS X (mod), CHA X (mod)
 - Saves: Fort +X | Ref +X | Will +X
 - Key Skills: (e.g., Persuasion +4, Stealth +2).
 - Spells: Cantrips, spell slots by level (if applicable).

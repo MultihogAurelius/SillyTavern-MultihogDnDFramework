@@ -484,6 +484,16 @@ Example: [[FAC: Iron Syndicate | ...]]  NOT  [[FAC: Khelt :: Iron Syndicate | ..
             .replace('10. Character vectors must take place', '11. Character vectors must take place');
     }
 
+    // ── MIGRATION: CHARACTER/PARTY prompts — Att/def → Combat + Gear (BAB) ───────
+    const OLD_CHAR_SNIPPET = 'Att/def: Weapon (stats) | Armor (AC: Z)';
+    if (s.stockPrompts?.character && s.stockPrompts.character.includes(OLD_CHAR_SNIPPET)) {
+        s.stockPrompts.character = DEFAULT_STOCK_PROMPTS.character;
+    }
+    const OLD_PARTY_SNIPPET = 'Att/def: Weapon (stats) | Armor (AC: Z)';
+    if (s.stockPrompts?.party && s.stockPrompts.party.includes(OLD_PARTY_SNIPPET)) {
+        s.stockPrompts.party = DEFAULT_STOCK_PROMPTS.party;
+    }
+
     return extensionSettings[MODULE_NAME];
 }
 
