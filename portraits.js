@@ -355,40 +355,23 @@ export async function generatePortraitDirect(prompt, entityName) {
         const apiKey = await ensurePollinationsKey();
         if (!apiKey) throw new Error('Pollinations API key is required');
 
-        const ctx = SillyTavern.getContext();
         const targetUrl = 'https://gen.pollinations.ai/v1/images/generations';
-        let headers;
-        try {
-            headers = (typeof ctx.getRequestHeaders === 'function') ? { ...ctx.getRequestHeaders() } : {};
-        } catch { headers = {}; }
-        headers['Authorization'] = `Bearer ${apiKey}`;
-        headers['Content-Type'] = 'application/json';
-
         const currentModel = s.pollinationsModel || 'flux';
 
         const doRequest = async (modelName) => {
-            let resp;
-            try {
-                resp = await fetch(`/proxy/${targetUrl}`, {
-                    method: 'POST',
-                    headers,
-                    body: JSON.stringify({ prompt, model: modelName, size: '512x512', response_format: 'b64_json' }),
-                });
-                if (!resp.ok && resp.status === 404) {
-                    throw new Error('Proxy 404');
-                }
-            } catch (proxyError) {
-                console.warn(`[RPG Tracker] Pollinations proxy request failed for model ${modelName}, trying direct connection...`, proxyError);
-                const directHeaders = {
-                    'Authorization': `Bearer ${apiKey}`,
-                    'Content-Type': 'application/json'
-                };
-                resp = await fetch(targetUrl, {
-                    method: 'POST',
-                    headers: directHeaders,
-                    body: JSON.stringify({ prompt, model: modelName, size: '512x512', response_format: 'b64_json' }),
-                });
-            }
+            // Call Pollinations directly — do NOT use ST's /proxy/ endpoint.
+            // ST's /proxy/ is a reverse-proxy that routes to the currently configured
+            // ST backend (e.g. RunPod, OpenAI) rather than the URL we pass, which causes
+            // requests to land on the wrong (possibly offline) backend.
+            const directHeaders = {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json',
+            };
+            const resp = await fetch(targetUrl, {
+                method: 'POST',
+                headers: directHeaders,
+                body: JSON.stringify({ prompt, model: modelName, size: '512x512', response_format: 'b64_json' }),
+            });
 
             if (!resp.ok) {
                 const errText = await resp.text().catch(() => 'Unknown error');
@@ -845,6 +828,17 @@ export function triggerBackgroundPortraitGeneration(name, refresh) {
             if (typeof refresh === 'function') refresh();
         } catch (err) {
             console.error(`[RPG Tracker] Background portrait generation failed for ${name}:`, err);
+            const errMsg = String(err.message || err);
+            const is524 = errMsg.includes('524') || errMsg.includes('timeout') || errMsg.includes('Upstream');
+            if (is524) {
+                toastr['warning'](
+                    `Portrait generation for "${name}" failed: LLM connection timed out (524). The portrait prompt is written by your main LLM model — check your State Tracker connection settings and ensure it is online.`,
+                    'RPG Tracker',
+                    { timeOut: 8000 }
+                );
+            } else {
+                toastr['error'](`Portrait generation failed for "${name}": ${errMsg.substring(0, 120)}`, 'RPG Tracker');
+            }
         } finally {
             activeGenerations.delete(name);
         }
