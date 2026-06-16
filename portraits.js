@@ -205,7 +205,7 @@ export async function generatePortraitPrompt(entityName) {
             const lastMsgs = filteredMsgs.slice(-5);
             if (lastMsgs.length > 0) {
                 const msgText = lastMsgs.map(m => `${m.name || (m.is_user ? 'User' : 'Character')}: ${m.mes}`).join('\n\n');
-                contextParts.push(`Recent Chat Context (Last 5 Messages):\n${msgText.substring(0, 3000)}`);
+                contextParts.push(`Recent Chat Context (Last 5 Messages):\n${msgText.substring(0, 12000)}`);
             }
         }
     } catch { /* ignore */ }
