@@ -544,12 +544,20 @@ export async function generateWithPollinations(prompt, entityName, localApply, r
         if (result === 3) {
             await showPreview(); // Regenerate
         } else if (result) {
-            // Wait for generation to finish, then scale and apply
+            // Wait for generation to finish, then crop, scale, and apply
             try {
                 const dataUrl = await genPromise;
-                const scaled = await scaleImageTo512Square(dataUrl);
-                localApply(scaled);
-                toastr['success'](`Portrait applied for ${entityName}!`, 'RPG Tracker');
+                const cropped = await ctx.callGenericPopup(
+                    'Set the crop position of the portrait',
+                    ctx.POPUP_TYPE?.CROP ?? 4,
+                    '',
+                    { cropImage: dataUrl, cropAspect: 1 }
+                );
+                if (cropped) {
+                    const scaled = await scaleImageTo512Square(cropped);
+                    localApply(scaled);
+                    toastr['success'](`Portrait applied for ${entityName}!`, 'RPG Tracker');
+                }
             } catch (err) {
                 toastr['error']('Cannot apply — generation failed: ' + err.message, 'RPG Tracker');
             }
@@ -611,12 +619,20 @@ export async function generateWithNativeExtension(prompt, entityName, localApply
         if (result === 3) {
             await showPreview(); // Regenerate
         } else if (result) {
-            // Wait for generation to finish, then scale and apply
+            // Wait for generation to finish, then crop, scale, and apply
             try {
                 const imageUrl = await genPromise;
-                const scaled = await scaleImageTo512Square(imageUrl);
-                localApply(scaled);
-                toastr['success'](`Portrait applied for ${entityName}!`, 'RPG Tracker');
+                const cropped = await ctx.callGenericPopup(
+                    'Set the crop position of the portrait',
+                    ctx.POPUP_TYPE?.CROP ?? 4,
+                    '',
+                    { cropImage: imageUrl, cropAspect: 1 }
+                );
+                if (cropped) {
+                    const scaled = await scaleImageTo512Square(cropped);
+                    localApply(scaled);
+                    toastr['success'](`Portrait applied for ${entityName}!`, 'RPG Tracker');
+                }
             } catch (err) {
                 toastr['error']('Cannot apply — generation failed: ' + err.message, 'RPG Tracker');
             }
