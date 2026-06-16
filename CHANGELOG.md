@@ -2,9 +2,10 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
-## [3.4.9] - 2026-06-16
+## [3.5.0] - 2026-06-16
 
 ### Added
+- **AI Character Portrait Cropping**: Added image cropping support for AI-generated portraits (from Pollinations or the native ST Image Generation extension) prior to scaling and applying.
 - **AI Character Portrait Generation**: Introduced a built-in portrait generation system powered by the Pollinations API. By clicking on any character, party member, or enemy's portrait box in the tracker, you can select "🤖 AI Generate" to instantly create a high-quality visual representation of them based on their description and game state.
 - **Portrait Prompt Extended Context**: The AI portrait prompt generator now receives massive context to produce highly accurate portraits. It is injected with: 1) the full Lorebook Agent context (all active entries, keywords, and content), 2) the current game state memo, and 3) the last 5 messages of the chat history to capture immediate actions, injuries, and current outfits.
 - **Inventory Currency Auto-Rendering**: Bare currency items in the inventory (e.g. `💰 45 GP` listed as a standalone item — not a worth annotation) now always render with an inline coin badge. Gold/GP → gold coin, Silver/SP → silver coin, Bronze/Copper/CP → bronze coin, Dollar/USD/Euro/Pound → dollar badge. The underlying memo text is never modified.
