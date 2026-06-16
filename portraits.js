@@ -488,7 +488,7 @@ export async function generateWithPollinations(prompt, entityName, localApply, r
 
     let currentModel = s.pollinationsModel || 'flux';
 
-    const showPreview = async () => {
+    const showPreview = async (preGeneratedUrl = null) => {
         const modelOptions = POLLINATIONS_IMAGE_MODELS.map(m => {
             const sel = m.id === currentModel ? 'selected' : '';
             return `<option value="${m.id}" ${sel}>${m.label} (${m.tier})</option>`;
@@ -499,8 +499,8 @@ export async function generateWithPollinations(prompt, entityName, localApply, r
         const spinnerId = `rt-poll-spinner-${Date.now()}`;
         const errorId = `rt-poll-error-${Date.now()}`;
 
-        // Fire generation immediately
-        const genPromise = generatePortraitDirect(prompt, entityName);
+        // Fire generation immediately or use pre-generated/cropped URL
+        const genPromise = preGeneratedUrl ? Promise.resolve(preGeneratedUrl) : generatePortraitDirect(prompt, entityName);
         genPromise.then(dataUrl => {
             const img = document.getElementById(imgId);
             const spinner = document.getElementById(spinnerId);
@@ -531,7 +531,10 @@ export async function generateWithPollinations(prompt, entityName, localApply, r
 
         const popupOpts = {
             okButton: '✅ Apply Portrait', cancelButton: 'Cancel', wide: false,
-            customButtons: [{ text: '🔄 Regenerate', result: 3, classes: ['menu_button'] }],
+            customButtons: [
+                { text: '🔄 Regenerate', result: 3, classes: ['menu_button'] },
+                { text: '✂️ Crop', result: 4, classes: ['menu_button'] }
+            ],
         };
 
         setTimeout(() => {
@@ -543,8 +546,8 @@ export async function generateWithPollinations(prompt, entityName, localApply, r
 
         if (result === 3) {
             await showPreview(); // Regenerate
-        } else if (result) {
-            // Wait for generation to finish, then crop, scale, and apply
+        } else if (result === 4) {
+            // Crop button clicked
             try {
                 const dataUrl = await genPromise;
                 const cropped = await ctx.callGenericPopup(
@@ -554,10 +557,21 @@ export async function generateWithPollinations(prompt, entityName, localApply, r
                     { cropImage: dataUrl, cropAspect: 1 }
                 );
                 if (cropped) {
-                    const scaled = await scaleImageTo512Square(cropped);
-                    localApply(scaled);
-                    toastr['success'](`Portrait applied for ${entityName}!`, 'RPG Tracker');
+                    await showPreview(cropped);
+                } else {
+                    await showPreview(dataUrl);
                 }
+            } catch (err) {
+                toastr['error']('Cannot crop — generation failed: ' + err.message, 'RPG Tracker');
+                await showPreview();
+            }
+        } else if (result) {
+            // Wait for generation to finish, then scale and apply directly
+            try {
+                const dataUrl = await genPromise;
+                const scaled = await scaleImageTo512Square(dataUrl);
+                localApply(scaled);
+                toastr['success'](`Portrait applied for ${entityName}!`, 'RPG Tracker');
             } catch (err) {
                 toastr['error']('Cannot apply — generation failed: ' + err.message, 'RPG Tracker');
             }
@@ -578,13 +592,13 @@ export async function generateWithNativeExtension(prompt, entityName, localApply
     const ctx = SillyTavern.getContext();
     if (!ctx.callGenericPopup) return;
 
-    const showPreview = async () => {
+    const showPreview = async (preGeneratedUrl = null) => {
         const imgId = `rt-native-img-${Date.now()}`;
         const spinnerId = `rt-native-spinner-${Date.now()}`;
         const errorId = `rt-native-error-${Date.now()}`;
 
-        // Fire generation immediately
-        const genPromise = generatePortraitDirect(prompt, entityName);
+        // Fire generation immediately or use pre-generated/cropped URL
+        const genPromise = preGeneratedUrl ? Promise.resolve(preGeneratedUrl) : generatePortraitDirect(prompt, entityName);
         genPromise.then(imageUrl => {
             const img = document.getElementById(imgId);
             const spinner = document.getElementById(spinnerId);
@@ -611,15 +625,18 @@ export async function generateWithNativeExtension(prompt, entityName, localApply
 
         const popupOpts = {
             okButton: '✅ Apply Portrait', cancelButton: 'Cancel', wide: false,
-            customButtons: [{ text: '🔄 Regenerate', result: 3, classes: ['menu_button'] }],
+            customButtons: [
+                { text: '🔄 Regenerate', result: 3, classes: ['menu_button'] },
+                { text: '✂️ Crop', result: 4, classes: ['menu_button'] }
+            ],
         };
 
         const result = await ctx.callGenericPopup(popupContent, ctx.POPUP_TYPE?.CONFIRM ?? 1, '', popupOpts);
 
         if (result === 3) {
             await showPreview(); // Regenerate
-        } else if (result) {
-            // Wait for generation to finish, then crop, scale, and apply
+        } else if (result === 4) {
+            // Crop button clicked
             try {
                 const imageUrl = await genPromise;
                 const cropped = await ctx.callGenericPopup(
@@ -629,10 +646,21 @@ export async function generateWithNativeExtension(prompt, entityName, localApply
                     { cropImage: imageUrl, cropAspect: 1 }
                 );
                 if (cropped) {
-                    const scaled = await scaleImageTo512Square(cropped);
-                    localApply(scaled);
-                    toastr['success'](`Portrait applied for ${entityName}!`, 'RPG Tracker');
+                    await showPreview(cropped);
+                } else {
+                    await showPreview(imageUrl);
                 }
+            } catch (err) {
+                toastr['error']('Cannot crop — generation failed: ' + err.message, 'RPG Tracker');
+                await showPreview();
+            }
+        } else if (result) {
+            // Wait for generation to finish, then scale and apply
+            try {
+                const imageUrl = await genPromise;
+                const scaled = await scaleImageTo512Square(imageUrl);
+                localApply(scaled);
+                toastr['success'](`Portrait applied for ${entityName}!`, 'RPG Tracker');
             } catch (err) {
                 toastr['error']('Cannot apply — generation failed: ' + err.message, 'RPG Tracker');
             }

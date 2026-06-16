@@ -3079,6 +3079,7 @@ Saves: Fort +X | Ref +X | Will +X`;
                 ],
             };
             if (currentSrc) {
+                popupOpts.customButtons.push({ text: '✂️ Crop Existing', result: 5, classes: ['menu_button'] });
                 popupOpts.customButtons.push({ text: '🗑 Clear Portrait', result: 2, classes: ['menu_button'] });
             }
 
@@ -3151,6 +3152,23 @@ Saves: Fort +X | Ref +X | Will +X`;
 
             if (result === 2) {
                 localApply(null);
+            } else if (result === 5) {
+                // Crop Existing — open the crop popup for the current image
+                try {
+                    const cropped = await ctx.callGenericPopup(
+                        'Set the crop position of the portrait',
+                        ctx.POPUP_TYPE?.CROP ?? 4,
+                        '',
+                        { cropImage: currentSrc, cropAspect: 1 }
+                    );
+                    if (cropped) {
+                        const scaled = await scaleImageTo512Square(cropped);
+                        localApply(scaled);
+                    }
+                } catch (err) {
+                    console.error(err);
+                    toastr['warning']('Could not crop existing image.', 'RPG Tracker');
+                }
             } else if (result === 4) {
                 // AI Generate — launch the prompt generation flow
                 try {
