@@ -355,32 +355,48 @@ export async function generatePortraitDirect(prompt, entityName) {
         const apiKey = await ensurePollinationsKey();
         if (!apiKey) throw new Error('Pollinations API key is required');
 
-        const targetUrl = 'https://gen.pollinations.ai/v1/images/generations';
         const currentModel = s.pollinationsModel || 'flux';
-
+ 
         const doRequest = async (modelName) => {
-            // Call Pollinations directly — do NOT use ST's /proxy/ endpoint.
-            // ST's /proxy/ is a reverse-proxy that routes to the currently configured
-            // ST backend (e.g. RunPod, OpenAI) rather than the URL we pass, which causes
-            // requests to land on the wrong (possibly offline) backend.
-            const directHeaders = {
-                'Authorization': `Bearer ${apiKey}`,
-                'Content-Type': 'application/json',
-            };
-            const resp = await fetch(targetUrl, {
-                method: 'POST',
-                headers: directHeaders,
-                body: JSON.stringify({ prompt, model: modelName, size: '512x512', response_format: 'b64_json' }),
-            });
+            const url = `https://gen.pollinations.ai/image/${encodeURIComponent(prompt)}?key=${apiKey}&model=${modelName}&width=512&height=512`;
+            
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 20000); // 20-second timeout
+            
+            let resp;
+            try {
+                resp = await fetch(url, { signal: controller.signal });
+                clearTimeout(timeoutId);
+            } catch (err) {
+                clearTimeout(timeoutId);
+                if (err.name === 'AbortError') {
+                    throw new Error('Pollinations request timed out after 20 seconds');
+                }
+                throw err;
+            }
 
             if (!resp.ok) {
                 const errText = await resp.text().catch(() => 'Unknown error');
                 throw new Error(`Pollinations ${resp.status}: ${errText.substring(0, 300)}`);
             }
-            const data = await resp.json();
-            const b64 = data?.data?.[0]?.b64_json;
-            if (!b64) throw new Error('No image data in API response');
-            return `data:image/png;base64,${b64}`;
+            
+            const blob = await resp.blob();
+            if (!blob || blob.size === 0) {
+                throw new Error('Received empty image blob from Pollinations API');
+            }
+            
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    if (typeof reader.result === 'string') {
+                        resolve(reader.result);
+                    } else {
+                        reject(new Error('Failed to read image as Base64 string'));
+                    }
+                };
+                reader.onerror = () => reject(new Error('FileReader error while converting image blob'));
+                reader.readAsDataURL(blob);
+            });
         };
 
         try {
