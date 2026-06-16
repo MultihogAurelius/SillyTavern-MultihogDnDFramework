@@ -1191,7 +1191,7 @@ function formatValueToCurrency(totalCp, detectedCurrency) {
             const isCollapsed = collapsed.has(tag);
 
             let totalValueBadge = '';
-            if (tag === 'INVENTORY' && items.totalValueGP) {
+            if (tag === 'INVENTORY' && items.totalValueGP && getSettings().showTotalInventoryValue !== false) {
                 const isModern = ['usd', 'eur', 'gbp'].includes(items.detectedCurrency);
                 const badgeColor = isModern ? '#85bb65' : '#ffd700';
                 const badgeBg = isModern ? 'rgba(133, 187, 101, 0.08)' : 'rgba(255, 215, 0, 0.08)';

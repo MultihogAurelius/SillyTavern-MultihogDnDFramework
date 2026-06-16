@@ -117,14 +117,24 @@
                             </div>
                         </div>
 
-                        <div style="margin-top: 6px; padding-left: 22px; margin-bottom: 2px; display: flex; align-items: center; gap: 8px;">
-                            <label style="font-size: 0.82em; opacity: 0.75; white-space: nowrap;">Item Worth
-                                <i class="fa-solid fa-circle-question interactable" title="Controls how item worth values (e.g. ~120 GP) are shown in Inventory. Hover: stripped from display, shown as a tooltip on hover. Display: shown as an inline coin badge next to the item. Bare currency items (e.g. '45 GP') always render as a coin badge regardless of this setting."></i>
+                        <div id="rpg_inventory_config_block" style="margin-top: 6px; border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; padding: 8px 10px;">
+                            <small style="display: block; margin-bottom: 6px; font-weight: bold; opacity: 0.9;">Inventory Settings</small>
+                            
+                            <label class="checkbox_label">
+                                <input id="rpg_tracker_show_total_value" type="checkbox" />
+                                <span>Show Total Inventory Value</span>
+                                <i class="fa-solid fa-circle-question interactable" title="When enabled, displays the calculated total value of all items in the inventory header bar."></i>
                             </label>
-                            <select id="rpg_tracker_inventory_worth_mode" class="text_pole" style="font-size: 0.82em; padding: 2px 4px; height: 24px; flex: 1;">
-                                <option value="hover">Hover (tooltip only)</option>
-                                <option value="display">Display (inline badge)</option>
-                            </select>
+
+                            <div style="margin-top: 6px; display: flex; align-items: center; gap: 8px; padding-left: 20px;">
+                                <label style="font-size: 0.82em; opacity: 0.75; white-space: nowrap;">Item Worth
+                                    <i class="fa-solid fa-circle-question interactable" title="Controls how item worth values (e.g. ~120 GP) are shown in Inventory. Hover: stripped from display, shown as a tooltip on hover. Display: shown as an inline coin badge next to the item. Bare currency items (e.g. '45 GP') always render as a coin badge regardless of this setting."></i>
+                                </label>
+                                <select id="rpg_tracker_inventory_worth_mode" class="text_pole" style="font-size: 0.82em; padding: 2px 4px; height: 24px; flex: 1;">
+                                    <option value="hover">Hover (tooltip only)</option>
+                                    <option value="display">Display (inline badge)</option>
+                                </select>
+                            </div>
                         </div>
 
                         <label class="checkbox_label" style="margin-top: 10px;">

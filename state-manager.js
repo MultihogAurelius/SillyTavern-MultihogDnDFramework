@@ -61,6 +61,7 @@ export function getSettings() {
         pollinationsApiKey: "",
         pollinationsModel: "zimage",
         inventoryWorthMode: "hover",   // 'hover' = worth shown as tooltip only | 'display' = coin badge shown inline
+        showTotalInventoryValue: true,
         barColors: {},
         modulePageSizes: {},
         customTheme: null,

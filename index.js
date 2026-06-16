@@ -882,6 +882,8 @@ function loadChatState(chatId) {
     $('#rpg_tracker_portrait_skip_prompt').prop('checked', !!s.portraitSkipPromptDialog);
     $('#rpg_tracker_portrait_auto_party').prop('checked', !!s.portraitAutoGenerateParty);
     $('#rpg_tracker_portrait_auto_enemies').prop('checked', !!s.portraitAutoGenerateEnemies);
+    $('#rpg_tracker_show_total_value').prop('checked', s.showTotalInventoryValue !== false);
+    $('#rpg_tracker_inventory_worth_mode').val(s.inventoryWorthMode || 'hover');
     $('#rpg_portrait_connection_source').val(s.portraitConnectionSource || 'default');
     $('#rpg_portrait_connection_profile').val(s.portraitConnectionProfileId || '');
     $('#rpg_portrait_completion_preset').val(s.portraitCompletionPresetId || '');
@@ -7252,6 +7254,12 @@ function buildSysprompt(rawText) {
 
         $('#rpg_tracker_inventory_worth_mode').val(settings.inventoryWorthMode || 'hover').on('change', function () {
             settings.inventoryWorthMode = String($(this).val());
+            saveSettings();
+            refreshRenderedView();
+        });
+
+        $('#rpg_tracker_show_total_value').prop('checked', settings.showTotalInventoryValue !== false).on('change', function () {
+            settings.showTotalInventoryValue = !!$(this).prop('checked');
             saveSettings();
             refreshRenderedView();
         });
