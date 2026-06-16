@@ -1,6 +1,4 @@
-# Fatbody D&D Framework
-
-**"Fatbody D&D gives you the Private Pyle experience."** —Gny. Sgt. Hartman
+# Multihog D&D Framework
 
 *A D&D-based RPG platform/simulation engine for SillyTavern.*
 
