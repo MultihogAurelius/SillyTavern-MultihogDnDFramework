@@ -2112,6 +2112,9 @@ export async function scanAssistantOutputForKeywords(narrativeText, opts = {}) {
     const currentKeyword = new Set(settings.keywordActivatedKeys || []);
     const newlyTriggered = [];
 
+    const directMatches = [];
+    const historyMatches = [];
+
     // Cache loaded books so the reverse sweep can reuse them without re-loading.
     /** @type {Map<string, any>} */
     const bookCache = new Map();
@@ -2125,33 +2128,54 @@ export async function scanAssistantOutputForKeywords(narrativeText, opts = {}) {
 
         for (const [uid, entry] of Object.entries(book.entries)) {
             const fullId = `${bookName}::${uid}`;
-            if (currentActive.has(fullId)) continue; // already active — skip
-
             const keywords = Array.isArray(entry.key) ? entry.key : [];
             if (keywords.length === 0) continue;
 
             // Check the current narrative text (discovery)
-            let matched = keywords.some(kw =>
+            const isDirectMatch = keywords.some(kw =>
                 typeof kw === 'string' && kw.length > 0 &&
                 lowerText.includes(kw.toLowerCase())
             );
 
-            // Retroactive lookback: check history window if not matched in the current text
-            if (!matched) {
+            if (isDirectMatch) {
+                directMatches.push(fullId);
+            } else {
+                // Only check lookback history if not matched in direct text and not already active
+                if (currentActive.has(fullId)) continue;
                 const depth = (typeof entry.depth === 'number' && entry.depth > 0) ? entry.depth : (book.scan_depth ?? 4);
                 const window = recentMessages.slice(-depth);
                 const windowText = window.map(m => (m.mes || m.content || '')).join(' ').toLowerCase();
-                matched = keywords.some(kw =>
+                const isHistoryMatch = keywords.some(kw =>
                     typeof kw === 'string' && kw.length > 0 &&
                     windowText.includes(kw.toLowerCase())
                 );
+                if (isHistoryMatch) {
+                    historyMatches.push(fullId);
+                }
             }
+        }
+    }
 
-            if (matched) {
-                currentActive.add(fullId);
-                currentKeyword.add(fullId);
-                newlyTriggered.push(fullId);
-            }
+    // First process history matches (lower priority)
+    for (const fullId of historyMatches) {
+        if (!currentActive.has(fullId)) {
+            currentActive.add(fullId);
+            currentKeyword.add(fullId);
+            newlyTriggered.push(fullId);
+        }
+    }
+
+    // Then process direct matches (highest priority)
+    for (const fullId of directMatches) {
+        // Move to the end of the Set to prioritize and protect from eviction/expiration
+        if (currentKeyword.has(fullId)) {
+            currentKeyword.delete(fullId);
+        }
+        currentKeyword.add(fullId);
+
+        if (!currentActive.has(fullId)) {
+            currentActive.add(fullId);
+            newlyTriggered.push(fullId);
         }
     }
 
