@@ -2,6 +2,12 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [3.5.7] - 2026-06-18
+
+### Added
+- **Bidirectional Settings Synchronization**: Fully synchronized all 8 "Quick Settings" fields in the Lorebook Agent panel with their respective counterparts in the main extension settings panel. Changes in either location are updated instantly.
+- **Agent Core Settings Drawer**: Created a new sub-drawer in the extension settings page specifically for core agent configuration options.
+
 ## [3.5.6] - 2026-06-18
 
 ### Changed

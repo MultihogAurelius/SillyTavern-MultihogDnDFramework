@@ -4237,6 +4237,7 @@ function createPanel() {
             basicCheck.addEventListener('change', (e) => {
                 const s = getSettings();
                 s.routerBasicMode = (/** @type {HTMLInputElement} */ (e.target)).checked;
+                $('#rpg_tracker_router_basic_mode').prop('checked', s.routerBasicMode);
                 saveSettings();
             });
         }
@@ -4246,6 +4247,7 @@ function createPanel() {
             nativeKwCheck.addEventListener('change', (e) => {
                 const s = getSettings();
                 s.routerNativeKeywordActivation = (/** @type {HTMLInputElement} */ (e.target)).checked;
+                $('#rpg_tracker_router_native_keyword_activation').prop('checked', s.routerNativeKeywordActivation);
                 saveSettings();
             });
         }
@@ -4900,15 +4902,6 @@ function createPanel() {
 
 
 
-        const lookbackInput = /** @type {HTMLInputElement} */ (agentPanel.querySelector('#rt-agent-router-lookback'));
-        if (lookbackInput) {
-            lookbackInput.addEventListener('change', (e) => {
-                const s = getSettings();
-                s.routerLookback = parseInt((/** @type {HTMLInputElement} */ (e.target)).value) || 4;
-                saveSettings();
-            });
-        }
-
         const directLookbackInput = /** @type {HTMLInputElement} */ (agentPanel.querySelector('#rt-agent-router-direct-lookback'));
         if (directLookbackInput) {
             directLookbackInput.addEventListener('change', (e) => {
@@ -4920,18 +4913,20 @@ function createPanel() {
 
         const maxAct = /** @type {HTMLInputElement} */ (agentPanel.querySelector('#rt-agent-router-max-activations'));
         if (maxAct) {
-            maxAct.addEventListener('change', () => {
+            maxAct.addEventListener('input', () => {
                 const s = getSettings();
                 s.routerMaxActivations = parseInt(maxAct.value) || 8;
+                $('#rpg_tracker_router_max_activations').val(s.routerMaxActivations);
                 saveSettings();
             });
         }
 
         const kwOverflowInp = /** @type {HTMLInputElement} */ (agentPanel.querySelector('#rt-agent-router-kw-overflow-cap'));
         if (kwOverflowInp) {
-            kwOverflowInp.addEventListener('change', () => {
+            kwOverflowInp.addEventListener('input', () => {
                 const s = getSettings();
                 s.routerMaxKeywordOverflow = parseInt(kwOverflowInp.value) || 0;
+                $('#rpg_tracker_router_max_keyword_overflow').val(s.routerMaxKeywordOverflow);
                 saveSettings();
             });
         }
@@ -4975,6 +4970,7 @@ function createPanel() {
             includeHiddenCheck.addEventListener('change', () => {
                 const s = getSettings();
                 s.routerIncludeHidden = includeHiddenCheck.checked;
+                $('#rpg_tracker_router_include_hidden').prop('checked', s.routerIncludeHidden);
                 saveSettings();
             });
         }
@@ -4982,9 +4978,10 @@ function createPanel() {
         // ── Run-every counter ──
         const runEveryInput = /** @type {HTMLInputElement} */ (agentPanel.querySelector('#rt-agent-router-run-every'));
         if (runEveryInput) {
-            runEveryInput.addEventListener('change', (e) => {
+            runEveryInput.addEventListener('input', (e) => {
                 const s = getSettings();
                 s.routerRunEvery = parseInt((/** @type {HTMLInputElement} */ (e.target)).value) || 1;
+                $('#rpg_tracker_router_run_every').val(s.routerRunEvery);
                 saveSettings();
             });
         }
@@ -9533,13 +9530,44 @@ RULES:
         });
 
 
-        $('#rpg_tracker_router_max_turns').val(settings.routerMaxTurns).on('input', function () {
-            settings.routerMaxTurns = parseInt(String($(this).val() || '')) || 5;
+        $('#rpg_tracker_router_basic_mode').prop('checked', settings.routerBasicMode).on('change', function () {
+            settings.routerBasicMode = $(this).prop('checked');
+            $('#rt-agent-router-basic').prop('checked', settings.routerBasicMode);
+            saveSettings();
+        });
+        $('#rpg_tracker_router_native_keyword_activation').prop('checked', settings.routerNativeKeywordActivation).on('change', function () {
+            settings.routerNativeKeywordActivation = $(this).prop('checked');
+            $('#rt-agent-router-native-kw').prop('checked', settings.routerNativeKeywordActivation);
+            saveSettings();
+        });
+        $('#rpg_tracker_router_include_hidden').prop('checked', settings.routerIncludeHidden).on('change', function () {
+            settings.routerIncludeHidden = $(this).prop('checked');
+            $('#rt-agent-router-include-hidden').prop('checked', settings.routerIncludeHidden);
             saveSettings();
         });
         $('#rpg_tracker_router_lookback').val(settings.routerLookback).on('input', function () {
             settings.routerLookback = parseInt(String($(this).val() || '')) || 4;
             $('#rt-agent-router-lookback').val(settings.routerLookback);
+            saveSettings();
+        });
+        $('#rpg_tracker_router_run_every').val(settings.routerRunEvery || 1).on('input', function () {
+            settings.routerRunEvery = parseInt(String($(this).val() || '')) || 1;
+            $('#rt-agent-router-run-every').val(settings.routerRunEvery);
+            saveSettings();
+        });
+        $('#rpg_tracker_router_max_turns').val(settings.routerMaxTurns).on('input', function () {
+            settings.routerMaxTurns = parseInt(String($(this).val() || '')) || 5;
+            $('#rt-agent-router-max-turns').val(settings.routerMaxTurns);
+            saveSettings();
+        });
+        $('#rpg_tracker_router_max_activations').val(settings.routerMaxActivations).on('input', function () {
+            settings.routerMaxActivations = parseInt(String($(this).val() || '')) || 8;
+            $('#rt-agent-router-max-activations').val(settings.routerMaxActivations);
+            saveSettings();
+        });
+        $('#rpg_tracker_router_max_keyword_overflow').val(settings.routerMaxKeywordOverflow ?? 0).on('input', function () {
+            settings.routerMaxKeywordOverflow = parseInt(String($(this).val() || '')) || 0;
+            $('#rt-agent-router-kw-overflow-cap').val(settings.routerMaxKeywordOverflow);
             saveSettings();
         });
 
