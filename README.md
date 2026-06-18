@@ -108,7 +108,7 @@ For the state pass, I use Gemini 3.1 Flash Lite or Flash 3 with low reasoning. V
 ---
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/bd7debe0-b97d-4aa0-a8ec-49cd0fc527f3" width="500" alt="Lorebook Agent" />
+  <img src="https://github.com/user-attachments/assets/0fc898ec-f27a-45f4-bc63-d229e3685695" width="500" alt="Lorebook Agent" />
   <br>
   <strong>Lorebook Agent</strong>
 </p>
@@ -119,5 +119,3 @@ For the state pass, I use Gemini 3.1 Flash Lite or Flash 3 with low reasoning. V
 MIT
 
 ***
-
-*AND YES, IT IS FULLY VIBE-CODED IN ANTIGRAVITY AND CURSOR!*
