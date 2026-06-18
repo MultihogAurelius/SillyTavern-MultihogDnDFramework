@@ -3508,7 +3508,7 @@ function createPanel() {
             </div>
             <div class="rpg-tracker-panel rpg-tracker-agent-panel ${settings.agentCollapsed ? 'rt-panel-collapsed ' : ''}${settings.trackerTheme || 'rt-theme-native'}" id="rpg-tracker-agent" style="display:none; position: absolute; right: 0; top: 30px; width: 300px; max-height: calc(100% - 30px); z-index: 1000; flex-direction: column; resize: none !important; overflow: hidden !important;">
                 <div class="rpg-tracker-header" style="cursor: default;">
-                    <span class="rpg-tracker-header-left"><i class="fa-solid fa-robot"></i> <span>Lorebook Agent</span></span>
+                    <span class="rpg-tracker-header-left"><i class="fa-solid fa-robot"></i> <span>Lorebook Agent: Autonomous Researcher</span></span>
                     <div class="rpg-tracker-header-center" id="rt-agent-pause-banner" style="color:#ffa500; font-size:0.7em; font-weight:bold; letter-spacing:0.04em;">${settings.routerPaused ? 'AGENT PAUSED' : ''}</div>
                     <div class="rpg-tracker-header-right">
                         <button class="rpg-tracker-icon-btn" id="rt-agent-router-manual-run" title="Run Research Now" style="color: var(--rt-accent);"><i class="fa-solid fa-play"></i></button>
@@ -3542,80 +3542,84 @@ function createPanel() {
                     </div>
                 </div>
                 <div class="rpg-tracker-content" style="flex: 1; overflow-y: auto; resize: none; padding: 10px; color: var(--rt-text);">
-                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
-                        <div style="font-weight: bold; opacity: 0.9; font-size: 0.923em; color: var(--rt-accent, #3498db);">AUTONOMOUS RESEARCHER</div>
-                        <button id="rt-agent-help-btn" style="background: var(--rt-accent-bg); border: 1px solid var(--rt-accent-dim); color: var(--rt-accent); border-radius: 12px; width: 20px; height: 20px; font-size: 0.846em; cursor: pointer; display: flex; align-items: center; justify-content: center;" title="What is the Lorebook Agent?">?</button>
+                    <!-- Quick Settings Collapsible Header -->
+                    <div id="rt-agent-settings-header" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; cursor: pointer; padding-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.08); user-select: none;">
+                        <div style="font-weight: bold; font-size: 0.846em; display: flex; align-items: center; gap: 6px; color: var(--rt-text-muted);">
+                            <i class="fa-solid ${settings.agentSettingsOpen !== false ? 'fa-chevron-down' : 'fa-chevron-right'}" id="rt-agent-settings-toggle-icon"></i> Quick Settings
+                        </div>
+                        <button id="rt-agent-help-btn" style="background: var(--rt-accent-bg); border: 1px solid var(--rt-accent-dim); color: var(--rt-accent); border-radius: 12px; width: 18px; height: 18px; font-size: 0.769em; cursor: pointer; display: flex; align-items: center; justify-content: center; margin: 0;" title="What is the Lorebook Agent?">?</button>
                     </div>
 
-                    <label style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; cursor: pointer; opacity: 0.8; font-size: 0.846em;" title="Use simple text tags [[NPC: Name | Desc]] instead of complex tools. Better for small models.">
-                        Basic Mode (tag-based, no tool calls)
-                        <input type="checkbox" id="rt-agent-router-basic" ${settings.routerBasicMode ? 'checked' : ''}>
-                    </label>
+                    <!-- Quick Settings Drawer -->
+                    <div id="rt-agent-settings-drawer" style="display: ${settings.agentSettingsOpen !== false ? 'block' : 'none'}; margin-bottom: 10px;">
+                        <label style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; cursor: pointer; opacity: 0.8; font-size: 0.846em;" title="Use simple text tags [[NPC: Name | Desc]] instead of complex tools. Better for small models.">
+                            Basic Mode (tag-based, no tool calls)
+                            <input type="checkbox" id="rt-agent-router-basic" ${settings.routerBasicMode ? 'checked' : ''}>
+                        </label>
 
-                    <label style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; cursor: pointer; opacity: 0.8; font-size: 0.846em;" title="When enabled, the extension's keyword scanner is fully disabled. SillyTavern's native lorebook keyword system handles all keyword-based entry activation. The agent will not auto-activate or auto-expire entries based on keywords.">
-                        Native Keyword Activation
-                        <input type="checkbox" id="rt-agent-router-native-kw" ${settings.routerNativeKeywordActivation ? 'checked' : ''}>
-                    </label>
+                        <label style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; cursor: pointer; opacity: 0.8; font-size: 0.846em;" title="When enabled, the extension's keyword scanner is fully disabled. SillyTavern's native lorebook keyword system handles all keyword-based entry activation. The agent will not auto-activate or auto-expire entries based on keywords.">
+                            Native Keyword Activation
+                            <input type="checkbox" id="rt-agent-router-native-kw" ${settings.routerNativeKeywordActivation ? 'checked' : ''}>
+                        </label>
 
-                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
-                        <div style="display: flex; align-items: center; gap: 6px; flex: 1;" title="Main lookback: last N chat messages (user and assistant, in order) included in the agent context during automatic passes.">
-                            <span style="font-size: 0.769em; opacity: 0.7;">Lookback (user/assistant):</span>
-                            <input type="text" inputmode="numeric" pattern="[0-9]*" id="rt-agent-router-lookback" value="${settings.routerLookback || 4}" min="1" max="100" style="width: 40px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); color: white; border-radius: 3px; text-align: center; font-size: 0.769em; padding: 1px;">
-                            <span style="font-size: 0.769em; opacity: 0.5;">msgs</span>
+                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+                            <div style="display: flex; align-items: center; gap: 6px; flex: 1;" title="Main lookback: last N chat messages (user and assistant, in order) included in the agent context during automatic passes.">
+                                <span style="font-size: 0.769em; opacity: 0.7;">Lookback (user/assistant):</span>
+                                <input type="text" inputmode="numeric" pattern="[0-9]*" id="rt-agent-router-lookback" value="${settings.routerLookback || 4}" min="1" max="100" style="width: 40px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); color: white; border-radius: 3px; text-align: center; font-size: 0.769em; padding: 1px;">
+                                <span style="font-size: 0.769em; opacity: 0.5;">msgs</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 6px; flex: 1;" title="Run every N messages: The agent only fires an auto-pass once per N AI responses. Higher = fewer runs, fewer tokens. Manual runs always fire immediately.">
+                                <span style="font-size: 0.769em; opacity: 0.7;">Run every:</span>
+                                <input type="text" inputmode="numeric" pattern="[0-9]*" id="rt-agent-router-run-every" value="${settings.routerRunEvery || 1}" min="1" max="50" style="width: 40px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); color: white; border-radius: 3px; text-align: center; font-size: 0.769em; padding: 1px;">
+                                <span style="font-size: 0.769em; opacity: 0.5;">msgs</span>
+                            </div>
                         </div>
-                        <div style="display: flex; align-items: center; gap: 6px; flex: 1;" title="Run every N messages: The agent only fires an auto-pass once per N AI responses. Higher = fewer runs, fewer tokens. Manual runs always fire immediately.">
-                            <span style="font-size: 0.769em; opacity: 0.7;">Run every:</span>
-                            <input type="text" inputmode="numeric" pattern="[0-9]*" id="rt-agent-router-run-every" value="${settings.routerRunEvery || 1}" min="1" max="50" style="width: 40px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); color: white; border-radius: 3px; text-align: center; font-size: 0.769em; padding: 1px;">
-                            <span style="font-size: 0.769em; opacity: 0.5;">msgs</span>
+                        <label style="display: flex; align-items: center; gap: 5px; margin-bottom: 10px; cursor: pointer; font-size: 0.769em; opacity: 0.75;" title="Include hidden messages (e.g. messages collapsed by a summarizer) in the agent's lookback window.">
+                            <input type="checkbox" id="rt-agent-router-include-hidden" ${settings.routerIncludeHidden ? 'checked' : ''}>
+                            <span>Include hidden msgs (summarizer)</span>
+                        </label>
+
+                        <div style="display: flex; gap: 8px; margin-bottom: 10px;">
+                            <div style="flex: 1;" title="Max Turns: How many Thought/Action loops the agent can perform before timing out (Advanced Mode only).">
+                                <div style="margin-bottom: 5px; opacity: 0.8; font-size: 0.846em; color: var(--rt-text-muted);">Max Agent Turns:</div>
+                                <input type="text" inputmode="numeric" pattern="[0-9]*" id="rt-agent-router-max-turns" value="${settings.routerMaxTurns || 5}" style="width: 100%; background: var(--rt-card-bg); color: var(--rt-text); border: var(--rt-border); border-radius: 4px; padding: 4px; font-size: 0.846em; box-sizing: border-box;">
+                            </div>
+                            <div style="flex: 1;" title="Max Active Keys: The maximum number of lore entries the agent can keep in Active Memory. Once reached, it must deactivate old entries to add new ones.">
+                                <div style="margin-bottom: 5px; opacity: 0.8; font-size: 0.846em; color: var(--rt-text-muted);">Max Active Keys:</div>
+                                <input type="text" inputmode="numeric" pattern="[0-9]*" id="rt-agent-router-max-activations" value="${settings.routerMaxActivations || 8}" min="1" max="20" style="width: 100%; background: var(--rt-card-bg); color: var(--rt-text); border: var(--rt-border); border-radius: 4px; padding: 4px; font-size: 0.846em; box-sizing: border-box;">
+                            </div>
+                            <div style="flex: 1;" title="Keyword Overflow Cap: max keyword-triggered entries allowed above Max Active Keys (0 = no cap). When exceeded, the oldest keyword entries are evicted first. Example: Max Active=8, Cap=4 → hard ceiling of 12 total.">
+                                <div style="margin-bottom: 5px; opacity: 0.8; font-size: 0.846em; color: var(--rt-text-muted); line-height: 1.2;">Keyword Overflow Cap<br><span style="font-size: 0.75em; opacity: 0.5; font-weight: normal;">(0 = no cap)</span>:</div>
+                                <input type="text" inputmode="numeric" pattern="[0-9]*" id="rt-agent-router-kw-overflow-cap" value="${settings.routerMaxKeywordOverflow ?? 0}" min="0" max="50" style="width: 100%; background: var(--rt-card-bg); color: var(--rt-text); border: var(--rt-border); border-radius: 4px; padding: 4px; font-size: 0.846em; box-sizing: border-box;">
+                            </div>
                         </div>
+                        
+                        <div style="margin-bottom: 5px; font-weight: bold; opacity: 0.8; font-size: 0.846em; color: var(--rt-text-muted);">Direct Command:</div>
+                        <textarea id="rt-agent-router-direct-prompt" placeholder="Ask the agent to find or record something specific..." style="width: 100% !important; min-height: 60px !important; height: 60px !important; background: var(--rt-card-bg) !important; color: var(--rt-text) !important; border: var(--rt-border) !important; border-radius: 4px !important; padding: 6px !important; font-size: 0.846em !important; margin-bottom: 6px !important; resize: vertical !important; display: block !important; box-sizing: border-box !important; line-height: 1.3 !important;">${settings.routerDirectPrompt || ''}</textarea>
+
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; background: var(--rt-header-bg); padding: 4px 8px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.05); box-sizing: border-box; min-height: 32px;">
+                            <div style="display: flex; align-items: center; gap: 6px;" title="Direct lookback: last N chat messages (user and assistant) for this manual run.">
+                                <span style="font-size: 0.769em; opacity: 0.7; color: var(--rt-text-muted);">Lookback (user/assistant):</span>
+                                <input type="text" inputmode="numeric" pattern="[0-9]*" id="rt-agent-router-direct-lookback" value="${settings.routerDirectLookback || 10}" min="1" max="100" style="width: 38px; background: var(--rt-card-bg); border: 1px solid var(--rt-accent-dim); color: var(--rt-accent); border-radius: 3px; text-align: center; font-size: 0.769em; padding: 1px; box-sizing: border-box; height: 20px;">
+                                <span style="font-size: 0.769em; opacity: 0.5; color: var(--rt-text-muted);">msgs</span>
+                            </div>
+                            <button id="rt-agent-router-run-direct" class="rpg-tracker-prompt-send" style="width: auto; height: 22px; padding: 0 10px; font-size: 0.769em; font-weight: bold; gap: 4px; margin: 0;" title="Execute Lorebook Agent pass">
+                                <i class="fa-solid fa-paper-plane" style="font-size: 0.692em;"></i> RUN COMMAND
+                            </button>
+                        </div>
+
+                        <details style="margin-top: 10px; border-top: 1px solid #444; padding-top: 10px;">
+                            <summary style="cursor: pointer; font-size: 0.846em; font-weight: bold; opacity: 0.8; color: #aaa;">Modular Repertoire (Prompt Rules)</summary>
+                            <div style="padding-top: 10px;">
+                                <div style="margin-bottom: 5px; font-weight: bold; opacity: 0.8; font-size: 0.846em;">Enabled Modules (Stock):</div>
+                                <div id="rt-agent-stock-modules-list" style="margin-bottom: 10px;"></div>
+
+                                <div style="margin-bottom: 5px; font-weight: bold; opacity: 0.8; font-size: 0.846em;">Custom Tags:</div>
+                                <div id="rt-agent-custom-tags-list"></div>
+                                <button id="rt-agent-add-custom-tag" style="width: 100%; background: #333; border: 1px solid #444; color: #ddd; font-size: 0.769em; padding: 2px; border-radius: 3px; cursor: pointer; margin-top: 4px;">+ Add Custom Tag</button>
+                            </div>
+                        </details>
                     </div>
-                    <label style="display: flex; align-items: center; gap: 5px; margin-bottom: 10px; cursor: pointer; font-size: 0.769em; opacity: 0.75;" title="Include hidden messages (e.g. messages collapsed by a summarizer) in the agent's lookback window.">
-                        <input type="checkbox" id="rt-agent-router-include-hidden" ${settings.routerIncludeHidden ? 'checked' : ''}>
-                        <span>Include hidden msgs (summarizer)</span>
-                    </label>
-
-                    <div style="display: flex; gap: 8px; margin-bottom: 10px;">
-
-                        <div style="flex: 1;" title="Max Turns: How many Thought/Action loops the agent can perform before timing out (Advanced Mode only).">
-                            <div style="margin-bottom: 5px; opacity: 0.8; font-size: 0.846em; color: var(--rt-text-muted);">Max Agent Turns:</div>
-                            <input type="text" inputmode="numeric" pattern="[0-9]*" id="rt-agent-router-max-turns" value="${settings.routerMaxTurns || 5}" style="width: 100%; background: var(--rt-card-bg); color: var(--rt-text); border: var(--rt-border); border-radius: 4px; padding: 4px; font-size: 0.846em; box-sizing: border-box;">
-                        </div>
-                        <div style="flex: 1;" title="Max Active Keys: The maximum number of lore entries the agent can keep in Active Memory. Once reached, it must deactivate old entries to add new ones.">
-                            <div style="margin-bottom: 5px; opacity: 0.8; font-size: 0.846em; color: var(--rt-text-muted);">Max Active Keys:</div>
-                            <input type="text" inputmode="numeric" pattern="[0-9]*" id="rt-agent-router-max-activations" value="${settings.routerMaxActivations || 8}" min="1" max="20" style="width: 100%; background: var(--rt-card-bg); color: var(--rt-text); border: var(--rt-border); border-radius: 4px; padding: 4px; font-size: 0.846em; box-sizing: border-box;">
-                        </div>
-                        <div style="flex: 1;" title="Keyword Overflow Cap: max keyword-triggered entries allowed above Max Active Keys (0 = no cap). When exceeded, the oldest keyword entries are evicted first. Example: Max Active=8, Cap=4 → hard ceiling of 12 total.">
-                            <div style="margin-bottom: 5px; opacity: 0.8; font-size: 0.846em; color: var(--rt-text-muted); line-height: 1.2;">Keyword Overflow Cap<br><span style="font-size: 0.75em; opacity: 0.5; font-weight: normal;">(0 = no cap)</span>:</div>
-                            <input type="text" inputmode="numeric" pattern="[0-9]*" id="rt-agent-router-kw-overflow-cap" value="${settings.routerMaxKeywordOverflow ?? 0}" min="0" max="50" style="width: 100%; background: var(--rt-card-bg); color: var(--rt-text); border: var(--rt-border); border-radius: 4px; padding: 4px; font-size: 0.846em; box-sizing: border-box;">
-                        </div>
-                    </div>
-                    
-                    <div style="margin-bottom: 5px; font-weight: bold; opacity: 0.8; font-size: 0.846em; color: var(--rt-text-muted);">Direct Command:</div>
-                    <textarea id="rt-agent-router-direct-prompt" placeholder="Ask the agent to find or record something specific..." style="width: 100% !important; min-height: 60px !important; height: 60px !important; background: var(--rt-card-bg) !important; color: var(--rt-text) !important; border: var(--rt-border) !important; border-radius: 4px !important; padding: 6px !important; font-size: 0.846em !important; margin-bottom: 6px !important; resize: vertical !important; display: block !important; box-sizing: border-box !important; line-height: 1.3 !important;">${settings.routerDirectPrompt || ''}</textarea>
-
-                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; background: var(--rt-header-bg); padding: 4px 8px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.05); box-sizing: border-box; min-height: 32px;">
-                        <div style="display: flex; align-items: center; gap: 6px;" title="Direct lookback: last N chat messages (user and assistant) for this manual run.">
-                            <span style="font-size: 0.769em; opacity: 0.7; color: var(--rt-text-muted);">Lookback (user/assistant):</span>
-                            <input type="text" inputmode="numeric" pattern="[0-9]*" id="rt-agent-router-direct-lookback" value="${settings.routerDirectLookback || 10}" min="1" max="100" style="width: 38px; background: var(--rt-card-bg); border: 1px solid var(--rt-accent-dim); color: var(--rt-accent); border-radius: 3px; text-align: center; font-size: 0.769em; padding: 1px; box-sizing: border-box; height: 20px;">
-                            <span style="font-size: 0.769em; opacity: 0.5; color: var(--rt-text-muted);">msgs</span>
-                        </div>
-                        <button id="rt-agent-router-run-direct" class="rpg-tracker-prompt-send" style="width: auto; height: 22px; padding: 0 10px; font-size: 0.769em; font-weight: bold; gap: 4px; margin: 0;" title="Execute Lorebook Agent pass">
-                            <i class="fa-solid fa-paper-plane" style="font-size: 0.692em;"></i> RUN COMMAND
-                        </button>
-                    </div>
-
-
-                    <details style="margin-top: 10px; border-top: 1px solid #444; padding-top: 10px;">
-                        <summary style="cursor: pointer; font-size: 0.846em; font-weight: bold; opacity: 0.8; color: #aaa;">Modular Repertoire (Prompt Rules)</summary>
-                        <div style="padding-top: 10px;">
-                            <div style="margin-bottom: 5px; font-weight: bold; opacity: 0.8; font-size: 0.846em;">Enabled Modules (Stock):</div>
-                            <div id="rt-agent-stock-modules-list" style="margin-bottom: 10px;"></div>
-
-                            <div style="margin-bottom: 5px; font-weight: bold; opacity: 0.8; font-size: 0.846em;">Custom Tags:</div>
-                            <div id="rt-agent-custom-tags-list"></div>
-                            <button id="rt-agent-add-custom-tag" style="width: 100%; background: #333; border: 1px solid #444; color: #ddd; font-size: 0.769em; padding: 2px; border-radius: 3px; cursor: pointer; margin-top: 4px;">+ Add Custom Tag</button>
-                        </div>
-                    </details>
 
 
 
@@ -3634,20 +3638,30 @@ function createPanel() {
                     </div>
                     <hr style="border-color: #333; margin: 10px 0;">
                     
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
-                        <div style="font-weight: bold; opacity: 0.8; font-size: 0.846em;">Lorebook Terminal:</div>
-                        <button id="rt-agent-router-terminal-clear" style="background: transparent; border: none; color: #ff5555; font-size: 0.692em; cursor: pointer; opacity: 0.7;">Clear</button>
-                    </div>
-                    <div id="rt-agent-router-terminal" style="background: var(--rt-card-bg); border: var(--rt-border); border-radius: 4px; padding: 8px; min-height: 80px; max-height: 200px; overflow-y: auto; margin-bottom: 10px; font-family: var(--rt-font-mono);">
-                        <div style="opacity: 0.4; font-size: 0.769em; font-style: italic; color: var(--rt-text-muted);">Waiting for agent activity...</div>
+                    <!-- Console Collapsible Header -->
+                    <div id="rt-agent-console-header" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; cursor: pointer; padding-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.08); user-select: none;">
+                        <div style="font-weight: bold; font-size: 0.846em; display: flex; align-items: center; gap: 6px; color: var(--rt-text-muted);">
+                            <i class="fa-solid ${settings.agentConsoleOpen !== false ? 'fa-chevron-down' : 'fa-chevron-right'}" id="rt-agent-console-toggle-icon"></i> Console
+                        </div>
                     </div>
 
-                    <hr style="border-color: rgba(255,255,255,0.05); margin: 10px 0;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
-                        <div style="font-weight: bold; opacity: 0.8; font-size: 0.846em;">Agent Log History:</div>
-                        <button id="rt-agent-router-log-clear" style="background: transparent; border: none; color: #ff5555; font-size: 0.692em; cursor: pointer; opacity: 0.7;">Clear</button>
-                    </div>
-                    <div id="rt-agent-router-log" style="display: flex; flex-direction: column; gap: 5px; margin-bottom: 15px; max-height: 150px; overflow-y: auto;">
+                    <!-- Console Section Drawer -->
+                    <div id="rt-agent-console-section" style="display: ${settings.agentConsoleOpen !== false ? 'block' : 'none'}; margin-bottom: 10px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                            <div style="font-weight: bold; opacity: 0.8; font-size: 0.846em;">Lorebook Terminal:</div>
+                            <button id="rt-agent-router-terminal-clear" style="background: transparent; border: none; color: #ff5555; font-size: 0.692em; cursor: pointer; opacity: 0.7;">Clear</button>
+                        </div>
+                        <div id="rt-agent-router-terminal" style="background: var(--rt-card-bg); border: var(--rt-border); border-radius: 4px; padding: 8px; min-height: 80px; max-height: 200px; overflow-y: auto; margin-bottom: 10px; font-family: var(--rt-font-mono);">
+                            <div style="opacity: 0.4; font-size: 0.769em; font-style: italic; color: var(--rt-text-muted);">Waiting for agent activity...</div>
+                        </div>
+
+                        <hr style="border-color: rgba(255,255,255,0.05); margin: 10px 0;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                            <div style="font-weight: bold; opacity: 0.8; font-size: 0.846em;">Agent Log History:</div>
+                            <button id="rt-agent-router-log-clear" style="background: transparent; border: none; color: #ff5555; font-size: 0.692em; cursor: pointer; opacity: 0.7;">Clear</button>
+                        </div>
+                        <div id="rt-agent-router-log" style="display: flex; flex-direction: column; gap: 5px; margin-bottom: 15px; max-height: 150px; overflow-y: auto;">
+                        </div>
                     </div>
 
                     <div style="margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px;">
@@ -4122,6 +4136,55 @@ function createPanel() {
             agentHeader.addEventListener('dblclick', (e) => {
                 if (e.target instanceof Element && e.target.closest('button, input, select, textarea')) return;
                 toggleAgentCollapse();
+            });
+        }
+
+        // ── Agent Quick Settings Toggle ──
+        const toggleAgentSettings = () => {
+            const s = getSettings();
+            s.agentSettingsOpen = !s.agentSettingsOpen;
+            saveSettings();
+
+            const drawer = agentPanel.querySelector('#rt-agent-settings-drawer');
+            if (drawer) {
+                drawer.style.display = s.agentSettingsOpen ? 'block' : 'none';
+            }
+
+            const icon = agentPanel.querySelector('#rt-agent-settings-toggle-icon');
+            if (icon) {
+                icon.className = s.agentSettingsOpen ? 'fa-solid fa-chevron-down' : 'fa-solid fa-chevron-right';
+            }
+        };
+
+        const settingsHeader = agentPanel.querySelector('#rt-agent-settings-header');
+        if (settingsHeader) {
+            settingsHeader.addEventListener('click', (e) => {
+                if (e.target instanceof Element && e.target.closest('#rt-agent-help-btn')) return;
+                toggleAgentSettings();
+            });
+        }
+
+        // ── Agent Console Toggle ──
+        const toggleAgentConsole = () => {
+            const s = getSettings();
+            s.agentConsoleOpen = !s.agentConsoleOpen;
+            saveSettings();
+
+            const consoleSection = agentPanel.querySelector('#rt-agent-console-section');
+            if (consoleSection) {
+                consoleSection.style.display = s.agentConsoleOpen ? 'block' : 'none';
+            }
+
+            const icon = agentPanel.querySelector('#rt-agent-console-toggle-icon');
+            if (icon) {
+                icon.className = s.agentConsoleOpen ? 'fa-solid fa-chevron-down' : 'fa-solid fa-chevron-right';
+            }
+        };
+
+        const consoleHeader = agentPanel.querySelector('#rt-agent-console-header');
+        if (consoleHeader) {
+            consoleHeader.addEventListener('click', () => {
+                toggleAgentConsole();
             });
         }
 

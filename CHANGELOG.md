@@ -2,6 +2,12 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [3.5.4] - 2026-06-18
+
+### Added
+- **Collapsible Drawers (Lorebook Agent UI)**: Grouped settings into a collapsible "Quick Settings" drawer, and wrapped the Terminal and Log History into a collapsible "Console" drawer. Toggles persist in user settings.
+- **Integrated Title**: Merged the "AUTONOMOUS RESEARCHER" header into the panel header as "Lorebook Agent: Autonomous Researcher".
+
 ## [3.5.3] - 2026-06-18
 
 ### Removed

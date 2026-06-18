@@ -42,6 +42,8 @@ export function getSettings() {
         enabled: true,
         trackerCollapsed: false,
         agentCollapsed: false,
+        agentSettingsOpen: true,
+        agentConsoleOpen: true,
         debugMode: true,
         connectionSource: "default",
         connectionProfileId: "",
