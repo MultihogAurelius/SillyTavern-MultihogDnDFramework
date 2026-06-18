@@ -2,6 +2,12 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [3.6.1] - 2026-06-18
+
+### Added
+- **Clickable World Progression Status Badge**: Clicking the ON/OFF badge in the Agent panel's World Progression drawer now toggles the enabled state directly. Added stopping of event propagation so it does not toggle the collapsible drawer folder, and styled the cursor to pointer.
+- **Badge Status Synchronization**: Wired the status badge to update dynamically upon settings page changes and initial panel load, resolving status desync issues.
+
 ## [3.6.0] - 2026-06-18
 
 ### Added
