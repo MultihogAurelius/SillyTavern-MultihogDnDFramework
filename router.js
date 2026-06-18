@@ -2498,7 +2498,7 @@ function computePeriodLabel(startMinutes, endMinutes, intervalHours) {
  * @param {string} timeStr        - Raw time string from [TIME] block (e.g. "11:52 AM, Day 3")
  * @param {number} currentMinutes - Current in-world total minutes (from parseInWorldMinutes)
  */
-export async function runWorldProgressionPass(timeStr, currentMinutes) {
+export async function runWorldProgressionPass(timeStr, currentMinutes, extraInstructions = null) {
     const settings = getSettings();
     const prefix = getLivePrefix();
     const worldBookName = prefix ? `${prefix}_World` : 'World';
@@ -2863,9 +2863,13 @@ ${rawDump}`;
 
     // 5. Build the system prompt from settings ({periodLabel} and {wordTarget} substitution)
     const rawPrompt = settings.worldProgressionSystemPrompt || '';
-    const systemPrompt = rawPrompt
+    let systemPrompt = rawPrompt
         .replace(/\{periodLabel\}/g, periodLabel)
         .replace(/\{wordTarget\}/g, String(wordTarget));
+
+    if (extraInstructions && extraInstructions.trim()) {
+        systemPrompt += `\n\n## EXTRA INSTRUCTIONS FOR THIS RUN\n${extraInstructions.trim()}`;
+    }
 
     // Auto-generation fallback: ensure skeleton NPC pool meets requested count
     if (settings.worldProgressionRandomizeNPCs) {

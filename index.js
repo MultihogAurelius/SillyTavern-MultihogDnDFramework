@@ -3682,6 +3682,9 @@ function createPanel() {
                         <button id="rt-agent-world-fire-now" style="width:100%; background:rgba(52,168,83,0.15); border:1px solid rgba(52,168,83,0.3); color:#34a853; border-radius:4px; padding:5px; font-size:0.769em; font-weight:bold; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:5px;">
                             <i class="fa-solid fa-globe"></i> Fire Now
                         </button>
+                        <button id="rt-agent-world-fire-extra" style="width:100%; background:rgba(0,180,216,0.15); border:1px solid rgba(0,180,216,0.3); color:#00b4d8; border-radius:4px; padding:5px; font-size:0.769em; font-weight:bold; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:5px; margin-top:5px;">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i> Fire with Extra Instructions
+                        </button>
                     </div>
 
                     <hr style="border-color: #333; margin: 10px 0; flex-shrink: 0;">
@@ -4396,6 +4399,62 @@ function createPanel() {
                 } finally {
                     /** @type {HTMLButtonElement} */ (worldFireNowBtn).disabled = false;
                     worldFireNowBtn.innerHTML = '<i class="fa-solid fa-globe"></i> Fire Now';
+                }
+            });
+        }
+
+        // ── Agent World Fire with Extra Instructions button ──
+        const worldFireExtraBtn = agentPanel.querySelector('#rt-agent-world-fire-extra');
+        if (worldFireExtraBtn) {
+            worldFireExtraBtn.addEventListener('click', async () => {
+                const { parseInWorldMinutes: piw, runWorldProgressionPass: rwp } = await import('./router.js');
+                const s = getSettings();
+                const timeMatch = (s.currentMemo || '').match(/\[TIME\]([\s\S]*?)\[\/TIME\]/i);
+                const timeStr = timeMatch ? extractCurrentTimeStr(timeMatch[1]) : '';
+                const currentMinutes = piw(timeStr);
+                if (currentMinutes < 0) {
+                    toastr['warning']('Cannot parse in-world time from State Memo. Make sure the State Tracker has run at least once.', 'World Progression');
+                    return;
+                }
+
+                const popupBody = `
+                    <div style="display:flex; flex-direction:column; gap:10px; width:100%; box-sizing:border-box;">
+                        <div style="font-size:13px; opacity:0.9; font-weight:bold;">🌍 Fire with Extra Instructions</div>
+                        <div style="font-size:11px; opacity:0.7; line-height:1.4;">
+                            Enter extra instructions to append to the World Progression system prompt for this run only (e.g., "make things pick up", "get more chaotic").
+                        </div>
+                        <textarea id="rt_wp_extra_instructions_agent" rows="4" class="text_pole"
+                            style="font-size:12px; resize:vertical; width:100%;"
+                            placeholder="e.g. Make the factions more aggressive, increase conflicts, or introduce a major weather event."></textarea>
+                    </div>
+                `;
+
+                let extraInstructions = '';
+                setTimeout(() => {
+                    const textarea = document.getElementById('rt_wp_extra_instructions_agent');
+                    if (textarea) {
+                        textarea.addEventListener('input', () => { extraInstructions = textarea.value.trim(); });
+                    }
+                }, 100);
+
+                const { Popup } = SillyTavern.getContext();
+                const choice = await Popup.show.confirm('World Progression', popupBody, { okButton: 'Fire', cancelButton: 'Cancel' });
+                if (!choice) return;
+
+                const savedLast = s.worldProgressionLastFiredAtMinutes;
+                s.worldProgressionLastFiredAtMinutes = -1;
+                /** @type {HTMLButtonElement} */ (worldFireExtraBtn).disabled = true;
+                worldFireExtraBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Generating…';
+                try {
+                    await rwp(timeStr, currentMinutes, extraInstructions);
+                    updateAgentWorldStatus();
+                    toastr['success']('World Progression report generated.', 'World Progression');
+                } catch (e) {
+                    toastr['error'](`World Progression error: ${e.message}`, 'World Progression');
+                    s.worldProgressionLastFiredAtMinutes = savedLast;
+                } finally {
+                    /** @type {HTMLButtonElement} */ (worldFireExtraBtn).disabled = false;
+                    worldFireExtraBtn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Fire with Extra Instructions';
                 }
             });
         }
@@ -10394,6 +10453,58 @@ RULES:
                 s.worldProgressionLastFiredAtMinutes = savedLast;
             } finally {
                 $wpGenerateNow.prop('disabled', false).html('<i class="fa-solid fa-globe"></i> Generate Now (current period)');
+            }
+        });
+
+        const $wpFireWithInstructions = $('#rpg_world_progression_fire_with_instructions');
+        $wpFireWithInstructions.on('click', async function () {
+            const { parseInWorldMinutes: piw, runWorldProgressionPass: rwp } = await import('./router.js');
+            const s = getSettings();
+            const timeMatch = (s.currentMemo || '').match(/\[TIME\]([\s\S]*?)\[\/TIME\]/i);
+            const timeStr = timeMatch ? extractCurrentTimeStr(timeMatch[1]) : '';
+            const currentMinutes = piw(timeStr);
+            if (currentMinutes < 0) {
+                toastr['warning']('Cannot parse in-world time from State Memo. Make sure the State Tracker has run at least once.', 'World Progression');
+                return;
+            }
+
+            const popupBody = `
+                <div style="display:flex; flex-direction:column; gap:10px; width:100%; box-sizing:border-box;">
+                    <div style="font-size:13px; opacity:0.9; font-weight:bold;">🌍 Fire with Extra Instructions</div>
+                    <div style="font-size:11px; opacity:0.7; line-height:1.4;">
+                        Enter extra instructions to append to the World Progression system prompt for this run only (e.g., "make things pick up", "get more chaotic").
+                    </div>
+                    <textarea id="rt_wp_extra_instructions_settings" rows="4" class="text_pole"
+                        style="font-size:12px; resize:vertical; width:100%;"
+                        placeholder="e.g. Make the factions more aggressive, increase conflicts, or introduce a major weather event."></textarea>
+                </div>
+            `;
+
+            let extraInstructions = '';
+            setTimeout(() => {
+                const textarea = document.getElementById('rt_wp_extra_instructions_settings');
+                if (textarea) {
+                    textarea.addEventListener('input', () => { extraInstructions = textarea.value.trim(); });
+                }
+            }, 100);
+
+            const { Popup } = SillyTavern.getContext();
+            const choice = await Popup.show.confirm('World Progression', popupBody, { okButton: 'Fire', cancelButton: 'Cancel' });
+            if (!choice) return;
+
+            // Force fire by temporarily clearing lastFiredAtMinutes so it picks up the current period
+            const savedLast = s.worldProgressionLastFiredAtMinutes;
+            s.worldProgressionLastFiredAtMinutes = -1;
+            $wpFireWithInstructions.prop('disabled', true).text('Generating…');
+            try {
+                await rwp(timeStr, currentMinutes, extraInstructions);
+                updateWorldProgressionLastFiredDisplay();
+                toastr['success']('World Progression report generated.', 'World Progression');
+            } catch (e) {
+                toastr['error'](`World Progression error: ${e.message}`, 'World Progression');
+                s.worldProgressionLastFiredAtMinutes = savedLast;
+            } finally {
+                $wpFireWithInstructions.prop('disabled', false).html('<i class="fa-solid fa-wand-magic-sparkles"></i> Fire with Extra Instructions');
             }
         });
 
