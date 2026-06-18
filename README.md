@@ -6,7 +6,7 @@ What this framework does is essentially turn SillyTavern into something like AI 
 
 I wasn't satisfied with any of the commercial offerings available (AI Realm, AI Dungeon, Friends & Fables, etc.), so I made my own D&D platform inside SillyTavern. 
 
-**Crucially, the system is input-output, not just some glorified stats collector. Every single thing has a backend.**
+**Crucially, the system is input-output, not just some glorified stats collector. Everything in the State Tracker is fed back to the AI. What you see is what the AI also sees.**
 
 ---
 
