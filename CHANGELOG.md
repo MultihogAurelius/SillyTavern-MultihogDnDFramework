@@ -2,6 +2,12 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [3.5.9] - 2026-06-18
+
+### Changed
+- **Lorebook Agent Action Buttons**: Moved the "Clean" and "Edit" action buttons from the expanded entry pane to the entry header row, alongside the "Delete" button, resolving blank gaps below open entries.
+- **Mobile Action Support**: Re-implemented action button visibility using parent container CSS classes (`.open`) instead of JavaScript mouse events. Buttons remain visible at `0.5` opacity when the entry is expanded, allowing mobile users without hover capabilities to interact with them.
+
 ## [3.5.8] - 2026-06-18
 
 ### Added
