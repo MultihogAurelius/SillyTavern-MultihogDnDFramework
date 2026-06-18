@@ -3653,6 +3653,37 @@ function createPanel() {
                         </div>
                     </div>
 
+                    <!-- World Progression Collapsible Header -->
+                    <div id="rt-agent-world-header" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; cursor: pointer; padding-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.08); user-select: none; flex-shrink: 0;">
+                        <div style="font-weight: bold; font-size: 0.846em; display: flex; align-items: center; gap: 6px; color: var(--rt-text-muted);">
+                            <i class="fa-solid ${settings.agentWorldOpen ? 'fa-chevron-down' : 'fa-chevron-right'}" id="rt-agent-world-toggle-icon"></i>
+                            🌍 World Progression
+                        </div>
+                        <span id="rt-agent-world-enabled-badge" style="font-size:0.692em; padding:1px 7px; border-radius:10px; font-weight:bold; ${settings.worldProgressionEnabled ? 'background:rgba(52,168,83,0.18); color:#34a853; border:1px solid rgba(52,168,83,0.3);' : 'background:rgba(255,255,255,0.06); color:rgba(255,255,255,0.35); border:1px solid rgba(255,255,255,0.1);'}">${settings.worldProgressionEnabled ? 'ON' : 'OFF'}</span>
+                    </div>
+
+                    <!-- World Progression Drawer -->
+                    <div id="rt-agent-world-drawer" style="display: ${settings.agentWorldOpen ? 'block' : 'none'}; margin-bottom: 10px; flex-shrink: 0;">
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-bottom:8px;">
+                            <div style="background:var(--rt-card-bg); border:var(--rt-border); border-radius:4px; padding:5px 8px;">
+                                <div style="font-size:0.692em; opacity:0.5; color:var(--rt-text-muted); margin-bottom:2px;">Last fired</div>
+                                <div id="rt-agent-world-last-fired" style="font-size:0.769em; color:var(--rt-text);">—</div>
+                            </div>
+                            <div style="background:var(--rt-card-bg); border:var(--rt-border); border-radius:4px; padding:5px 8px;">
+                                <div style="font-size:0.692em; opacity:0.5; color:var(--rt-text-muted); margin-bottom:2px;">Next fire</div>
+                                <div id="rt-agent-world-next-fire" style="font-size:0.769em; color:var(--rt-text);">—</div>
+                            </div>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:6px; margin-bottom:8px;">
+                            <span style="font-size:0.769em; opacity:0.7; white-space:nowrap;">Interval:</span>
+                            <input type="text" inputmode="numeric" pattern="[0-9]*" id="rt-agent-world-interval" value="${settings.worldProgressionIntervalHours || 24}" style="width:50px; background:var(--rt-card-bg); color:var(--rt-text); border:var(--rt-border); border-radius:3px; text-align:center; font-size:0.769em; padding:2px;">
+                            <span style="font-size:0.769em; opacity:0.5;">in-world hours</span>
+                        </div>
+                        <button id="rt-agent-world-fire-now" style="width:100%; background:rgba(52,168,83,0.15); border:1px solid rgba(52,168,83,0.3); color:#34a853; border-radius:4px; padding:5px; font-size:0.769em; font-weight:bold; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:5px;">
+                            <i class="fa-solid fa-globe"></i> Fire Now
+                        </button>
+                    </div>
+
                     <hr style="border-color: #333; margin: 10px 0; flex-shrink: 0;">
 
                     <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 5px; flex-shrink: 0;">
@@ -3996,6 +4027,34 @@ function createPanel() {
                 }
             });
         });
+
+        // Refresh World Progression status display (reads agentPanel from outer scope)
+        {
+            const wpS = getSettings();
+            const wpMins = wpS.worldProgressionLastFiredAtMinutes ?? -1;
+            const wpLabel = wpS.worldProgressionLastFiredPeriodLabel || '';
+            const wpIntervalMins = (wpS.worldProgressionIntervalHours || 24) * 60;
+            function _fmtWP(m) {
+                if (m < 0) return 'Never';
+                const day = Math.floor(m / 1440) + 1;
+                const rem = m % 1440;
+                const h24 = Math.floor(rem / 60), min = rem % 60;
+                const suffix = h24 >= 12 ? 'PM' : 'AM';
+                let h12 = h24 % 12; if (h12 === 0) h12 = 12;
+                return `Day ${day}, ${String(h12).padStart(2,'0')}:${String(min).padStart(2,'0')} ${suffix}`;
+            }
+            const wpLastEl = agentPanel.querySelector('#rt-agent-world-last-fired');
+            const wpNextEl = agentPanel.querySelector('#rt-agent-world-next-fire');
+            const wpBadge  = agentPanel.querySelector('#rt-agent-world-enabled-badge');
+            if (wpLastEl) wpLastEl.textContent = wpLabel || _fmtWP(wpMins);
+            if (wpNextEl) wpNextEl.textContent = _fmtWP(wpMins >= 0 ? wpMins + wpIntervalMins : wpIntervalMins);
+            if (wpBadge) {
+                wpBadge.textContent = wpS.worldProgressionEnabled ? 'ON' : 'OFF';
+                wpBadge.style.cssText = wpS.worldProgressionEnabled
+                    ? 'font-size:0.692em; padding:1px 7px; border-radius:10px; font-weight:bold; background:rgba(52,168,83,0.18); color:#34a853; border:1px solid rgba(52,168,83,0.3);'
+                    : 'font-size:0.692em; padding:1px 7px; border-radius:10px; font-weight:bold; background:rgba(255,255,255,0.06); color:rgba(255,255,255,0.35); border:1px solid rgba(255,255,255,0.1);';
+            }
+        }
     }
 
     // Assigned below when the agent panel is wired. Declared here so
@@ -4256,6 +4315,91 @@ function createPanel() {
             });
         }
 
+        // ── Agent World Progression Toggle ──
+        const toggleAgentWorld = () => {
+            const s = getSettings();
+            s.agentWorldOpen = !s.agentWorldOpen;
+            saveSettings();
+            const drawer = agentPanel.querySelector('#rt-agent-world-drawer');
+            if (drawer) drawer.style.display = s.agentWorldOpen ? 'block' : 'none';
+            const icon = agentPanel.querySelector('#rt-agent-world-toggle-icon');
+            if (icon) icon.className = s.agentWorldOpen ? 'fa-solid fa-chevron-down' : 'fa-solid fa-chevron-right';
+        };
+        const worldHeader = agentPanel.querySelector('#rt-agent-world-header');
+        if (worldHeader) {
+            worldHeader.addEventListener('click', () => toggleAgentWorld());
+        }
+
+        // ── Agent World Progression status display helper ──
+        function updateAgentWorldStatus() {
+            const s = getSettings();
+            const mins = s.worldProgressionLastFiredAtMinutes ?? -1;
+            const label = s.worldProgressionLastFiredPeriodLabel || '';
+            const intervalHours = s.worldProgressionIntervalHours || 24;
+            const intervalMins = intervalHours * 60;
+            function fmtWP(m) {
+                if (m < 0) return 'Never';
+                const day = Math.floor(m / 1440) + 1;
+                const rem = m % 1440;
+                const h24 = Math.floor(rem / 60), min = rem % 60;
+                const suffix = h24 >= 12 ? 'PM' : 'AM';
+                let h12 = h24 % 12; if (h12 === 0) h12 = 12;
+                return `Day ${day}, ${String(h12).padStart(2,'0')}:${String(min).padStart(2,'0')} ${suffix}`;
+            }
+            const lastEl = agentPanel.querySelector('#rt-agent-world-last-fired');
+            const nextEl = agentPanel.querySelector('#rt-agent-world-next-fire');
+            const badge  = agentPanel.querySelector('#rt-agent-world-enabled-badge');
+            if (lastEl) lastEl.textContent = label || fmtWP(mins);
+            if (nextEl) nextEl.textContent = fmtWP(mins >= 0 ? mins + intervalMins : intervalMins);
+            if (badge) {
+                badge.textContent = s.worldProgressionEnabled ? 'ON' : 'OFF';
+                badge.style.cssText = s.worldProgressionEnabled
+                    ? 'font-size:0.692em; padding:1px 7px; border-radius:10px; font-weight:bold; background:rgba(52,168,83,0.18); color:#34a853; border:1px solid rgba(52,168,83,0.3);'
+                    : 'font-size:0.692em; padding:1px 7px; border-radius:10px; font-weight:bold; background:rgba(255,255,255,0.06); color:rgba(255,255,255,0.35); border:1px solid rgba(255,255,255,0.1);';
+            }
+        }
+
+        // ── Agent World Interval input ──
+        const worldIntervalInp = /** @type {HTMLInputElement|null} */ (agentPanel.querySelector('#rt-agent-world-interval'));
+        if (worldIntervalInp) {
+            worldIntervalInp.addEventListener('input', () => {
+                getSettings().worldProgressionIntervalHours = parseInt(worldIntervalInp.value) || 24;
+                saveSettings();
+                updateAgentWorldStatus();
+            });
+        }
+
+        // ── Agent World Fire Now button ──
+        const worldFireNowBtn = agentPanel.querySelector('#rt-agent-world-fire-now');
+        if (worldFireNowBtn) {
+            worldFireNowBtn.addEventListener('click', async () => {
+                const { parseInWorldMinutes: piw, runWorldProgressionPass: rwp } = await import('./router.js');
+                const s = getSettings();
+                const timeMatch = (s.currentMemo || '').match(/\[TIME\]([\s\S]*?)\[\/TIME\]/i);
+                const timeStr = timeMatch ? extractCurrentTimeStr(timeMatch[1]) : '';
+                const currentMinutes = piw(timeStr);
+                if (currentMinutes < 0) {
+                    toastr['warning']('Cannot parse in-world time from State Memo. Make sure the State Tracker has run at least once.', 'World Progression');
+                    return;
+                }
+                const savedLast = s.worldProgressionLastFiredAtMinutes;
+                s.worldProgressionLastFiredAtMinutes = -1;
+                /** @type {HTMLButtonElement} */ (worldFireNowBtn).disabled = true;
+                worldFireNowBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Generating…';
+                try {
+                    await rwp(timeStr, currentMinutes);
+                    updateAgentWorldStatus();
+                    toastr['success']('World Progression report generated.', 'World Progression');
+                } catch (e) {
+                    toastr['error'](`World Progression error: ${e.message}`, 'World Progression');
+                    s.worldProgressionLastFiredAtMinutes = savedLast;
+                } finally {
+                    /** @type {HTMLButtonElement} */ (worldFireNowBtn).disabled = false;
+                    worldFireNowBtn.innerHTML = '<i class="fa-solid fa-globe"></i> Fire Now';
+                }
+            });
+        }
+
         // ── Agent enable button (header ⏻) ──
         const agentEnableBtn = agentPanel.querySelector('#rt-agent-router-enable-btn');
         if (agentEnableBtn) {
@@ -4323,7 +4467,7 @@ function createPanel() {
             keysRead.textContent = '[' + item.keys.join(', ') + ']';
 
             const contentRead = document.createElement('div');
-            contentRead.style.cssText = 'font-size:10px; opacity:0.88; color:var(--rt-text); line-height:1.45; white-space:pre-wrap; word-break:break-word; max-height:220px; overflow-y:auto;';
+            contentRead.style.cssText = 'font-size:10px; opacity:0.88; color:var(--rt-text); line-height:1.45; white-space:pre-wrap; word-break:break-word; overflow-y:auto;';
             contentRead.textContent = item.content || '';
 
             const cleanBtn = entryHdr.querySelector('.rt-agent-entry-clean');

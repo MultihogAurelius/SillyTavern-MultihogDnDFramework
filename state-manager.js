@@ -45,6 +45,7 @@ export function getSettings() {
         agentSettingsOpen: true,
         agentConsoleOpen: true,
         agentModulesOpen: true,
+        agentWorldOpen: false,
         debugMode: true,
         connectionSource: "default",
         connectionProfileId: "",
