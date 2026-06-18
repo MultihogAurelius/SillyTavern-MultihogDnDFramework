@@ -3659,7 +3659,7 @@ function createPanel() {
                             <i class="fa-solid ${settings.agentWorldOpen ? 'fa-chevron-down' : 'fa-chevron-right'}" id="rt-agent-world-toggle-icon"></i>
                             🌍 World Progression
                         </div>
-                        <span id="rt-agent-world-enabled-badge" style="font-size:0.692em; padding:1px 7px; border-radius:10px; font-weight:bold; ${settings.worldProgressionEnabled ? 'background:rgba(52,168,83,0.18); color:#34a853; border:1px solid rgba(52,168,83,0.3);' : 'background:rgba(255,255,255,0.06); color:rgba(255,255,255,0.35); border:1px solid rgba(255,255,255,0.1);'}">${settings.worldProgressionEnabled ? 'ON' : 'OFF'}</span>
+                        <span id="rt-agent-world-enabled-badge" style="font-size:0.692em; padding:1px 7px; border-radius:10px; font-weight:bold; cursor:pointer; user-select:none; ${settings.worldProgressionEnabled ? 'background:rgba(52,168,83,0.18); color:#34a853; border:1px solid rgba(52,168,83,0.3);' : 'background:rgba(255,255,255,0.06); color:rgba(255,255,255,0.35); border:1px solid rgba(255,255,255,0.1);'}" title="Click to toggle World Progression">${settings.worldProgressionEnabled ? 'ON' : 'OFF'}</span>
                     </div>
 
                     <!-- World Progression Drawer -->
@@ -4210,6 +4210,7 @@ function createPanel() {
 
         // Apply on open
         updateAgentPanelDisabled();
+        updateAgentWorldStatus();
 
         // ── Agent collapse/expand ──
         const toggleAgentCollapse = () => {
@@ -4330,7 +4331,25 @@ function createPanel() {
         };
         const worldHeader = agentPanel.querySelector('#rt-agent-world-header');
         if (worldHeader) {
-            worldHeader.addEventListener('click', () => toggleAgentWorld());
+            worldHeader.addEventListener('click', (e) => {
+                if (e.target instanceof Element && e.target.closest('#rt-agent-world-enabled-badge')) return;
+                toggleAgentWorld();
+            });
+        }
+
+        const badgeEl = agentPanel.querySelector('#rt-agent-world-enabled-badge');
+        if (badgeEl) {
+            badgeEl.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const s = getSettings();
+                s.worldProgressionEnabled = !s.worldProgressionEnabled;
+                saveSettings();
+                updateAgentWorldStatus();
+                $('#rpg_world_progression_enabled').prop('checked', s.worldProgressionEnabled);
+                if (_currentChatId) {
+                    await syncCampaignPrefixAndWorldsForChat(_currentChatId, 'toggle-world-progression');
+                }
+            });
         }
 
         // ── Agent World Progression status display helper ──
@@ -4357,8 +4376,8 @@ function createPanel() {
             if (badge) {
                 badge.textContent = s.worldProgressionEnabled ? 'ON' : 'OFF';
                 badge.style.cssText = s.worldProgressionEnabled
-                    ? 'font-size:0.692em; padding:1px 7px; border-radius:10px; font-weight:bold; background:rgba(52,168,83,0.18); color:#34a853; border:1px solid rgba(52,168,83,0.3);'
-                    : 'font-size:0.692em; padding:1px 7px; border-radius:10px; font-weight:bold; background:rgba(255,255,255,0.06); color:rgba(255,255,255,0.35); border:1px solid rgba(255,255,255,0.1);';
+                    ? 'font-size:0.692em; padding:1px 7px; border-radius:10px; font-weight:bold; cursor:pointer; user-select:none; background:rgba(52,168,83,0.18); color:#34a853; border:1px solid rgba(52,168,83,0.3);'
+                    : 'font-size:0.692em; padding:1px 7px; border-radius:10px; font-weight:bold; cursor:pointer; user-select:none; background:rgba(255,255,255,0.06); color:rgba(255,255,255,0.35); border:1px solid rgba(255,255,255,0.1);';
             }
         }
 
@@ -10208,6 +10227,7 @@ RULES:
         $wpEnabled.prop('checked', !!settings.worldProgressionEnabled).on('change', async function () {
             getSettings().worldProgressionEnabled = !!$(this).prop('checked');
             saveSettings();
+            updateAgentWorldStatus();
             if (_currentChatId) {
                 await syncCampaignPrefixAndWorldsForChat(_currentChatId, 'toggle-world-progression');
             }
