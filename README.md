@@ -53,12 +53,16 @@ Together they solve the four core problems of LLM tabletop RP: the AI forgetting
 - **Automatic Long-Context Tracking** via the Lorebook Agent with World Engine simulation.
 - **AI Portrait Generation** via Pollinations.ai — free, non-profit image generation with full lorebook agent context awareness for accurate character portraits.
 - **Inventory Currency Auto-Rendering** — items with a worth value automatically display a styled coin badge (gold, silver, bronze, or dollar) based on the currency type.
+  
+---
 
 <div align="center">
   <figure>
-    <img width="1915" height="980" alt="image" src="https://github.com/user-attachments/assets/5cf03cdf-a413-401f-b685-0aa288714267" />
+    <img width="1916" height="981" alt="image" src="https://github.com/user-attachments/assets/0c64389a-1d49-4d49-ba63-88da5216eae7" />
   </figure>
 </div>
+
+---
 
 ## Installation
 
