@@ -10137,6 +10137,24 @@ RULES:
             $('#rt-agent-router-include-hidden').prop('checked', settings.routerIncludeHidden);
             saveSettings();
         });
+        // Lorebook Agent lookback mode
+        const routerSinceLastUserChk = $('#rpg_tracker_router_lookback_since_last_user');
+        const routerLookbackNumericRow = $('#rpg_tracker_router_lookback_numeric_row');
+
+        const applyRouterSinceLastUserUI = (enabled) => {
+            routerLookbackNumericRow.css({ opacity: enabled ? '0.35' : '1', 'pointer-events': enabled ? 'none' : 'auto' });
+        };
+
+        if (routerSinceLastUserChk.length) {
+            const isEnabled = settings.routerLookbackSinceLastUser !== false; // default true
+            routerSinceLastUserChk.prop('checked', isEnabled);
+            applyRouterSinceLastUserUI(isEnabled);
+            routerSinceLastUserChk.on('change', function () {
+                settings.routerLookbackSinceLastUser = !!$(this).prop('checked');
+                applyRouterSinceLastUserUI(settings.routerLookbackSinceLastUser);
+                saveSettings();
+            });
+        }
         $('#rpg_tracker_router_lookback').val(settings.routerLookback).on('input', function () {
             settings.routerLookback = parseInt(String($(this).val() || '')) || 4;
             $('#rt-agent-router-lookback').val(settings.routerLookback);

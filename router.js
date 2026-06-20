@@ -278,13 +278,30 @@ export async function runRouterPass(narrativeOutput, manualPrompt = null, custom
         if (overrideChatLog) {
             recentChatString = overrideChatLog;
         } else {
-            const N = customLookback !== null ? customLookback : (settings.routerLookback || 4);
-            recentChatString = chat.slice(-N).map(m => {
+            const sinceLastUser = customLookback === null && settings.routerLookbackSinceLastUser !== false; // default true
+            let startIdx;
+            if (sinceLastUser) {
+                // Walk backward to find the most recent user message, then include it
+                // and everything after — captures the full turn including tool call messages.
+                startIdx = chat.length - 1;
+                while (startIdx > 0 && !(/** @type {any} */ (chat[startIdx])).is_user) {
+                    startIdx--;
+                }
+                // If no user message found (all-AI chat), fall back to last 4
+                if (startIdx === 0 && !(/** @type {any} */ (chat[0]))?.is_user) {
+                    startIdx = Math.max(0, chat.length - 4);
+                }
+            } else {
+                const N = customLookback !== null ? customLookback : (settings.routerLookback || 4);
+                startIdx = Math.max(0, chat.length - N);
+            }
+            recentChatString = chat.slice(startIdx).map(m => {
                 const name = (/** @type {any} */ (m)).is_user ? 'Player' : ((/** @type {any} */ (m)).name || 'Narrator');
                 const content = (/** @type {any} */ (m)).mes || (/** @type {any} */ (m)).content || '';
                 return `${name}: ${content.replace(/<[^>]+>/g, '')}`;
             }).join('\n\n');
         }
+
 
         // Extract Current Context (Time & Location)
         const timeRegex = /([0-9]{1,2}:[0-9]{2}\s*[AP]M,\s*Day\s*[0-9]+)/i;
