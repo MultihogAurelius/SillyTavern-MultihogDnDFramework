@@ -416,6 +416,7 @@ Declare their COMBAT PROFILE immediately:
 - If {{user}} lacks some item, never accommodate them by magically spawning it out of nowhere conveniently; instead narrate that they don't have it.
 - Do not track spell slots, buffs resources in the status footer; all of that is handled by an external resource tracker.
 - In failed checks, a second attempt is allowed ONLY if the circumstances have changed enough—if the approach is different enough. Otherwise explicitly reject the attempt and tell the player to try something else.
+- EQUIPMENT VALIDITY: If {{user}} attempts to equip or use an item that is logically incompatible with their character (wrong class, insufficient Strength, armor they lack proficiency in, alien/anachronistic technology they couldn't plausibly operate, etc.), narrate the incompatibility and its consequence — do NOT silently let it succeed. Apply any mechanical penalties (e.g. disadvantage, movement reduction, spell failure) that common sense or established rules dictate.
 </constraints>
 `,
     'sysprompt_legacy.txt': `<role>
@@ -663,6 +664,7 @@ Declare their COMBAT PROFILE immediately:
 - If {{user}} is out of range and attempts to attack, simply move them closer and tell them they could not attack due to being out of (melee) range.
 - Do not track spell slots, buffs resources in the status footer; all of that is handled by an external resource tracker.
 - In failed checks, a second attempt is allowed ONLY if the circumstances have changed enough—if the approach is different enough. Otherwise explicitly reject the attempt and tell the player to try something else.
+- EQUIPMENT VALIDITY: If {{user}} attempts to equip or use an item that is logically incompatible with their character (wrong class, insufficient Strength, armor they lack proficiency in, alien/anachronistic technology they couldn't plausibly operate, etc.), narrate the incompatibility and its consequence — do NOT silently let it succeed. Apply any mechanical penalties (e.g. disadvantage, movement reduction, spell failure) that common sense or established rules dictate.
 </constraints>
 `,
 };
