@@ -4940,19 +4940,40 @@ function createPanel() {
                                     <div style="font-size:10px;color:rgba(255,255,255,0.35);margin-bottom:10px;">Shows the "Add NPC from Character Card" button. <b>Recommended: Disabled</b> (organic NPC creation prevents context bloat).</div>
                                 </div>`;
 
+                                let newMajor = curS.npcMajorTokens ?? 125;
+                                let newMinor = curS.npcMinorTokens ?? 100;
+                                let newRel = curS.npcRelationshipBars ?? false;
+                                let newImport = curS.experimentalNpcImport ?? false;
+
+                                setTimeout(() => {
+                                    const majorEl = document.getElementById('rt-npc-major-tokens');
+                                    const minorEl = document.getElementById('rt-npc-minor-tokens');
+                                    const relEl = document.getElementById('rt-npc-rel-bars');
+                                    const importEl = document.getElementById('rt-npc-card-import');
+
+                                    if (majorEl) majorEl.addEventListener('input', () => newMajor = parseInt(majorEl.value, 10) || 125);
+                                    if (minorEl) minorEl.addEventListener('input', () => newMinor = parseInt(minorEl.value, 10) || 100);
+                                    if (relEl) {
+                                        relEl.addEventListener('change', () => {
+                                            newRel = relEl.checked;
+                                            if (relEl.nextElementSibling) relEl.nextElementSibling.textContent = newRel ? 'Enabled' : 'Disabled';
+                                        });
+                                    }
+                                    if (importEl) {
+                                        importEl.addEventListener('change', () => {
+                                            newImport = importEl.checked;
+                                            if (importEl.nextElementSibling) importEl.nextElementSibling.textContent = newImport ? 'Enabled' : 'Disabled';
+                                        });
+                                    }
+                                }, 0);
+
                                 const result = await ctx.callGenericPopup(popupHtml, ctx.POPUP_TYPE?.CONFIRM ?? 3, '', {
                                     okButton: 'Save', cancelButton: 'Cancel', wide: false,
                                 });
 
                                 if (result) {
-                                    const majorEl = document.getElementById('rt-npc-major-tokens');
-                                    const minorEl = document.getElementById('rt-npc-minor-tokens');
-                                    const relEl = document.getElementById('rt-npc-rel-bars');
-                                    const importEl = document.getElementById('rt-npc-card-import');
-                                    const newMajor = Math.max(50, Math.min(1000, parseInt(majorEl?.value, 10) || 125));
-                                    const newMinor = Math.max(30, Math.min(500, parseInt(minorEl?.value, 10) || 100));
-                                    const newRel = relEl?.checked ?? false;
-                                    const newImport = importEl?.checked ?? false;
+                                    newMajor = Math.max(50, Math.min(1000, newMajor));
+                                    newMinor = Math.max(30, Math.min(500, newMinor));
 
                                     const updS = getSettings();
                                     updS.experimentalNpcImport = newImport;
