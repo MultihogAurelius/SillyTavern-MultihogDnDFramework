@@ -2,6 +2,14 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [3.8.3] - 2026-06-24
+
+### Changed
+- **Sysprompt Settings Drawer Restructure**:
+  - Renamed the drawer to "Sysprompt Editor & Reset".
+  - Moved the AI-Assisted Section Builder and Custom Sysprompt Library sections to the top of the drawer.
+  - Consolidated the Normal and Legacy update buttons into a single "Apply Sysprompt" button that dynamically chooses between `sysprompt.txt` and `sysprompt_legacy.txt` based on the user's active RNG settings.
+
 ## [3.8.2] - 2026-06-24
 
 ### Fixed

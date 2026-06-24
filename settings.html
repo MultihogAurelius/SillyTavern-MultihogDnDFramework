@@ -969,39 +969,19 @@
 
             
 
-            <!-- SUB-DRAWER 5: SYSPROMPT EDITOR & UPDATER -->
+            <!-- SUB-DRAWER 5: SYSPROMPT EDITOR & RESET -->
             <div class="inline-drawer">
                 <div class="inline-drawer-toggle inline-drawer-header">
                     <i class="fa-solid fa-file-pen" style="margin-right: 8px; opacity: 0.7;"></i>
-                    <b>Sysprompt Editor & Updater</b>
+                    <b>Sysprompt Editor &amp; Reset</b>
                     <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
                 </div>
                 <div class="inline-drawer-content">
                     <div class="flex-container flexFlowColumn gap-1">
                         <div style="font-size: 0.8em; opacity: 0.65; line-height: 1.4; margin-bottom: 8px;">
-                            Manage your D&amp;D system prompt. Update it to the latest version, switch between Normal and Legacy modes, or use AI to add new sections.
+                            Manage your D&amp;D system prompt. Switch between Normal and Legacy modes via RNG settings, customize it with sections, or reset prompts to defaults.
                         </div>
 
-                        <div style="font-weight: bold; font-size: 0.85em; opacity: 0.8; margin-bottom: 4px;">Update Sysprompt</div>
-                        <div style="display: flex; gap: 6px;">
-                            <button id="rpg_tracker_btn_update_sysprompt" class="menu_button interactable"
-                                style="flex: 1; background: rgba(0, 200, 140, 0.18); border-color: #00c88c;"
-                                title="Fetches the latest sysprompt.txt (Normal mode) and writes it to your Quick Prompt Main box.">
-                                <i class="fa-solid fa-arrow-up-from-bracket"></i> Update (Normal)
-                            </button>
-                            <button id="rpg_tracker_btn_update_sysprompt_legacy" class="menu_button interactable"
-                                style="flex: 1; background: rgba(200, 170, 0, 0.18); border-color: #ccaa00;"
-                                title="Fetches the legacy sysprompt (without Tool Calls) and writes it to your Quick Prompt Main box.">
-                                <i class="fa-solid fa-arrow-up-from-bracket"></i> Update (Legacy)
-                            </button>
-                        </div>
-                        <button id="rpg_tracker_btn_reset_and_apply_sysprompt" class="menu_button interactable"
-                            style="width: 100%; margin-top: 4px; background: rgba(80, 140, 255, 0.18); border-color: #5588ff;"
-                            title="Resets ALL prompts (Core, Stock Modules, Block Order) and writes sysprompt.txt to Quick Prompt Main box.">
-                            <i class="fa-solid fa-rotate"></i> Reset All &amp; Apply
-                        </button>
-
-                        <hr>
                         <div style="font-weight: bold; font-size: 0.85em; opacity: 0.8; margin-bottom: 4px;">AI-Assisted Section Builder</div>
                         <div style="font-size: 0.78em; opacity: 0.6; line-height: 1.4; margin-bottom: 6px;">
                             Describe a new system/mechanic and let AI generate a new &lt;section&gt; block. You can review, retry, or edit before it's appended to your sysprompt.
@@ -1019,6 +999,19 @@
                         <button id="rpg_tracker_btn_sysprompt_library" class="menu_button interactable"
                             style="width: 100%; margin-top: 4px; background: rgba(50, 150, 255, 0.15); border-color: rgba(50, 150, 255, 0.4);" title="Manage saved custom sysprompt sections">
                             <i class="fa-solid fa-book-open"></i> Custom Sysprompt Library
+                        </button>
+
+                        <hr>
+                        <div style="font-weight: bold; font-size: 0.85em; opacity: 0.8; margin-bottom: 4px;">Apply &amp; Reset</div>
+                        <button id="rpg_tracker_btn_update_sysprompt" class="menu_button interactable"
+                            style="width: 100%; background: rgba(0, 200, 140, 0.18); border-color: #00c88c;"
+                            title="Fetches and writes the system prompt to your Quick Prompt Main box according to the current RNG mode settings (Normal vs. Legacy).">
+                            <i class="fa-solid fa-arrow-up-from-bracket"></i> Apply Sysprompt
+                        </button>
+                        <button id="rpg_tracker_btn_reset_and_apply_sysprompt" class="menu_button interactable"
+                            style="width: 100%; margin-top: 4px; background: rgba(80, 140, 255, 0.18); border-color: #5588ff;"
+                            title="Resets ALL prompts (Core, Stock Modules, Block Order) and writes the current system prompt template to Quick Prompt Main box.">
+                            <i class="fa-solid fa-rotate"></i> Reset All &amp; Apply
                         </button>
                     </div>
                 </div>

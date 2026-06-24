@@ -7680,7 +7680,7 @@ function buildSysprompt(rawText) {
 
         // --- Version Upgrade Prompt Reset Dialog ---
         {
-            let currentVersion = '3.8.2'; // Fallback
+            let currentVersion = '3.8.3'; // Fallback
             try {
                 const manifestUrl = new URL('./manifest.json', import.meta.url);
                 const response = await fetch(manifestUrl);
@@ -9292,9 +9292,9 @@ RULES:
             saveSettings();
             toastr['success']('Stock modules, order, and prompts reset to factory defaults.', 'RPG Tracker');
         });
-        // ── Update Sysprompt (Normal) ──
+        // ── Apply Sysprompt ──
         $('#rpg_tracker_btn_update_sysprompt').on('click', async function () {
-            const fileName = 'sysprompt.txt';
+            const fileName = getSettings().diceFunctionTool ? 'sysprompt.txt' : 'sysprompt_legacy.txt';
             let content;
             try {
                 const response = await fetch(`/scripts/extensions/third-party/${FOLDER_NAME}/${fileName}`);
@@ -9309,7 +9309,7 @@ RULES:
             }
 
             if (!content) {
-                toastr['error']('Could not load sysprompt.txt. Main prompt was NOT updated.', 'RPG Tracker');
+                toastr['error'](`Could not load ${fileName}. Main prompt was NOT updated.`, 'RPG Tracker');
                 return;
             }
 
@@ -9319,44 +9319,10 @@ RULES:
             if (mainTextarea) {
                 mainTextarea.value = content;
                 mainTextarea.dispatchEvent(new Event('blur', { bubbles: true }));
-                toastr['success']('Main sysprompt updated (Normal mode)! \u2705', 'RPG Tracker');
+                toastr['success'](`Main sysprompt updated (${getSettings().diceFunctionTool ? 'Normal' : 'Legacy'} mode)! ✅`, 'RPG Tracker');
             } else {
                 await navigator.clipboard.writeText(content).catch(() => { });
                 toastr['info']('Quick-edit textarea not found. Sysprompt copied to clipboard — paste it manually into your Main prompt.', 'RPG Tracker');
-            }
-        });
-
-        // ── Update Sysprompt (Legacy) ──
-        $('#rpg_tracker_btn_update_sysprompt_legacy').on('click', async function () {
-            const fileName = 'sysprompt_legacy.txt';
-            let content;
-            try {
-                const response = await fetch(`/scripts/extensions/third-party/${FOLDER_NAME}/${fileName}`);
-                if (response.ok) {
-                    content = await response.text();
-                } else {
-                    throw new Error(`Server returned ${response.status}`);
-                }
-            } catch (err) {
-                console.warn(`[Multihog Framework] Could not fetch ${fileName}, using hardcoded fallback:`, err);
-                content = RT_PROMPTS[fileName];
-            }
-
-            if (!content) {
-                toastr['error']('Could not load sysprompt_legacy.txt. Main prompt was NOT updated.', 'RPG Tracker');
-                return;
-            }
-
-            content = buildSysprompt(content);
-
-            const mainTextarea = /** @type {HTMLTextAreaElement} */ (document.getElementById('main_prompt_quick_edit_textarea'));
-            if (mainTextarea) {
-                mainTextarea.value = content;
-                mainTextarea.dispatchEvent(new Event('blur', { bubbles: true }));
-                toastr['success']('Main sysprompt updated (Legacy mode)! \u2705', 'RPG Tracker');
-            } else {
-                await navigator.clipboard.writeText(content).catch(() => { });
-                toastr['info']('Quick-edit textarea not found. Legacy sysprompt copied to clipboard — paste it manually.', 'RPG Tracker');
             }
         });
 
