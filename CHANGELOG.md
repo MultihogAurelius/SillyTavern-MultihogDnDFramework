@@ -2,6 +2,12 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [3.8.11] - 2026-06-24
+
+### Added
+- **Apply Sysprompt Button**:
+  - Restored the **Apply Sysprompt** button under the Narrator Configuration block in the General & Visuals menu.
+
 ## [3.8.10] - 2026-06-24
 
 ### Removed

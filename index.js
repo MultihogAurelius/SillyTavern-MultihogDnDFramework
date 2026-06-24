@@ -7617,7 +7617,7 @@ function buildSysprompt(rawText) {
 
         // --- Version Upgrade Prompt Reset Dialog ---
         {
-            let currentVersion = '3.8.10'; // Fallback
+            let currentVersion = '3.8.11'; // Fallback
             try {
                 const manifestUrl = new URL('./manifest.json', import.meta.url);
                 const response = await fetch(manifestUrl);
@@ -9187,6 +9187,39 @@ RULES:
             $('#rpg_tracker_core_prompt').val(freshSettings.systemPromptTemplate);
             saveSettings();
             toastr['success']('Core prompt reset to default.', 'RPG Tracker');
+        });
+
+        $('#rpg_tracker_btn_update_sysprompt_general').on('click', async function () {
+            const fileName = getSettings().diceFunctionTool ? 'sysprompt.txt' : 'sysprompt_legacy.txt';
+            let content;
+            try {
+                const response = await fetch(`/scripts/extensions/third-party/${FOLDER_NAME}/${fileName}`);
+                if (response.ok) {
+                    content = await response.text();
+                } else {
+                    throw new Error(`Server returned ${response.status}`);
+                }
+            } catch (err) {
+                console.warn(`[Multihog Framework] Could not fetch ${fileName}, using hardcoded fallback:`, err);
+                content = RT_PROMPTS[fileName];
+            }
+
+            if (!content) {
+                toastr['error'](`Could not load ${fileName}. Main prompt was NOT updated.`, 'RPG Tracker');
+                return;
+            }
+
+            content = buildSysprompt(content);
+
+            const mainTextarea = /** @type {HTMLTextAreaElement} */ (document.getElementById('main_prompt_quick_edit_textarea'));
+            if (mainTextarea) {
+                mainTextarea.value = content;
+                mainTextarea.dispatchEvent(new Event('blur', { bubbles: true }));
+                toastr['success'](`Main sysprompt updated (${getSettings().diceFunctionTool ? 'Normal' : 'Legacy'} mode)! ✅`, 'RPG Tracker');
+            } else {
+                await navigator.clipboard.writeText(content).catch(() => { });
+                toastr['info']('Quick-edit textarea not found. Sysprompt copied to clipboard — paste it manually into your Main prompt.', 'RPG Tracker');
+            }
         });
 
         $('#rpg_tracker_btn_reset_all_prompts').on('click', function () {
