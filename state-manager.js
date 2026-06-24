@@ -20,7 +20,7 @@ export const MODULE_NAME = 'rpg_tracker';
  * @param {number} minorWords
  * @returns {string}
  */
-export function buildNpcInstruction(majorWords = 90, minorWords = 60) {
+export function buildNpcInstruction(majorWords = 25, minorWords = 15) {
     let instruction = `Named characters the party interacts with. Do NOT create an entry for {{user}}. Mention {{user}} in EVENT or QUEST entries as needed.
 
 IMPORTANT: Wrap the immutable identity sections (Appearance, Personality, Brief Background, Habits/Behaviors) inside a single \`[CORE]\` and \`[/CORE]\` tag block. The Description field inside the [[ ]] tags must contain this block. These sections are permanent — once written they must NOT be rewritten, overwritten, or updated through normal entry update/record operations.
@@ -44,12 +44,12 @@ If the NPC's relationship with the player meaningfully changes based on what hap
   [[REL: Book::UID | Friendship | +N]] or [[REL: Book::UID | Friendship | -N]]
   [[REL: Book::UID | Affection | +N]] or [[REL: Book::UID | Affection | -N]]
 Output only the delta — do NOT write or track the relationship total. The current total is intentionally hidden from you so your judgment stays anchored to the quality of the interaction, not the existing pool. A constraint warning will appear in the entry only if a value has reached its hard limit (100 or -100); in that case, do not award further increments in the capped direction. Use your judgment on magnitude (typical range: ±5 to ±25 per turn).`;
+
     instruction += `\n\nBe concise and functional — every word should serve gameplay or characterization. Avoid adjective dumps and purple prose.
 
-[WORD BUDGET TARGETS]
-You MUST explicitly target these word counts for the [CORE] block. Write concise, high-density sentences and trim ruthlessly to stay under budget:
-- Major NPCs (recurring, plot-important): Target exactly ${majorWords} words.
-- Minor NPCs (shopkeepers, guards, one-off encounters): Target exactly ${minorWords} words — use only Appearance and Personality for minor NPCs (also wrapped in [CORE]...[/CORE]), skip other sections.`;
+## CORE LENGTH TARGETS
+Major NPCs (recurring, plot-important): target AT LEAST ${majorWords} words per each section of [CORE].
+Minor NPCs (shopkeepers, guards, one-off encounters): target AT LEAST ${minorWords} words per each section of [CORE].`;
     return instruction;
 }
 
@@ -106,8 +106,8 @@ export function getSettings() {
         pollinationsModel: "zimage",
         inventoryWorthMode: "hover",   // 'hover' = worth shown as tooltip only | 'display' = coin badge shown inline
         showTotalInventoryValue: true,
-        npcMajorWords: 90,
-        npcMinorWords: 60,
+        npcMajorWords: 25,
+        npcMinorWords: 15,
         npcRelationshipBars: false,
         npcRelationshipValues: {},
         experimentalNpcImport: true,
@@ -603,16 +603,32 @@ Example: [[FAC: Iron Syndicate | ...]]  NOT  [[FAC: Khelt :: Iron Syndicate | ..
     if (!s.settingsVersion || s.settingsVersion < '3.12.0') {
         // Convert old token keys to word keys using approximate conversion (125t→90w, 100t→60w)
         if (s.npcMajorWords === undefined) {
-            s.npcMajorWords = s.npcMajorTokens !== undefined ? Math.round(s.npcMajorTokens * 0.72) : 90;
+            s.npcMajorWords = s.npcMajorTokens !== undefined ? Math.round(s.npcMajorTokens * 0.72) : 25;
         }
         if (s.npcMinorWords === undefined) {
-            s.npcMinorWords = s.npcMinorTokens !== undefined ? Math.round(s.npcMinorTokens * 0.72) : 60;
+            s.npcMinorWords = s.npcMinorTokens !== undefined ? Math.round(s.npcMinorTokens * 0.72) : 15;
         }
         // Rebuild instruction with word-based limits
         if (s.routerModules?.npc) {
             s.routerModules.npc.instruction = buildNpcInstruction(s.npcMajorWords, s.npcMinorWords);
         }
         s.settingsVersion = '3.12.0';
+    }
+
+    // Migrate NPC limits from total words to per-section word targets (v3.13.0)
+    if (!s.settingsVersion || s.settingsVersion < '3.13.0') {
+        // Convert old total word limits (90/60) to reasonable per-section defaults (25/15)
+        if (s.npcMajorWords === 90 || s.npcMajorWords > 100) {
+            s.npcMajorWords = 25;
+        }
+        if (s.npcMinorWords === 60 || s.npcMinorWords > 100) {
+            s.npcMinorWords = 15;
+        }
+        // Rebuild instruction with new length target wording
+        if (s.routerModules?.npc) {
+            s.routerModules.npc.instruction = buildNpcInstruction(s.npcMajorWords, s.npcMinorWords);
+        }
+        s.settingsVersion = '3.13.0';
     }
 
 

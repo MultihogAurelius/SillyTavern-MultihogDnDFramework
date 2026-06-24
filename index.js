@@ -4849,17 +4849,17 @@ function createPanel() {
                                     <div style="font-size:16px;font-weight:bold;color:#d4a940;margin-bottom:16px;">⚙️ NPC Settings</div>
 
                                     <div style="margin-bottom:14px;">
-                                        <label style="font-size:12px;color:rgba(255,255,255,0.7);display:block;margin-bottom:4px;">Major NPC Word Limit</label>
-                                        <input type="number" id="rt-npc-major-words" value="${curS.npcMajorWords ?? 90}" min="20" max="500" step="10"
+                                        <label style="font-size:12px;color:rgba(255,255,255,0.7);display:block;margin-bottom:4px;">Major NPC Section Word Target</label>
+                                        <input type="number" id="rt-npc-major-words" value="${curS.npcMajorWords ?? 25}" min="5" max="100" step="5"
                                             style="width:100%;background:rgba(0,0,0,0.4);color:white;border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:6px 10px;font-size:13px;box-sizing:border-box;">
-                                        <div style="font-size:10px;color:rgba(255,255,255,0.35);margin-top:2px;">Recurring, plot-important NPCs. Default: 90 words</div>
+                                        <div style="font-size:10px;color:rgba(255,255,255,0.35);margin-top:2px;">Recurring, plot-important NPCs. Default: 25 words per section</div>
                                     </div>
 
                                     <div style="margin-bottom:14px;">
-                                        <label style="font-size:12px;color:rgba(255,255,255,0.7);display:block;margin-bottom:4px;">Minor NPC Word Limit</label>
-                                        <input type="number" id="rt-npc-minor-words" value="${curS.npcMinorWords ?? 60}" min="10" max="200" step="10"
+                                        <label style="font-size:12px;color:rgba(255,255,255,0.7);display:block;margin-bottom:4px;">Minor NPC Section Word Target</label>
+                                        <input type="number" id="rt-npc-minor-words" value="${curS.npcMinorWords ?? 15}" min="5" max="100" step="5"
                                             style="width:100%;background:rgba(0,0,0,0.4);color:white;border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:6px 10px;font-size:13px;box-sizing:border-box;">
-                                        <div style="font-size:10px;color:rgba(255,255,255,0.35);margin-top:2px;">Shopkeepers, guards, one-off encounters. Default: 60 words</div>
+                                        <div style="font-size:10px;color:rgba(255,255,255,0.35);margin-top:2px;">Shopkeepers, guards, one-off encounters. Default: 15 words per section</div>
                                     </div>
 
                                     <div style="margin-bottom:6px;display:flex;align-items:center;gap:10px;">
@@ -4883,19 +4883,19 @@ function createPanel() {
                                     <div style="font-size:10px;color:rgba(255,255,255,0.35);margin-bottom:10px;">Shows the "Add NPC from Character Card" button. This allows importing character cards into campaigns with AI review to fit them into the story. However, organic NPC creation is recommended.</div>
                                 </div>`;
 
-                                let newMajor = curS.npcMajorWords ?? 90;
-                                let newMinor = curS.npcMinorWords ?? 60;
+                                let newMajor = curS.npcMajorWords ?? 25;
+                                let newMinor = curS.npcMinorWords ?? 15;
                                 let newRel = curS.npcRelationshipBars ?? false;
                                 let newImport = curS.experimentalNpcImport ?? false;
 
                                 setTimeout(() => {
-                                    const majorEl = document.getElementById('rt-npc-major-tokens');
-                                    const minorEl = document.getElementById('rt-npc-minor-tokens');
+                                    const majorEl = document.getElementById('rt-npc-major-words');
+                                    const minorEl = document.getElementById('rt-npc-minor-words');
                                     const relEl = document.getElementById('rt-npc-rel-bars');
                                     const importEl = document.getElementById('rt-npc-card-import');
 
-                                    if (majorEl) majorEl.addEventListener('input', () => newMajor = parseInt(majorEl.value, 10) || 90);
-                                    if (minorEl) minorEl.addEventListener('input', () => newMinor = parseInt(minorEl.value, 10) || 60);
+                                    if (majorEl) majorEl.addEventListener('input', () => newMajor = parseInt(majorEl.value, 10) || 25);
+                                    if (minorEl) minorEl.addEventListener('input', () => newMinor = parseInt(minorEl.value, 10) || 15);
                                     if (relEl) {
                                         relEl.addEventListener('change', () => {
                                             newRel = relEl.checked;
@@ -8717,8 +8717,8 @@ function buildSysprompt(rawText) {
                         if ($suffixPromptEl.length) {
                             $suffixPromptEl.val(sTempTracker.userPromptSuffix);
                         }
-                        $('#rpg_tracker_npc_major_words').val(sTempTracker.npcMajorWords ?? 90);
-                        $('#rpg_tracker_npc_minor_words').val(sTempTracker.npcMinorWords ?? 60);
+                        $('#rpg_tracker_npc_major_words').val(sTempTracker.npcMajorWords ?? 25);
+                        $('#rpg_tracker_npc_minor_words').val(sTempTracker.npcMinorWords ?? 15);
                         $('#rpg_tracker_npc_rel_bars').prop('checked', !!sTempTracker.npcRelationshipBars);
                         $('#rpg_tracker_npc_card_import').prop('checked', !!sTempTracker.experimentalNpcImport);
                         if (typeof refreshOrderList === 'function') refreshOrderList();
@@ -8903,8 +8903,8 @@ function buildSysprompt(rawText) {
                                     if ($suffixPromptEl.length) {
                                         $suffixPromptEl.val(sTempTracker.userPromptSuffix);
                                     }
-                                    $('#rpg_tracker_npc_major_words').val(sTempTracker.npcMajorWords ?? 90);
-                                    $('#rpg_tracker_npc_minor_words').val(sTempTracker.npcMinorWords ?? 60);
+                                    $('#rpg_tracker_npc_major_words').val(sTempTracker.npcMajorWords ?? 25);
+                                    $('#rpg_tracker_npc_minor_words').val(sTempTracker.npcMinorWords ?? 15);
                                     $('#rpg_tracker_npc_rel_bars').prop('checked', !!sTempTracker.npcRelationshipBars);
                                     $('#rpg_tracker_npc_card_import').prop('checked', !!sTempTracker.experimentalNpcImport);
                                     if (typeof refreshOrderList === 'function') refreshOrderList();
@@ -11485,17 +11485,17 @@ RULES:
         });
 
         // NPC Settings Bindings
-        $('#rpg_tracker_npc_major_words').val(settings.npcMajorWords ?? 90).on('input', function () {
-            const val = parseInt(String($(this).val() || '')) || 90;
-            settings.npcMajorWords = Math.max(20, Math.min(500, val));
+        $('#rpg_tracker_npc_major_words').val(settings.npcMajorWords ?? 25).on('input', function () {
+            const val = parseInt(String($(this).val() || '')) || 25;
+            settings.npcMajorWords = Math.max(5, Math.min(100, val));
             if (settings.routerModules?.npc) {
                 settings.routerModules.npc.instruction = buildNpcInstruction(settings.npcMajorWords, settings.npcMinorWords);
             }
             saveSettings();
         });
-        $('#rpg_tracker_npc_minor_words').val(settings.npcMinorWords ?? 60).on('input', function () {
-            const val = parseInt(String($(this).val() || '')) || 60;
-            settings.npcMinorWords = Math.max(10, Math.min(300, val));
+        $('#rpg_tracker_npc_minor_words').val(settings.npcMinorWords ?? 15).on('input', function () {
+            const val = parseInt(String($(this).val() || '')) || 15;
+            settings.npcMinorWords = Math.max(5, Math.min(100, val));
             if (settings.routerModules?.npc) {
                 settings.routerModules.npc.instruction = buildNpcInstruction(settings.npcMajorWords, settings.npcMinorWords);
             }
