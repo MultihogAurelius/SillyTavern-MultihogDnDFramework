@@ -4915,8 +4915,8 @@ function createPanel() {
                                 });
 
                                 if (result) {
-                                    newMajor = Math.max(20, Math.min(500, newMajor));
-                                    newMinor = Math.max(10, Math.min(200, newMinor));
+                                    newMajor = Math.max(5, Math.min(100, newMajor));
+                                    newMinor = Math.max(5, Math.min(100, newMinor));
 
                                     const updS = getSettings();
                                     updS.experimentalNpcImport = newImport;
@@ -4937,6 +4937,9 @@ function createPanel() {
 
                                     SillyTavern.getContext().saveSettingsDebounced?.();
                                     toastr['success']('NPC settings saved.', 'NPC Settings');
+                                    if (typeof globalThis._rpgRenderAgentModules === 'function') {
+                                        globalThis._rpgRenderAgentModules();
+                                    }
                                     await refreshManifest();
                                 }
                             });
@@ -6297,7 +6300,11 @@ Rules:
                     if (confirm(`Reset ${id.toUpperCase()} module slots and instruction to default?`)) {
                         const st = getSettings();
                         if (DEFAULT_MODULES[id]) {
-                            st.routerModules[id].instruction = DEFAULT_MODULES[id].instruction;
+                            if (id === 'npc') {
+                                st.routerModules[id].instruction = buildNpcInstruction(st.npcMajorWords, st.npcMinorWords);
+                            } else {
+                                st.routerModules[id].instruction = DEFAULT_MODULES[id].instruction;
+                            }
                             if (DEFAULT_MODULES[id].format != null) st.routerModules[id].format = DEFAULT_MODULES[id].format;
                             saveSettings();
                             renderAgentModules();
@@ -8730,7 +8737,11 @@ function buildSysprompt(rawText) {
                         }
                         for (const [id, def] of Object.entries(DEFAULT_MODULES)) {
                             if (fresh.routerModules && fresh.routerModules[id]) {
-                                fresh.routerModules[id].instruction = def.instruction;
+                                if (id === 'npc') {
+                                    fresh.routerModules[id].instruction = buildNpcInstruction(fresh.npcMajorWords, fresh.npcMinorWords);
+                                } else {
+                                    fresh.routerModules[id].instruction = def.instruction;
+                                }
                                 fresh.routerModules[id].format = def.format;
                             }
                         }
@@ -8919,7 +8930,11 @@ function buildSysprompt(rawText) {
                                     }
                                     for (const [id, def] of Object.entries(DEFAULT_MODULES)) {
                                         if (fresh.routerModules && fresh.routerModules[id]) {
-                                            fresh.routerModules[id].instruction = def.instruction;
+                                            if (id === 'npc') {
+                                                fresh.routerModules[id].instruction = buildNpcInstruction(fresh.npcMajorWords, fresh.npcMinorWords);
+                                            } else {
+                                                fresh.routerModules[id].instruction = def.instruction;
+                                            }
                                             fresh.routerModules[id].format = def.format;
                                         }
                                     }
@@ -11492,6 +11507,9 @@ RULES:
                 settings.routerModules.npc.instruction = buildNpcInstruction(settings.npcMajorWords, settings.npcMinorWords);
             }
             saveSettings();
+            if (typeof globalThis._rpgRenderAgentModules === 'function') {
+                globalThis._rpgRenderAgentModules();
+            }
         });
         $('#rpg_tracker_npc_minor_words').val(settings.npcMinorWords ?? 15).on('input', function () {
             const val = parseInt(String($(this).val() || '')) || 15;
@@ -11500,6 +11518,9 @@ RULES:
                 settings.routerModules.npc.instruction = buildNpcInstruction(settings.npcMajorWords, settings.npcMinorWords);
             }
             saveSettings();
+            if (typeof globalThis._rpgRenderAgentModules === 'function') {
+                globalThis._rpgRenderAgentModules();
+            }
         });
         $('#rpg_tracker_npc_rel_bars').prop('checked', !!settings.npcRelationshipBars).on('change', function () {
             settings.npcRelationshipBars = $(this).prop('checked');
