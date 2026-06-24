@@ -2,6 +2,12 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [3.8.10] - 2026-06-24
+
+### Removed
+- **Outdated Description**:
+  - Removed outdated description text in the **Sysprompt Editor** drawer.
+
 ## [3.8.9] - 2026-06-24
 
 ### Added
