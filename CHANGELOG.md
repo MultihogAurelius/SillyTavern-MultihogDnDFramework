@@ -2,6 +2,12 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [3.11.2] - 2026-06-24
+
+### Fixed
+- **System Prompts Constraints**:
+  - Removed `[RNG_QUEUE v6.0_PROPER] is ONLY used in active combat` constraint from `sysprompt_legacy.txt` and its fallback copy in `constants.js` under `<RNG_constraints>`.
+
 ## [3.11.1] - 2026-06-24
 
 ### Fixed
