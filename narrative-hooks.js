@@ -389,7 +389,7 @@ async function buildNpcRelationsBlock(settings) {
         lines.push(`${displayName}: ${fStr}, ${aStr}`);
     }
 
-    if (!lines.length) return '';
+    if (!lines.length) return `[NPC_RELATIONS]\nNo established relationships yet.\n[/NPC_RELATIONS]\n\n`;
     return `[NPC_RELATIONS]\n${lines.join('\n')}\n[/NPC_RELATIONS]\n\n`;
 }
 
