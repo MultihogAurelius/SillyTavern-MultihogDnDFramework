@@ -476,7 +476,7 @@ export async function runRouterPass(narrativeOutput, manualPrompt = null, custom
 9. Do NOT merge multiple distinct chronological events into a single entry to "reduce fragmentation". Each distinct event must remain as a separate entry so it triggers on its own keywords.
 10. NEVER modify, shorten, or delete content within \`[CORE] ... [/CORE]\` blocks under any circumstances. Keep the tags and their inner content completely unchanged.
 11. For legacy NPC entries lacking these tags, identify their persistent sections (Appearance, Personality, Brief Background, Habits/Behaviors) and wrap them inside a \`[CORE] ... [/CORE]\` block to protect them from future passes. Do not include Relationship, Friendship/Rapport, or Affection/Interest lines inside the block.
-12. Compress turn-by-turn or granular combat status logs (e.g., creature HP changes, turn-by-turn action lists, temporary conditions mid-fight) into a single, high-level narrative summary that captures both the initiation (who/what attacked {{user}}) and final outcome.
+12. Compress turn-by-turn or granular combat status logs (e.g., creature HP changes, turn-by-turn action lists, temporary conditions mid-fight) into high-level updates: for long combats, preserve the initiation (who/what attacked {{user}}), a progress summary every ~5 rounds (capturing major shifts or stalemates), and the final outcome.
 13. Output your reasoning first, then the tags.`;
 
             let agentInstructionPrompt = `You are the Lorebook Archivist. Consolidate bloated lorebook entries using the tools provided.
@@ -498,7 +498,7 @@ For each flagged entry:
 8. Do NOT merge multiple distinct chronological events into a single entry to "reduce fragmentation". Each distinct historical event must remain as its own entry so it triggers on its specific keywords.
 9. NEVER modify, shorten, or delete content within \`[CORE] ... [/CORE]\` blocks under any circumstances. Keep the tags and their inner content completely unchanged.
 10. For legacy NPC entries lacking these tags, identify their persistent sections (Appearance, Personality, Brief Background, Habits/Behaviors) and wrap them inside a \`[CORE] ... [/CORE]\` block to protect them from future passes. Do not include Relationship, Friendship/Rapport, or Affection/Interest lines inside the block.
-11. Compress turn-by-turn or granular combat status logs (e.g., creature HP changes, turn-by-turn action lists, temporary conditions mid-fight) into a single, high-level narrative summary that captures both the initiation (who/what attacked {{user}}) and final outcome.
+11. Compress turn-by-turn or granular combat status logs (e.g., creature HP changes, turn-by-turn action lists, temporary conditions mid-fight) into high-level updates: for long combats, preserve the initiation (who/what attacked {{user}}), a progress summary every ~5 rounds (capturing major shifts or stalemates), and the final outcome.
 12. Call commit exactly once at the end. Do not call it per-entry.`;
 
             if (customInstructions) {
