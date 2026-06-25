@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [3.16.10] - 2026-06-25
+
+### Changed
+- **Combat Granularity and Summarization Rules**: Reinforced prompts across NPC instructions, event modules, main Researcher Agent update rules, and the Lorebook Archivist cleanup/consolidation rules to forbid granular, turn-by-turn combat status logging (HP updates, condition tracking, minor actions). Instructed models to summarize combat history into macro-level outcomes.
+
 ## [3.16.9] - 2026-06-25
 
 ### Fixed

@@ -48,7 +48,11 @@ Major NPCs (recurring, plot-important): target AT LEAST ${majorWords} words per 
 Minor NPCs (shopkeepers, guards, one-off encounters): target AT LEAST ${minorWords} words per each section of [CORE].
 
 Expand/extrapolate thematically if you can't otherwise meet the specified length targets.
-</CORE LENGTH TARGETS>`;
+</CORE LENGTH TARGETS>
+
+<COMBAT_GRANULARITY>
+Do NOT record per-round combat updates (e.g., creature HP changes, turn-by-turn action lists, temporary conditions mid-fight). Only record the final resolved outcome of combat once it concludes.
+</COMBAT_GRANULARITY>`;
     return instruction;
 }
 
@@ -59,7 +63,7 @@ export const DEFAULT_MODULES = {
     loc:   { enabled: true, tag: 'LOC',   format: 'Name | Description | Keywords',                    instruction: 'Named places. The Name MUST be the full hierarchical path using " :: " as the separator (e.g. "Khelt :: Rust-Lantern District :: Marrow-Deep Mines Office"). Include each ancestor name as a keyword (e.g. "Khelt, Rust-Lantern District, mines").' },
     fac:   { enabled: true, tag: 'FAC',   format: 'Name | Status | Description | Keywords',           instruction: 'Named factions, guilds, organisations. **Status**: short current-state line (standing with the party, active conflicts, what changed recently). **Description**: longer narrative (history, ideology, schemes, notable members). **Keywords**: comma-separated terms for discovery.' },
     quest: { enabled: true, tag: 'QUEST', format: 'Name | Location | Description | Keywords',         instruction: 'ONLY record a quest if the tag [QUEST ACCEPTED] is outputted in the narrative. A quest being mentioned or offered is NOT enough.' },
-    event: { enabled: true, tag: 'EVENT', format: 'Name | Details | Keywords',                        instruction: 'Significant narrative events. The Name is a SHORT, STABLE identifier (e.g. "Siege of Ashford") — no timestamps in the name, no "Final"/"Update" suffixes. Put timestamps in the Details field. Reuse the exact same Name when adding new information — entries are chronicles that accumulate automatically.' },
+    event: { enabled: true, tag: 'EVENT', format: 'Name | Details | Keywords',                        instruction: 'Significant narrative events. The Name is a SHORT, STABLE identifier (e.g. "Siege of Ashford") — no timestamps in the name, no "Final"/"Update" suffixes. Put timestamps in the Details field. Reuse the exact same Name when adding new information — entries are chronicles that accumulate automatically. COMBAT GRANULARITY: Do NOT record turn-by-turn status, round-by-round HP changes, or granular actions. Record only the overall flow and final outcome of an encounter (e.g., how it started, key moments, and final resolution).' },
     world: { enabled: false, tag: 'WORLD', format: 'Name | Details | Keywords',                       instruction: 'World Progression reports tracking off-screen NPC actions and events. Name must be the time period (e.g. "Day 1", "Week 1 (Days 1-7)").' }
 };
 
@@ -386,6 +390,8 @@ Entries are append-only chronicles. Provide ONLY the new information as a timest
 
 IMPORTANT: Always use the exact macro string \`{{user}}\` when referring to the player. Do NOT write the plain word "user" or "player" in your entry updates.
 
+- **COMBAT GRANULARITY**: Do NOT record granular, turn-by-turn combat status updates (e.g., individual monster HP, turn actions, temporary combat conditions). Only update NPC entries or record EVENT entries with the macro-level outcome (e.g., the battle resolved, who died/survived/fled).
+
 For locations: the [ID:] stamp at the top of every injected entry gives you the ID to pass to the update tool.
 IMPORTANT: Never include the [ID:] line in the content field you write. It is managed automatically — only use the ID value in the "id" field of the update tool.
 
@@ -650,6 +656,18 @@ Example: [[FAC: Iron Syndicate | ...]]  NOT  [[FAC: Khelt :: Iron Syndicate | ..
         }
         s.systemPromptTemplate = defaults.systemPromptTemplate;
         s.settingsVersion = '3.16.0';
+    }
+
+    // Reinforce NPC and Event prompts regarding combat granularity and logs (v3.16.10)
+    if (!s.settingsVersion || s.settingsVersion < '3.16.10') {
+        if (s.routerModules?.npc) {
+            s.routerModules.npc.instruction = buildNpcInstruction(s.npcMajorWords, s.npcMinorWords);
+        }
+        if (s.routerModules?.event) {
+            s.routerModules.event.instruction = DEFAULT_MODULES.event.instruction;
+        }
+        s.routerSystemPromptTemplate = defaults.routerSystemPromptTemplate;
+        s.settingsVersion = '3.16.10';
     }
 
 
