@@ -4535,7 +4535,8 @@ function createPanel() {
 
             const contentRead = document.createElement('div');
             contentRead.style.cssText = 'font-size:10px; opacity:0.88; color:var(--rt-text); line-height:1.45; white-space:pre-wrap; word-break:break-word; overflow-y:auto;';
-            contentRead.textContent = item.content || '';
+            const _stripCoreTagsForDisplay = (s) => (s || '').replace(/\[\/?CORE\]/gi, '').trim();
+            contentRead.textContent = _stripCoreTagsForDisplay(item.content);
 
             const cleanBtn = entryHdr.querySelector('.rt-agent-entry-clean');
             const editBtn = entryHdr.querySelector('.rt-agent-entry-edit');
@@ -4547,7 +4548,7 @@ function createPanel() {
 
             const syncReadFromItem = () => {
                 keysRead.textContent = '[' + item.keys.join(', ') + ']';
-                contentRead.textContent = item.content || '';
+                contentRead.textContent = _stripCoreTagsForDisplay(item.content);
             };
 
             // ── Edit form (hidden until Edit) ─────────────────────────────
