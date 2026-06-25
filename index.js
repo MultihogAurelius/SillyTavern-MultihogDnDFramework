@@ -5128,20 +5128,19 @@ function createPanel() {
                                 const isPos = clamped >= 0;
                                 const bgColor = isPos ? colorPos : colorNeg;
                                 const valColor = clamped === 0 ? 'var(--SmartThemeEmColor, inherit)' : bgColor;
-                                return `<div style="display:flex;flex-direction:column;gap:4px;margin-bottom:14px;">
-                                    <div style="display:flex;align-items:center;gap:12px;">
-                                        <span style="font-size:20px;">${icon}</span>
-                                        <span style="font-size:13px;width:80px;color:var(--SmartThemeBodyColor, inherit);opacity:0.65;font-weight:500;">${label}</span>
-                                        <div style="flex:1;height:12px;background:var(--SmartThemeBorderColor, rgba(128,128,128,0.15));border-radius:6px;position:relative;overflow:hidden;">
-                                            <div style="position:absolute;left:50%;top:0;bottom:0;width:1px;background:var(--SmartThemeBorderColor, rgba(128,128,128,0.25));"></div>
-                                            <div id="rt-npc-detail-${type}-fill" style="position:absolute;top:0;bottom:0;border-radius:6px;background:${bgColor};${isPos ? `left:50%;width:${pct}%;` : `right:50%;width:${pct}%;`}transition:width 0.3s ease;"></div>
-                                        </div>
-                                        <span id="rt-npc-detail-${type}-text" style="font-size:15px;font-weight:bold;width:40px;text-align:right;color:${valColor};font-family:monospace;">${clamped > 0 ? '+' : ''}${clamped}</span>
+                                return `<div style="display:grid;grid-template-columns:auto 80px 1fr 40px;align-items:center;column-gap:12px;row-gap:6px;margin-bottom:14px;">
+                                    <span style="font-size:20px;">${icon}</span>
+                                    <span style="font-size:13px;color:var(--SmartThemeBodyColor, inherit);opacity:0.65;font-weight:500;">${label}</span>
+                                    <div style="height:12px;background:var(--SmartThemeBorderColor, rgba(128,128,128,0.15));border-radius:6px;position:relative;overflow:hidden;">
+                                        <div style="position:absolute;left:50%;top:0;bottom:0;width:1px;background:var(--SmartThemeBorderColor, rgba(128,128,128,0.25));"></div>
+                                        <div id="rt-npc-detail-${type}-fill" style="position:absolute;top:0;bottom:0;border-radius:6px;background:${bgColor};${isPos ? `left:50%;width:${pct}%;` : `right:50%;width:${pct}%;`}transition:width 0.3s ease;"></div>
                                     </div>
-                                    <div style="display:flex;align-items:center;gap:10px;padding-left:32px;">
-                                        <input type="range" id="rt-npc-detail-${type}-slider" min="-100" max="100" value="${clamped}" step="5"
-                                            style="flex:1;accent-color:${bgColor};height:4px;background:rgba(255,255,255,0.1);border-radius:2px;cursor:pointer;outline:none;">
-                                    </div>
+                                    <span id="rt-npc-detail-${type}-text" style="font-size:15px;font-weight:bold;text-align:right;color:${valColor};font-family:monospace;">${clamped > 0 ? '+' : ''}${clamped}</span>
+                                    <div></div>
+                                    <div></div>
+                                    <input type="range" id="rt-npc-detail-${type}-slider" min="-100" max="100" value="${clamped}" step="5"
+                                        style="width:100%;margin:0;accent-color:${bgColor};height:4px;cursor:pointer;outline:none;">
+                                    <div></div>
                                 </div>`;
                             };
 
