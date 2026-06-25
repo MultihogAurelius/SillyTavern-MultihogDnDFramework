@@ -795,7 +795,6 @@ export function installInterceptor() {
  */
 export async function processRelationshipTags() {
     const settings = getSettings();
-    if (!settings.enabled || settings.paused) return;
 
     const ctx = SillyTavern.getContext();
     if (!ctx.chat || ctx.chat.length === 0) return;
@@ -977,12 +976,9 @@ export function resetRouterTick(clearKeywordPool = false) {
 export async function onGenerationEnded() {
     const settings = getSettings();
 
-    // Step 0: Relationship tag processing — runs FIRST, before all other guards
-    // (isStateRunning, combinedNarrative, throttles). This guarantees bars update
-    // on every single generation regardless of any other system state.
-    if (settings.enabled && !settings.paused) {
-        await processRelationshipTags();
-    }
+    // Step 0: Relationship tag processing - runs FIRST, unconditionally.
+    // This guarantees bars update on every single generation even if the main lore agent is paused.
+    await processRelationshipTags();
 
     const isStateRunning = typeof globalThis._rpgStateModelRunning === 'function' && globalThis._rpgStateModelRunning();
     if (!settings.enabled || settings.paused || isStateRunning) return;
