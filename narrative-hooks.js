@@ -801,8 +801,8 @@ export async function processRelationshipTags() {
     if (!ctx.chat || ctx.chat.length === 0) return;
     const chat = ctx.chat;
 
-    // Regex matches [REL: Name | field | delta] but IGNORES ones already wrapped in <!-- -->
-    const REL_RE = /(?<!<!--\s*)\[REL:\s*([^|\]]+)\|\s*(friendship|affection)\s*\|\s*([+-]?\s*\d+)\s*\]/gi;
+    // Standard regex matches [REL: Name | field | delta]
+    const REL_RE = /\[REL:\s*([^|\]]+)\|\s*(friendship|affection)\s*\|\s*([+-]?\s*\d+)\s*\]/gi;
     
     const matches = [];
     let lastMsg = null;
@@ -814,17 +814,29 @@ export async function processRelationshipTags() {
         if (!msg || !msg.mes) continue;
         if (!msg.mes.includes('[REL:')) continue;
 
-        let match;
         let msgHasMatch = false;
-        while ((match = REL_RE.exec(msg.mes)) !== null) {
-            matches.push({ name: match[1].trim(), field: match[2].toLowerCase(), delta: parseInt(match[3].replace(/\s+/g, ''), 10) });
+        
+        const newMes = msg.mes.replace(REL_RE, (matchStr, name, field, delta, offset, fullString) => {
+            // Ignore if already inside an HTML comment
+            const before = fullString.substring(0, offset);
+            if (before.lastIndexOf('<!--') > before.lastIndexOf('-->')) {
+                return matchStr; // Return unchanged
+            }
+
+            matches.push({ 
+                name: name.trim(), 
+                field: field.toLowerCase(), 
+                delta: parseInt(delta.replace(/\s+/g, ''), 10) 
+            });
             msgHasMatch = true;
-        }
+
+            // Wrap in <!--TRACKER: to integrate with the user's regex preset
+            return `<!--TRACKER: ${matchStr}-->`;
+        });
 
         if (msgHasMatch) {
-            // Always WRAP the tags in HTML comments so they are hidden from the user but remain in the context
-            msg.mes = msg.mes.replace(REL_RE, (m) => `<!-- ${m} -->`).trimEnd();
-            lastMsg = msg; // Track that we modified at least one message
+            msg.mes = newMes.trimEnd();
+            lastMsg = msg;
         }
     }
 
@@ -849,11 +861,15 @@ export async function processRelationshipTags() {
     }
 
     try {
-        // Also force the DOM to hide it immediately if it's in the last message
+        // Force the DOM to hide it immediately if it's in the last message
         const lastMesEls = document.querySelectorAll('#chat .mes .mes_text');
         for (const el of lastMesEls) {
             if (el.innerHTML.includes('[REL:')) {
-                el.innerHTML = el.innerHTML.replace(REL_RE, (m) => `<!-- ${m} -->`);
+                el.innerHTML = el.innerHTML.replace(REL_RE, (matchStr, name, field, delta, offset, fullString) => {
+                    const before = fullString.substring(0, offset);
+                    if (before.lastIndexOf('<!--') > before.lastIndexOf('-->')) return matchStr;
+                    return `<!--TRACKER: ${matchStr}-->`;
+                });
             }
         }
     } catch (_) {}
