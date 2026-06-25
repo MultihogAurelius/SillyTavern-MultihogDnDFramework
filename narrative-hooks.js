@@ -353,8 +353,8 @@ function buildInjectedEntryText(id, entry, settings) {
  */
 async function buildNpcRelationsBlock(settings) {
     const relVals = settings.npcRelationshipValues || {};
-    const activeKeys = settings.activeRouterKeys || [];
-    if (!activeKeys.length) return '';
+    const activeKeys = [...(settings.activeRouterKeys || []), ...(settings.activeWorldKeys || [])];
+    if (!activeKeys.length) return `[NPC_RELATIONS]\nNo established relationships yet.\n[/NPC_RELATIONS]\n\n`;
 
     const ctx = SillyTavern.getContext();
     const lines = [];
@@ -834,7 +834,7 @@ export async function processRelationshipTags() {
     // The map stores MULTIPLE keys per NPC: full name, each significant word (length > 2).
     // This resolves titled NPCs like "Ser Harys Swyft" whether the AI writes the full
     // name, a partial name, or just a given name.
-    const activeKeys = settings.activeRouterKeys || [];
+    const activeKeys = [...(settings.activeRouterKeys || []), ...(settings.activeWorldKeys || [])];
     /** @type {Record<string, any>} */
     const bookCache = {};
     /** @type {Record<string, Array<{id:string, displayName:string}>>} */
