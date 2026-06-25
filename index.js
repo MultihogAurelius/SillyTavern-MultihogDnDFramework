@@ -4864,6 +4864,16 @@ function createPanel() {
                                     </div>
 
                                     <div style="margin-bottom:6px;display:flex;align-items:center;gap:10px;">
+                                        <label style="font-size:12px;color:rgba(255,255,255,0.7);flex:1;">Relationship Bars</label>
+                                        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+                                            <input type="checkbox" id="rt-npc-rel-bars" ${curS.npcRelationshipBars ? 'checked' : ''}
+                                                style="width:16px;height:16px;accent-color:#d4a940;cursor:pointer;">
+                                            <span style="font-size:11px;color:rgba(255,255,255,0.5);">${curS.npcRelationshipBars ? 'Enabled' : 'Disabled'}</span>
+                                        </label>
+                                    </div>
+                                    <div style="font-size:10px;color:rgba(255,255,255,0.35);margin-bottom:14px;">Shows Friendship/Affection tracking bars on NPC cards and popups. Also adds relationship fields to the AI instruction.</div>
+
+                                    <div style="margin-bottom:6px;display:flex;align-items:center;gap:10px;">
                                         <label style="font-size:12px;color:rgba(255,255,255,0.7);flex:1;">Character Card Converter</label>
                                         <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
                                             <input type="checkbox" id="rt-npc-card-import" ${curS.experimentalNpcImport ? 'checked' : ''}
@@ -4876,15 +4886,23 @@ function createPanel() {
 
                                 let newMajor = curS.npcMajorWords ?? 25;
                                 let newMinor = curS.npcMinorWords ?? 15;
+                                let newRel = curS.npcRelationshipBars ?? false;
                                 let newImport = curS.experimentalNpcImport ?? false;
 
                                 setTimeout(() => {
                                     const majorEl = document.getElementById('rt-npc-major-words');
                                     const minorEl = document.getElementById('rt-npc-minor-words');
+                                    const relEl = document.getElementById('rt-npc-rel-bars');
                                     const importEl = document.getElementById('rt-npc-card-import');
 
                                     if (majorEl) majorEl.addEventListener('input', () => newMajor = parseInt(majorEl.value, 10) || 25);
                                     if (minorEl) minorEl.addEventListener('input', () => newMinor = parseInt(minorEl.value, 10) || 15);
+                                    if (relEl) {
+                                        relEl.addEventListener('change', () => {
+                                            newRel = relEl.checked;
+                                            if (relEl.nextElementSibling) relEl.nextElementSibling.textContent = newRel ? 'Enabled' : 'Disabled';
+                                        });
+                                    }
                                     if (importEl) {
                                         importEl.addEventListener('change', () => {
                                             newImport = importEl.checked;
@@ -4905,10 +4923,12 @@ function createPanel() {
                                     updS.experimentalNpcImport = newImport;
                                     updS.npcMajorWords = newMajor;
                                     updS.npcMinorWords = newMinor;
+                                    updS.npcRelationshipBars = newRel;
 
                                     // Update the main settings panel inputs if present
                                     $('#rpg_tracker_npc_major_words').val(newMajor);
                                     $('#rpg_tracker_npc_minor_words').val(newMinor);
+                                    $('#rpg_tracker_npc_rel_bars').prop('checked', newRel);
                                     $('#rpg_tracker_npc_card_import').prop('checked', newImport);
 
                                     // Rebuild the NPC instruction from settings
@@ -4935,19 +4955,62 @@ function createPanel() {
                         const npcGrid = document.createElement('div');
                         npcGrid.className = 'rt-npc-card-grid';
 
+                        // Helper: parse relationship values — read from code-owned settings, not entry text
+                        const parseRelationship = (entryId) => {
+                            const s = getSettings();
+                            const rel = (s.npcRelationshipValues || {})[entryId];
+                            return {
+                                friendship: rel?.friendship ?? 0,
+                                affection:  rel?.affection  ?? 0,
+                            };
+                        };
+
+                        // Helper: render a dual-direction bar (always renders, even at 0)
+                        const renderRelBar = (value, type, entryId) => {
+                            const clamped = Math.max(-100, Math.min(100, value));
+                            const pct = Math.abs(clamped) / 2; // 50% of track = full
+                            const icon = type === 'friendship' ? '🤝' : '💗';
+                            const isPositive = clamped >= 0;
+                            const fillClass = isPositive
+                                ? `${type}-pos positive`
+                                : `${type}-neg negative`;
+                            const valClass = type === 'friendship'
+                                ? (clamped > 0 ? 'val-positive' : clamped < 0 ? 'val-negative' : 'val-zero')
+                                : (clamped > 0 ? 'val-affection-positive' : clamped < 0 ? 'val-affection-negative' : 'val-zero');
+                            // Last-delta badge from log
+                            const curS = getSettings();
+                            const log = (curS.npcRelationshipLog?.[entryId] || []).find(e => e.field === type);
+                            const badgeHtml = log
+                                ? (() => {
+                                    const badgeColor = log.source === 'manual' ? 'rgba(180,180,180,0.7)' : (log.delta > 0 ? '#4ade80' : '#ef4444');
+                                    const sign = log.delta > 0 ? '+' : '';
+                                    const label = log.source === 'manual' ? '✋' : '🤖';
+                                    return `<span style="font-size:9px;font-weight:bold;color:${badgeColor};margin-left:4px;opacity:0.85;" title="${label} last change: ${sign}${log.delta}">${sign}${log.delta}</span>`;
+                                  })()
+                                : '';
+                            return `<div class="rt-npc-bar-row">
+                                <span class="rt-npc-bar-icon">${icon}</span>
+                                <div class="rt-npc-bar-track">
+                                    <div class="rt-npc-bar-center-marker"></div>
+                                    <div class="rt-npc-bar-fill ${fillClass}" style="width:${pct}%;"></div>
+                                </div>
+                                <span class="rt-npc-bar-value ${valClass}">${clamped > 0 ? '+' : ''}${clamped}${badgeHtml}</span>
+                            </div>`;
+                        };
+
                         // Helper: get brief synopsis for the card (pulls from Appearance section or first text)
                         const getNpcDescription = (content) => {
                             if (!content) return '';
                             // Strip [CORE] and [/CORE] tags before parsing
                             const cleanContent = content.replace(/\[\/?CORE\]/gi, '');
                             // Try to extract Appearance section content first
-                            const appMatch = cleanContent.match(/Appearance:\s*(.+?)(?=\s*(?:Personality|Brief Background|Habits|Behaviors):|$)/is);
+                            const appMatch = cleanContent.match(/Appearance:\s*(.+?)(?=\s*(?:Personality|Brief Background|Habits|Behaviors|Relationship with|Friendship\/Rapport|Affection\/Interest):|$)/is);
                             if (appMatch && appMatch[1].trim()) {
                                 return appMatch[1].trim().substring(0, 140);
                             }
                             // Fallback: first meaningful text
                             const lines = cleanContent.split('\n').map(l => l.trim())
-                                .filter(l => l && !/^\[ID:/i.test(l));
+                                .filter(l => l && !/^\[ID:/i.test(l) && !/^Friendship\/Rapport:/i.test(l) && !/^Affection\/Interest:/i.test(l));
                             return lines.slice(0, 2).join(' ').substring(0, 140);
                         };
 
@@ -4973,15 +5036,15 @@ function createPanel() {
                             }
 
                             // 2. Parse core sections
-                            const sectionMarkers = /(?=(?:Appearance|Personality|Brief Background|Habits\/Behaviors|(?<!Habits\/)Behaviors)\s*:)/gi;
+                            const sectionMarkers = /(?=(?:Appearance|Personality|Brief Background|Habits\/Behaviors|(?<!Habits\/)Behaviors|Relationship with\s*\{\{user\}\}|(?<!Friendship\/|Affection\/)Relationship)\s*:)/gi;
                             const normalizedCore = coreContent.replace(sectionMarkers, '\n');
                             const coreLines = normalizedCore.split('\n');
                             let currentSection = 'General';
-                            const sectionPattern = /^(Appearance|Personality|Brief Background|Habits\/Behaviors|(?<!Habits\/)Behaviors)\s*:/i;
+                            const sectionPattern = /^(Appearance|Personality|Brief Background|Habits\/Behaviors|(?<!Habits\/)Behaviors|Relationship with\s*\{\{user\}\}|(?<!Friendship\/|Affection\/)Relationship)\s*:/i;
 
                             for (const line of coreLines) {
                                 const trimmed = line.trim();
-                                if (!trimmed || /^\[ID:/i.test(trimmed)) continue;
+                                if (!trimmed || /^\[ID:/i.test(trimmed) || /^Friendship\/Rapport:/i.test(trimmed) || /^Affection\/Interest:/i.test(trimmed)) continue;
                                 const match = trimmed.match(sectionPattern);
                                 if (match) {
                                     currentSection = match[1].replace(/\s*\{\{user\}\}/, '').replace(/\s+with$/i, '').trim();
@@ -5000,7 +5063,7 @@ function createPanel() {
                             const dynamicLines = dynamicContent.split('\n');
                             for (const line of dynamicLines) {
                                 const trimmed = line.trim();
-                                if (!trimmed || /^\[ID:/i.test(trimmed)) continue;
+                                if (!trimmed || /^\[ID:/i.test(trimmed) || /^Friendship\/Rapport:/i.test(trimmed) || /^Affection\/Interest:/i.test(trimmed)) continue;
 
                                 // Ignore lines that contain ONLY a timestamp and no other text (e.g. "[05:47 PM, Day 1]")
                                 const timestampOnlyRegex = /^\[[^\]]+\]\s*$/;
@@ -5017,11 +5080,11 @@ function createPanel() {
                         const sectionIcons = {
                             'General': '📋', 'Appearance': '👁️', 'Personality': '🧠',
                             'Brief Background': '📜', 'Habits/Behaviors': '🔄', 'Habits': '🔄',
-                            'Behaviors': '🔄',
+                            'Behaviors': '🔄', 'Relationship': '❤️',
                         };
 
                         // Helper: open NPC detail popup
-                        const openNpcDetailPopup = (item) => {
+                        const openNpcDetailPopup = (item, rel) => {
                             const ctx = SillyTavern.getContext();
                             if (!ctx.callGenericPopup) return;
                             const normLabel = item.label.replace(/\s*\(.*?\)/g, '').trim();
@@ -5041,7 +5104,7 @@ function createPanel() {
                                                          name === 'Personality' ? '#8b5cf6' :
                                                          name === 'Brief Background' ? '#3b82f6' :
                                                          name.includes('Habit') || name.includes('Behavior') ? '#10b981' :
-                                                         'var(--SmartThemeEmColor, var(--SmartThemeBodyColorTextMuted, rgba(128,128,128,0.5)))';
+                                                         name === 'Relationship' ? '#f472b6' : 'var(--SmartThemeEmColor, var(--SmartThemeBodyColorTextMuted, rgba(128,128,128,0.5)))';
                                     sectionsHtml += `<div style="margin-bottom:18px;">
                                         <div style="font-size:14px;font-weight:bold;color:${sectionColor};text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;display:flex;align-items:center;gap:7px;">
                                             <span style="font-size:16px;">${icon}</span> ${escapeHtml(name)}
@@ -5069,6 +5132,34 @@ function createPanel() {
                                 sectionsHtml += `</div>`;
                             }
 
+                            // Friendship/Affection bars for popup (large version, with editable sliders)
+                            const makeBigBar = (val, label, colorPos, colorNeg, icon, type) => {
+                                const clamped = Math.max(-100, Math.min(100, val));
+                                const pct = Math.abs(clamped) / 2;
+                                const isPos = clamped >= 0;
+                                const bgColor = isPos ? colorPos : colorNeg;
+                                const valColor = clamped === 0 ? 'var(--SmartThemeEmColor, inherit)' : bgColor;
+                                return `<div style="display:grid;grid-template-columns:auto 80px 1fr 40px;align-items:center;column-gap:12px;row-gap:6px;margin-bottom:14px;">
+                                    <span style="font-size:20px;">${icon}</span>
+                                    <span style="font-size:13px;color:var(--SmartThemeBodyColor, inherit);opacity:0.65;font-weight:500;">${label}</span>
+                                    <div style="height:12px;background:var(--SmartThemeBorderColor, rgba(128,128,128,0.15));border-radius:6px;position:relative;overflow:hidden;">
+                                        <div style="position:absolute;left:50%;top:0;bottom:0;width:1px;background:var(--SmartThemeBorderColor, rgba(128,128,128,0.25));"></div>
+                                        <div id="rt-npc-detail-${type}-fill" style="position:absolute;top:0;bottom:0;border-radius:6px;background:${bgColor};${isPos ? `left:50%;width:${pct}%;` : `right:50%;width:${pct}%;`}transition:width 0.3s ease;"></div>
+                                    </div>
+                                    <span id="rt-npc-detail-${type}-text" style="font-size:15px;font-weight:bold;text-align:right;color:${valColor};font-family:monospace;">${clamped > 0 ? '+' : ''}${clamped}</span>
+                                    <div></div>
+                                    <div></div>
+                                    <input type="range" id="rt-npc-detail-${type}-slider" min="-100" max="100" value="${clamped}" step="5"
+                                        style="width:100%;margin:0;accent-color:${bgColor};height:4px;cursor:pointer;outline:none;">
+                                    <div></div>
+                                </div>`;
+                            };
+
+                            const barsHtml = `
+                                ${makeBigBar(rel.friendship, 'Friendship', '#4ade80', '#ef4444', '🤝', 'friendship')}
+                                ${makeBigBar(rel.affection, 'Affection', '#f472b6', '#a855f7', '💗', 'affection')}
+                            `;
+
                             // Full-size portrait (512px stored, display at native res)
                             const portraitEl = portraitSrc
                                 ? `<img src="${escapeHtml(portraitSrc)}" style="width:100%;height:auto;aspect-ratio:1;object-fit:cover;border-radius:12px;border:2px solid rgba(212,169,64,0.3);box-shadow:0 4px 20px rgba(0,0,0,0.4);" alt="${escapeHtml(item.label)}">`
@@ -5082,19 +5173,118 @@ function createPanel() {
                                     <div style="flex:1;min-width:220px;">
                                         <div style="font-size:24px;font-weight:bold;color:#d4a940;margin-bottom:8px;line-height:1.2;">${escapeHtml(item.label)}</div>
                                         <span style="font-size:11px;padding:3px 10px;border-radius:10px;font-weight:bold;${item.is_active ? 'background:rgba(0,255,170,0.12);color:#00ffaa;border:1px solid rgba(0,255,170,0.25);' : 'background:var(--SmartThemeBorderColor, rgba(128,128,128,0.1));color:var(--SmartThemeBodyColor, inherit);opacity:0.65;border:1px solid var(--SmartThemeBorderColor, rgba(128,128,128,0.2));'}">${item.is_active ? '● Active' : '○ Inactive'}</span>
+                                        ${s.npcRelationshipBars ? `<div style="margin-top:20px;">${barsHtml}</div>` : ''}
                                     </div>
                                 </div>
                                 <div style="border-top:2px solid rgba(212,169,64,0.15);padding-top:18px;">
                                     ${sectionsHtml || `<div style="font-size:14px;color:var(--SmartThemeBodyColor, inherit);opacity:0.5;font-style:italic;padding:16px 0;">No structured sections found. Edit the entry to add Appearance, Personality, and other sections.</div>`}
                                 </div>
+                                ${(() => {
+                                    const log = (s.npcRelationshipLog?.[item.id] || []).slice(0, 20);
+                                    if (!s.npcRelationshipBars || log.length === 0) return '';
+                                    const rows = log.map(e => {
+                                        const date = new Date(e.timestamp);
+                                        const timeStr = date.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) + ', ' + date.toLocaleDateString([], {month:'short',day:'numeric'});
+                                        const sign = e.delta > 0 ? '+' : '';
+                                        const deltaColor = e.delta > 0 ? '#4ade80' : '#ef4444';
+                                        const srcIcon = e.source === 'manual' ? '✋' : '🤖';
+                                        const fieldLabel = e.field === 'friendship' ? '🤝' : '💗';
+                                        return `<tr>
+                                            <td style="font-size:10px;color:var(--SmartThemeBodyColor,inherit);opacity:0.5;padding:3px 8px 3px 0;white-space:nowrap;">${timeStr}</td>
+                                            <td style="font-size:12px;padding:3px 8px;">${fieldLabel}</td>
+                                            <td style="font-size:13px;font-weight:bold;color:${deltaColor};font-family:monospace;padding:3px 8px;">${sign}${e.delta}</td>
+                                            <td style="font-size:11px;color:var(--SmartThemeBodyColor,inherit);opacity:0.45;padding:3px 0;">${srcIcon} → ${e.newValue >= 0 ? '+' : ''}${e.newValue}</td>
+                                        </tr>`;
+                                    }).join('');
+                                    return `<div style="border-top:2px solid rgba(212,169,64,0.15);padding-top:18px;margin-top:18px;">
+                                        <div style="font-size:11px;font-weight:bold;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:12px;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:4px;">📊 Relationship History</div>
+                                        <table style="width:100%;border-collapse:collapse;">${rows}</table>
+                                    </div>`;
+                                })()}
                             </div>`;
+
+
 
                             ctx.callGenericPopup(popupHtml, ctx.POPUP_TYPE?.TEXT ?? 1, '', {
                                 okButton: 'Close', cancelButton: false, wide: true, large: true,
                             });
+
+                            // Attach input change listeners to the sliders
+                            if (s.npcRelationshipBars) {
+                                setTimeout(() => {
+                                    ['friendship', 'affection'].forEach(type => {
+                                        const slider = document.getElementById(`rt-npc-detail-${type}-slider`);
+                                        if (!slider) return;
+                                        // Capture the value at drag-start for delta calculation
+                                        let valueAtDragStart = parseInt(slider.value, 10);
+                                        slider.addEventListener('mousedown', () => {
+                                            valueAtDragStart = parseInt(slider.value, 10);
+                                        });
+                                        slider.addEventListener('input', (e) => {
+                                            const newVal = parseInt(e.target.value, 10);
+                                            // 1. Update text and fill
+                                            const textEl = document.getElementById(`rt-npc-detail-${type}-text`);
+                                            const fillEl = document.getElementById(`rt-npc-detail-${type}-fill`);
+                                            if (textEl) {
+                                                textEl.textContent = (newVal > 0 ? '+' : '') + newVal;
+                                            }
+                                            if (fillEl) {
+                                                const pct = Math.abs(newVal) / 2;
+                                                fillEl.style.width = `${pct}%`;
+                                                let bgColor = '';
+                                                if (newVal >= 0) {
+                                                    fillEl.style.left = '50%';
+                                                    fillEl.style.right = 'auto';
+                                                    bgColor = type === 'friendship' ? '#4ade80' : '#f472b6';
+                                                } else {
+                                                    fillEl.style.left = 'auto';
+                                                    fillEl.style.right = '50%';
+                                                    bgColor = type === 'friendship' ? '#ef4444' : '#a855f7';
+                                                }
+                                                fillEl.style.background = bgColor;
+                                                slider.style.accentColor = bgColor;
+                                                if (textEl) {
+                                                    textEl.style.color = newVal === 0 ? 'var(--SmartThemeEmColor, inherit)' : bgColor;
+                                                }
+                                            }
+                                            // 2. Save value (log written on 'change', not on every 'input' tick)
+                                            const settings = getSettings();
+                                            if (!settings.npcRelationshipValues) settings.npcRelationshipValues = {};
+                                            if (!settings.npcRelationshipValues[item.id]) {
+                                                settings.npcRelationshipValues[item.id] = { friendship: 0, affection: 0 };
+                                            }
+                                            settings.npcRelationshipValues[item.id][type] = newVal;
+                                            saveSettings();
+                                        });
+
+                                        slider.addEventListener('change', () => {
+                                            // On drag release: compute effective delta and write a manual log entry
+                                            const settings = getSettings();
+                                            const finalVal = settings.npcRelationshipValues?.[item.id]?.[type] ?? 0;
+                                            const effectiveDelta = finalVal - valueAtDragStart;
+                                            if (effectiveDelta !== 0) {
+                                                if (!settings.npcRelationshipLog) settings.npcRelationshipLog = {};
+                                                if (!settings.npcRelationshipLog[item.id]) settings.npcRelationshipLog[item.id] = [];
+                                                settings.npcRelationshipLog[item.id].unshift({
+                                                    timestamp: Date.now(),
+                                                    field: type,
+                                                    delta: effectiveDelta,
+                                                    newValue: finalVal,
+                                                    source: 'manual',
+                                                });
+                                                if (settings.npcRelationshipLog[item.id].length > 50) settings.npcRelationshipLog[item.id].length = 50;
+                                                saveSettings();
+                                            }
+                                            valueAtDragStart = finalVal;
+                                            if (typeof refreshManifest === 'function') refreshManifest();
+                                        });
+                                    });
+                                }, 0);
+                            }
                         };
 
                         for (const item of items) {
+                            const rel = parseRelationship(item.id);
                             const desc = getNpcDescription(item.content);
                             const normLabel = item.label.replace(/\s*\(.*?\)/g, '').trim();
                             const portraitSrc = s.customPortraits?.[normLabel] || '';
@@ -5118,6 +5308,10 @@ function createPanel() {
                                     <div class="rt-npc-name">${escapeHtml(item.label)}${isDirty ? ' <span style="color:#ffa500; font-size:8px;" title="Unsaved edits">●</span>' : ''}</div>
                                     <div class="rt-npc-desc">${escapeHtml(desc)}</div>
                                     <span class="rt-npc-status-badge ${item.is_active ? 'active' : 'inactive'}">${item.is_active ? '● Active' : '○ Inactive'}</span>
+                                    ${s.npcRelationshipBars ? `<div class="rt-npc-bars">
+                                        ${renderRelBar(rel.friendship, 'friendship', item.id)}
+                                        ${renderRelBar(rel.affection, 'affection', item.id)}
+                                    </div>` : ''}
                                     <div class="rt-npc-actions">
                                         <button class="rt-npc-action-btn rt-npc-view" data-id="${item.id}" title="View NPC card"><i class="fa-solid fa-address-card"></i></button>
                                         <button class="rt-npc-action-btn rt-npc-edit" data-id="${item.id}" title="Edit entry"><i class="fa-solid fa-pen-to-square"></i></button>
@@ -5204,7 +5398,7 @@ function createPanel() {
                             const viewBtn = card.querySelector('.rt-npc-view');
                             if (viewBtn) viewBtn.addEventListener('click', (e) => {
                                 e.stopPropagation();
-                                openNpcDetailPopup(item);
+                                openNpcDetailPopup(item, rel);
                             });
 
                             const editBtn = card.querySelector('.rt-npc-edit');
@@ -5244,7 +5438,12 @@ function createPanel() {
                                     if (ok) {
                                         _dirtyEntries.delete(item.id);
                                         _openEntries.delete(item.id);
-await refreshManifest();
+                                        // Clean up code-owned relationship values for this NPC
+                                        const delSettings = getSettings();
+                                        if (delSettings.npcRelationshipValues) {
+                                            delete delSettings.npcRelationshipValues[item.id];
+                                        }
+                                        await refreshManifest();
                                         toastr['success'](`Deleted "${item.label}"`, 'NPCs');
                                     }
                                 }
@@ -5615,6 +5814,13 @@ await refreshManifest();
                 content = parts.join('\n');
             }
 
+            // Ensure relationship fields are present even in adapted content (only if bars enabled)
+            if (s.npcRelationshipBars && adaptedContent && !/Friendship\/Rapport:/i.test(content)) {
+                // Legacy: adapted content from old prompt may still include bars text — strip it
+                content = content.replace(/\s*Friendship\/Rapport:[^\n]*/gi, '')
+                                 .replace(/\s*Affection\/Interest:[^\n]*/gi, '');
+            }
+
             // Ensure the content has a [CORE] wrap around the persistent sections
             if (!/\[CORE\]/i.test(content)) {
                 const lines = content.split('\n');
@@ -5622,7 +5828,10 @@ await refreshManifest();
                 const relLines = [];
                 for (const line of lines) {
                     const trimmed = line.trim();
-                    if (trimmed || coreLines.length > 0) {
+                    if (/^Friendship\/Rapport:/i.test(trimmed) || /^Affection\/Interest:/i.test(trimmed)) {
+                        // Drop legacy text-based bar lines — values are now code-owned
+                        continue;
+                    } else if (trimmed || coreLines.length > 0) {
                         coreLines.push(line);
                     }
                 }
@@ -5706,7 +5915,11 @@ await refreshManifest();
                 s.activeRouterKeys.push(fullId);
             }
 
-
+            // Initialise code-owned relationship values for this NPC
+            if (!s.npcRelationshipValues) s.npcRelationshipValues = {};
+            if (!s.npcRelationshipValues[fullId]) {
+                s.npcRelationshipValues[fullId] = { friendship: 0, affection: 0 };
+            }
 
             // Embed avatar as portrait
             if (charCard.avatar) {
@@ -8672,6 +8885,7 @@ function buildSysprompt(rawText) {
                         }
                         $('#rpg_tracker_npc_major_words').val(sTempTracker.npcMajorWords ?? 25);
                         $('#rpg_tracker_npc_minor_words').val(sTempTracker.npcMinorWords ?? 15);
+                        $('#rpg_tracker_npc_rel_bars').prop('checked', !!sTempTracker.npcRelationshipBars);
                         $('#rpg_tracker_npc_card_import').prop('checked', !!sTempTracker.experimentalNpcImport);
                         if (typeof refreshOrderList === 'function') refreshOrderList();
 
@@ -8861,7 +9075,7 @@ function buildSysprompt(rawText) {
                                     }
                                     $('#rpg_tracker_npc_major_words').val(sTempTracker.npcMajorWords ?? 25);
                                     $('#rpg_tracker_npc_minor_words').val(sTempTracker.npcMinorWords ?? 15);
-           
+                                    $('#rpg_tracker_npc_rel_bars').prop('checked', !!sTempTracker.npcRelationshipBars);
                                     $('#rpg_tracker_npc_card_import').prop('checked', !!sTempTracker.experimentalNpcImport);
                                     if (typeof refreshOrderList === 'function') refreshOrderList();
                                     resetCount++;
@@ -11466,6 +11680,10 @@ RULES:
             if (typeof globalThis._rpgRenderAgentModules === 'function') {
                 globalThis._rpgRenderAgentModules();
             }
+        });
+        $('#rpg_tracker_npc_rel_bars').prop('checked', !!settings.npcRelationshipBars).on('change', function () {
+            settings.npcRelationshipBars = $(this).prop('checked');
+            saveSettings();
         });
         $('#rpg_tracker_npc_card_import').prop('checked', !!settings.experimentalNpcImport).on('change', function () {
             settings.experimentalNpcImport = $(this).prop('checked');

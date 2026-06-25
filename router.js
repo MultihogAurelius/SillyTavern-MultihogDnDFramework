@@ -255,12 +255,32 @@ export async function runRouterPass(narrativeOutput, manualPrompt = null, custom
         function updateActiveEntries() {
             activeEntriesFull = [];
             newlyTriggeredFull = [];
+            const relValues = settings.npcRelationshipValues || {};
             for (const [name, book] of Object.entries(archiveBooks)) {
                 for (const [uid, entry] of Object.entries(book.entries)) {
                     const fullId = `${name}::${uid}`;
                     if (settings.activeRouterKeys?.includes(fullId)) {
                         const label = entry.comment || entry.key?.[0] || fullId;
                         let block = `### [ACTIVE] ${label}\nID: ${fullId}\nContent: ${entry.content}`;
+                        // Append cap-constraint hints for NPC relationship values.
+                        // Totals are intentionally hidden so the agent awards deltas from
+                        // a consistent baseline, uncorrupted by the existing pool size.
+                        // Only inject a hint when a value is near the cap (within 15 points)
+                        // so the agent knows further movement in that direction is futile.
+                        const rel = relValues[fullId];
+                        if (rel !== undefined) {
+                            const fVal = rel.friendship ?? 0;
+                            const aVal = rel.affection  ?? 0;
+                            // Always inject current totals so the agent can calibrate delta magnitude
+                            block += `\n[Current Relations: Friendship ${fVal >= 0 ? '+' : ''}${fVal}, Affection ${aVal >= 0 ? '+' : ''}${aVal}]`;
+                            // Cap-constraint hints (only when at limit)
+                            const hints = [];
+                            if (fVal >= 100)  hints.push('Friendship is at maximum — do not award further positive increments');
+                            if (fVal <= -100) hints.push('Friendship is at minimum — do not award further negative increments');
+                            if (aVal >= 100)  hints.push('Affection is at maximum — do not award further positive increments');
+                            if (aVal <= -100) hints.push('Affection is at minimum — do not award further negative increments');
+                            if (hints.length > 0) block += `\n⚠ Relationship constraint: ${hints.join('; ')}.`;
+                        }
                         if (triggeredSet.has(fullId)) {
                             newlyTriggeredFull.push(block);
                         } else {
@@ -792,6 +812,12 @@ ${modularPrompt}
 4. **RECALL**: To read or update an archive entry, use [[ACTIVATE: Name]]. Its full content becomes visible next turn.
 5. **LIMIT**: You are limited to **${settings.routerMaxActivations || 8} active entries**. Nothing is archived automatically. If you exceed this limit you will see a **BUDGET VIOLATION** line and you MUST use [[DEACTIVATE: Name]] on the least relevant active entries to return within budget before this pass ends.
 
+## NPC RELATIONSHIP DELTAS
+If an NPC's relationship with the player changes meaningfully based on events, output:
+  [[REL: Book::UID | Friendship | +15]]   (use the exact UID from the active memory block)
+  [[REL: Book::UID | Affection | -10]]
+Output only the delta — do NOT rewrite bar values in the entry text. Base your judgment on the NPC's personality, values, and temperament as described in their entry, inferring how they would realistically react.
+
 ## NPC APPEARANCE UPDATES
 If an NPC's physical appearance changes significantly (major injury, permanent outfit change, etc.), output:
   [[UPDATE_APPEARANCE: Book::UID | New appearance text here]]
@@ -963,6 +989,19 @@ Thought: I see a new NPC named Barnaby in Khelt's Rust-Lantern District. I will 
                                         required: ['id']
                                     }
                                 },
+                                rel: {
+                                    type: 'array',
+                                    description: 'Apply relationship delta(s) to NPC(s). Base relationship changes on the NPC\'s personality, values, and temperament as described in their entry, inferring what they would realistically appreciate or resent. Do NOT include the current total — output only the signed integer delta.',
+                                    items: {
+                                        type: 'object',
+                                        properties: {
+                                            id:    { type: 'string', description: 'Book::UID of the NPC entry.' },
+                                            field: { type: 'string', enum: ['friendship', 'affection'], description: 'Which relationship axis to update.' },
+                                            delta: { type: 'integer', description: 'Signed integer delta (e.g. 15 or -20). Range: -100 to 100.' }
+                                        },
+                                        required: ['id', 'field', 'delta']
+                                    }
+                                },
                                 appearance: {
                                     type: 'array',
                                     description: 'Surgically update the Appearance field inside an NPC\'s [CORE] block. Only use when the NPC\'s physical appearance changes significantly.',
@@ -1036,11 +1075,12 @@ Available actions:
 - grep_lore({"query": "..."}) ? search lorebooks for entries matching a keyword
 - inspect_book({"book_name": "..."}) ? list UIDs in a lorebook
 - read_entry({"uid": "Book::0"}) ? read full content of an entry
-- commit({"record": [...], "update": [...], "rename": [...], "activate": [...], "deactivate": [...], "delete_ids": [...], "appearance": [...]}) ? write all changes and finish
+- commit({"record": [...], "update": [...], "rename": [...], "activate": [...], "deactivate": [...], "delete_ids": [...], "rel": [...], "appearance": [...]}) ? write all changes and finish
 
 commit record items: {"label": "Name only (NO tag prefix)", "keys": ["kw1","kw2"], "content": "...", "category": "NPC|LOC|FAC|QUEST|EVENT"}
 commit update items: {"id": "Book::UID", "content": "new text to append"}
 commit rename items: {"id": "Book::UID", "label": "New Name (optional)", "keys": ["kw1","kw2"] (optional, max 6)}
+commit rel items: {"id": "Book::UID", "field": "friendship"|"affection", "delta": ±N} — output only the delta, not the total
 commit appearance items: {"id": "Book::UID", "content": "new appearance text"} — surgically updates the Appearance field inside [CORE]}
 
 ## EXAMPLE
@@ -1666,7 +1706,32 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
         document.dispatchEvent(new CustomEvent('rt_lore_agent_updated'));
     }
 
-    // 5. Appearance updates — surgical replacement of the Appearance field inside [CORE]
+    // 5. Relationship deltas
+    for (const item of (action.rel || [])) {
+        const { id, field, delta } = item;
+        if (!id || !field || typeof delta !== 'number') {
+            errors.push(`Invalid rel item: ${JSON.stringify(item)}`);
+            continue;
+        }
+        const f = field.toLowerCase();
+        if (f !== 'friendship' && f !== 'affection') {
+            errors.push(`Unknown relationship field "${field}" for ${id}`);
+            continue;
+        }
+        if (!settings.npcRelationshipValues) settings.npcRelationshipValues = {};
+        if (!settings.npcRelationshipValues[id]) settings.npcRelationshipValues[id] = { friendship: 0, affection: 0 };
+        const current = settings.npcRelationshipValues[id][f] ?? 0;
+        const newValue = Math.max(-100, Math.min(100, current + delta));
+        settings.npcRelationshipValues[id][f] = newValue;
+        // Append to relationship change log (capped at 50 entries per NPC)
+        if (!settings.npcRelationshipLog) settings.npcRelationshipLog = {};
+        if (!settings.npcRelationshipLog[id]) settings.npcRelationshipLog[id] = [];
+        settings.npcRelationshipLog[id].unshift({ timestamp: Date.now(), field: f, delta, newValue, source: 'agent' });
+        if (settings.npcRelationshipLog[id].length > 50) settings.npcRelationshipLog[id].length = 50;
+        changed = true;
+    }
+
+    // 6. Appearance updates — surgical replacement of the Appearance field inside [CORE]
     for (const item of (action.appearance || [])) {
         const { id, content: newAppearance } = item;
         if (!id || !newAppearance) {
@@ -1855,7 +1920,7 @@ export async function reapplyRouterPass(prePassSnapshot, postPassState) {
  * Parses basic narrative tags [[TAG: ...]]
  */
 function parseBasicTags(text, archiveBooks) {
-    const action = { record: [], update: [], activate: [], deactivate: [], delete_ids: [], rewrite: [], consolidate: [], appearance: [] };
+    const action = { record: [], update: [], activate: [], deactivate: [], delete_ids: [], rewrite: [], consolidate: [], rel: [], appearance: [] };
     const settings = getSettings();
 
     // REWRITE tag parser
@@ -1877,6 +1942,17 @@ function parseBasicTags(text, archiveBooks) {
         action.consolidate.push({ targets, survivor, content });
     }
 
+    // REL tag parser: [[REL: Book::UID | Friendship | +15]]
+    const relRegex = /\[\[REL:\s*([^|]+)\|\s*(friendship|affection)\s*\|\s*([+-]?\d+)\s*\]\]/gi;
+    let rm;
+    while ((rm = relRegex.exec(text)) !== null) {
+        const id    = rm[1].trim();
+        const field = rm[2].trim().toLowerCase();
+        const delta = parseInt(rm[3], 10);
+        if (id && field && !isNaN(delta)) {
+            action.rel.push({ id, field, delta });
+        }
+    }
 
     // UPDATE_APPEARANCE tag parser: [[UPDATE_APPEARANCE: Book::UID | new appearance text]]
     const appearRegex = /\[\[UPDATE_APPEARANCE:\s*([^|]+)\|([\s\S]*?)\]\]/gi;
@@ -1921,7 +1997,7 @@ function parseBasicTags(text, archiveBooks) {
 
     while ((match = tagRegex.exec(text)) !== null) {
         const tagName = match[1].toUpperCase();
-        if (tagName === 'REWRITE' || tagName === 'CONSOLIDATE' || tagName === 'UPDATE_APPEARANCE') continue; // Collision protection
+        if (tagName === 'REWRITE' || tagName === 'CONSOLIDATE' || tagName === 'REL' || tagName === 'UPDATE_APPEARANCE') continue; // Collision protection
 
         const inner = match[2];
         const parts = inner.split('|').map(p => p.trim());

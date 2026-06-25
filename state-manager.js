@@ -39,7 +39,13 @@ After the [/CORE] block, append timestamped narrative updates as usual ([Day X, 
 ## APPEARANCE UPDATES
 If the NPC's physical appearance changes significantly (major injury, permanent outfit change, etc.), output:
   [[UPDATE_APPEARANCE: Book::UID | New appearance text]]
-This surgically replaces only the Appearance field inside [CORE]. Do NOT write appearance changes as event/update entries.`;
+This surgically replaces only the Appearance field inside [CORE]. Do NOT write appearance changes as event/update entries.
+
+## RELATIONSHIP DELTAS
+If the NPC's relationship with the player meaningfully changes based on what happened, output:
+  [[REL: Book::UID | Friendship | +N]] or [[REL: Book::UID | Friendship | -N]]
+  [[REL: Book::UID | Affection | +N]] or [[REL: Book::UID | Affection | -N]]
+Output only the delta — do NOT write or track the relationship total. The current total is intentionally hidden from you so your judgment stays anchored to the quality of the interaction, not the existing pool. Base your judgment on the personality of the NPC in question (e.g., from their [CORE] block), inferring what they would realistically appreciate, tolerate, or resent given their temperament, values, and traits. A constraint warning will appear in the entry only if a value has reached its hard limit (100 or -100); in that case, do not award further increments in the capped direction. Use your judgment on magnitude (typical range: ±5 to ±25 per turn).`;
 
     instruction += `\n\nBe concise and functional — every word should serve gameplay or characterization. Avoid adjective dumps and purple prose.
 
@@ -107,6 +113,9 @@ export function getSettings() {
         showTotalInventoryValue: true,
         npcMajorWords: 25,
         npcMinorWords: 15,
+        npcRelationshipBars: false,
+        npcRelationshipValues: {},
+        npcRelationshipLog: {},      // { [fullId]: [{timestamp,field,delta,newValue,source}] } — capped 50/NPC
         experimentalNpcImport: true,
         barColors: {},
         modulePageSizes: {},
@@ -576,6 +585,7 @@ Example: [[FAC: Iron Syndicate | ...]]  NOT  [[FAC: Khelt :: Iron Syndicate | ..
         // Ensure NPC settings exist with defaults
         if (s.npcMajorTokens === undefined) s.npcMajorTokens = 125;
         if (s.npcMinorTokens === undefined) s.npcMinorTokens = 100;
+        if (s.npcRelationshipBars === undefined) s.npcRelationshipBars = false;
         // Rebuild instruction from current settings
         if (s.routerModules?.npc) {
             s.routerModules.npc.instruction = buildNpcInstruction(s.npcMajorTokens, s.npcMinorTokens);
@@ -585,6 +595,8 @@ Example: [[FAC: Iron Syndicate | ...]]  NOT  [[FAC: Khelt :: Iron Syndicate | ..
 
     // Migrate NPC system to [CORE] tag, code-owned relationship bars, and delta-based updates (v3.11.0)
     if (!s.settingsVersion || s.settingsVersion < '3.11.0') {
+        // Initialize relationship value store
+        if (!s.npcRelationshipValues) s.npcRelationshipValues = {};
         // Force-rebuild NPC instruction to new format
         if (s.routerModules?.npc) {
             s.routerModules.npc.instruction = buildNpcInstruction(

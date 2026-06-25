@@ -325,9 +325,17 @@ function extractTextContent(msg) {
 
 /**
  * Formats a lorebook entry block for injection into the GM/narrator prompt.
+ * Automatically prepends any active NPC relationship status values if relationship bars are enabled.
  */
 function buildInjectedEntryText(id, entry, settings) {
     let content = entry.content || '';
+    const rel = settings.npcRelationshipValues?.[id];
+    if (rel && settings.npcRelationshipBars) {
+        const friendship = rel.friendship ?? 0;
+        const affection = rel.affection ?? 0;
+        // Inject relationship values immediately below the entity header
+        content = `Relationship with {{user}}: Friendship: ${friendship}/100, Affection: ${affection}/100\n${content}`;
+    }
     const label = entry.key?.[0] || entry.comment || id.split('::')[1];
     return `### [${label}]\n${content}\n\n`;
 }

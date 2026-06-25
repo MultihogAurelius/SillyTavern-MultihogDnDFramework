@@ -2714,6 +2714,79 @@
     border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
+/* ── NPC Relationship Bars ── */
+.rt-npc-bars {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    margin-top: 3px;
+    width: 100%;
+}
+.rt-npc-bar-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 8px;
+    color: var(--rt-text-muted);
+}
+.rt-npc-bar-icon {
+    flex-shrink: 0;
+    width: 12px;
+    text-align: center;
+    font-size: 9px;
+}
+.rt-npc-bar-track {
+    flex: 1;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 3px;
+    position: relative;
+    overflow: hidden;
+}
+.rt-npc-bar-center-marker {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: rgba(255, 255, 255, 0.15);
+    z-index: 1;
+}
+.rt-npc-bar-fill {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    border-radius: 3px;
+    transition: width 0.3s ease, left 0.3s ease, background 0.3s ease;
+}
+/* Positive fill: grows from center to right */
+.rt-npc-bar-fill.positive {
+    left: 50%;
+}
+/* Negative fill: grows from center to left */
+.rt-npc-bar-fill.negative {
+    right: 50%;
+}
+.rt-npc-bar-fill.friendship-pos { background: linear-gradient(90deg, #4ade8088, #4ade80); }
+.rt-npc-bar-fill.friendship-neg { background: linear-gradient(270deg, #ef444488, #ef4444); }
+.rt-npc-bar-fill.affection-pos  { background: linear-gradient(90deg, #f472b688, #f472b6); }
+.rt-npc-bar-fill.affection-neg  { background: linear-gradient(270deg, #a855f788, #a855f7); }
+
+.rt-npc-bar-value {
+    flex-shrink: 0;
+    width: 26px;
+    text-align: right;
+    font-family: var(--rt-font-mono);
+    font-size: 8px;
+    font-weight: bold;
+    line-height: 1;
+}
+.rt-npc-bar-value.val-positive { color: #4ade80; }
+.rt-npc-bar-value.val-negative { color: #ef4444; }
+.rt-npc-bar-value.val-zero     { color: var(--rt-text-muted); }
+.rt-npc-bar-value.val-affection-positive { color: #f472b6; }
+.rt-npc-bar-value.val-affection-negative { color: #a855f7; }
+
 /* ── NPC Card Actions ── */
 .rt-npc-actions {
     display: flex;
