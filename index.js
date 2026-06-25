@@ -4966,7 +4966,7 @@ function createPanel() {
                         };
 
                         // Helper: render a dual-direction bar (always renders, even at 0)
-                        const renderRelBar = (value, type) => {
+                        const renderRelBar = (value, type, entryId) => {
                             const clamped = Math.max(-100, Math.min(100, value));
                             const pct = Math.abs(clamped) / 2; // 50% of track = full
                             const icon = type === 'friendship' ? '🤝' : '💗';
@@ -4977,13 +4977,24 @@ function createPanel() {
                             const valClass = type === 'friendship'
                                 ? (clamped > 0 ? 'val-positive' : clamped < 0 ? 'val-negative' : 'val-zero')
                                 : (clamped > 0 ? 'val-affection-positive' : clamped < 0 ? 'val-affection-negative' : 'val-zero');
+                            // Last-delta badge from log
+                            const curS = getSettings();
+                            const log = (curS.npcRelationshipLog?.[entryId] || []).find(e => e.field === type);
+                            const badgeHtml = log
+                                ? (() => {
+                                    const badgeColor = log.source === 'manual' ? 'rgba(180,180,180,0.7)' : (log.delta > 0 ? '#4ade80' : '#ef4444');
+                                    const sign = log.delta > 0 ? '+' : '';
+                                    const label = log.source === 'manual' ? '✋' : '🤖';
+                                    return `<span style="font-size:9px;font-weight:bold;color:${badgeColor};margin-left:4px;opacity:0.85;" title="${label} last change: ${sign}${log.delta}">${sign}${log.delta}</span>`;
+                                  })()
+                                : '';
                             return `<div class="rt-npc-bar-row">
                                 <span class="rt-npc-bar-icon">${icon}</span>
                                 <div class="rt-npc-bar-track">
                                     <div class="rt-npc-bar-center-marker"></div>
                                     <div class="rt-npc-bar-fill ${fillClass}" style="width:${pct}%;"></div>
                                 </div>
-                                <span class="rt-npc-bar-value ${valClass}">${clamped > 0 ? '+' : ''}${clamped}</span>
+                                <span class="rt-npc-bar-value ${valClass}">${clamped > 0 ? '+' : ''}${clamped}${badgeHtml}</span>
                             </div>`;
                         };
 
@@ -5168,7 +5179,30 @@ function createPanel() {
                                 <div style="border-top:2px solid rgba(212,169,64,0.15);padding-top:18px;">
                                     ${sectionsHtml || `<div style="font-size:14px;color:var(--SmartThemeBodyColor, inherit);opacity:0.5;font-style:italic;padding:16px 0;">No structured sections found. Edit the entry to add Appearance, Personality, and other sections.</div>`}
                                 </div>
+                                ${(() => {
+                                    const log = (s.npcRelationshipLog?.[item.id] || []).slice(0, 20);
+                                    if (!s.npcRelationshipBars || log.length === 0) return '';
+                                    const rows = log.map(e => {
+                                        const date = new Date(e.timestamp);
+                                        const timeStr = date.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) + ', ' + date.toLocaleDateString([], {month:'short',day:'numeric'});
+                                        const sign = e.delta > 0 ? '+' : '';
+                                        const deltaColor = e.delta > 0 ? '#4ade80' : '#ef4444';
+                                        const srcIcon = e.source === 'manual' ? '✋' : '🤖';
+                                        const fieldLabel = e.field === 'friendship' ? '🤝' : '💗';
+                                        return `<tr>
+                                            <td style="font-size:10px;color:var(--SmartThemeBodyColor,inherit);opacity:0.5;padding:3px 8px 3px 0;white-space:nowrap;">${timeStr}</td>
+                                            <td style="font-size:12px;padding:3px 8px;">${fieldLabel}</td>
+                                            <td style="font-size:13px;font-weight:bold;color:${deltaColor};font-family:monospace;padding:3px 8px;">${sign}${e.delta}</td>
+                                            <td style="font-size:11px;color:var(--SmartThemeBodyColor,inherit);opacity:0.45;padding:3px 0;">${srcIcon} → ${e.newValue >= 0 ? '+' : ''}${e.newValue}</td>
+                                        </tr>`;
+                                    }).join('');
+                                    return `<div style="border-top:2px solid rgba(212,169,64,0.15);padding-top:18px;margin-top:18px;">
+                                        <div style="font-size:11px;font-weight:bold;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:12px;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:4px;">📊 Relationship History</div>
+                                        <table style="width:100%;border-collapse:collapse;">${rows}</table>
+                                    </div>`;
+                                })()}
                             </div>`;
+
 
 
                             ctx.callGenericPopup(popupHtml, ctx.POPUP_TYPE?.TEXT ?? 1, '', {
@@ -5181,6 +5215,11 @@ function createPanel() {
                                     ['friendship', 'affection'].forEach(type => {
                                         const slider = document.getElementById(`rt-npc-detail-${type}-slider`);
                                         if (!slider) return;
+                                        // Capture the value at drag-start for delta calculation
+                                        let valueAtDragStart = parseInt(slider.value, 10);
+                                        slider.addEventListener('mousedown', () => {
+                                            valueAtDragStart = parseInt(slider.value, 10);
+                                        });
                                         slider.addEventListener('input', (e) => {
                                             const newVal = parseInt(e.target.value, 10);
                                             // 1. Update text and fill
@@ -5208,8 +5247,7 @@ function createPanel() {
                                                     textEl.style.color = newVal === 0 ? 'var(--SmartThemeEmColor, inherit)' : bgColor;
                                                 }
                                             }
-
-                                            // 2. Save settings
+                                            // 2. Save value (log written on 'change', not on every 'input' tick)
                                             const settings = getSettings();
                                             if (!settings.npcRelationshipValues) settings.npcRelationshipValues = {};
                                             if (!settings.npcRelationshipValues[item.id]) {
@@ -5220,7 +5258,24 @@ function createPanel() {
                                         });
 
                                         slider.addEventListener('change', () => {
-                                            // Trigger full manifest refresh on mouse release to clean up the card bars in grid
+                                            // On drag release: compute effective delta and write a manual log entry
+                                            const settings = getSettings();
+                                            const finalVal = settings.npcRelationshipValues?.[item.id]?.[type] ?? 0;
+                                            const effectiveDelta = finalVal - valueAtDragStart;
+                                            if (effectiveDelta !== 0) {
+                                                if (!settings.npcRelationshipLog) settings.npcRelationshipLog = {};
+                                                if (!settings.npcRelationshipLog[item.id]) settings.npcRelationshipLog[item.id] = [];
+                                                settings.npcRelationshipLog[item.id].unshift({
+                                                    timestamp: Date.now(),
+                                                    field: type,
+                                                    delta: effectiveDelta,
+                                                    newValue: finalVal,
+                                                    source: 'manual',
+                                                });
+                                                if (settings.npcRelationshipLog[item.id].length > 50) settings.npcRelationshipLog[item.id].length = 50;
+                                                saveSettings();
+                                            }
+                                            valueAtDragStart = finalVal;
                                             if (typeof refreshManifest === 'function') refreshManifest();
                                         });
                                     });
@@ -5254,8 +5309,8 @@ function createPanel() {
                                     <div class="rt-npc-desc">${escapeHtml(desc)}</div>
                                     <span class="rt-npc-status-badge ${item.is_active ? 'active' : 'inactive'}">${item.is_active ? '● Active' : '○ Inactive'}</span>
                                     ${s.npcRelationshipBars ? `<div class="rt-npc-bars">
-                                        ${renderRelBar(rel.friendship, 'friendship')}
-                                        ${renderRelBar(rel.affection, 'affection')}
+                                        ${renderRelBar(rel.friendship, 'friendship', item.id)}
+                                        ${renderRelBar(rel.affection, 'affection', item.id)}
                                     </div>` : ''}
                                     <div class="rt-npc-actions">
                                         <button class="rt-npc-action-btn rt-npc-view" data-id="${item.id}" title="View NPC card"><i class="fa-solid fa-address-card"></i></button>

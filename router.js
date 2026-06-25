@@ -268,9 +268,12 @@ export async function runRouterPass(narrativeOutput, manualPrompt = null, custom
                         // so the agent knows further movement in that direction is futile.
                         const rel = relValues[fullId];
                         if (rel !== undefined) {
-                            const hints = [];
                             const fVal = rel.friendship ?? 0;
                             const aVal = rel.affection  ?? 0;
+                            // Always inject current totals so the agent can calibrate delta magnitude
+                            block += `\n[Current Relations: Friendship ${fVal >= 0 ? '+' : ''}${fVal}, Affection ${aVal >= 0 ? '+' : ''}${aVal}]`;
+                            // Cap-constraint hints (only when at limit)
+                            const hints = [];
                             if (fVal >= 100)  hints.push('Friendship is at maximum — do not award further positive increments');
                             if (fVal <= -100) hints.push('Friendship is at minimum — do not award further negative increments');
                             if (aVal >= 100)  hints.push('Affection is at maximum — do not award further positive increments');
@@ -1717,7 +1720,13 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
         if (!settings.npcRelationshipValues) settings.npcRelationshipValues = {};
         if (!settings.npcRelationshipValues[id]) settings.npcRelationshipValues[id] = { friendship: 0, affection: 0 };
         const current = settings.npcRelationshipValues[id][f] ?? 0;
-        settings.npcRelationshipValues[id][f] = Math.max(-100, Math.min(100, current + delta));
+        const newValue = Math.max(-100, Math.min(100, current + delta));
+        settings.npcRelationshipValues[id][f] = newValue;
+        // Append to relationship change log (capped at 50 entries per NPC)
+        if (!settings.npcRelationshipLog) settings.npcRelationshipLog = {};
+        if (!settings.npcRelationshipLog[id]) settings.npcRelationshipLog[id] = [];
+        settings.npcRelationshipLog[id].unshift({ timestamp: Date.now(), field: f, delta, newValue, source: 'agent' });
+        if (settings.npcRelationshipLog[id].length > 50) settings.npcRelationshipLog[id].length = 50;
         changed = true;
     }
 

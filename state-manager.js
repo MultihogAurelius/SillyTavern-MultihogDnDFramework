@@ -115,6 +115,7 @@ export function getSettings() {
         npcMinorWords: 15,
         npcRelationshipBars: false,
         npcRelationshipValues: {},
+        npcRelationshipLog: {},      // { [fullId]: [{timestamp,field,delta,newValue,source}] } — capped 50/NPC
         experimentalNpcImport: true,
         barColors: {},
         modulePageSizes: {},
