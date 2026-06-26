@@ -849,8 +849,63 @@ export async function processRelationshipTags(msgIndex) {
         console.log('[RPG Tracker] Aborting: lastMsg or lastMsg.mes is empty');
         return;
     }
+
+    let anyChanged = false;
+    const triggerUIUpdate = () => {
+        if (typeof ctx.saveChatDebounced === 'function') ctx.saveChatDebounced();
+        ctx.saveSettingsDebounced?.();
+        if (typeof globalThis._rpgRenderRouterUI === 'function') globalThis._rpgRenderRouterUI();
+        refreshRelationshipBarsDOM(settings);
+        document.dispatchEvent(new CustomEvent('rt_lore_agent_updated'));
+    };
+
+    // --- 1. SWIPE ROLLBACK & INITIALIZATION ---
+    lastMsg.extra = lastMsg.extra || {};
+    const swipeId = lastMsg.swipe_id ?? 0;
+
+    // Convert old array format to object-keyed-by-swipe format if needed
+    if (Array.isArray(lastMsg.extra.rpgProcessedTags)) {
+        lastMsg.extra.rpgProcessedTags = { [swipeId]: lastMsg.extra.rpgProcessedTags };
+    } else if (!lastMsg.extra.rpgProcessedTags) {
+        lastMsg.extra.rpgProcessedTags = {};
+    }
+    lastMsg.extra.rpgRollbackData = lastMsg.extra.rpgRollbackData || {};
+
+    // Detect swipe change and perform rollback
+    if (lastMsg.extra.rpgActiveSwipe !== undefined && lastMsg.extra.rpgActiveSwipe !== swipeId) {
+        const prevSwipeId = lastMsg.extra.rpgActiveSwipe;
+        console.log(`[RPG Tracker] Swipe changed from ${prevSwipeId} to ${swipeId}. Rolling back previous allocations.`);
+        
+        if (lastMsg.extra.rpgRollbackData[prevSwipeId]) {
+            for (const rb of lastMsg.extra.rpgRollbackData[prevSwipeId]) {
+                // Reverse the exact delta that was successfully applied
+                if (settings.npcRelationshipValues && settings.npcRelationshipValues[rb.npcId]) {
+                    const current = settings.npcRelationshipValues[rb.npcId][rb.field] ?? 0;
+                    settings.npcRelationshipValues[rb.npcId][rb.field] = Math.max(-100, Math.min(100, current - rb.actualAppliedDelta));
+                }
+                
+                // Remove the exact log entry
+                if (settings.npcRelationshipLog && Array.isArray(settings.npcRelationshipLog[rb.npcId])) {
+                    settings.npcRelationshipLog[rb.npcId] = settings.npcRelationshipLog[rb.npcId].filter(l => l.timestamp !== rb.logTimestamp);
+                }
+                console.log(`[RPG Tracker] Rolled back ${rb.field} delta (${rb.actualAppliedDelta}) for ${rb.npcId}`);
+            }
+            anyChanged = true;
+        }
+
+        // We are entering a new swipe. Clear its tracking data so it gets evaluated fresh.
+        lastMsg.extra.rpgProcessedTags[swipeId] = [];
+        lastMsg.extra.rpgRollbackData[swipeId] = [];
+    }
+
+    lastMsg.extra.rpgActiveSwipe = swipeId;
+    lastMsg.extra.rpgProcessedTags[swipeId] = lastMsg.extra.rpgProcessedTags[swipeId] || [];
+    lastMsg.extra.rpgRollbackData[swipeId] = lastMsg.extra.rpgRollbackData[swipeId] || [];
+
+    // --- 2. EARLY RETURNS (After Rollback) ---
     if (!/\[REL:/i.test(lastMsg.mes)) {
         console.log('[RPG Tracker] Aborting: lastMsg.mes does not contain [REL:');
+        if (anyChanged) triggerUIUpdate();
         return;
     }
 
@@ -861,20 +916,6 @@ export async function processRelationshipTags(msgIndex) {
     const matches = [];
     let match;
     
-    // Ensure the message has an extra metadata dictionary for tracking processed tags
-    lastMsg.extra = lastMsg.extra || {};
-    // Use swipe_id to prevent previous swipes from falsely deduplicating the current swipe
-    const swipeId = lastMsg.swipe_id ?? 0;
-    
-    // Convert old array format to object-keyed-by-swipe format if needed
-    if (Array.isArray(lastMsg.extra.rpgProcessedTags)) {
-        lastMsg.extra.rpgProcessedTags = { [swipeId]: lastMsg.extra.rpgProcessedTags };
-    } else if (!lastMsg.extra.rpgProcessedTags) {
-        lastMsg.extra.rpgProcessedTags = {};
-    }
-    
-    lastMsg.extra.rpgProcessedTags[swipeId] = lastMsg.extra.rpgProcessedTags[swipeId] || [];
-
     while ((match = REL_RE.exec(lastMsg.mes)) !== null) {
         const matchStr = match[0];
         
@@ -899,6 +940,7 @@ export async function processRelationshipTags(msgIndex) {
 
     if (matches.length === 0) {
         console.log('[RPG Tracker] Aborting: matches.length === 0 after parsing');
+        if (anyChanged) triggerUIUpdate();
         return;
     }
 
@@ -943,19 +985,31 @@ export async function processRelationshipTags(msgIndex) {
             if (!settings.npcRelationshipValues[resolved.id]) settings.npcRelationshipValues[resolved.id] = { friendship: 0, affection: 0 };
             
             const prev = settings.npcRelationshipValues[resolved.id][m.field] ?? 0;
-            settings.npcRelationshipValues[resolved.id][m.field] = Math.max(-100, Math.min(100, prev + m.delta));
+            const newVal = Math.max(-100, Math.min(100, prev + m.delta));
+            const actualAppliedDelta = newVal - prev;
+            settings.npcRelationshipValues[resolved.id][m.field] = newVal;
 
             if (!settings.npcRelationshipLog) settings.npcRelationshipLog = {};
             // Strict array check to prevent crashes from corrupted legacy data
             if (!Array.isArray(settings.npcRelationshipLog[resolved.id])) settings.npcRelationshipLog[resolved.id] = [];
-            settings.npcRelationshipLog[resolved.id].unshift({ timestamp: Date.now(), field: m.field, delta: m.delta, newValue: settings.npcRelationshipValues[resolved.id][m.field], source: 'ai' });
+            
+            const logTimestamp = Date.now();
+            settings.npcRelationshipLog[resolved.id].unshift({ timestamp: logTimestamp, field: m.field, delta: m.delta, newValue: newVal, source: 'ai' });
             
             const sign = m.delta > 0 ? '+' : '';
             const icon = m.field === 'friendship' ? '🤝' : '💗';
             const label = m.field === 'friendship' ? 'Friendship' : 'Affection';
             // @ts-ignore
             toastr.info(`${icon} ${m.name}: ${sign}${m.delta} ${label}`, 'Relationship', { timeOut: 3500, positionClass: 'toast-bottom-right' });
-            console.log(`[RPG Tracker] Applied relationship delta: ${m.name} | ${m.field} | ${m.delta}`);
+            console.log(`[RPG Tracker] Applied relationship delta: ${m.name} | ${m.field} | ${m.delta} (Actual: ${actualAppliedDelta})`);
+
+            // Save rollback data for future swipes
+            lastMsg.extra.rpgRollbackData[swipeId].push({
+                npcId: resolved.id,
+                field: m.field,
+                actualAppliedDelta: actualAppliedDelta,
+                logTimestamp: logTimestamp
+            });
 
             // Mark this specific tag string as processed in the message metadata for THIS swipe
             lastMsg.extra.rpgProcessedTags[swipeId].push(m.rawStr);
@@ -968,17 +1022,7 @@ export async function processRelationshipTags(msgIndex) {
     }
 
     if (anyChanged) {
-        // Persist the message metadata so it survives reloads
-        if (typeof ctx.saveChatDebounced === 'function') ctx.saveChatDebounced();
-
-        ctx.saveSettingsDebounced?.();
-        if (typeof globalThis._rpgRenderRouterUI === 'function') globalThis._rpgRenderRouterUI();
-        
-        // Lightweight surgical DOM update: patch only the bar fill + value text
-        // without reloading the entire manifest (which is very slow on large installs).
-        refreshRelationshipBarsDOM(settings);
-        
-        document.dispatchEvent(new CustomEvent('rt_lore_agent_updated'));
+        triggerUIUpdate();
     }
 }
 
