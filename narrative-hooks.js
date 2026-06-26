@@ -351,6 +351,34 @@ const label = entry.key?.[0] || entry.comment || id.split('::')[1];
  * @param {ReturnType<typeof import('./state-manager.js').getSettings>} settings
  * @returns {Promise<string>}
  */
+/**
+ * Maps a friendship value (-100..+100) to a tier label and short behavioral hint.
+ * Pure code — no LLM dependency.
+ */
+function getFriendshipTier(v) {
+    if (v <= -60) return { label: 'HOSTILE',            hint: 'open contempt, refuses cooperation, may sabotage or attack' };
+    if (v <= -30) return { label: 'COLD/DISTRUSTFUL',   hint: 'curt and guarded, answers with bare minimum, visible irritation' };
+    if (v <= -1)  return { label: 'WARY/UNEASY',        hint: 'polite but distant, avoids personal topics, second-guesses motives' };
+    if (v <= 15)  return { label: 'NEUTRAL/ACQUAINTANCE',hint: 'civil and transactional, neither warm nor cold' };
+    if (v <= 40)  return { label: 'FRIENDLY',            hint: 'genuine warmth, light humor, willing to help when asked' };
+    if (v <= 70)  return { label: 'CLOSE FRIEND',        hint: 'deep trust, confides worries, stands up for {{user}}, proactive help' };
+    return                { label: 'BONDED/FAMILY',      hint: 'unbreakable loyalty, would risk life without hesitation, shares deepest secrets' };
+}
+
+/**
+ * Maps an affection value (-100..+100) to a tier label and short behavioral hint.
+ * Pure code — no LLM dependency.
+ */
+function getAffectionTier(v) {
+    if (v <= -60) return { label: 'REVULSION',              hint: 'finds {{user}} repulsive, recoils from proximity, hostile to any advance' };
+    if (v <= -30) return { label: 'AVERSION',               hint: 'clearly uninterested, dismisses flirtation coldly, steers away from intimacy' };
+    if (v <= -1)  return { label: 'INDIFFERENT/UNINTERESTED',hint: 'no romantic spark, gentle deflection of any advances' };
+    if (v <= 15)  return { label: 'NEUTRAL CURIOSITY',      hint: 'no feelings formed yet, might notice {{user}} but won\'t act on it' };
+    if (v <= 40)  return { label: 'INTERESTED',             hint: 'steals glances, responds warmly to compliments, comfortable with proximity' };
+    if (v <= 70)  return { label: 'ATTRACTED',              hint: 'seeks {{user}}\'s company, flustered by bold compliments, visible tension' };
+    return                { label: 'DEEPLY IN LOVE',        hint: 'emotionally devoted, craves closeness, expresses tenderness openly' };
+}
+
 async function buildNpcRelationsBlock(settings) {
     const relVals = settings.npcRelationshipValues || {};
     const activeKeys = [...(settings.activeRouterKeys || []), ...(settings.activeWorldKeys || [])];
@@ -387,67 +415,18 @@ async function buildNpcRelationsBlock(settings) {
         const a = rel.affection ?? 0;
         const fStr = `Friendship ${f >= 0 ? '+' : ''}${f}`;
         const aStr = `Affection ${a >= 0 ? '+' : ''}${a}`;
-        lines.push(`${displayName}: ${fStr}, ${aStr}`);
+        const fTier = getFriendshipTier(f);
+        const aTier = getAffectionTier(a);
+        lines.push(`${displayName}: ${fStr}, ${aStr}\n  Friendship tier: ${fTier.label} — ${fTier.hint}\n  Affection tier: ${aTier.label} — ${aTier.hint}`);
     }
 
     if (!lines.length) {
         return `[NPC_RELATIONS]\nNo established relationships yet.\n[/NPC_RELATIONS]\n\n`;
     }
     
-    const header = [
-        `These are the current relationship standings between the protagonist and present NPCs.`,
-        `Both Friendship and Affection range from -100 to +100. These values MUST organically, subtly, and pervasively influence how every NPC speaks, acts, reacts, and behaves toward the protagonist in EVERY interaction — not just explicitly social ones.`,
-        ``,
-        `<FRIENDSHIP_TIERS>`,
-        `Friendship reflects trust, camaraderie, and mutual respect.`,
-        `-100 to -60 (HOSTILE): The NPC despises the protagonist. They refuse cooperation, speak with open contempt or threats, may actively sabotage or attack. Greetings are met with hostility ("You dare show your face here?"). Requests are flatly denied or mocked. They warn others against the protagonist.`,
-        `-59 to -30 (COLD/DISTRUSTFUL): The NPC dislikes the protagonist. Conversations are curt, dismissive, and guarded. They answer questions with the bare minimum, refuse favors, and show visible irritation. Body language is closed off — crossed arms, averted gaze, terse replies. They may comply under duress but resent it.`,
-        `-29 to -1 (WARY/UNEASY): The NPC is uncomfortable around the protagonist. Polite but distant, they keep interactions short, avoid personal topics, and maintain emotional walls. Trust must be earned — they second-guess motives and hedge their words.`,
-        `0 to +15 (NEUTRAL/ACQUAINTANCE): Standard professional courtesy. The NPC is neither warm nor cold — transactional and civil. They'll answer questions straightforwardly but won't volunteer information or go out of their way.`,
-        `+16 to +40 (FRIENDLY): The NPC genuinely likes the protagonist. Conversations flow naturally with warmth, light humor, and willingness to share. They offer unsolicited advice, remember past encounters fondly, and are inclined to help when asked. Greetings are warm ("Good to see you again!").`,
-        `+41 to +70 (CLOSE FRIEND): Deep mutual trust. The NPC shares personal stories, confides worries, and stands up for the protagonist in front of others. They offer help proactively, make sacrifices, and joke with familiar intimacy. In danger, they prioritize the protagonist's safety.`,
-        `+71 to +100 (BONDED/FAMILY): Near-unbreakable loyalty. The NPC treats the protagonist like a sibling or lifelong companion. They would risk their life without hesitation, share their deepest secrets, and defend the protagonist's honor fiercely. Conversations are effortless, filled with inside jokes and unspoken understanding.`,
-        `</FRIENDSHIP_TIERS>`,
-        ``,
-        `<AFFECTION_TIERS>`,
-        `Affection reflects romantic/physical attraction and emotional intimacy beyond friendship.`,
-        `-100 to -60 (REVULSION): The NPC finds the protagonist repulsive or deeply off-putting. Any flirtation is met with disgust, anger, or fear. They recoil from physical proximity and may feel threatened by romantic advances.`,
-        `-59 to -30 (AVERSION): The NPC is clearly uninterested and uncomfortable with any romantic subtext. Flirtation is dismissed coldly or with visible cringe. They actively steer conversations away from anything personal or intimate.`,
-        `-29 to -1 (INDIFFERENT/UNINTERESTED): No romantic spark. The NPC treats flirtation as awkward or misplaced but isn't hostile about it — more of a gentle deflection or confused look.`,
-        `0 to +15 (NEUTRAL CURIOSITY): The NPC hasn't formed romantic feelings but isn't closed off. They might blush faintly at a well-placed compliment or notice the protagonist's appearance without acting on it.`,
-        `+16 to +40 (INTERESTED): The NPC is visibly intrigued. They steal glances, respond warmly to compliments, and may initiate light flirtation themselves. Physical proximity doesn't bother them — they might lean in during conversation, touch an arm casually, or linger during goodbyes.`,
-        `+41 to +70 (ATTRACTED): Strong romantic interest. The NPC seeks out the protagonist's company, becomes flustered by bold compliments, and shows jealousy when the protagonist flirts with others. Physical tension is palpable — lingering eye contact, finding excuses to be near, playful banter with romantic undertones.`,
-        `+71 to +100 (DEEPLY IN LOVE): The NPC is emotionally devoted. They express tenderness openly, prioritize the protagonist's emotional wellbeing, and crave physical and emotional closeness. Vulnerability comes naturally, and they may express their feelings through actions (gifts, protection, grand gestures) even if they struggle to say it directly.`,
-        `</AFFECTION_TIERS>`,
-        ``,
-        `<BEHAVIORAL_RULES>`,
-        `These tiers are NOT rigid thresholds — they are a spectrum. Blend behaviors fluidly based on the exact value. An NPC at +38 friendship should act distinctly different from one at +65.`,
-        `EVERY scene should reflect these values: how NPCs greet the protagonist, how they respond to requests, how they behave in combat alongside or against them, how they react to danger, how they speak in group settings, what information they volunteer, and whether they show vulnerability.`,
-        `NPCs with high friendship but low affection treat the protagonist like a trusted comrade — warm but platonic. NPCs with high affection but low friendship might be attracted but distrustful — flirtatious yet guarded. Both values together create a unique behavioral fingerprint for each NPC.`,
-        `</BEHAVIORAL_RULES>`,
-        ``,
-        `<RELATIONSHIP_ALLOCATION>`,
-        `When a meaningful interaction occurs that would realistically shift an NPC's feelings, emit a tag at the END of your response:`,
-        `[REL: NpcName | friendship | +/-N] or [REL: NpcName | affection | +/-N]`,
-        ``,
-        `WHEN TO ALLOCATE (non-exhaustive — use judgment for ALL situations):`,
-        `• Direct compliments, insults, gifts, or threats (+/-1 to 5)`,
-        `• Sharing a meal, campfire conversation, bonding over shared interests (+1 to 3 friendship)`,
-        `• Surviving danger together, completing a quest as allies (+3 to 8 friendship)`,
-        `• Betrayal, breaking a promise, abandoning them in danger (-5 to -15 friendship)`,
-        `• Saving their life or a loved one's life (+8 to 15 friendship)`,
-        `• Flirtatious banter received well (+1 to 3 affection), received poorly (-1 to -3 affection)`,
-        `• A meaningful personal confession or vulnerable moment (+3 to 6 affection)`,
-        `• A romantic gesture — a dance, a gift with personal significance, a protective act (+4 to 8 affection)`,
-        `• Spending extended quality time together with positive interactions (+2 to 4 of either or both)`,
-        `• Disrespecting their values, culture, or loved ones (-3 to -10 friendship)`,
-        `• Ignoring them, forgetting something important to them (-1 to -3 friendship)`,
-        `These are EXAMPLES. Adapt your judgment to any situation. The magnitude should reflect the NPC's personality — a stoic warrior might give +1 where a warm innkeeper gives +3 for the same compliment.`,
-        `Typical range: 1-5 for minor moments, 5-15 for major events. Only use 15+ for life-altering moments.`,
-        `</RELATIONSHIP_ALLOCATION>`,
-    ].join('\n');
+    const header = `Current relationship standings between the protagonist and present NPCs. Both axes range from -100 to +100. Let the tier descriptions below each NPC guide how they behave toward {{user}} this turn.`;
 
-    return `[NPC_RELATIONS]\n${header}\n\n${lines.join('\n')}\n[/NPC_RELATIONS]\n\n`;
+    return `[NPC_RELATIONS]\n${header}\n\n${lines.join('\n\n')}\n[/NPC_RELATIONS]\n\n`;
 }
 
 export function installInterceptor() {
