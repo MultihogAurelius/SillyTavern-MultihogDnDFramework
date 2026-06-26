@@ -2567,14 +2567,16 @@ function countRedundantPairs(content, threshold = 0.6) {
  */
 export function parseInWorldMinutes(timeStr) {
     if (!timeStr) return -1;
-    const m = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM),\s*Day\s*(\d+)/i);
+    const m = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?,\s*Day\s*(\d+)/i);
     if (!m) return -1;
     let hours = parseInt(m[1], 10);
     const minutes = parseInt(m[2], 10);
-    const ampm = m[3].toUpperCase();
+    const ampm = m[3] ? m[3].toUpperCase() : null;
     const day = parseInt(m[4], 10);
-    if (ampm === 'PM' && hours !== 12) hours += 12;
-    if (ampm === 'AM' && hours === 12) hours = 0;
+    if (ampm) {
+        if (ampm === 'PM' && hours !== 12) hours += 12;
+        if (ampm === 'AM' && hours === 12) hours = 0;
+    }
     return (day - 1) * 24 * 60 + hours * 60 + minutes;
 }
 
@@ -2591,12 +2593,18 @@ function computePeriodLabel(startMinutes, endMinutes, intervalHours) {
     const minutesOfToday = endMinutes % (24 * 60);
     let hours = Math.floor(minutesOfToday / 60);
     const mins = minutesOfToday % 60;
-    const ampm = hours >= 12 ? 'PM' : 'AM';
-    let displayHours = hours % 12;
-    if (displayHours === 0) displayHours = 12;
-    const displayHoursStr = String(displayHours).padStart(2, '0');
     const displayMins = String(mins).padStart(2, '0');
-    return `Day ${day}, ${displayHoursStr}:${displayMins} ${ampm}`;
+    const s = getSettings();
+    if (s.use24hTime) {
+        const displayHoursStr = String(hours).padStart(2, '0');
+        return `Day ${day}, ${displayHoursStr}:${displayMins}`;
+    } else {
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        let displayHours = hours % 12;
+        if (displayHours === 0) displayHours = 12;
+        const displayHoursStr = String(displayHours).padStart(2, '0');
+        return `Day ${day}, ${displayHoursStr}:${displayMins} ${ampm}`;
+    }
 }
 
 /**

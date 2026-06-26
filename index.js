@@ -961,10 +961,14 @@ function loadChatState(chatId) {
             const remMinutes = totalMins % 1440;
             const h24 = Math.floor(remMinutes / 60);
             const m = remMinutes % 60;
-            const suffix = h24 >= 12 ? 'PM' : 'AM';
-            let h12 = h24 % 12;
-            if (h12 === 0) h12 = 12;
-            return `Day ${day}, ${String(h12).padStart(2, '0')}:${String(m).padStart(2, '0')} ${suffix}`;
+            if (s.use24hTime) {
+                return `Day ${day}, ${String(h24).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+            } else {
+                const suffix = h24 >= 12 ? 'PM' : 'AM';
+                let h12 = h24 % 12;
+                if (h12 === 0) h12 = 12;
+                return `Day ${day}, ${String(h12).padStart(2, '0')}:${String(m).padStart(2, '0')} ${suffix}`;
+            }
         }
         const mins = s.worldProgressionLastFiredAtMinutes ?? -1;
         const label = s.worldProgressionLastFiredPeriodLabel || '';
@@ -4039,9 +4043,13 @@ function createPanel() {
                 const day = Math.floor(m / 1440) + 1;
                 const rem = m % 1440;
                 const h24 = Math.floor(rem / 60), min = rem % 60;
-                const suffix = h24 >= 12 ? 'PM' : 'AM';
-                let h12 = h24 % 12; if (h12 === 0) h12 = 12;
-                return `Day ${day}, ${String(h12).padStart(2,'0')}:${String(min).padStart(2,'0')} ${suffix}`;
+                if (wpS.use24hTime) {
+                    return `Day ${day}, ${String(h24).padStart(2,'0')}:${String(min).padStart(2,'0')}`;
+                } else {
+                    const suffix = h24 >= 12 ? 'PM' : 'AM';
+                    let h12 = h24 % 12; if (h12 === 0) h12 = 12;
+                    return `Day ${day}, ${String(h12).padStart(2,'0')}:${String(min).padStart(2,'0')} ${suffix}`;
+                }
             }
             const wpLastEl = agentPanel.querySelector('#rt-agent-world-last-fired');
             const wpNextEl = agentPanel.querySelector('#rt-agent-world-next-fire');
@@ -4361,9 +4369,13 @@ function createPanel() {
                 const day = Math.floor(m / 1440) + 1;
                 const rem = m % 1440;
                 const h24 = Math.floor(rem / 60), min = rem % 60;
-                const suffix = h24 >= 12 ? 'PM' : 'AM';
-                let h12 = h24 % 12; if (h12 === 0) h12 = 12;
-                return `Day ${day}, ${String(h12).padStart(2,'0')}:${String(min).padStart(2,'0')} ${suffix}`;
+                if (s.use24hTime) {
+                    return `Day ${day}, ${String(h24).padStart(2,'0')}:${String(min).padStart(2,'0')}`;
+                } else {
+                    const suffix = h24 >= 12 ? 'PM' : 'AM';
+                    let h12 = h24 % 12; if (h12 === 0) h12 = 12;
+                    return `Day ${day}, ${String(h12).padStart(2,'0')}:${String(min).padStart(2,'0')} ${suffix}`;
+                }
             }
             const lastEl = agentPanel.querySelector('#rt-agent-world-last-fired');
             const nextEl = agentPanel.querySelector('#rt-agent-world-next-fire');
@@ -8795,6 +8807,7 @@ function buildSysprompt(rawText) {
                         $('#rpg_tracker_npc_minor_words').val(sTempTracker.npcMinorWords ?? 15);
                         $('#rpg_tracker_npc_card_import').prop('checked', !!sTempTracker.experimentalNpcImport);
                         $('#rpg_tracker_ignore_npc_limits').prop('checked', !!sTempTracker.ignoreNpcImportLimits);
+                        $('#rpg_tracker_use_24h_time').prop('checked', !!sTempTracker.use24hTime);
                         if (typeof refreshOrderList === 'function') refreshOrderList();
 
                         // 3. Lorebook Agent
@@ -8986,6 +8999,7 @@ function buildSysprompt(rawText) {
            
                                     $('#rpg_tracker_npc_card_import').prop('checked', !!sTempTracker.experimentalNpcImport);
                                     $('#rpg_tracker_ignore_npc_limits').prop('checked', !!sTempTracker.ignoreNpcImportLimits);
+                                    $('#rpg_tracker_use_24h_time').prop('checked', !!sTempTracker.use24hTime);
                                     if (typeof refreshOrderList === 'function') refreshOrderList();
                                     resetCount++;
                                     console.log('[RPG Tracker] State tracker prompts reset to defaults.');
@@ -11788,10 +11802,14 @@ RULES:
                 const remMinutes = totalMins % 1440;
                 const h24 = Math.floor(remMinutes / 60);
                 const m = remMinutes % 60;
-                const suffix = h24 >= 12 ? 'PM' : 'AM';
-                let h12 = h24 % 12;
-                if (h12 === 0) h12 = 12;
-                return `Day ${day}, ${String(h12).padStart(2, '0')}:${String(m).padStart(2, '0')} ${suffix}`;
+                if (s.use24hTime) {
+                    return `Day ${day}, ${String(h24).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+                } else {
+                    const suffix = h24 >= 12 ? 'PM' : 'AM';
+                    let h12 = h24 % 12;
+                    if (h12 === 0) h12 = 12;
+                    return `Day ${day}, ${String(h12).padStart(2, '0')}:${String(m).padStart(2, '0')} ${suffix}`;
+                }
             }
 
             let lastReportText = 'Never';
@@ -11825,6 +11843,12 @@ RULES:
         });
         $wpInterval.val(settings.worldProgressionIntervalHours || 24).on('input', function () {
             getSettings().worldProgressionIntervalHours = parseInt(String($(this).val() || '')) || 24;
+            saveSettings();
+            updateWorldProgressionLastFiredDisplay();
+        });
+        const $wpUse24hTime = $('#rpg_tracker_use_24h_time');
+        $wpUse24hTime.prop('checked', !!settings.use24hTime).on('change', function () {
+            getSettings().use24hTime = !!$(this).prop('checked');
             saveSettings();
             updateWorldProgressionLastFiredDisplay();
         });
@@ -12008,15 +12032,19 @@ RULES:
             const currentNextMins = currentLastMins >= 0 ? currentLastMins + intervalMinutes : intervalMinutes;
 
             function fmtHint(totalMins) {
-                if (totalMins < 0) return 'Day 1, 12:00 AM';
+                if (totalMins < 0) return s.use24hTime ? 'Day 1, 00:00' : 'Day 1, 12:00 AM';
                 const day = Math.floor(totalMins / 1440) + 1;
                 const remMinutes = totalMins % 1440;
                 const h24 = Math.floor(remMinutes / 60);
                 const m = remMinutes % 60;
-                const suffix = h24 >= 12 ? 'PM' : 'AM';
-                let h12 = h24 % 12;
-                if (h12 === 0) h12 = 12;
-                return `Day ${day}, ${String(h12).padStart(2, '0')}:${String(m).padStart(2, '0')} ${suffix}`;
+                if (s.use24hTime) {
+                    return `Day ${day}, ${String(h24).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+                } else {
+                    const suffix = h24 >= 12 ? 'PM' : 'AM';
+                    let h12 = h24 % 12;
+                    if (h12 === 0) h12 = 12;
+                    return `Day ${day}, ${String(h12).padStart(2, '0')}:${String(m).padStart(2, '0')} ${suffix}`;
+                }
             }
 
             const userInput = window.prompt(

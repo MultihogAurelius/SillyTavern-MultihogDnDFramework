@@ -115,6 +115,7 @@ export function getSettings() {
         npcMinorWords: 15,
         experimentalNpcImport: true,
         ignoreNpcImportLimits: false,
+        use24hTime: false,
         barColors: {},
         modulePageSizes: {},
         customTheme: null,

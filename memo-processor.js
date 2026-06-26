@@ -1005,6 +1005,14 @@ export function buildModulesInstructionText(settings) {
                 }
             }
 
+            // ── Dynamic format adjustments for Time Module ──────────────────
+            if (key === 'time' && settings.use24hTime) {
+                p = p.replace(/HH:MM AM\/PM/g, 'HH:MM (24-hour format)')
+                     .replace(/10:00 PM/g, '22:00')
+                     .replace(/08:00 AM/g, '08:00')
+                     .replace(/AM\/PM/gi, '24-hour format');
+            }
+
             modulesText += `- [${key.toUpperCase()}]: ${p}\n`;
         }
     }
