@@ -48,12 +48,12 @@ Together they solve the four core problems of LLM tabletop RP: the AI forgetting
 - **Mobile support** (open from the wand menu).
 - **Talk to the tracker model directly via (💬)**, making editing or adding things easy.
 - **Onboarding system** - roll up a random character or describe one to the model.
-- **Character card importing** - import any existing character into the story as an NPC; AI will automatically adapt it to the story, regardless of setting/theme.
 - **Profile saving** - switch between multiple campaigns without losing your state.
 - **Homebrew-friendly** and flexible in general, relying on AI to do a lot of the lifting.
 - **Automatic Long-Context Tracking** via the Lorebook Agent with World Engine simulation.
 - **AI Portrait Generation** via Pollinations.ai — free, non-profit image generation with full lorebook agent context awareness for accurate character portraits.
 - **Inventory Currency Auto-Rendering** — items with a worth value automatically display a styled coin badge (gold, silver, bronze, or dollar) based on the currency type.
+- **Character card importing** - import any existing character into the story as an NPC; AI will automatically adapt it to the story, regardless of setting/theme.
   
 ---
 
