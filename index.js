@@ -5112,11 +5112,11 @@ function createPanel() {
                                 wide: true,
                                 large: true,
                                 customButtons: [
-                                    { text: '✏️ Edit Text', result: 'edit', classes: ['menu_button'] }
+                                    { text: '✏️ Edit Text', result: 1001, classes: ['menu_button'] }
                                 ]
                             };
                             const result = await ctx.callGenericPopup(popupHtml, ctx.POPUP_TYPE?.TEXT ?? 1, '', popupOpts);
-                            if (result === 'edit') {
+                            if (result === 1001) {
                                 const editBtn = document.querySelector(`.rt-npc-edit[data-id="${item.id.replace(/"/g, '\\"') }"]`);
                                 if (editBtn) {
                                     editBtn.click();

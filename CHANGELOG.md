@@ -7,6 +7,9 @@ All notable changes to the **Multihog D&D Framework** will be documented in this
 ### Added
 - **Edit Button inside Full NPC Card**: Added an "✏️ Edit Text" button to the generic popup modal for Full NPC Cards. When clicked, it automatically closes the popup, expands the corresponding NPC card in the sidebar, triggers its inline edit mode, and smoothly scrolls it into view.
 
+### Fixed
+- **NPC Card Details Popup Crash**: Fixed an issue where the NPC card details popup failed to open because the Edit button used a string value for `result`, violating the SillyTavern custom buttons API constraint requiring integer results.
+
 ## [3.16.15] - 2026-06-25
 
 ### Fixed
