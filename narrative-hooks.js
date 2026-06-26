@@ -832,22 +832,14 @@ export async function processRelationshipTags(msgIndex) {
     if (!ctx.chat || ctx.chat.length === 0) return;
     
     // Resolve the target message.
-    // If called from MESSAGE_UPDATED, msgIndex is the exact message to check.
-    // If called from GENERATION_ENDED (no index), scan backwards for the last
-    // AI message that actually contains a [REL:] tag — avoids the race where
-    // chat.length-1 is still the user's turn when the event fires.
+    // MESSAGE_UPDATED passes the exact index \u2014 use it directly.
+    // GENERATION_ENDED calls with no index; the setTimeout in onGenerationEnded
+    // guarantees ST has committed the AI message by now, so chat.length-1 is safe.
     let lastMsg;
     if (typeof msgIndex === 'number' && msgIndex >= 0 && msgIndex < ctx.chat.length) {
         lastMsg = ctx.chat[msgIndex];
     } else {
-        // Scan from end backwards, skipping user messages, until we find one with [REL:]
-        for (let i = ctx.chat.length - 1; i >= Math.max(0, ctx.chat.length - 2); i--) {
-            const msg = ctx.chat[i];
-            if (msg && !msg.is_user && msg.mes && /\[REL:/i.test(msg.mes)) {
-                lastMsg = msg;
-                break;
-            }
-        }
+        lastMsg = ctx.chat[ctx.chat.length - 1];
     }
     if (!lastMsg || !lastMsg.mes) return;
     if (!/\[REL:/i.test(lastMsg.mes)) return;
