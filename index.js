@@ -6501,12 +6501,12 @@ Rules:
                 
                 const customLabel = document.createElement('label');
                 customLabel.className = 'rt-npc-form-label';
-                customLabel.textContent = 'Selected Role / Archetype *';
+                customLabel.textContent = 'Archetype / Role *';
                 
                 const customInput = document.createElement('input');
                 customInput.className = 'rt-npc-form-input';
                 customInput.type = 'text';
-                customInput.placeholder = 'Select a chip above or type a custom role (e.g. Mentor, Bartender)...';
+                customInput.placeholder = 'Type a custom role (e.g. Mentor, Bartender) or select a chip above...';
                 customInput.style.marginBottom = '8px';
 
                 for (const { id, icon } of archetypes) {
