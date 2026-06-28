@@ -6120,8 +6120,6 @@ Rules:
                 return null;
             }
         };
-
-        /**
         const openNpcCreatorDialog = async (bookName, prefix) => {
             const ctx = SillyTavern.getContext();
 
