@@ -5267,42 +5267,7 @@ function createPanel() {
                             if (portraitWrap) {
                                 portraitWrap.addEventListener('click', async (e) => {
                                     e.stopPropagation();
-                                    if (portraitSrc) {
-                                        await showPortraitSettingsMenu(item.label, refreshManifest, item.content || '');
-                                    } else {
-                                        try {
-                                            if (s.portraitSkipPromptDialog) {
-                                                toastr['info'](`Generating portrait for ${item.label} in background…`, 'NPC Portrait');
-                                                const prompt = await generateNpcPortraitPrompt(item.label, item.content || '');
-                                                if (!prompt) {
-                                                    toastr['warning']('Could not generate portrait prompt.', 'NPC Portrait');
-                                                    return;
-                                                }
-                                                toastr['info'](`Generating image for ${item.label}…`, 'NPC Portrait');
-                                                const dataUrl = await generatePortraitDirect(prompt, item.label);
-                                                const scaled = await scaleImageTo512Square(dataUrl);
-                                                applyPortraitData(item.label, scaled);
-                                                toastr['success'](`Portrait auto-generated and applied for ${item.label}!`, 'NPC Portrait');
-                                                await refreshManifest();
-                                                refreshRenderedView();
-                                            } else {
-                                                toastr['info'](`Generating portrait prompt for ${item.label}...`, 'NPC Portrait');
-                                                const prompt = await generateNpcPortraitPrompt(item.label, item.content || '');
-                                                if (!prompt) {
-                                                    toastr['warning']('Could not generate portrait prompt.', 'NPC Portrait');
-                                                    return;
-                                                }
-                                                await showPortraitPromptPopup(prompt, item.label, (src) => {
-                                                    applyPortraitData(item.label, src);
-                                                }, () => {
-                                                    void refreshManifest().catch(() => {});
-                                                    refreshRenderedView();
-                                                });
-                                            }
-                                        } catch (err) {
-                                            toastr['error'](`Portrait generation failed: ${String(err.message || err).substring(0, 120)}`, 'NPC Portrait');
-                                        }
-                                    }
+                                    await showPortraitSettingsMenu(item.label, refreshManifest, item.content || '');
                                 });
                             }
 
