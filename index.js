@@ -5229,7 +5229,30 @@ function createPanel() {
                                         </div>
                                     </div>
                                 </div>
+                                ${(() => {
+                                    const log = (s.npcRelationshipLog?.[item.id] || []).slice(0, 20);
+                                    if (!s.npcRelationshipBars || log.length === 0) return '';
+                                    const rows = log.map(e => {
+                                        const date = new Date(e.timestamp);
+                                        const timeStr = date.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) + ', ' + date.toLocaleDateString([], {month:'short',day:'numeric'});
+                                        const sign = e.delta > 0 ? '+' : '';
+                                        const deltaColor = e.delta > 0 ? '#4ade80' : '#ef4444';
+                                        const srcIcon = e.source === 'manual' ? '✋' : '🤖';
+                                        const fieldLabel = e.field === 'friendship' ? '🤝' : '💗';
+                                        return `<tr>
+                                            <td style="font-size:10px;color:var(--SmartThemeBodyColor,inherit);opacity:0.5;padding:3px 8px 3px 0;white-space:nowrap;">${timeStr}</td>
+                                            <td style="font-size:12px;padding:3px 8px;">${fieldLabel}</td>
+                                            <td style="font-size:13px;font-weight:bold;color:${deltaColor};font-family:monospace;padding:3px 8px;">${sign}${e.delta}</td>
+                                            <td style="font-size:11px;color:var(--SmartThemeBodyColor,inherit);opacity:0.45;padding:3px 0;">${srcIcon} → ${e.newValue >= 0 ? '+' : ''}${e.newValue}</td>
+                                        </tr>`;
+                                    }).join('');
+                                    return `<div style="border-top:2px solid rgba(212,169,64,0.15);padding-top:18px;margin-top:18px;">
+                                        <div style="font-size:11px;font-weight:bold;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:12px;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:4px;">📊 Relationship History</div>
+                                        <table style="width:100%;border-collapse:collapse;">${rows}</table>
+                                    </div>`;
+                                })()}
                             `;
+
 
                             // Wire up in-popup edit/save/cancel
                             const viewPane = popupDom.querySelector('.rt-npc-popup-view');
