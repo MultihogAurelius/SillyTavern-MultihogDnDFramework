@@ -658,8 +658,8 @@ export async function generateWithPollinations(prompt, entityName, localApply, r
             // Wait for generation to finish, then scale and apply directly
             try {
                 const dataUrl = await genPromise;
-                const scaled = await scaleImageTo512Square(dataUrl);
-                localApply(scaled);
+                const finalUrl = dataUrl.startsWith('data:') ? await scaleImageTo512Square(dataUrl) : dataUrl;
+                localApply(finalUrl);
                 if (typeof refresh === 'function') refresh();
                 toastr['success'](`Portrait applied for ${entityName}!`, 'RPG Tracker');
             } catch (err) {
@@ -748,8 +748,8 @@ export async function generateWithNativeExtension(prompt, entityName, localApply
             // Wait for generation to finish, then scale and apply
             try {
                 const imageUrl = await genPromise;
-                const scaled = await scaleImageTo512Square(imageUrl);
-                localApply(scaled);
+                const finalUrl = imageUrl.startsWith('data:') ? await scaleImageTo512Square(imageUrl) : imageUrl;
+                localApply(finalUrl);
                 if (typeof refresh === 'function') refresh();
                 toastr['success'](`Portrait applied for ${entityName}!`, 'RPG Tracker');
             } catch (err) {
