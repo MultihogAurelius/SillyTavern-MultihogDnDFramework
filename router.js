@@ -803,6 +803,20 @@ Action: commit({"rewrite": [{"id": "Eldoria_Events::3", "content": "Compressed v
             modularPrompt = modularPrompt.replace(/\{\{#if_world\}\}[\s\S]*?\{\{\/if_world\}\}/g, '');
             modularPrompt = modularPrompt.replace(/\{\{#if_world\}\}|\{\{\/if_world\}\}|\{\{dayStr\}\}|\{\{prevDay\}\}/g, '');
 
+            const relSection = settings.npcRelationshipBars ? `
+## NPC RELATIONSHIP DELTAS
+Scan the recent narrative chat history for visible inline annotations of the form \`*(Friendship: NPCName +X — reason)*\` or \`*(Affection: NPCName -Y — reason)*\` emitted by the GM/Narrator. When you see these, parse them and emit a relationship delta update using the following tag format (you can use either the NPC's name or their Book::UID):
+  [[REL: NameOrUID | friendship | +10]]
+  [[REL: NameOrUID | affection | -5]]
+When a new NPC is registered, you MUST infer an appropriate starting relationship delta from the narrative context in the same pass. For example:
+- Long-time friends, regular companions, mentors, or close partners: set a strong starting friendship (e.g., +30 to +60).
+- Casual friends, helpful acquaintances, or positive encounters: set a minor starting friendship (e.g., +10 to +25).
+- Romantically interested or close loved ones: set starting affection and/or friendship (e.g., +20 to +50).
+- Minor foes, hostile rivals, or unfriendly targets: set a minor negative starting friendship (e.g., -5 to -15).
+- Direct enemies, antagonist figures, or deadly threats: set a strong negative starting friendship (e.g., -20 to -60).
+- Unknown/neutral: default to 0 (no delta).
+` : '';
+
             const basicSystemPrompt = `You are the Research Assistant. Your task is to identify and record important narrative entities and events.
 
 ${modularPrompt}
@@ -813,13 +827,7 @@ ${modularPrompt}
 3. **ARCHIVE INDEX**: Inactive entries — labels and keywords only. You CANNOT see their full biography.
 4. **RECALL**: To read or update an archive entry, use [[ACTIVATE: Name]]. Its full content becomes visible next turn.
 5. **LIMIT**: You are limited to **${settings.routerMaxActivations || 8} active entries**. Nothing is archived automatically. If you exceed this limit you will see a **BUDGET VIOLATION** line and you MUST use [[DEACTIVATE: Name]] on the least relevant active entries to return within budget before this pass ends.
-
-## NPC RELATIONSHIP DELTAS
-If an NPC's relationship with the player changes meaningfully based on events, output:
-  [[REL: Book::UID | Friendship | +15]]   (use the exact UID from the active memory block)
-  [[REL: Book::UID | Affection | -10]]
-Output only the delta — do NOT rewrite bar values in the entry text. Base your judgment on the NPC's personality, values, and temperament as described in their entry, inferring how they would realistically react.
-
+${relSection}
 ## NPC APPEARANCE UPDATES
 If an NPC's physical appearance changes significantly (major injury, permanent outfit change, etc.), output:
   [[UPDATE_APPEARANCE: Book::UID | New appearance text here]]
@@ -879,6 +887,110 @@ Habits/Behaviors: Wipes his brow with a greasy rag.
             ];
             const categoryEnum = validCategories.length ? validCategories : ['NPC', 'LOC', 'QUEST', 'FAC', 'EVENT'];
 
+            // Dynamically build the commit tool parameters based on settings
+            const commitProperties = {
+                record: {
+                    type: 'array',
+                    description: 'New entries to create. Recording an entry with an existing label automatically updates it.',
+                    items: {
+                        type: 'object',
+                        properties: {
+                            label: { type: 'string', description: 'Entity name only. NO tag prefix (e.g. "Iron Syndicate", NOT "FAC: Iron Syndicate").' },
+                            keys:  { type: 'array', items: { type: 'string' }, description: 'Search keywords. Include the entity name/title itself (without timestamps like "[Day 1]") as a keyword, plus any ancestor location names.' },
+                            content:  { type: 'string', description: 'Full description.' },
+                            category: { type: 'string', enum: categoryEnum, description: 'Determines which lorebook the entry goes into.' }
+                        },
+                        required: ['label', 'keys', 'content', 'category']
+                    }
+                },
+                update: {
+                    type: 'array',
+                    description: 'Append new information to existing entries.',
+                    items: {
+                        type: 'object',
+                        properties: {
+                            id:      { type: 'string', description: 'Book::UID format (e.g. "Eldoria_NPCs::0").' },
+                            content: { type: 'string', description: 'New information to append.' }
+                        },
+                        required: ['id', 'content']
+                    }
+                },
+                activate:   { type: 'array', items: { type: 'string' }, description: 'Book::UID IDs to move into active context.' },
+                deactivate: { type: 'array', items: { type: 'string' }, description: 'Book::UID IDs to remove from active context.' },
+                delete_ids: { type: 'array', items: { type: 'string' }, description: 'Book::UID IDs to permanently delete.' },
+                rewrite: {
+                    type: 'array',
+                    description: 'Replace the entire content of existing entries. Use for compressing bloated entries.',
+                    items: {
+                        type: 'object',
+                        properties: {
+                            id:      { type: 'string', description: 'Book::UID of the entry to rewrite.' },
+                            content: { type: 'string', description: 'New canonical content. Replaces everything.' }
+                        },
+                        required: ['id', 'content']
+                    }
+                },
+                consolidate: {
+                    type: 'array',
+                    description: 'Merge multiple entries into one. All targets are deleted; the survivor gets the new content. Use rename in the same commit to give the survivor a canonical label/keys after merging.',
+                    items: {
+                        type: 'object',
+                        properties: {
+                            targets:  {
+                                type: 'array',
+                                items: { type: 'string' },
+                                description: 'One or more Book::UID IDs to delete after merging.'
+                            },
+                            survivor: { type: 'string', description: 'Book::UID of the entry to keep, with merged content.' },
+                            content:  { type: 'string', description: 'Full merged canonical content for the survivor.' }
+                        },
+                        required: ['targets', 'survivor', 'content']
+                    }
+                },
+                rename: {
+                    type: 'array',
+                    description: 'Change the display label and/or keyword list of an existing entry without modifying its content. Use when an entity is revealed, renamed, or destroyed, or to give a consolidation survivor a canonical label. Max 6 keywords per entry — choose only the most essential trigger words.',
+                    items: {
+                        type: 'object',
+                        properties: {
+                            id:    { type: 'string', description: 'Book::UID of the entry to rename/rekey.' },
+                            label: { type: 'string', description: 'New display label. Omit to keep the current label.' },
+                            keys:  { type: 'array', items: { type: 'string' }, description: 'Full replacement keyword list (max 6). Replaces existing keywords entirely. Omit to keep current keywords.' }
+                        },
+                        required: ['id']
+                    }
+                }
+            };
+
+            if (settings.npcRelationshipBars) {
+                commitProperties.rel = {
+                    type: 'array',
+                    description: 'Apply relationship delta(s) to NPC(s). Base relationship changes on the NPC\'s personality, values, and temperament as described in their entry, or parse them from visible inline relationship annotations in the chat log. When a new NPC is recorded, you MUST infer an appropriate starting relationship delta (e.g. +30 to +60 for close long-time friends/companions/mentors, +10 to +25 for casual friends/acquaintances, -20 to -60 for direct enemies, 0 for neutral) and emit it in the same pass. Output only the delta, not the total.',
+                    items: {
+                        type: 'object',
+                        properties: {
+                            id:    { type: 'string', description: 'Book::UID or plain NPC name.' },
+                            field: { type: 'string', enum: ['friendship', 'affection'], description: 'Which relationship axis to update.' },
+                            delta: { type: 'integer', description: 'Signed integer delta (e.g. 15 or -20). Range: -100 to 100.' }
+                        },
+                        required: ['id', 'field', 'delta']
+                    }
+                };
+            }
+
+            commitProperties.appearance = {
+                type: 'array',
+                description: 'Surgically update the Appearance field inside an NPC\'s [CORE] block. Only use when the NPC\'s physical appearance changes significantly.',
+                items: {
+                    type: 'object',
+                    properties: {
+                        id:      { type: 'string', description: 'Book::UID of the NPC entry.' },
+                        content: { type: 'string', description: 'New appearance text. Replaces only the Appearance field inside [CORE].' }
+                    },
+                    required: ['id', 'content']
+                }
+            };
+
             /** @type {Array<object>} */
             const agentTools = [
                 {
@@ -924,104 +1036,7 @@ Habits/Behaviors: Wipes his brow with a greasy rag.
                         description: 'Write all changes to the lorebook and finish the research pass. The ONLY way to persist data.',
                         parameters: {
                             type: 'object',
-                            properties: {
-                                record: {
-                                    type: 'array',
-                                    description: 'New entries to create. Recording an entry with an existing label automatically updates it.',
-                                    items: {
-                                        type: 'object',
-                                        properties: {
-                                            label: { type: 'string', description: 'Entity name only. NO tag prefix (e.g. "Iron Syndicate", NOT "FAC: Iron Syndicate").' },
-                                            keys:  { type: 'array', items: { type: 'string' }, description: 'Search keywords. Include the entity name/title itself (without timestamps like "[Day 1]") as a keyword, plus any ancestor location names.' },
-                                            content:  { type: 'string', description: 'Full description.' },
-                                            category: { type: 'string', enum: categoryEnum, description: 'Determines which lorebook the entry goes into.' }
-                                        },
-                                        required: ['label', 'keys', 'content', 'category']
-                                    }
-                                },
-                                update: {
-                                    type: 'array',
-                                    description: 'Append new information to existing entries.',
-                                    items: {
-                                        type: 'object',
-                                        properties: {
-                                            id:      { type: 'string', description: 'Book::UID format (e.g. "Eldoria_NPCs::0").' },
-                                            content: { type: 'string', description: 'New information to append.' }
-                                        },
-                                        required: ['id', 'content']
-                                    }
-                                },
-                                activate:   { type: 'array', items: { type: 'string' }, description: 'Book::UID IDs to move into active context.' },
-                                deactivate: { type: 'array', items: { type: 'string' }, description: 'Book::UID IDs to remove from active context.' },
-                                delete_ids: { type: 'array', items: { type: 'string' }, description: 'Book::UID IDs to permanently delete.' },
-                                rewrite: {
-                                    type: 'array',
-                                    description: 'Replace the entire content of existing entries. Use for compressing bloated entries.',
-                                    items: {
-                                        type: 'object',
-                                        properties: {
-                                            id:      { type: 'string', description: 'Book::UID of the entry to rewrite.' },
-                                            content: { type: 'string', description: 'New canonical content. Replaces everything.' }
-                                        },
-                                        required: ['id', 'content']
-                                    }
-                                },
-                                consolidate: {
-                                    type: 'array',
-                                    description: 'Merge multiple entries into one. All targets are deleted; the survivor gets the new content. Use rename in the same commit to give the survivor a canonical label/keys after merging.',
-                                    items: {
-                                        type: 'object',
-                                        properties: {
-                                            targets:  {
-                                                type: 'array',
-                                                items: { type: 'string' },
-                                                description: 'One or more Book::UID IDs to delete after merging.'
-                                            },
-                                            survivor: { type: 'string', description: 'Book::UID of the entry to keep, with merged content.' },
-                                            content:  { type: 'string', description: 'Full merged canonical content for the survivor.' }
-                                        },
-                                        required: ['targets', 'survivor', 'content']
-                                    }
-                                },
-                                rename: {
-                                    type: 'array',
-                                    description: 'Change the display label and/or keyword list of an existing entry without modifying its content. Use when an entity is revealed, renamed, or destroyed, or to give a consolidation survivor a canonical label. Max 6 keywords per entry — choose only the most essential trigger words.',
-                                    items: {
-                                        type: 'object',
-                                        properties: {
-                                            id:    { type: 'string', description: 'Book::UID of the entry to rename/rekey.' },
-                                            label: { type: 'string', description: 'New display label. Omit to keep the current label.' },
-                                            keys:  { type: 'array', items: { type: 'string' }, description: 'Full replacement keyword list (max 6). Replaces existing keywords entirely. Omit to keep current keywords.' }
-                                        },
-                                        required: ['id']
-                                    }
-                                },
-                                rel: {
-                                    type: 'array',
-                                    description: 'Apply relationship delta(s) to NPC(s). Base relationship changes on the NPC\'s personality, values, and temperament as described in their entry, inferring what they would realistically appreciate or resent. Do NOT include the current total — output only the signed integer delta.',
-                                    items: {
-                                        type: 'object',
-                                        properties: {
-                                            id:    { type: 'string', description: 'Book::UID of the NPC entry.' },
-                                            field: { type: 'string', enum: ['friendship', 'affection'], description: 'Which relationship axis to update.' },
-                                            delta: { type: 'integer', description: 'Signed integer delta (e.g. 15 or -20). Range: -100 to 100.' }
-                                        },
-                                        required: ['id', 'field', 'delta']
-                                    }
-                                },
-                                appearance: {
-                                    type: 'array',
-                                    description: 'Surgically update the Appearance field inside an NPC\'s [CORE] block. Only use when the NPC\'s physical appearance changes significantly.',
-                                    items: {
-                                        type: 'object',
-                                        properties: {
-                                            id:      { type: 'string', description: 'Book::UID of the NPC entry.' },
-                                            content: { type: 'string', description: 'New appearance text. Replaces only the Appearance field inside [CORE].' }
-                                        },
-                                        required: ['id', 'content']
-                                    }
-                                }
-                            }
+                            properties: commitProperties
                         }
                     }
                 }
@@ -1057,6 +1072,14 @@ Include the entity name/title itself (without timestamps like "[Day 1]") as a ke
 ## FIELD INSTRUCTIONS
 ${Object.values(settings.routerModules || {}).filter(m => m.enabled).map(m => `- ${m.tag}: ${m.instruction}`).join('\n')}${(settings.routerCustomTags || []).length ? '\n\n### CUSTOM CATEGORIES\n' + (settings.routerCustomTags || []).map(m => `- ${m.tag.toUpperCase()}: ${m.instruction}`).join('\n') : ''}`;
 
+            const commitActionSchema = settings.npcRelationshipBars
+                ? `commit({"record": [...], "update": [...], "rename": [...], "activate": [...], "deactivate": [...], "delete_ids": [...], "rel": [...], "appearance": [...]}) ? write all changes and finish`
+                : `commit({"record": [...], "update": [...], "rename": [...], "activate": [...], "deactivate": [...], "delete_ids": [...], "appearance": [...]}) ? write all changes and finish`;
+
+            const commitRelDescription = settings.npcRelationshipBars
+                ? `\ncommit rel items: {"id": "Book::UID or NPC Name", "field": "friendship"|"affection", "delta": ±N} — updates relationships based on narrative/inline annotations (signed integer delta)`
+                : ``;
+
             const agentSystemPrompt = usesNativeTools
                 // Clean prompt for native tool calling ? model gets schemas via the API
                 ? `${basePrompt}
@@ -1082,12 +1105,11 @@ Available actions:
 - grep_lore({"query": "..."}) ? search lorebooks for entries matching a keyword
 - inspect_book({"book_name": "..."}) ? list UIDs in a lorebook
 - read_entry({"uid": "Book::0"}) ? read full content of an entry
-- commit({"record": [...], "update": [...], "rename": [...], "activate": [...], "deactivate": [...], "delete_ids": [...], "rel": [...], "appearance": [...]}) ? write all changes and finish
+- commit({${settings.npcRelationshipBars ? '"record": [...], "update": [...], "rename": [...], "activate": [...], "deactivate": [...], "delete_ids": [...], "rel": [...], "appearance": [...]' : '"record": [...], "update": [...], "rename": [...], "activate": [...], "deactivate": [...], "delete_ids": [...], "appearance": [...]'}}) ? write all changes and finish
 
 commit record items: {"label": "Name only (NO tag prefix)", "keys": ["kw1","kw2"], "content": "...", "category": "NPC|LOC|FAC|QUEST|EVENT"}
 commit update items: {"id": "Book::UID", "content": "new text to append"}
-commit rename items: {"id": "Book::UID", "label": "New Name (optional)", "keys": ["kw1","kw2"] (optional, max 6)}
-commit rel items: {"id": "Book::UID", "field": "friendship"|"affection", "delta": ±N} — output only the delta, not the total
+commit rename items: {"id": "Book::UID", "label": "New Name (optional)", "keys": ["kw1","kw2"] (optional, max 6)}${commitRelDescription}
 commit appearance items: {"id": "Book::UID", "content": "new appearance text"} — surgically updates the Appearance field inside [CORE]}
 
 ## EXAMPLE
@@ -1440,6 +1462,7 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
     }
 
     // 3. Record new (with Deduplication)
+    const newlyCreatedMap = {};
     // Group entries by target book and commit once per book to avoid UID collisions
     const records = action.record || [];
     const prefix = getLivePrefix();
@@ -1593,6 +1616,7 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
                     if (!newActive.includes(fullId)) newActive.push(fullId);
                 }
                 recordedIds.push(`${fullId} (updated)`);
+                newlyCreatedMap[rec.label.toLowerCase().trim()] = fullId;
             } else {
                 // Append new entry with the next sequential UID
                 const uids = Object.keys(bookData.entries).map(Number).filter(n => !isNaN(n));
@@ -1620,6 +1644,7 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
                     if (!newActive.includes(fullId)) newActive.push(fullId);
                 }
                 recordedIds.push(fullId);
+                newlyCreatedMap[rec.label.toLowerCase().trim()] = fullId;
             }
             changed = true;
         }
@@ -1727,16 +1752,65 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
             errors.push(`Unknown relationship field "${field}" for ${id}`);
             continue;
         }
+
+        let resolvedId = id;
+        if (!resolvedId.includes('::')) {
+            const cleanId = resolvedId.toLowerCase().trim();
+            if (newlyCreatedMap[cleanId]) {
+                resolvedId = newlyCreatedMap[cleanId];
+            } else {
+                const prefix = getLivePrefix();
+                const npcBookName = prefix ? `${prefix}_NPCs` : 'NPCs';
+                let npcBook = null;
+                try {
+                    npcBook = await ctx.loadWorldInfo(npcBookName);
+                } catch (_) {}
+                
+                let foundUid = null;
+                if (npcBook && npcBook.entries) {
+                    for (const [uid, entry] of Object.entries(npcBook.entries)) {
+                        const label = (entry.comment || '').replace(/^\[.*?\]\s*/i, '').toLowerCase().trim();
+                        if (label === cleanId) {
+                            foundUid = uid;
+                            break;
+                        }
+                    }
+                }
+                if (foundUid !== null) {
+                    resolvedId = `${npcBookName}::${foundUid}`;
+                } else {
+                    let fallbackFound = null;
+                    for (const [bookName, bookData] of Object.entries(allBooks)) {
+                        if (!bookData || !bookData.entries) continue;
+                        for (const [uid, entry] of Object.entries(bookData.entries)) {
+                            const label = (entry.comment || '').replace(/^\[.*?\]\s*/i, '').toLowerCase().trim();
+                            if (label === cleanId) {
+                                fallbackFound = `${bookName}::${uid}`;
+                                break;
+                            }
+                        }
+                        if (fallbackFound) break;
+                    }
+                    if (fallbackFound) {
+                        resolvedId = fallbackFound;
+                    } else {
+                        errors.push(`Could not resolve NPC name "${id}" to a Book::UID`);
+                        continue;
+                    }
+                }
+            }
+        }
+
         if (!settings.npcRelationshipValues) settings.npcRelationshipValues = {};
-        if (!settings.npcRelationshipValues[id]) settings.npcRelationshipValues[id] = { friendship: 0, affection: 0 };
-        const current = settings.npcRelationshipValues[id][f] ?? 0;
+        if (!settings.npcRelationshipValues[resolvedId]) settings.npcRelationshipValues[resolvedId] = { friendship: 0, affection: 0 };
+        const current = settings.npcRelationshipValues[resolvedId][f] ?? 0;
         const newValue = Math.max(-100, Math.min(100, current + delta));
-        settings.npcRelationshipValues[id][f] = newValue;
+        settings.npcRelationshipValues[resolvedId][f] = newValue;
         // Append to relationship change log (capped at 50 entries per NPC)
         if (!settings.npcRelationshipLog) settings.npcRelationshipLog = {};
-        if (!settings.npcRelationshipLog[id]) settings.npcRelationshipLog[id] = [];
-        settings.npcRelationshipLog[id].unshift({ timestamp: Date.now(), field: f, delta, newValue, source: 'agent' });
-        if (settings.npcRelationshipLog[id].length > 50) settings.npcRelationshipLog[id].length = 50;
+        if (!settings.npcRelationshipLog[resolvedId]) settings.npcRelationshipLog[resolvedId] = [];
+        settings.npcRelationshipLog[resolvedId].unshift({ timestamp: Date.now(), field: f, delta, newValue, source: 'agent' });
+        if (settings.npcRelationshipLog[resolvedId].length > 50) settings.npcRelationshipLog[resolvedId].length = 50;
         changed = true;
     }
 

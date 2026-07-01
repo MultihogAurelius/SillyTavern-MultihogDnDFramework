@@ -41,6 +41,24 @@ If the NPC's physical appearance changes significantly (major injury, permanent 
   [[UPDATE_APPEARANCE: Book::UID | New appearance text]]
 This surgically replaces only the Appearance/Species field inside [CORE]. Do NOT write appearance changes as event/update entries.`;
 
+    let enableRelBars = false;
+    try {
+        const settings = getSettings();
+        enableRelBars = !!settings.npcRelationshipBars;
+    } catch (_) {}
+
+    if (enableRelBars) {
+        instruction += `\n\n## NPC RELATIONSHIPS
+Scan the recent narrative chat history for visible inline annotations of the form \`*(Friendship: NPCName +X — reason)*\` or \`*(Affection: NPCName -Y — reason)*\` emitted by the GM/Narrator. When you see these, parse them and emit a relationship delta update using the \`[[REL:\` command (or \`rel\` parameter in commit). Do NOT include the current total — output only the signed integer delta (e.g., +2 or -15).
+When a new NPC is registered, you MUST infer an appropriate starting relationship delta from the narrative context in the same pass. For example:
+- Long-time friends, regular companions, mentors, or close partners: set a strong starting friendship (e.g., +30 to +60).
+- Casual friends, helpful acquaintances, or positive encounters: set a minor starting friendship (e.g., +10 to +25).
+- Romantically interested or close loved ones: set starting affection and/or friendship (e.g., +20 to +50).
+- Minor foes, hostile rivals, or unfriendly targets: set a minor negative starting friendship (e.g., -5 to -15).
+- Direct enemies, antagonist figures, or deadly threats: set a strong negative starting friendship (e.g., -20 to -60).
+- Unknown/neutral: default to 0 (no delta).`;
+    }
+
     instruction += `\n\nBe concise and functional — every word should serve gameplay or characterization. Avoid adjective dumps and purple prose.`;
 
     if (!ignoreLimits) {

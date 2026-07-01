@@ -269,10 +269,6 @@ INLINE ANNOTATION (visible — place immediately after the triggering moment):
 *(Friendship: Marcus +10 — saved his life in the alley)*
 *(Affection: Elena +2 — she seemed touched by the compliment)*
 
-MACHINE TAGS (stripped before display — place ALL at the very end of the response, one per line):
-[REL: FirstName | field | delta]
-  FirstName = NPC's first name only | field = friendship or affection | delta = signed integer
-
 FRIENDSHIP scale (guides, not hard rules):
 +1/+2 ... Casual warmth, shared laugh, pleasant campfire talk, small kindness
 +2/+5 ... Compliment, meaningful help, bonding over shared memories or interests
@@ -303,8 +299,6 @@ Typical range: 1-5 for minor moments, 5-15 for major events. Only use 15+ for li
 
 EXAMPLE — end of a response where {{user}} complimented Elena:
 *(Affection: Elena +2 — she seemed genuinely moved by the words)*
-
-[REL: Elena | affection | +2]
 </relationship_tracking>
 
 <state_memo>

@@ -1,7 +1,7 @@
 import { EXAMPLES, COLOR_EXAMPLES, DEFAULT_STOCK_PROMPTS, RT_PROMPTS, BLOCK_ICONS, BLOCK_ORDER, PAGE_SIZE, NO_PAGINATE, QUESTS_NARRATOR_MODERN, QUESTS_NARRATOR_LEGACY } from './constants.js';
 import { MODULE_NAME, DEFAULT_MODULES, getSettings, getBarBackground, migrateCustomFields, saveChatState, saveProfile, deleteProfile, getEffectiveRouterCampaignPrefix, sanitizeCampaignPrefixString, buildNpcInstruction } from './state-manager.js';
 import { sendStateRequest, fetchOllamaModels, fetchOpenAIModels, testOpenAIConnection, getConnectionProfiles, getCurrentCompletionPreset, setCompletionPreset } from './llm-client.js';
-import { getDiceToolName, getDiceCommandName, getDiceCommandAliases, doDiceRoll, registerDiceFunctionTool, registerDiceSlashCommand, installInterceptor, getNarrativeBlocks, onGenerationStarted, onGenerationEnded, processRelationshipTags, ensureRelTagRegex, resetRouterTick, makeRngQueue, buildRngBlock, RNG_QUEUE_LEN } from './narrative-hooks.js';
+import { getDiceToolName, getDiceCommandName, getDiceCommandAliases, doDiceRoll, registerDiceFunctionTool, registerDiceSlashCommand, installInterceptor, getNarrativeBlocks, onGenerationStarted, onGenerationEnded, ensureRelTagRegex, resetRouterTick, makeRngQueue, buildRngBlock, RNG_QUEUE_LEN } from './narrative-hooks.js';
 import { deduplicateMemo, mergeMemo, computeDelta, escapeHtml, escapeRegex, highlightParens, cleanToolCallMessage, cleanMessageContent, getLastUserAction, buildLorebookContext, buildModulesInstructionText, buildModuleFormatInstruction, parseQuestsFromMemo, syncQuestsFromMemo, syncQuestsToMemo, writeQuestsToMemo, getQuestMood, extractCurrentTimeStr, stripCompletedQuestsFromMemo, parseInWorldTime } from './memo-processor.js';
 import { renderSubFieldByRule, tryRenderMarker, renderCustomBlockLine, stripMemoHtml, escapeHtmlWithColor, parseMemoBlocks, getPageSize, loadCollapsed, saveCollapsed, loadDetached, saveDetached, blockToItems, renderMemoAsCards, renderQuestLog, renderLorebookTerminal } from './renderer.js';
 import { registerLogQuestTool, checkQuestDeadlines, renderQuestsAsPlainText } from './quests.js';
@@ -2870,6 +2870,14 @@ Saves: Fort +X | Ref +X | Will +X`;
             if (cb) cb.checked = !!fresh.syspromptModules?.[key];
         }
 
+        // Relationship system sync
+        const relBarsCb = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_tracker_npc_rel_bars'));
+        if (relBarsCb) relBarsCb.checked = !!fresh.npcRelationshipBars;
+        const syspromptRelBarsCb = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_sysprompt_mod_npc_rel_bars'));
+        if (syspromptRelBarsCb) syspromptRelBarsCb.checked = !!fresh.npcRelationshipBars;
+        const onboardingRelBarsCb = /** @type {HTMLInputElement|null} */ (el.querySelector('#rt_onboarding_mod_npc_rel_bars'));
+        if (onboardingRelBarsCb) onboardingRelBarsCb.checked = !!fresh.npcRelationshipBars;
+
         // Custom Sysprompt
         const customSyspromptEl = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_tracker_custom_sysprompt'));
         if (customSyspromptEl) customSyspromptEl.checked = !!fresh.customSysprompt;
@@ -2891,6 +2899,7 @@ Saves: Fort +X | Ref +X | Will +X`;
         refreshOrderList();
         saveSettings();
         scheduleAutoApply();
+        refreshRenderedView();
     };
 
     // RNG Mode Sync
@@ -3016,6 +3025,28 @@ Saves: Fort +X | Ref +X | Will +X`;
     syncOptionalMod('#rt_onboarding_mod_loot', 'loot');
     syncOptionalMod('#rt_onboarding_mod_random_events', 'random_events');
     syncOptionalMod('#rt_onboarding_mod_resting', 'resting');
+
+    // Onboarding Relationship System Sync
+    const onboardingRelBarsCb = el.querySelector('#rt_onboarding_mod_npc_rel_bars');
+    if (onboardingRelBarsCb) {
+        onboardingRelBarsCb.checked = !!s.npcRelationshipBars;
+        onboardingRelBarsCb.addEventListener('change', () => {
+            syncSettingsAndUI(settings => {
+                settings.npcRelationshipBars = !!onboardingRelBarsCb.checked;
+                if (settings.routerModules?.npc) {
+                    settings.routerModules.npc.instruction = buildNpcInstruction(settings.npcMajorWords, settings.npcMinorWords, settings.ignoreNpcImportLimits);
+                }
+            });
+            setTimeout(() => {
+                if (typeof globalThis._rpgRenderAgentModules === 'function') {
+                    globalThis._rpgRenderAgentModules();
+                }
+                if (typeof refreshAgentManifest === 'function') {
+                    void refreshAgentManifest().catch(() => {});
+                }
+            }, 1);
+        });
+    }
 
     // Custom Sysprompt toggle (onboarding)
     const onboardingCustomSyspromptCb = el.querySelector('#rt_onboarding_custom_sysprompt');
@@ -3226,8 +3257,8 @@ function refreshRenderedView() {
     if (el) {
         let html = renderMemoAsCards(memo, null, _sectionPages);
 
-        // Append quest log section if module is enabled (always render, even when empty)
-        if (s.modules?.quests) {
+        // Append quest log section if module is enabled and we are not on the onboarding screen
+        if (s.syspromptModules?.quests !== false && memo && memo.trim()) {
             const snapshotQuests = parseQuestsFromMemo(memo);
             html += renderQuestLog(snapshotQuests, currentTime, collapsed, detached);
         }
@@ -4805,15 +4836,14 @@ function createPanel() {
             list.innerHTML = '<div style="text-align: center; opacity: 0.5; font-size: 0.769em; padding: 10px;">Loading...</div>';
 
             try {
-                const manifest = await getLorebookManifest();
-                if (!manifest.length) {
-                    const hasPrefix = !!(getSettings().routerCampaignPrefix || '').trim();
-                    list.innerHTML = `<div style="text-align: center; opacity: 0.5; font-size: 0.769em; padding: 10px;">${hasPrefix ? 'No records found.' : 'Set a Campaign Prefix to see records.'}</div>`;
+                const s = getSettings();
+                const prefix = (s.routerCampaignPrefix || '').trim();
+                if (!prefix) {
+                    list.innerHTML = '<div style="text-align: center; opacity: 0.5; font-size: 0.769em; padding: 10px;">Set a Campaign Prefix to see records.</div>';
                     return;
                 }
 
-                const s = getSettings();
-                const prefix = s.routerCampaignPrefix || '';
+                const manifest = await getLorebookManifest();
 
                 // Group entries by lorebook
                 /** @type {Map<string, typeof manifest>} */
@@ -4822,6 +4852,12 @@ function createPanel() {
                     if (item.book.endsWith('_Skeleton')) continue;
                     if (!byBook.has(item.book)) byBook.set(item.book, []);
                     byBook.get(item.book).push(item);
+                }
+
+                // Ensure NPC book is always represented so the user can add NPCs
+                const npcBookName = `${prefix}_NPCs`;
+                if (!byBook.has(npcBookName)) {
+                    byBook.set(npcBookName, []);
                 }
 
                 list.innerHTML = '';
@@ -4895,7 +4931,7 @@ function createPanel() {
                                     </div>
 
                                     <div style="margin-bottom:6px;display:flex;align-items:center;gap:10px;">
-                                        <label style="font-size:12px;color:rgba(255,255,255,0.7);flex:1;">Relationship Bars</label>
+                                        <label style="font-size:12px;color:rgba(255,255,255,0.7);flex:1;">Relationship System (BETA)</label>
                                         <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
                                             <input type="checkbox" id="rt-npc-rel-bars" ${curS.npcRelationshipBars ? 'checked' : ''}
                                                 style="width:16px;height:16px;accent-color:#d4a940;cursor:pointer;">
@@ -4953,7 +4989,6 @@ function createPanel() {
                                         ignoreEl.addEventListener('change', () => {
                                             newIgnoreLimits = ignoreEl.checked;
                                             if (ignoreEl.nextElementSibling) ignoreEl.nextElementSibling.textContent = newIgnoreLimits ? 'Enabled' : 'Disabled';
-
                                         });
                                     }
                                 }, 0);
@@ -4963,7 +4998,6 @@ function createPanel() {
                                 });
 
                                 if (result) {
-                                    // Clamp final values — min 1 word, max 1000 words
                                     const finalMajor = Math.max(1, Math.min(1000, newMajor));
                                     const finalMinor = Math.max(1, Math.min(1000, newMinor));
 
@@ -4977,6 +5011,9 @@ function createPanel() {
                                     $('#rpg_tracker_npc_major_words').val(finalMajor);
                                     $('#rpg_tracker_npc_minor_words').val(finalMinor);
                                     $('#rpg_tracker_npc_rel_bars').prop('checked', newRel);
+                                    $('#rpg_sysprompt_mod_npc_rel_bars').prop('checked', newRel);
+                                    const onbRel = document.getElementById('rt_onboarding_mod_npc_rel_bars');
+                                    if (onbRel) onbRel.checked = newRel;
                                     $('#rpg_tracker_ignore_npc_limits').prop('checked', newIgnoreLimits);
 
                                     // Rebuild the NPC instruction from settings
@@ -4984,7 +5021,6 @@ function createPanel() {
                                         updS.routerModules.npc.instruction = buildNpcInstruction(finalMajor, finalMinor, newIgnoreLimits);
                                     }
 
-                                    // Use the framework's saveSettings() for consistent persistence
                                     saveSettings();
                                     toastr['success']('NPC settings saved.', 'NPC Settings');
                                     if (typeof globalThis._rpgRenderAgentModules === 'function') {
@@ -5249,7 +5285,10 @@ function createPanel() {
                                         + '</tr>';
                                 }
                                 relLogHtml = '<div class="rt-npc-log-container" style="border-top:2px solid rgba(212,169,64,0.15);padding-top:18px;margin-top:18px;' + (logEntries.length === 0 ? 'display:none;' : '') + '">'
-                                    + '<div style="font-size:11px;font-weight:bold;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:12px;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:4px;">📊 Relationship History</div>'
+                                    + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:4px;">'
+                                    + '<span style="font-size:11px;font-weight:bold;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:1.5px;">📊 Relationship History</span>'
+                                    + '<button class="rt-npc-log-clear-btn" style="background:transparent;border:none;color:#ff5555;cursor:pointer;font-size:10px;opacity:0.6;padding:0;" title="Clear relationship history">🗑️ Clear Log</button>'
+                                    + '</div>'
                                     + '<table class="rt-npc-log-table" style="width:100%;border-collapse:collapse;">' + rows + '</table>'
                                     + '</div>';
                             }
@@ -5307,6 +5346,27 @@ function createPanel() {
                                 viewPane.style.display = 'block';
                             });
 
+                            const clearLogBtn = popupDom.querySelector('.rt-npc-log-clear-btn');
+                            if (clearLogBtn) {
+                                clearLogBtn.addEventListener('click', () => {
+                                    if (confirm('Clear relationship history log for this NPC? (This cannot be undone)')) {
+                                        const cleanS = getSettings();
+                                        if (cleanS.npcRelationshipLog) {
+                                            delete cleanS.npcRelationshipLog[item.id];
+                                            saveSettings();
+                                        }
+                                        const logContainer = popupDom.querySelector('.rt-npc-log-container');
+                                        if (logContainer) logContainer.style.display = 'none';
+                                        
+                                        // Also clear the badges in the background card UI!
+                                        const cardEl = document.querySelector(`.rt-npc-card[data-entry-id="${item.id}"]`);
+                                        if (cardEl) {
+                                            cardEl.querySelectorAll('.rt-npc-bar-value span').forEach(badge => badge.remove());
+                                        }
+                                    }
+                                });
+                            }
+
                             const bindSlider = (type) => {
                                 const slider = popupDom.querySelector(`#rt-npc-detail-${type}-slider`);
                                 const fill = popupDom.querySelector(`#rt-npc-detail-${type}-fill`);
@@ -5336,20 +5396,6 @@ function createPanel() {
                                     const val = parseInt(slider.value, 10) || 0;
                                     if (val === originalValue) return;
                                     
-                                    // Log the change
-                                    if (!s.npcRelationshipLog) s.npcRelationshipLog = {};
-                                    if (!s.npcRelationshipLog[item.id]) s.npcRelationshipLog[item.id] = [];
-                                    s.npcRelationshipLog[item.id].unshift({
-                                        timestamp: Date.now(),
-                                        field: type,
-                                        delta: val - originalValue,
-                                        newValue: val,
-                                        source: 'manual'
-                                    });
-                                    if (s.npcRelationshipLog[item.id].length > 20) {
-                                        s.npcRelationshipLog[item.id] = s.npcRelationshipLog[item.id].slice(0, 20);
-                                    }
-                                    
                                     // Update the setting
                                     if (!s.npcRelationshipValues) s.npcRelationshipValues = {};
                                     if (!s.npcRelationshipValues[item.id]) s.npcRelationshipValues[item.id] = { friendship: 0, affection: 0 };
@@ -5358,52 +5404,38 @@ function createPanel() {
                                     
                                     originalValue = val;
                                     
-                                    // Re-render the log table
-                                    const logContainer = popupDom.querySelector('.rt-npc-log-container');
-                                    const logTable = popupDom.querySelector('.rt-npc-log-table');
-                                    if (logContainer && logTable) {
-                                        logContainer.style.display = 'block';
-                                        let rows = '';
-                                        for (const e of s.npcRelationshipLog[item.id]) {
-                                            const date = new Date(e.timestamp);
-                                            const timeStr = date.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})
-                                                + ', ' + date.toLocaleDateString([], {month: 'short', day: 'numeric'});
-                                            const sign = e.delta > 0 ? '+' : '';
-                                            const deltaColor = e.delta > 0 ? '#4ade80' : '#ef4444';
-                                            const srcIcon = e.source === 'manual' ? '✋' : '🤖';
-                                            const fieldLabel = e.field === 'friendship' ? '🤝' : '💗';
-                                            rows += '<tr>'
-                                                + '<td style="font-size:10px;color:var(--SmartThemeBodyColor,inherit);opacity:0.5;padding:3px 8px 3px 0;white-space:nowrap;">' + timeStr + '</td>'
-                                                + '<td style="font-size:12px;padding:3px 8px;">' + fieldLabel + '</td>'
-                                                + '<td style="font-size:13px;font-weight:bold;color:' + deltaColor + ';font-family:monospace;padding:3px 8px;">' + sign + e.delta + '</td>'
-                                                + '<td style="font-size:11px;color:var(--SmartThemeBodyColor,inherit);opacity:0.45;padding:3px 0;">' + srcIcon + ' \u2192 ' + (e.newValue >= 0 ? '+' : '') + e.newValue + '</td>'
-                                                + '</tr>';
-                                        }
-                                        logTable.innerHTML = rows;
-                                    }
-                                    
                                     // Dynamically re-render the NPC card in the background UI
                                     const cardEl = document.querySelector(`.rt-npc-card[data-entry-id="${item.id}"]`);
                                     if (cardEl) {
-                                        const typeCap = type.charAt(0).toUpperCase() + type.slice(1);
                                         const bgIsPos = val >= 0;
                                         const bgBarColor = bgIsPos 
                                             ? (type === 'friendship' ? '#4ade80' : '#f472b6')
                                             : (type === 'friendship' ? '#ef4444' : '#a855f7');
                                         
-                                        const barFill = cardEl.querySelector(`.rt-npc-bar-${type} .rt-npc-bar-fill`);
+                                        const barFill = cardEl.querySelector(`.rt-npc-bar-fill.${type}-pos, .rt-npc-bar-fill.${type}-neg`);
                                         if (barFill) {
                                             barFill.style.width = (Math.abs(val) / 2) + '%';
                                             barFill.style.left = bgIsPos ? '50%' : 'auto';
                                             barFill.style.right = bgIsPos ? 'auto' : '50%';
                                             barFill.style.background = bgBarColor;
-                                        }
-                                        const valText = cardEl.querySelector(`.rt-npc-bar-val[title="${typeCap}"]`);
-                                        if (valText) {
-                                            valText.textContent = (val > 0 ? '+' : '') + val;
-                                            valText.style.color = val === 0 ? 'var(--SmartThemeBodyColor, inherit)' : bgBarColor;
-                                            if (val === 0) valText.style.opacity = '0.5';
-                                            else valText.style.opacity = '1';
+                                            barFill.className = `rt-npc-bar-fill ${type}-${bgIsPos ? 'pos positive' : 'neg negative'}`;
+
+                                            const rowEl = barFill.closest('.rt-npc-bar-row');
+                                            if (rowEl) {
+                                                const valText = rowEl.querySelector('.rt-npc-bar-value');
+                                                if (valText) {
+                                                    if (valText.firstChild && valText.firstChild.nodeType === Node.TEXT_NODE) {
+                                                        valText.firstChild.nodeValue = `${val > 0 ? '+' : ''}${val}`;
+                                                    } else {
+                                                        valText.innerHTML = `${val > 0 ? '+' : ''}${val}`;
+                                                    }
+                                                    
+                                                    const valClass = type === 'friendship'
+                                                        ? (val > 0 ? 'val-positive' : val < 0 ? 'val-negative' : 'val-zero')
+                                                        : (val > 0 ? 'val-affection-positive' : val < 0 ? 'val-affection-negative' : 'val-zero');
+                                                    valText.className = `rt-npc-bar-value ${valClass}`;
+                                                }
+                                            }
                                         }
                                     }
                                 });
@@ -5533,7 +5565,7 @@ function createPanel() {
                             const viewBtn = card.querySelector('.rt-npc-view');
                             if (viewBtn) viewBtn.addEventListener('click', (e) => {
                                 e.stopPropagation();
-                                openNpcDetailPopup(item, rel);
+                                openNpcDetailPopup(item, parseRelationship(item.id));
                             });
 
                             const editBtn = card.querySelector('.rt-npc-edit');
@@ -9468,6 +9500,7 @@ function buildSysprompt(rawText) {
                         $('#rpg_tracker_npc_major_words').val(sTempTracker.npcMajorWords ?? 25);
                         $('#rpg_tracker_npc_minor_words').val(sTempTracker.npcMinorWords ?? 15);
                         $('#rpg_tracker_npc_rel_bars').prop('checked', !!sTempTracker.npcRelationshipBars);
+                        $('#rpg_sysprompt_mod_npc_rel_bars').prop('checked', !!sTempTracker.npcRelationshipBars);
                         $('#rpg_tracker_npc_card_import').prop('checked', !!sTempTracker.experimentalNpcImport);
                         $('#rpg_tracker_ignore_npc_limits').prop('checked', !!sTempTracker.ignoreNpcImportLimits);
                         if (typeof refreshOrderList === 'function') refreshOrderList();
@@ -9659,6 +9692,7 @@ function buildSysprompt(rawText) {
                                     $('#rpg_tracker_npc_major_words').val(sTempTracker.npcMajorWords ?? 25);
                                     $('#rpg_tracker_npc_minor_words').val(sTempTracker.npcMinorWords ?? 15);
                                     $('#rpg_tracker_npc_rel_bars').prop('checked', !!sTempTracker.npcRelationshipBars);
+                                    $('#rpg_sysprompt_mod_npc_rel_bars').prop('checked', !!sTempTracker.npcRelationshipBars);
                                     $('#rpg_tracker_npc_card_import').prop('checked', !!sTempTracker.experimentalNpcImport);
                                     $('#rpg_tracker_ignore_npc_limits').prop('checked', !!sTempTracker.ignoreNpcImportLimits);
                                     if (typeof refreshOrderList === 'function') refreshOrderList();
@@ -9948,7 +9982,6 @@ function buildSysprompt(rawText) {
         eventSource.on(event_types.GENERATION_STARTED, onGenerationStarted);
         eventSource.on(event_types.GENERATION_ENDED, onGenerationEnded);
         eventSource.on(event_types.GENERATION_STOPPED, onGenerationEnded);
-        eventSource.on(event_types.MESSAGE_UPDATED, processRelationshipTags);
 
         // Auto-register the visual [REL:] tag hiding regex script
         ensureRelTagRegex();
@@ -10733,6 +10766,7 @@ function buildSysprompt(rawText) {
             
             let existingFieldsContext = "";
             BLOCK_ORDER.forEach(tag => {
+                if (tag === 'QUESTS' && settings.syspromptModules?.quests === false) return;
                 if (!settings.modules || settings.modules[tag] !== false) {
                     const modLower = tag.toLowerCase();
                     const promptContent = (settings.stockPrompts && settings.stockPrompts[modLower]) 
@@ -11733,6 +11767,7 @@ RULES:
 
                 saveSettings();
                 scheduleAutoApply();
+                refreshRenderedView();
             });
 
             if (key === 'quests') {
@@ -11768,6 +11803,7 @@ RULES:
                 }
                 saveSettings();
                 scheduleAutoApply();
+                refreshRenderedView();
             });
         }
 
@@ -11787,6 +11823,7 @@ RULES:
                 }
                 saveSettings();
                 scheduleAutoApply();
+                refreshRenderedView();
             });
         }
 
@@ -11806,6 +11843,7 @@ RULES:
                 }
                 saveSettings();
                 scheduleAutoApply();
+                refreshRenderedView();
             });
         }
 
@@ -12283,10 +12321,36 @@ RULES:
                 globalThis._rpgRenderAgentModules();
             }
         });
-        $('#rpg_tracker_npc_rel_bars').prop('checked', !!settings.npcRelationshipBars).on('change', function () {
-            settings.npcRelationshipBars = $(this).prop('checked');
+        const handleRelBarsChange = (val) => {
+            settings.npcRelationshipBars = val;
+            $('#rpg_tracker_npc_rel_bars').prop('checked', val);
+            $('#rpg_sysprompt_mod_npc_rel_bars').prop('checked', val);
+
+            const onbRel = document.getElementById('rt_onboarding_mod_npc_rel_bars');
+            if (onbRel) onbRel.checked = val;
+
+            if (settings.routerModules?.npc) {
+                settings.routerModules.npc.instruction = buildNpcInstruction(settings.npcMajorWords, settings.npcMinorWords, settings.ignoreNpcImportLimits);
+            }
             saveSettings();
             scheduleAutoApply();
+            setTimeout(() => {
+                if (typeof globalThis._rpgRenderAgentModules === 'function') {
+                    globalThis._rpgRenderAgentModules();
+                }
+                if (typeof refreshAgentManifest === 'function') {
+                    void refreshAgentManifest().catch(() => {});
+                }
+                refreshRenderedView();
+            }, 1);
+        };
+
+        $('#rpg_tracker_npc_rel_bars').prop('checked', !!settings.npcRelationshipBars).on('change', function () {
+            handleRelBarsChange($(this).prop('checked'));
+        });
+
+        $('#rpg_sysprompt_mod_npc_rel_bars').prop('checked', !!settings.npcRelationshipBars).on('change', function () {
+            handleRelBarsChange($(this).prop('checked'));
         });
         // Note: experimentalNpcImport removed — NPC Creator button is always visible.
         $('#rpg_tracker_ignore_npc_limits').prop('checked', !!settings.ignoreNpcImportLimits).on('change', function () {

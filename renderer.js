@@ -1171,6 +1171,10 @@ function formatValueToCurrency(totalCp, detectedCurrency) {
                             <input type="checkbox" id="rt_onboarding_mod_resting" />
                             <span>💤 Time-Limited Resting and interruption rolls based on location danger</span>
                         </label>
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                            <input type="checkbox" id="rt_onboarding_mod_npc_rel_bars" />
+                            <span>💞 Relationship System (BETA)</span>
+                        </label>
                     </div>
 
                     <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin-top: 4px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.1);">

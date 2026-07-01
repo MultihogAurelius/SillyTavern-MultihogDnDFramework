@@ -982,6 +982,7 @@ export function buildModulesInstructionText(settings) {
         if (key === 'quests_legacy') continue;
         if (key === 'time_24h') continue;
 
+        if (key === 'quests' && settings.syspromptModules?.quests === false) continue;
         if (settings.modules[key]) {
             let p = prompt;
 

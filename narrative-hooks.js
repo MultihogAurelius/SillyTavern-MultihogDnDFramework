@@ -554,7 +554,7 @@ export function installInterceptor() {
             }
 
             // Quest deadline check — fires before state model pass, deterministically
-            if (settings.modules?.quests) {
+            if (settings.syspromptModules?.quests !== false) {
                 const memoQuests = parseQuestsFromMemo(settings.currentMemo);
                 if (memoQuests.length) {
                     const { checkQuestDeadlines, renderQuestsAsPlainText } = await import('./quests.js');
@@ -829,206 +829,7 @@ export function installInterceptor() {
 /**
  * Processes [REL: Name | field | delta] tags emitted by the narrator AI.
  */
-export async function processRelationshipTags(msgIndex) {
-    const settings = getSettings();
-    console.log('[RPG Tracker] processRelationshipTags called with msgIndex:', msgIndex);
 
-    const ctx = SillyTavern.getContext();
-    if (!ctx.chat || ctx.chat.length === 0) {
-        console.log('[RPG Tracker] Aborting: ctx.chat is empty');
-        return;
-    }
-    
-    // Resolve the target message.
-    let lastMsg;
-    if (typeof msgIndex === 'number' && msgIndex >= 0 && msgIndex < ctx.chat.length) {
-        lastMsg = ctx.chat[msgIndex];
-        console.log('[RPG Tracker] Using provided msgIndex:', msgIndex);
-    } else {
-        lastMsg = ctx.chat[ctx.chat.length - 1];
-        console.log('[RPG Tracker] Using chat.length - 1:', ctx.chat.length - 1);
-    }
-    
-    if (!lastMsg || !lastMsg.mes) {
-        console.log('[RPG Tracker] Aborting: lastMsg or lastMsg.mes is empty');
-        return;
-    }
-
-    let anyChanged = false;
-    const triggerUIUpdate = () => {
-        if (typeof ctx.saveChatDebounced === 'function') ctx.saveChatDebounced();
-        ctx.saveSettingsDebounced?.();
-        if (typeof globalThis._rpgRenderRouterUI === 'function') globalThis._rpgRenderRouterUI();
-        refreshRelationshipBarsDOM(settings);
-        document.dispatchEvent(new CustomEvent('rt_lore_agent_updated'));
-    };
-
-    // --- 1. SWIPE ROLLBACK & INITIALIZATION ---
-    lastMsg.extra = lastMsg.extra || {};
-    const swipeId = lastMsg.swipe_id ?? 0;
-
-    // Convert old array format to object-keyed-by-swipe format if needed
-    if (Array.isArray(lastMsg.extra.rpgProcessedTags)) {
-        lastMsg.extra.rpgProcessedTags = { [swipeId]: lastMsg.extra.rpgProcessedTags };
-    } else if (!lastMsg.extra.rpgProcessedTags) {
-        lastMsg.extra.rpgProcessedTags = {};
-    }
-    lastMsg.extra.rpgRollbackData = lastMsg.extra.rpgRollbackData || {};
-
-    // Detect swipe change and perform rollback
-    if (lastMsg.extra.rpgActiveSwipe !== undefined && lastMsg.extra.rpgActiveSwipe !== swipeId) {
-        const prevSwipeId = lastMsg.extra.rpgActiveSwipe;
-        console.log(`[RPG Tracker] Swipe changed from ${prevSwipeId} to ${swipeId}. Rolling back previous allocations.`);
-        
-        if (lastMsg.extra.rpgRollbackData[prevSwipeId]) {
-            for (const rb of lastMsg.extra.rpgRollbackData[prevSwipeId]) {
-                // Reverse the exact delta that was successfully applied
-                if (settings.npcRelationshipValues && settings.npcRelationshipValues[rb.npcId]) {
-                    const current = settings.npcRelationshipValues[rb.npcId][rb.field] ?? 0;
-                    settings.npcRelationshipValues[rb.npcId][rb.field] = Math.max(-100, Math.min(100, current - rb.actualAppliedDelta));
-                }
-                
-                // Remove the exact log entry
-                if (settings.npcRelationshipLog && Array.isArray(settings.npcRelationshipLog[rb.npcId])) {
-                    settings.npcRelationshipLog[rb.npcId] = settings.npcRelationshipLog[rb.npcId].filter(l => l.timestamp !== rb.logTimestamp);
-                }
-                console.log(`[RPG Tracker] Rolled back ${rb.field} delta (${rb.actualAppliedDelta}) for ${rb.npcId}`);
-            }
-            anyChanged = true;
-        }
-
-        // We are entering a new swipe. Clear its tracking data so it gets evaluated fresh.
-        lastMsg.extra.rpgProcessedTags[swipeId] = [];
-        lastMsg.extra.rpgRollbackData[swipeId] = [];
-    }
-
-    lastMsg.extra.rpgActiveSwipe = swipeId;
-    lastMsg.extra.rpgProcessedTags[swipeId] = lastMsg.extra.rpgProcessedTags[swipeId] || [];
-    lastMsg.extra.rpgRollbackData[swipeId] = lastMsg.extra.rpgRollbackData[swipeId] || [];
-
-    // --- 2. EARLY RETURNS (After Rollback) ---
-    if (!/\[REL:/i.test(lastMsg.mes)) {
-        console.log('[RPG Tracker] Aborting: lastMsg.mes does not contain [REL:');
-        if (anyChanged) triggerUIUpdate();
-        return;
-    }
-
-    console.log('[RPG Tracker] [REL:] tag found in message!', lastMsg.mes);
-
-    // 2. Extracts data using indestructible regex
-    const REL_RE = /\[REL:\s*([^|]+)\|\s*([^|]+)\|\s*([^\]]+)\]/gi;
-    const matches = [];
-    let match;
-    
-    while ((match = REL_RE.exec(lastMsg.mes)) !== null) {
-        const matchStr = match[0];
-        
-        // Skip if this exact tag string has already been processed for THIS specific swipe
-        if (lastMsg.extra.rpgProcessedTags[swipeId].includes(matchStr)) {
-            console.log('[RPG Tracker] Skipping tag, already processed for this swipe:', matchStr);
-            continue;
-        }
-
-        const cleanName = match[1].replace(/[\u200B\uFEFF]/g, '').trim();
-        const cleanField = match[2].replace(/[^a-z]/gi, '').toLowerCase();
-        const cleanDeltaStr = match[3].replace(/[^\d+-]/g, '');
-        const parsedDelta = parseInt(cleanDeltaStr, 10);
-
-        if ((cleanField === 'friendship' || cleanField === 'affection') && !isNaN(parsedDelta)) {
-            matches.push({ name: cleanName, field: cleanField, delta: parsedDelta, rawStr: matchStr });
-            console.log('[RPG Tracker] Parsed match:', { name: cleanName, field: cleanField, delta: parsedDelta });
-        } else {
-            console.log('[RPG Tracker] Failed to parse match:', matchStr, { cleanField, parsedDelta });
-        }
-    }
-
-    if (matches.length === 0) {
-        console.log('[RPG Tracker] Aborting: matches.length === 0 after parsing');
-        if (anyChanged) triggerUIUpdate();
-        return;
-    }
-
-    // Load active entries to resolve NPC IDs
-    const activeKeys = [...(settings.activeRouterKeys || []), ...(settings.activeWorldKeys || [])];
-    const bookCache = {};
-    const activeEntries = [];
-
-    for (const id of activeKeys) {
-        const [bookName, uid] = id.split('::');
-        if (!bookName || !uid) continue;
-        if (!bookCache[bookName]) {
-            try { bookCache[bookName] = await ctx.loadWorldInfo(bookName); } catch (_) { bookCache[bookName] = null; }
-        }
-        const entry = bookCache[bookName]?.entries?.[uid];
-        if (!entry) continue;
-
-        const displayName = (entry.comment || '').replace(/^\[.*?\]\s*/i, '').trim();
-        const keywords = Array.isArray(entry.key) ? entry.key.map(k => k.toLowerCase().trim()) : [];
-        activeEntries.push({ id, displayName, keywords, comment: (entry.comment || '').toLowerCase() });
-    }
-
-
-
-    for (const m of matches) {
-        if (m.delta === 0) continue;
-        const targetName = m.name.toLowerCase();
-        const resolved = activeEntries.find(e => 
-            e.displayName.toLowerCase() === targetName || 
-            e.keywords.some(k => k === targetName) || 
-            e.comment.includes(targetName)
-        );
-
-        if (!resolved) {
-            // @ts-ignore
-            toastr.warning(`Could not find active NPC matching "${m.name}"`, 'RPG Tracker');
-            continue;
-        }
-
-        try {
-            if (!settings.npcRelationshipValues) settings.npcRelationshipValues = {};
-            if (!settings.npcRelationshipValues[resolved.id]) settings.npcRelationshipValues[resolved.id] = { friendship: 0, affection: 0 };
-            
-            const prev = settings.npcRelationshipValues[resolved.id][m.field] ?? 0;
-            const newVal = Math.max(-100, Math.min(100, prev + m.delta));
-            const actualAppliedDelta = newVal - prev;
-            settings.npcRelationshipValues[resolved.id][m.field] = newVal;
-
-            if (!settings.npcRelationshipLog) settings.npcRelationshipLog = {};
-            // Strict array check to prevent crashes from corrupted legacy data
-            if (!Array.isArray(settings.npcRelationshipLog[resolved.id])) settings.npcRelationshipLog[resolved.id] = [];
-            
-            const logTimestamp = Date.now();
-            settings.npcRelationshipLog[resolved.id].unshift({ timestamp: logTimestamp, field: m.field, delta: m.delta, newValue: newVal, source: 'ai' });
-            
-            const sign = m.delta > 0 ? '+' : '';
-            const icon = m.field === 'friendship' ? '🤝' : '💗';
-            const label = m.field === 'friendship' ? 'Friendship' : 'Affection';
-            // @ts-ignore
-            toastr.info(`${icon} ${m.name}: ${sign}${m.delta} ${label}`, 'Relationship', { timeOut: 3500, positionClass: 'toast-bottom-right' });
-            console.log(`[RPG Tracker] Applied relationship delta: ${m.name} | ${m.field} | ${m.delta} (Actual: ${actualAppliedDelta})`);
-
-            // Save rollback data for future swipes
-            lastMsg.extra.rpgRollbackData[swipeId].push({
-                npcId: resolved.id,
-                field: m.field,
-                actualAppliedDelta: actualAppliedDelta,
-                logTimestamp: logTimestamp
-            });
-
-            // Mark this specific tag string as processed in the message metadata for THIS swipe
-            lastMsg.extra.rpgProcessedTags[swipeId].push(m.rawStr);
-            anyChanged = true;
-        } catch (e) {
-            console.error('[RPG Tracker] Error updating relationship for', m.name, e);
-            // @ts-ignore
-            toastr.error(`Error updating relationship for ${m.name}: ${e.message}`, 'RPG Tracker');
-        }
-    }
-
-    if (anyChanged) {
-        triggerUIUpdate();
-    }
-}
 
 /**
  * Lightweight bar-only DOM refresh. Finds every `.rt-npc-card[data-entry-id]` in the
@@ -1228,11 +1029,6 @@ export function resetRouterTick(clearKeywordPool = false) {
  */
 export async function onGenerationEnded() {
     const settings = getSettings();
-
-    // Step 0: Relationship tag processing — deferred one tick so ST has time
-    // to fully commit the AI message to ctx.chat before we try to read it.
-    // Without this, ctx.chat[length-1] can still be the user's message.
-    setTimeout(() => processRelationshipTags(), 0);
 
     const isStateRunning = typeof globalThis._rpgStateModelRunning === 'function' && globalThis._rpgStateModelRunning();
     if (!settings.enabled || settings.paused || isStateRunning) return;
