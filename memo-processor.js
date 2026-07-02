@@ -291,8 +291,6 @@ export function mergeQuestUpdates(jsonText, memoText = null) {
     const settings = getSettings();
     const target = (memoText !== null) ? memoText : settings.currentMemo;
     const quests = parseQuestsFromMemo(target);
-    
-    if (!quests.length) return target;
 
     let parsed;
     try {
@@ -308,6 +306,14 @@ export function mergeQuestUpdates(jsonText, memoText = null) {
     const mods = settings.syspromptModules || {};
     const isDeadlines = !!mods.questsDeadlines;
     const isFrustration = !!mods.questsFrustration;
+    const isDifficulty = !!mods.questsDifficulty;
+
+    const tMatch = target?.match(/\[TIME\]([\s\S]*?)\[\/TIME\]/i);
+    let acceptedTime = "08:00 AM, Day 1";
+    if (tMatch) {
+        const timeStr = extractCurrentTimeStr(tMatch[1]);
+        if (timeStr) acceptedTime = timeStr;
+    }
 
     let changed = false;
     for (const update of updates) {
@@ -325,8 +331,34 @@ export function mergeQuestUpdates(jsonText, memoText = null) {
             }
         }
 
-        if (!quest) continue;
-        if (quest.status === 'failed') continue;
+        if (quest && quest.status === 'failed') continue;
+
+        if (!quest) {
+            // No existing quest or objective matches this id — this is a brand-new quest.
+            // The extractor's diff schema only sends {id, status, difficulty, objectives},
+            // so synthesize sane defaults for the fields LogQuest would normally populate.
+            if (!update.id) continue;
+            const firstObjText = Array.isArray(update.objectives) && update.objectives[0]?.text;
+            quest = {
+                id: update.id,
+                title: update.title || firstObjText || `Quest ${update.id}`,
+                giver_name: update.giver_name || 'Unknown',
+                giver_location: update.giver_location || 'Unknown Location',
+                objectives: [],
+                rewards: update.rewards ? (Array.isArray(update.rewards) ? update.rewards : [update.rewards]) : [],
+                difficulty: isDifficulty ? (update.difficulty || 'Medium') : undefined,
+                deadline_time: isDeadlines ? (update.deadline_time || null) : undefined,
+                frustration_coefficient: isFrustration ? (update.frustration_coefficient || 1.0) : undefined,
+                auto_fail: (isDeadlines && !isFrustration),
+                accepted_time: acceptedTime,
+                status: ['active', 'completed', 'failed', 'past deadline'].includes(update.status) ? update.status : 'active',
+            };
+            quests.push(quest);
+            changed = true;
+            if (settings.debugMode) {
+                console.log(`[RPG Tracker] mergeQuestUpdates: synthesized new quest "${quest.title}" (${quest.id}) from State Extractor diff.`);
+            }
+        }
 
         if (objectiveDirectUpdate) {
             if (update.status && ['active', 'completed', 'failed'].includes(update.status)) {

@@ -1558,8 +1558,37 @@ function handleRecolor(barId, currentBg, targetEl) {
 
         const c1 = popup.querySelector('#color1');
         const c2 = popup.querySelector('#color2');
-        if (c1) c1.addEventListener('input', (e) => { cfg.color = /** @type {HTMLInputElement} */ (e.target).value; applyLive(); });
-        if (c2) c2.addEventListener('input', (e) => { cfg.color2 = /** @type {HTMLInputElement} */ (e.target).value; applyLive(); });
+
+        // --- Live preview while dragging: only patch bar color in-place, no re-render ---
+        const patchBarColor = () => {
+            let bg;
+            if (cfg.mode === 'gradient' && cfg.color2) {
+                bg = `linear-gradient(90deg,${cfg.color},${cfg.color2})`;
+            } else {
+                bg = cfg.color;
+            }
+            // Patch the actual bar fill element directly — O(1), no DOM rebuild.
+            document.querySelectorAll(`.rt-hp-bar-wrap[data-recolor-id="${CSS.escape(barId)}"] .rt-hp-bar,
+                                       .rt-xp-bar-wrap[data-recolor-id="${CSS.escape(barId)}"] .rt-xp-bar`)
+                .forEach(bar => { bar.style.background = bg; });
+        };
+
+        if (c1) {
+            // `input`: fires every frame while dragging — cheap live patch only
+            c1.addEventListener('input', (e) => {
+                cfg.color = /** @type {HTMLInputElement} */ (e.target).value;
+                patchBarColor();
+            });
+            // `change`: fires once on mouse-up — now safe to save + full re-render
+            c1.addEventListener('change', () => { applyLive(); });
+        }
+        if (c2) {
+            c2.addEventListener('input', (e) => {
+                cfg.color2 = /** @type {HTMLInputElement} */ (e.target).value;
+                patchBarColor();
+            });
+            c2.addEventListener('change', () => { applyLive(); });
+        }
 
         popup.querySelector('#recolor-ok').addEventListener('click', () => {
             applyLive();

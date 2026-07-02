@@ -1069,6 +1069,53 @@
     padding-bottom: 2px;
 }
 
+/* Multi-marker rows: two or more ((TAG)) segments on one text line rendered
+   side-by-side. Each segment is wrapped in an rt-mmc-cell; only the outer
+   wrapper draws the shared bottom border. */
+.rt-multi-marker-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: nowrap;
+    gap: 0 8px;
+    margin-top: -3px;
+    margin-bottom: 2px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    padding-bottom: 2px;
+}
+
+/* Each cell wrapper — fixed types (pills, badges, text) take natural width */
+.rt-mmc-cell {
+    flex: 0 0 auto;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+}
+
+/* Stretch types (bars, progress) fill the remaining row space */
+.rt-mmc-cell--stretch {
+    flex: 1 1 auto;
+    min-width: 80px;
+}
+
+/* Strip per-segment borders/margins so the row wrapper is the only separator */
+.rt-mmc-cell > .rt-entity-sub-line {
+    border-bottom: none;
+    margin-top: 0;
+    margin-bottom: 0;
+    padding-bottom: 0;
+    width: 100%;
+}
+
+/* hp/xp bar-wrap must fill its stretch cell */
+.rt-mmc-cell--stretch > .rt-entity-sub-line .rt-hp-bar-wrap,
+.rt-mmc-cell--stretch > .rt-entity-sub-line .rt-xp-bar-wrap {
+    flex: 1;
+    min-width: 40px;
+}
+
+
+
 .rt-entity-sub-label {
     color: inherit;
     opacity: 0.7;
@@ -1193,16 +1240,33 @@
     font-weight: 500;
 }
 
-/* Difficulty badges */
+/* Difficulty & custom alert badges */
 .rt-difficulty-badge {
     display: inline-block;
-    border-radius: 10px;
-    padding: 1px 10px;
-    font-size: 0.85em;
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-size: 0.82em;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
+
+.rt-coin-badge {
+    display: inline-block;
+    font-weight: bold;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 1px 6px;
+    border-radius: 4px;
+    border: 1px solid currentColor;
+}
+
+/* Fix overlapping backgrounds: guarantee 6px gap when badge is preceded by a label */
+.rt-entity-sub-label + .rt-difficulty-badge,
+.rt-entity-sub-label + .rt-coin-badge,
+.rt-entity-sub-label + .rt-dice-roll {
+    margin-left: 6px;
+}
+
 
 /* Progress bar */
 .rt-progress-row {
