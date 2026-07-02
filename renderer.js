@@ -157,7 +157,7 @@ const DEFAULT_XP_COLOR = 'linear-gradient(90deg, #0088ff, #00d4ff)';
             case 'coin': {
                 const cColor = rule.color || '#fff';
                 const icon = rule.icon || '🪙';
-                return `<div class="rt-entity-sub-line">${labelHtml}<span class="rt-coin-badge" style="color:${cColor}; font-weight:bold; background:rgba(255,255,255,0.05); padding:2px 8px; border-radius:12px; border:1px solid ${cColor}44;">${icon} ${escapeHtmlWithColor(value)}</span></div>`;
+                return `<div class="rt-entity-sub-line">${labelHtml}<span class="rt-coin-badge" style="color:${cColor}; border-color:${cColor}44;">${icon} ${escapeHtmlWithColor(value)}</span></div>`;
             }
             case 'dice_roll': {
                 // value is something like "1d20+5 = 18"
@@ -209,66 +209,157 @@ const DEFAULT_XP_COLOR = 'linear-gradient(90deg, #0088ff, #00d4ff)';
     }
 
 
+    // Shared marker type map used by tokenizeMarkers and tryRenderMarker.
+    const MARKER_TYPE_MAP = {
+        PILLS:{ renderType: 'pills' }, PLS:{ renderType: 'pills' },
+        BAR:{ renderType: 'hp_bar' }, B:{ renderType: 'hp_bar' }, HPBAR:{ renderType: 'hp_bar' }, HPB:{ renderType: 'hp_bar' }, HP: { renderType: 'hp_bar' },
+        BARRED:{ renderType: 'hp_bar', color: 'linear-gradient(90deg,#e74c3c,#c0392b)' },
+        BARBLUE:{ renderType: 'hp_bar', color: 'linear-gradient(90deg,#3498db,#2980b9)' },
+        BARGREEN:{ renderType: 'hp_bar', color: 'linear-gradient(90deg,#2ecc71,#27ae60)' },
+        BARYELLOW:{ renderType: 'hp_bar', color: 'linear-gradient(90deg,#f1c40f,#f39c12)' },
+        BARPURPLE:{ renderType: 'hp_bar', color: 'linear-gradient(90deg,#9b59b6,#8e44ad)' },
+        BARORANGE:{ renderType: 'hp_bar', color: 'linear-gradient(90deg,#e67e22,#d35400)' },
+        XPBAR:{ renderType: 'xp_bar' }, XB:{ renderType: 'xp_bar' },
+        TEXT:{ renderType: 'text' },
+        BADGE:{ renderType: 'badge' }, BDG:{ renderType: 'badge' },
+        HIGHLIGHT:{ renderType: 'highlight' }, HGT:{ renderType: 'highlight' },
+        OBJ:{ renderType: 'objective' },
+        REWARD:{ renderType: 'reward' },
+        DIFFICULTY:{ renderType: 'difficulty' },
+        PROGRESS:{ renderType: 'progress' },
+        PILLRED:{ renderType: 'pill_colored', pillClass: 'rt-pill-debuff' },
+        PILLGREEN:{ renderType: 'pill_colored', pillClass: 'rt-pill-buff' },
+        PILLBLUE:{ renderType: 'pill_colored', pillClass: 'rt-pill-magic' },
+        WARNING:{ renderType: 'badge_colored', color: '#f1c40f' },
+        DANGER:{ renderType: 'badge_colored', color: '#e74c3c' },
+        SUCCESS:{ renderType: 'badge_colored', color: '#2ecc71' },
+        INFO:{ renderType: 'badge_colored', color: '#3498db' },
+        GOLD:{ renderType: 'coin', color: '#ffd700', icon: '💰' },
+        SILVER:{ renderType: 'coin', color: '#c0c0c0', icon: '🪙' },
+        BRONZE:{ renderType: 'coin', color: '#cd7f32', icon: '🪙' },
+        DOLLAR:{ renderType: 'coin', color: '#85bb65', icon: '💵' },
+        HEART:{ renderType: 'coin', color: '#ff4466', icon: '❤️' },
+        SKULL:{ renderType: 'coin', color: '#aaaaaa', icon: '💀' },
+        SOUL:{ renderType: 'coin', color: '#aa88ff', icon: '👻' },
+        ROLL:{ renderType: 'dice_roll' }
+    };
+
+    // Regex that matches the NEXT ((MARKER)) token anywhere in a string.
+    // Used iteratively by tokenizeMarkers.
+    const MARKER_TOKEN_RE = /\(\((PILLS|BAR|HPBAR|XPBAR|TEXT|BADGE|HIGHLIGHT|PLS|B|HPB|XB|HGT|BDG|HP|OBJ|REWARD|DIFFICULTY|PROGRESS|BARRED|BARBLUE|BARGREEN|BARYELLOW|BARPURPLE|BARORANGE|PILLRED|PILLGREEN|PILLBLUE|WARNING|DANGER|SUCCESS|INFO|GOLD|SILVER|BRONZE|DOLLAR|HEART|SKULL|SOUL|ROLL)\)\)/i;
+
     /**
-     * If `line` begins with a ((MARKER)) prefix, renders it and returns HTML.
-     * Returns null if no marker is present, so callers can fall through to
-     * their own renderer. This makes markers work in ALL stock blocks.
+     * Splits `line` into an ordered array of segments wherever a ((MARKER))
+     * token appears.  Each segment is:
+     *   { preText: string, markerType: string, rule: object }
+     * where `preText` is the text between the previous marker's end (or the
+     * start of the line) and this marker, and the segment's "content" is
+     * everything from after this marker up to the next marker (resolved by
+     * the caller when building the reconstructed line).
+     *
+     * Returns [] if no markers are found in the line.
      */
-    export function tryRenderMarker(line, tag = '', entityName = '') {
-        const markerRegex = /^(.*?)\(\((PILLS|BAR|HPBAR|XPBAR|TEXT|BADGE|HIGHLIGHT|PLS|B|HPB|XB|HGT|BDG|HP|OBJ|REWARD|DIFFICULTY|PROGRESS|BARRED|BARBLUE|BARGREEN|BARYELLOW|BARPURPLE|BARORANGE|PILLRED|PILLGREEN|PILLBLUE|WARNING|DANGER|SUCCESS|INFO|GOLD|SILVER|BRONZE|DOLLAR|HEART|SKULL|SOUL|ROLL)\)\)\s*(.*)$/i;
-        const m = line.match(markerRegex);
-        if (!m) return null;
+    function tokenizeMarkers(line) {
+        const segments = [];
+        let remaining = line;
 
-        const typeMap = {
-            PILLS:{ renderType: 'pills' }, PLS:{ renderType: 'pills' },
-            BAR:{ renderType: 'hp_bar' }, B:{ renderType: 'hp_bar' }, HPBAR:{ renderType: 'hp_bar' }, HPB:{ renderType: 'hp_bar' }, HP: { renderType: 'hp_bar' },
-            BARRED:{ renderType: 'hp_bar', color: 'linear-gradient(90deg,#e74c3c,#c0392b)' },
-            BARBLUE:{ renderType: 'hp_bar', color: 'linear-gradient(90deg,#3498db,#2980b9)' },
-            BARGREEN:{ renderType: 'hp_bar', color: 'linear-gradient(90deg,#2ecc71,#27ae60)' },
-            BARYELLOW:{ renderType: 'hp_bar', color: 'linear-gradient(90deg,#f1c40f,#f39c12)' },
-            BARPURPLE:{ renderType: 'hp_bar', color: 'linear-gradient(90deg,#9b59b6,#8e44ad)' },
-            BARORANGE:{ renderType: 'hp_bar', color: 'linear-gradient(90deg,#e67e22,#d35400)' },
-            XPBAR:{ renderType: 'xp_bar' }, XB:{ renderType: 'xp_bar' },
-            TEXT:{ renderType: 'text' },
-            BADGE:{ renderType: 'badge' }, BDG:{ renderType: 'badge' },
-            HIGHLIGHT:{ renderType: 'highlight' }, HGT:{ renderType: 'highlight' },
-            OBJ:{ renderType: 'objective' },
-            REWARD:{ renderType: 'reward' },
-            DIFFICULTY:{ renderType: 'difficulty' },
-            PROGRESS:{ renderType: 'progress' },
-            PILLRED:{ renderType: 'pill_colored', pillClass: 'rt-pill-debuff' },
-            PILLGREEN:{ renderType: 'pill_colored', pillClass: 'rt-pill-buff' },
-            PILLBLUE:{ renderType: 'pill_colored', pillClass: 'rt-pill-magic' },
-            WARNING:{ renderType: 'badge_colored', color: '#f1c40f' },
-            DANGER:{ renderType: 'badge_colored', color: '#e74c3c' },
-            SUCCESS:{ renderType: 'badge_colored', color: '#2ecc71' },
-            INFO:{ renderType: 'badge_colored', color: '#3498db' },
-            GOLD:{ renderType: 'coin', color: '#ffd700', icon: '💰' },
-            SILVER:{ renderType: 'coin', color: '#c0c0c0', icon: '🪙' },
-            BRONZE:{ renderType: 'coin', color: '#cd7f32', icon: '🪙' },
-            DOLLAR:{ renderType: 'coin', color: '#85bb65', icon: '💵' },
-            HEART:{ renderType: 'coin', color: '#ff4466', icon: '❤️' },
-            SKULL:{ renderType: 'coin', color: '#aaaaaa', icon: '💀' },
-            SOUL:{ renderType: 'coin', color: '#aa88ff', icon: '👻' },
-            ROLL:{ renderType: 'dice_roll' }
-        };
+        while (true) {
+            const m = MARKER_TOKEN_RE.exec(remaining);
+            if (!m) break;
 
-        const preText = m[1].trim();
-        const markerType = m[2].toUpperCase();
-        const postText = m[3].trim();
-        const rule = typeMap[markerType] || { renderType: 'text' };
+            const preText = remaining.slice(0, m.index).trim();
+            const markerType = m[1].toUpperCase();
+            remaining = remaining.slice(m.index + m[0].length).trimStart();
 
-        // Reconstruct a line for renderSubFieldByRule
-        const reconstructedContent = preText ? `${preText} ${postText}`.trim() : postText;
+            segments.push({ preText, markerType, rule: MARKER_TYPE_MAP[markerType] || { renderType: 'text' } });
+        }
+
+        // Assign each segment its content:
+        //   segment[i].content = segment[i+1].preText  (text between marker i and marker i+1)
+        //   segment[last].content = remaining tail after the last marker
+        // IMPORTANT: once a preText is consumed as content for segment[i], clear it on
+        // segment[i+1] so renderMarkerSegment doesn't double-prepend it as a label.
+        for (let i = 0; i < segments.length; i++) {
+            if (i < segments.length - 1) {
+                segments[i].content = segments[i + 1].preText;
+                segments[i + 1].preText = ''; // consumed — don't re-use as label
+            } else {
+                segments[i].content = remaining.trim();
+            }
+        }
+
+        return segments;
+    }
+
+    /**
+     * Renders one tokenized marker segment into HTML via renderSubFieldByRule.
+     * `preText` becomes the label prefix; `content` is the value portion.
+     * `rowContext` is an optional string from sibling segments on the same
+     * multi-marker row — appended to barId so two bars with the same label on
+     * different rows (e.g. two "Charges" bars) get distinct color identities.
+     */
+    function renderMarkerSegment(seg, tag, entityName, rowContext = '') {
+        const { preText, content, rule } = seg;
+        const reconstructedContent = preText ? `${preText} ${content}`.trim() : content.trim();
 
         let barId = null;
         if (rule.renderType === 'hp_bar' || rule.renderType === 'xp_bar') {
             const colonIdx = reconstructedContent.indexOf(':');
             const labelText = colonIdx !== -1 ? reconstructedContent.substring(0, colonIdx).trim() : 'Bar';
-            barId = `${tag}:${entityName}:${labelText}`;
+            // Include rowContext so that identical labels on different multi-marker rows
+            // produce distinct barIds (e.g. "Charges" beside "Fireball" vs "Charges" beside "Ice Storm").
+            const ctxSuffix = rowContext ? `[${rowContext}]` : '';
+            barId = `${tag}:${entityName}:${labelText}${ctxSuffix}`;
         }
 
         return renderSubFieldByRule(rule, reconstructedContent, barId);
+    }
+
+    /**
+     * If `line` contains one or more ((MARKER)) tokens, renders it and returns HTML.
+     *
+     * • Single marker  → same output as before (one wrapped <div>).
+     * • Multiple markers → each segment is rendered independently and all are
+     *   placed side-by-side inside a <div class="rt-multi-marker-row"> flex row,
+     *   with the ((TAG)) token acting as the implicit column separator.
+     *
+     * Returns null if no marker is present, so callers can fall through to
+     * their own renderer. This makes markers work in ALL stock blocks.
+     *
+     * Example (two columns on one line):
+     *   Spells: ((PLS)) Fireball, Magic Missile ((BAR)) Charges: 3/5
+     */
+    export function tryRenderMarker(line, tag = '', entityName = '') {
+        const segments = tokenizeMarkers(line);
+        if (segments.length === 0) return null;
+
+        if (segments.length === 1) {
+            // Single-marker fast path — identical to the previous behaviour.
+            return renderMarkerSegment(segments[0], tag, entityName);
+        }
+
+        // Multi-marker: render each segment and wrap it in a typed cell.
+        // Stretchy render types (bars, progress) get flex:1 so they fill remaining
+        // space; fixed types (pills, badges, text) take only their natural width.
+        const STRETCH_TYPES = new Set(['hp_bar', 'xp_bar', 'progress']);
+
+        // Pre-compute each segment's reconstructed text so we can use sibling content
+        // as rowContext to disambiguate same-label bars across different rows.
+        const segContents = segments.map(s => (s.preText ? `${s.preText} ${s.content}` : s.content).trim());
+
+        const childrenHtml = segments.map((seg, i) => {
+            // rowContext = sibling's content + this segment's index.
+            // The sibling content disambiguates bars across different rows;
+            // the index disambiguates multiple identical bars on the SAME row.
+            const rowContext = `${segContents[i === 0 ? 1 : 0] ?? ''}:${i}`;
+            const html = renderMarkerSegment(seg, tag, entityName, rowContext);
+            const cellClass = STRETCH_TYPES.has(seg.rule.renderType)
+                ? 'rt-mmc-cell rt-mmc-cell--stretch'
+                : 'rt-mmc-cell';
+            return `<div class="${cellClass}">${html}</div>`;
+        }).join('');
+
+        return `<div class="rt-multi-marker-row">${childrenHtml}</div>`;
     }
 
     export function renderLineInEntityContext(tag, line, entityName, rawLine) {
