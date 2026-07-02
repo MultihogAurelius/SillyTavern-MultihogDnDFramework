@@ -323,7 +323,7 @@ The report covers the in-world period: **{periodLabel}**
 2. QUESTS and EVENTS are historical records for context only — they are NOT simulatable entities. Never generate entries that describe a quest advancing, stalling, succeeding, or failing. If a quest appears in the designated entities block, ignore it entirely.
 3. Prioritize named ACTIVE WORLD LORE NPCs. Every report must include at least 2. These are your highest-value subjects. However, if the ## DESIGNATED ENTITIES FOR THIS PERIOD block is present, you MUST strictly follow it and only change the status, advance the timeline, or create new narrative beats for these designated entities. You are strictly forbidden from changing the status, advancing the timeline, or creating new narrative beats for unauthorized entities. However, you MAY mention them passively as background context if their past, established actions are a direct catalyst for the designated entities.
 4. For NPCs who were physically present with {{user}} during the reporting period, only generate plausible background activity — digital actions, private decisions, private thoughts/opinions, off-screen communications. Do not relocate them.
-5. Format as 15 short entries, 1 sentence each. Dense, no filler, no markdown.
+5. Format as 15 bullet-pointed entries (using "- "), with a blank line (newline) between each world event. Dense, no filler, no markdown. Each entry must be exactly 1 sentence. Do NOT prefix the lines with the period or time label.
 6. Output ONLY the report content. No preamble, no tags, no meta-commentary.
 7. Do not simply repeat the same entities and always build on the previous report; take interesting entities from the ACTIVE WORLD LORE as well as the SKELETON regardless of whether they were featured in the previous report(s). If designated entities are provided, strictly limit your active scope to those, obeying the passive referencing rule for other entities.
 8. DO NOT write a cumulative report, stacking old entries in the same report. Only write new events, not a recap of the previous ones; they are preserved in their own file.
@@ -764,6 +764,20 @@ Example: [[FAC: Iron Syndicate | ...]]  NOT  [[FAC: Khelt :: Iron Syndicate | ..
             .replace('8. Cross-category entity bleeding is desirable', '9. Cross-category entity bleeding is desirable')
             .replace('9. You must strictly respect geographical', '10. You must strictly respect geographical')
             .replace('10. Character vectors must take place', '11. Character vectors must take place');
+    }
+ 
+    // ── MIGRATION: Update World Progression System Prompt with bullet-pointed and blank line rules ──
+    if (s.worldProgressionSystemPrompt && !s.worldProgressionSystemPrompt.includes('Do NOT prefix the lines with the period or time label')) {
+        // Replace from original or intermediate form
+        s.worldProgressionSystemPrompt = s.worldProgressionSystemPrompt
+            .replace(
+                '5. Format as 15 short entries, 1 sentence each. Dense, no filler, no markdown.',
+                '5. Format as 15 bullet-pointed entries (using "- "), with a blank line (newline) between each world event. Dense, no filler, no markdown. Each entry must be exactly 1 sentence. Do NOT prefix the lines with the period or time label.'
+            )
+            .replace(
+                '5. Format as 15 bullet-pointed entries (using "- [{periodLabel}] Event Description..."), with a blank line (newline) between each world event. Dense, no filler, no markdown. Each entry must be exactly 1 sentence.',
+                '5. Format as 15 bullet-pointed entries (using "- "), with a blank line (newline) between each world event. Dense, no filler, no markdown. Each entry must be exactly 1 sentence. Do NOT prefix the lines with the period or time label.'
+            );
     }
 
     // ── MIGRATION: CHARACTER/PARTY prompts — Att/def → Combat + Gear (BAB) ───────

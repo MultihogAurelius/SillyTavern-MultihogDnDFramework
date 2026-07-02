@@ -3719,18 +3719,33 @@ export async function runSkeletonGenerationPass(atmosphereSummary, append = fals
     }
 
     // Refresh the SillyTavern UI so it updates immediately without F5
-    setTimeout(async () => {
+    if (typeof ctx.executeSlashCommandsWithOptions === 'function') {
         try {
+            await new Promise(r => setTimeout(r, 300));
             if (typeof ctx.updateWorldInfoList === 'function') {
                 await ctx.updateWorldInfoList();
             }
+            await ctx.executeSlashCommandsWithOptions(`/world state=on silent=true "${skeletonBookName}"`);
             if (typeof ctx.reloadWorldInfoEditor === 'function') {
                 ctx.reloadWorldInfoEditor(skeletonBookName, true);
             }
         } catch (uiErr) {
             console.warn('[RPG Tracker] UI refresh after skeleton generation failed:', uiErr);
         }
-    }, 200);
+    } else {
+        setTimeout(async () => {
+            try {
+                if (typeof ctx.updateWorldInfoList === 'function') {
+                    await ctx.updateWorldInfoList();
+                }
+                if (typeof ctx.reloadWorldInfoEditor === 'function') {
+                    ctx.reloadWorldInfoEditor(skeletonBookName, true);
+                }
+            } catch (uiErr) {
+                console.warn('[RPG Tracker] UI refresh after skeleton generation failed:', uiErr);
+            }
+        }, 200);
+    }
 
     broadcastStep('finish', `\uD83D\uDDE6 World Skeleton: ${records.length} entries generated and saved to "${skeletonBookName}".`);
     return records.length;
