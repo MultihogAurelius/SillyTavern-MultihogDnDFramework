@@ -306,6 +306,7 @@ export function mergeQuestUpdates(jsonText, memoText = null) {
     const mods = settings.syspromptModules || {};
     const isDeadlines = !!mods.questsDeadlines;
     const isFrustration = !!mods.questsFrustration;
+    const isDifficulty = !!mods.questsDifficulty;
 
     const tMatch = target?.match(/\[TIME\]([\s\S]*?)\[\/TIME\]/i);
     let acceptedTime = "08:00 AM, Day 1";
@@ -330,6 +331,8 @@ export function mergeQuestUpdates(jsonText, memoText = null) {
             }
         }
 
+        if (quest && quest.status === 'failed') continue;
+
         if (!quest) {
             // No existing quest or objective matches this id — this is a brand-new quest.
             // The extractor's diff schema only sends {id, status, difficulty, objectives},
@@ -342,8 +345,8 @@ export function mergeQuestUpdates(jsonText, memoText = null) {
                 giver_name: update.giver_name || 'Unknown',
                 giver_location: update.giver_location || 'Unknown Location',
                 objectives: [],
-                rewards: Array.isArray(update.rewards) ? update.rewards : [],
-                difficulty: update.difficulty,
+                rewards: update.rewards ? (Array.isArray(update.rewards) ? update.rewards : [update.rewards]) : [],
+                difficulty: isDifficulty ? (update.difficulty || 'Medium') : undefined,
                 deadline_time: isDeadlines ? (update.deadline_time || null) : undefined,
                 frustration_coefficient: isFrustration ? (update.frustration_coefficient || 1.0) : undefined,
                 auto_fail: (isDeadlines && !isFrustration),
@@ -352,8 +355,10 @@ export function mergeQuestUpdates(jsonText, memoText = null) {
             };
             quests.push(quest);
             changed = true;
+            if (settings.debugMode) {
+                console.log(`[RPG Tracker] mergeQuestUpdates: synthesized new quest "${quest.title}" (${quest.id}) from State Extractor diff.`);
+            }
         }
-        if (quest.status === 'failed') continue;
 
         if (objectiveDirectUpdate) {
             if (update.status && ['active', 'completed', 'failed'].includes(update.status)) {
