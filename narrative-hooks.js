@@ -985,6 +985,25 @@ export async function parseAndApplyNarrativeRelTags() {
             anyChanged = true;
         }
 
+        // State Tracker memo rollback on swipe
+        if (settings.stateTrackerSwipeRollback !== false && lastAiMsg.extra.rpgMemoRollback) {
+            const prevMemoSnapshot = lastAiMsg.extra.rpgMemoRollback[prevSwipeId];
+            if (typeof prevMemoSnapshot === 'string') {
+                console.log('[RPG Tracker] Swipe rollback: restoring memo snapshot from swipe', prevSwipeId);
+                settings.currentMemo = prevMemoSnapshot;
+                // Sync memo history: remove the entry that was pushed for the old swipe
+                if (Array.isArray(settings.memoHistory) && settings.memoHistory[0] !== prevMemoSnapshot) {
+                    settings.memoHistory.shift();
+                    if (settings.historyIndex !== undefined && settings.historyIndex > 0) settings.historyIndex--;
+                }
+                // Clear the stale rollback snapshot for this new swipe (will be re-stamped when ST runs)
+                delete lastAiMsg.extra.rpgMemoRollback[swipeId];
+                anyChanged = true;
+                // Notify UI to re-render the memo pane
+                if (typeof globalThis._rpgUpdateUIMemo === 'function') globalThis._rpgUpdateUIMemo(prevMemoSnapshot);
+            }
+        }
+
         // We are entering a new swipe. Clear its tracking data so it gets evaluated fresh.
         lastAiMsg.extra.rpgProcessedTags[swipeId] = [];
         lastAiMsg.extra.rpgRollbackData[swipeId] = [];

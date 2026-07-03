@@ -390,6 +390,11 @@
                             <i class="fa-solid fa-circle-question interactable" style="font-size: 0.85em; opacity: 0.7; margin-left: 4px;" title="How often the State Tracker runs. Set to 1 to run every message, 2 to run every other message, etc. Useful for reducing API costs."></i>
                         </label>
                         <input id="rpg_tracker_state_run_every" type="text" inputmode="numeric" pattern="[0-9]*" class="text_pole" value="1" title="Run the State Tracker every N messages. 1 = every message." />
+                        <label class="checkbox_label" title="When enabled, automatically restores the State Tracker memo to the snapshot taken before the previous swipe if the user swipes away to a different generation.">
+                            <input id="rpg_tracker_state_swipe_rollback" type="checkbox" checked />
+                            Auto Rollback Memo on Swipe
+                            <i class="fa-solid fa-circle-question interactable" style="font-size: 0.85em; opacity: 0.7; margin-left: 4px;" title="Restores the State Tracker memo to its pre-update snapshot when you swipe to a different AI response. Prevents memo drift from discarded generations."></i>
+                        </label>
                     </div>
 
 

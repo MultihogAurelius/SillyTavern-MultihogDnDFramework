@@ -2186,6 +2186,18 @@ async function runStateModelPass(narrativeOutput, isFullContext = false, overrid
                 // ── FULL COMMIT: treat this chunk as a completed turn ──
                 lastDelta = commitChunkResult(merged, memoBeforeThisChunk);
 
+                // Stamp the pre-commit memo snapshot on the message for swipe rollback
+                if (getSettings().stateTrackerSwipeRollback !== false) {
+                    const { chat: _sc } = SillyTavern.getContext();
+                    const _lastAi = _sc ? [..._sc].reverse().find(m => !m.is_user) : null;
+                    if (_lastAi) {
+                        _lastAi.extra = _lastAi.extra || {};
+                        const _sid = _lastAi.swipe_id ?? 0;
+                        _lastAi.extra.rpgMemoRollback = _lastAi.extra.rpgMemoRollback || {};
+                        _lastAi.extra.rpgMemoRollback[_sid] = memoBeforeThisChunk;
+                    }
+                }
+
                 if (settings.debugMode) console.log(`[RPG Tracker] Chunk ${i + 1}/${chunks.length} committed.`);
             }
         }
@@ -2907,6 +2919,10 @@ Saves: Fort +X | Ref +X | Will +X`;
         if (syspromptRelBarsCb) syspromptRelBarsCb.checked = !!fresh.npcRelationshipBars;
         const onboardingRelBarsCb = /** @type {HTMLInputElement|null} */ (el.querySelector('#rt_onboarding_mod_npc_rel_bars'));
         if (onboardingRelBarsCb) onboardingRelBarsCb.checked = !!fresh.npcRelationshipBars;
+        const relToastUICb = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_tracker_npc_rel_toast'));
+        if (relToastUICb) relToastUICb.checked = fresh.npcRelationshipToast !== false;
+        const stateSwipeRollbackUICb = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_tracker_state_swipe_rollback'));
+        if (stateSwipeRollbackUICb) stateSwipeRollbackUICb.checked = fresh.stateTrackerSwipeRollback !== false;
 
         // Custom Sysprompt
         const customSyspromptEl = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_tracker_custom_sysprompt'));
@@ -10581,6 +10597,13 @@ function buildSysprompt(rawText) {
         if (stateRunEveryInput.length) {
             stateRunEveryInput.val(settings.stateTrackerRunEvery !== undefined ? settings.stateTrackerRunEvery : 1).on('input', function () {
                 settings.stateTrackerRunEvery = Math.max(1, parseInt(/** @type {string} */($(this).val())) || 1);
+                saveSettings();
+            });
+        }
+        const stateSwipeRollbackCb = $('#rpg_tracker_state_swipe_rollback');
+        if (stateSwipeRollbackCb.length) {
+            stateSwipeRollbackCb.prop('checked', settings.stateTrackerSwipeRollback !== false).on('change', function () {
+                settings.stateTrackerSwipeRollback = $(this).prop('checked');
                 saveSettings();
             });
         }
