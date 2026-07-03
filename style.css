@@ -1666,12 +1666,12 @@
         left: 3vw !important;
         right: 3vw !important;
         width: 94vw !important;
-        height: calc(100vh - 44px - 58px) !important; /* fallback */
-        height: calc(100dvh - 44px - 58px) !important; /* viewport minus ST toolbar and input bar */
+        height: calc(100vh - 44px - 8px - env(safe-area-inset-bottom, 0px)) !important; /* fallback */
+        height: calc(100dvh - 44px - 8px - env(safe-area-inset-bottom, 0px)) !important;
         bottom: auto !important;
         min-width: unset !important;
         max-width: 100% !important;
-        max-height: calc(100dvh - 44px - 58px) !important;
+        max-height: calc(100dvh - 44px - 8px - env(safe-area-inset-bottom, 0px)) !important;
         resize: none !important;
     }
 
