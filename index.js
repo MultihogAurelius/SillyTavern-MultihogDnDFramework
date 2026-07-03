@@ -4976,6 +4976,16 @@ function createPanel() {
                                     </div>
                                     <div style="font-size:10px;color:rgba(255,255,255,0.35);margin-bottom:14px;">Shows Friendship/Affection tracking bars on NPC cards and popups. Also adds relationship fields to the AI instruction.</div>
 
+                                     <div style="margin-bottom:6px;display:flex;align-items:center;gap:10px;">
+                                         <label style="font-size:12px;color:rgba(255,255,255,0.7);flex:1;">Show Relationship Toast Notifications</label>
+                                         <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+                                             <input type="checkbox" id="rt-npc-rel-toast" ${curS.npcRelationshipToast !== false ? 'checked' : ''}
+                                                 style="width:16px;height:16px;accent-color:#d4a940;cursor:pointer;">
+                                             <span style="font-size:11px;color:rgba(255,255,255,0.5);">${curS.npcRelationshipToast !== false ? 'Enabled' : 'Disabled'}</span>
+                                         </label>
+                                     </div>
+                                     <div style="font-size:10px;color:rgba(255,255,255,0.35);margin-bottom:14px;">Emits a toast notification in the bottom-right corner when friendship or affection values change.</div>
+
                                     <div style="margin-bottom:6px;display:flex;align-items:center;gap:10px;">
                                         <label style="font-size:12px;color:rgba(255,255,255,0.7);flex:1;">Ignore Character Limits When Importing Character Cards</label>
                                         <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
@@ -4989,6 +4999,7 @@ function createPanel() {
 
                                 let newRel = curS.npcRelationshipBars ?? false;
                                 let newIgnoreLimits = curS.ignoreNpcImportLimits ?? false;
+                                let newRelToast = curS.npcRelationshipToast !== false;
                                 // Track word count values via closure — updated by input events,
                                 // read at save time. Initialized to current saved values so
                                 // leaving them unchanged correctly preserves the user's setting.
@@ -5027,6 +5038,13 @@ function createPanel() {
                                             if (ignoreEl.nextElementSibling) ignoreEl.nextElementSibling.textContent = newIgnoreLimits ? 'Enabled' : 'Disabled';
                                         });
                                     }
+                                    const relToastEl = document.getElementById('rt-npc-rel-toast');
+                                    if (relToastEl) {
+                                        relToastEl.addEventListener('change', () => {
+                                            newRelToast = relToastEl.checked;
+                                            if (relToastEl.nextElementSibling) relToastEl.nextElementSibling.textContent = newRelToast ? 'Enabled' : 'Disabled';
+                                        });
+                                    }
                                 }, 0);
 
                                 const result = await ctx.callGenericPopup(popupHtml, ctx.POPUP_TYPE?.CONFIRM ?? 3, '', {
@@ -5042,6 +5060,8 @@ function createPanel() {
                                     updS.npcMajorWords = finalMajor;
                                     updS.npcMinorWords = finalMinor;
                                     updS.npcRelationshipBars = newRel;
+                                    updS.npcRelationshipToast = newRelToast;
+                                    $('#rpg_tracker_npc_rel_toast').prop('checked', newRelToast);
 
                                     // Update the main settings panel inputs if present
                                     $('#rpg_tracker_npc_major_words').val(finalMajor);
@@ -12446,6 +12466,10 @@ RULES:
 
         $('#rpg_sysprompt_mod_npc_rel_bars').prop('checked', !!settings.npcRelationshipBars).on('change', function () {
             handleRelBarsChange($(this).prop('checked'));
+        });
+        $('#rpg_tracker_npc_rel_toast').prop('checked', settings.npcRelationshipToast !== false).on('change', function () {
+            settings.npcRelationshipToast = $(this).prop('checked');
+            saveSettings();
         });
         // Note: experimentalNpcImport removed — NPC Creator button is always visible.
         $('#rpg_tracker_ignore_npc_limits').prop('checked', !!settings.ignoreNpcImportLimits).on('change', function () {

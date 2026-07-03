@@ -133,6 +133,7 @@ export function getSettings() {
         npcMajorWords: 25,
         npcMinorWords: 15,
         npcRelationshipBars: false,
+        npcRelationshipToast: true,           // emit toast notification when relationship values change
         npcRelationshipValues: {},
         npcRelationshipLog: {},      // { [fullId]: [{timestamp,field,delta,newValue,source}] } — capped 50/NPC
         experimentalNpcImport: true,

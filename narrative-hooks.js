@@ -1067,7 +1067,7 @@ export async function parseAndApplyNarrativeRelTags() {
         const icon = m.field === 'friendship' ? '🤝' : '💗';
         const label = m.field === 'friendship' ? 'Friendship' : 'Affection';
         // @ts-ignore
-        if (typeof toastr !== 'undefined') toastr.info(`${icon} ${m.name}: ${sign}${m.delta} ${label}`, 'Relationship', { timeOut: 3500, positionClass: 'toast-bottom-right' });
+        if (typeof toastr !== 'undefined' && settings.npcRelationshipToast !== false) toastr.info(`${icon} ${m.name}: ${sign}${m.delta} ${label}`, 'Relationship', { timeOut: 3500, positionClass: 'toast-bottom-right' });
         
         console.log(`[RPG Tracker] Narrative rel applied: ${m.name} → ${resolvedId} | ${m.field} ${sign}${m.delta} → ${newVal} (Actual applied: ${actualAppliedDelta})`);
 
