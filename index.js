@@ -3741,8 +3741,9 @@ function createPanel() {
 
                     <hr style="border-color: #333; margin: 10px 0; flex-shrink: 0;">
 
-                    <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 5px; flex-shrink: 0;">
+                    <div id="rt-agent-keys-toggle" style="display: flex; align-items: center; gap: 6px; margin-bottom: 5px; flex-shrink: 0; cursor: pointer; user-select: none;">
                         <div style="font-weight: bold; opacity: 0.8; font-size: 0.846em; display: flex; align-items: center; gap: 4px;">
+                            <span id="rt-agent-keys-chevron" style="display: inline-block; width: 10px; transition: transform 0.2s; font-size: 0.9em; opacity: 0.7;"><i class="fa-solid fa-chevron-down"></i></span>
                             Active Lore Keys:
                             <span id="rt-agent-active-tokens" style="font-weight: normal; opacity: 0.55; color: var(--rt-text-muted); font-size: 0.95em;">(0t)</span>
                         </div>
@@ -4000,6 +4001,12 @@ function createPanel() {
         const keysContainer = agentPanel.querySelector('#rt-agent-router-active-keys');
         const logContainer = agentPanel.querySelector('#rt-agent-router-log');
         if (!keysContainer || !logContainer) return;
+
+        keysContainer.style.display = s.agentKeysCollapsed ? 'none' : 'flex';
+        const chevron = agentPanel.querySelector('#rt-agent-keys-chevron');
+        if (chevron) {
+            chevron.style.transform = s.agentKeysCollapsed ? 'rotate(-90deg)' : '';
+        }
 
         const ctx = SillyTavern.getContext();
         const books = {};
@@ -7698,10 +7705,32 @@ Rules:
 
     // updateUndoLabel kept as alias so existing call-sites still compile
     const updateUndoLabel = syncAgentNav;
-    // ── Active Keys Refresh Button ────────────────────────────────────────
+    // ── Active Keys Refresh Button & Toggle ────────────────────────────────
+    const keysToggleBtn = agentPanel.querySelector('#rt-agent-keys-toggle');
+    if (keysToggleBtn) {
+        keysToggleBtn.addEventListener('click', (e) => {
+            if (e.target.closest('#rt-agent-keys-refresh')) {
+                return;
+            }
+            const s = getSettings();
+            s.agentKeysCollapsed = !s.agentKeysCollapsed;
+            saveSettings();
+
+            const keysContainer = agentPanel.querySelector('#rt-agent-router-active-keys');
+            const chevron = agentPanel.querySelector('#rt-agent-keys-chevron');
+            if (keysContainer) {
+                keysContainer.style.display = s.agentKeysCollapsed ? 'none' : 'flex';
+            }
+            if (chevron) {
+                chevron.style.transform = s.agentKeysCollapsed ? 'rotate(-90deg)' : '';
+            }
+        });
+    }
+
     const keysRefreshBtn = agentPanel.querySelector('#rt-agent-keys-refresh');
     if (keysRefreshBtn) {
-        keysRefreshBtn.addEventListener('click', async () => {
+        keysRefreshBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
             keysRefreshBtn.querySelector('i')?.classList.add('fa-spin');
             const _ctx = SillyTavern.getContext();
             if (typeof _ctx.updateWorldInfoList === 'function') {
