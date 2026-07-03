@@ -3553,6 +3553,7 @@ function createPanel() {
                     <button class="rpg-tracker-icon-btn" id="rpg-tracker-view-btn" title="Toggle rendered view">⊞</button>
                     <button class="rpg-tracker-icon-btn" id="rpg-tracker-portraits-menu-btn" title="AI Portrait Actions">🖼️</button>
                     <button class="rpg-tracker-icon-btn" id="rpg-tracker-debug-btn" title="Context Debugger" style="display:none;">🛠️</button>
+                    <button class="rpg-tracker-icon-btn rt-overflow-trigger" id="rt-overflow-btn" title="More actions">⋯</button>
                     <button class="rpg-tracker-icon-btn" id="rpg-tracker-collapse-btn" title="Collapse Panel"><i class="fa-solid ${settings.trackerCollapsed ? 'fa-chevron-down' : 'fa-chevron-up'}"></i></button>
                     <button class="rpg-tracker-icon-btn" id="rpg-tracker-close-btn" title="Hide panel">✕</button>
                 </div>
@@ -8153,6 +8154,59 @@ Rules:
     updateMenu.querySelector('#rt-update-regular').addEventListener('click', () => manualUpdate('regular'));
     updateMenu.querySelector('#rt-update-custom').addEventListener('click', () => manualUpdate('custom'));
     updateMenu.querySelector('#rt-update-full').addEventListener('click', () => manualUpdate('full'));
+
+    // ── Overflow menu (mobile) ────────────────────────────────────────────────
+    const overflowBtn = panel.querySelector('#rt-overflow-btn');
+    const overflowMenu = document.createElement('div');
+    overflowMenu.className = 'rt-overflow-menu';
+    overflowMenu.style.display = 'none';
+    overflowMenu.innerHTML = `
+        <div class="rt-overflow-section-header">Actions</div>
+        <div class="rt-overflow-item" id="rt-ov-agent"><span class="rt-ov-icon">🤖</span><span>Lorebook Agent</span></div>
+        <div class="rt-overflow-item" id="rt-ov-enable"><span class="rt-ov-icon">⏻</span><span id="rt-ov-enable-label">Enable / Disable</span></div>
+        <div class="rt-overflow-item" id="rt-ov-pause"><span class="rt-ov-icon">⏸</span><span id="rt-ov-pause-label">Pause Tracker</span></div>
+        <div class="rt-overflow-item" id="rt-ov-prompt"><span class="rt-ov-icon">💬</span><span>Direct Prompt</span></div>
+        <div class="rt-overflow-item" id="rt-ov-view"><span class="rt-ov-icon">⊞</span><span>Toggle Rendered View</span></div>
+        <div class="rt-overflow-item" id="rt-ov-portraits"><span class="rt-ov-icon">🖼️</span><span>Portrait Actions</span></div>
+        <div class="rt-overflow-section-header">Update State</div>
+        <div class="rt-overflow-item" id="rt-ov-upd-regular"><span class="rt-ov-icon">🔄</span><span>Regular Update</span><small>Since last user message</small></div>
+        <div class="rt-overflow-item" id="rt-ov-upd-custom"><span class="rt-ov-icon">🔄</span><span>Lookback Update</span><small>Last N messages</small></div>
+        <div class="rt-overflow-item" id="rt-ov-upd-full"><span class="rt-ov-icon">🔄</span><span>Full Context Audit</span><small>Re-examine whole history</small></div>
+    `;
+    panel.appendChild(overflowMenu);
+
+    overflowBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isVisible = overflowMenu.style.display !== 'none';
+        overflowMenu.style.display = 'none';
+        if (!isVisible) {
+            const rect = overflowBtn.getBoundingClientRect();
+            const panelRect = panel.getBoundingClientRect();
+            overflowMenu.style.top = (rect.bottom - panelRect.top + 5) + 'px';
+            overflowMenu.style.right = (panelRect.right - rect.right) + 'px';
+            overflowMenu.style.left = 'auto';
+            // Refresh dynamic labels
+            const s = getSettings();
+            const enableLabel = overflowMenu.querySelector('#rt-ov-enable-label');
+            if (enableLabel) enableLabel.textContent = s.enabled ? 'Disable Tracker' : 'Enable Tracker';
+            const pauseLabel = overflowMenu.querySelector('#rt-ov-pause-label');
+            if (pauseLabel) pauseLabel.textContent = s.trackerPaused ? 'Resume Tracker' : 'Pause Tracker';
+            overflowMenu.style.display = 'flex';
+            const closeOv = () => { overflowMenu.style.display = 'none'; document.removeEventListener('click', closeOv); };
+            setTimeout(() => document.addEventListener('click', closeOv), 10);
+        }
+    });
+
+    const _ovClose = () => { overflowMenu.style.display = 'none'; };
+    overflowMenu.querySelector('#rt-ov-agent').addEventListener('click', () => { _ovClose(); panel.querySelector('#rpg-tracker-agent-btn')?.click(); });
+    overflowMenu.querySelector('#rt-ov-enable').addEventListener('click', () => { _ovClose(); panel.querySelector('#rpg-tracker-enable-btn')?.click(); });
+    overflowMenu.querySelector('#rt-ov-pause').addEventListener('click', () => { _ovClose(); panel.querySelector('#rpg-tracker-pause-btn')?.click(); });
+    overflowMenu.querySelector('#rt-ov-prompt').addEventListener('click', () => { _ovClose(); panel.querySelector('#rpg-tracker-prompt-btn')?.click(); });
+    overflowMenu.querySelector('#rt-ov-view').addEventListener('click', () => { _ovClose(); panel.querySelector('#rpg-tracker-view-btn')?.click(); });
+    overflowMenu.querySelector('#rt-ov-portraits').addEventListener('click', () => { _ovClose(); panel.querySelector('#rpg-tracker-portraits-menu-btn')?.click(); });
+    overflowMenu.querySelector('#rt-ov-upd-regular').addEventListener('click', () => { _ovClose(); manualUpdate('regular'); });
+    overflowMenu.querySelector('#rt-ov-upd-custom').addEventListener('click', () => { _ovClose(); manualUpdate('custom'); });
+    overflowMenu.querySelector('#rt-ov-upd-full').addEventListener('click', () => { _ovClose(); manualUpdate('full'); });
 
     // Link the settings button too if it's already rendered
     // For settings button, we'll keep it simple or just trigger regular
