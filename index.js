@@ -5047,7 +5047,7 @@ function createPanel() {
 
                                     // Rebuild the NPC instruction from settings
                                     if (updS.routerModules?.npc) {
-                                        updS.routerModules.npc.instruction = buildNpcInstruction(finalMajor, finalMinor, newIgnoreLimits);
+                                        updS.routerModules.npc.instruction = buildNpcInstruction(finalMajor, finalMinor, false); // ignoreLimits only applies at import-time, not stored globally
                                     }
 
                                     saveSettings();
