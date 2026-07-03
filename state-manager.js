@@ -817,7 +817,12 @@ export function getBarBackground(barId, defaultBackground, pct = null) {
     const cfg = s.barColors?.[barId];
     if (!cfg) {
         const isHP = barId.endsWith(':HP') || barId.includes(':HPBAR');
-        if (isHP && pct !== null) {
+        // Only apply automatic pct-based HP coloring when the caller hasn't supplied
+        // a custom color (i.e. defaultBackground is the default HP green).
+        // Explicit marker colors like ((BARRED)) or ((BARGREEN)) pass their own
+        // gradient as defaultBackground — those must NOT be silently overridden.
+        const DEFAULT_HP = '#00ffaa';
+        if (isHP && pct !== null && (defaultBackground === DEFAULT_HP || defaultBackground == null)) {
             return pct > 60 ? '#00ffaa' : pct > 30 ? '#ffaa00' : '#ff5555';
         }
         return defaultBackground;
