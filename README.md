@@ -112,6 +112,9 @@ For the State Tracker and Lorebook Agent, use Gemini 3.1 Flash. It's good enough
   <strong>Lorebook Agent</strong>
 </p>
 
+## Donations
+Everything is of course provided for free (and I also encourage people to fork and do whatever they want with the code), but if you want to give me a tip, you can: https://buymeacoffee.com/multihog
+
 ---
 
 ## License
