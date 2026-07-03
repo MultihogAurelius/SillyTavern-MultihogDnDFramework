@@ -151,6 +151,7 @@ IGNORE NARRATIVE FLUFF: Do not track temporary dialogue or actions. Only track p
 INTEGRATION: Track all durations stated by the narrative (e.g. 'poisoned for 3 turns'). Decrement by 1 each round in [COMBAT]. For out-of-combat/time-based durations, calculate the delta between the current [TIME] and the [TIME] in the PRIOR MEMO.
 CREATION: You MAY create a section that did not exist in the Prior Memo when the narrative warrants it based on your enabled modules.
 DELETION: To REMOVE a section entirely, you MUST output: \`[TAG]REMOVED[/TAG]\`.
+NO RELATIONSHIPS: Never track relationships or reputation, and never create a relationship or reputation section (e.g., [RELATIONSHIPS] or [REPUTATION]). NPC relationships are handled by a separate, dedicated system.
 </core_directives>
 
 <modules>
@@ -828,6 +829,21 @@ Example: [[FAC: Iron Syndicate | ...]]  NOT  [[FAC: Khelt :: Iron Syndicate | ..
         s.stockPrompts.inventory = DEFAULT_STOCK_PROMPTS.inventory;
     }
 
+
+    // ── MIGRATION: Block RELATIONSHIPS section in State Tracker core prompt ───────
+    if (s.systemPromptTemplate && !s.systemPromptTemplate.includes('NO RELATIONSHIPS')) {
+        if (s.systemPromptTemplate.includes('DELETION: To REMOVE a section entirely, you MUST output: `[TAG]REMOVED[/TAG]`.')) {
+            s.systemPromptTemplate = s.systemPromptTemplate.replace(
+                'DELETION: To REMOVE a section entirely, you MUST output: `[TAG]REMOVED[/TAG]`.',
+                'DELETION: To REMOVE a section entirely, you MUST output: `[TAG]REMOVED[/TAG]`.\nNO RELATIONSHIPS: Never track relationships or reputation, and never create a relationship or reputation section (e.g., [RELATIONSHIPS] or [REPUTATION]). NPC relationships are handled by a separate, dedicated system.'
+            );
+        } else if (s.systemPromptTemplate.includes('DELETION: To REMOVE a section entirely, you MUST output: \\`[TAG]REMOVED[/TAG]\\`.')) {
+            s.systemPromptTemplate = s.systemPromptTemplate.replace(
+                'DELETION: To REMOVE a section entirely, you MUST output: \\`[TAG]REMOVED[/TAG]\\`.',
+                'DELETION: To REMOVE a section entirely, you MUST output: \\`[TAG]REMOVED[/TAG]\\`.\nNO RELATIONSHIPS: Never track relationships or reputation, and never create a relationship or reputation section (e.g., [RELATIONSHIPS] or [REPUTATION]). NPC relationships are handled by a separate, dedicated system.'
+            );
+        }
+    }
 
     return extensionSettings[MODULE_NAME];
 }
