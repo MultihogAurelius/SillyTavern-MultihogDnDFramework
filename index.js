@@ -1,7 +1,7 @@
 import { EXAMPLES, COLOR_EXAMPLES, DEFAULT_STOCK_PROMPTS, RT_PROMPTS, BLOCK_ICONS, BLOCK_ORDER, PAGE_SIZE, NO_PAGINATE, QUESTS_NARRATOR_MODERN, QUESTS_NARRATOR_LEGACY } from './constants.js';
 import { MODULE_NAME, DEFAULT_MODULES, getSettings, getBarBackground, migrateCustomFields, saveChatState, saveProfile, deleteProfile, getEffectiveRouterCampaignPrefix, sanitizeCampaignPrefixString, buildNpcInstruction } from './state-manager.js';
 import { sendStateRequest, fetchOllamaModels, fetchOpenAIModels, testOpenAIConnection, getConnectionProfiles, getCurrentCompletionPreset, setCompletionPreset } from './llm-client.js';
-import { getDiceToolName, getDiceCommandName, getDiceCommandAliases, doDiceRoll, registerDiceFunctionTool, registerDiceSlashCommand, installInterceptor, getNarrativeBlocks, onGenerationStarted, onGenerationEnded, ensureRelTagRegex, resetRouterTick, makeRngQueue, buildRngBlock, RNG_QUEUE_LEN, parseAndApplyNarrativeRelTags } from './narrative-hooks.js';
+import { getDiceToolName, getDiceCommandName, getDiceCommandAliases, doDiceRoll, registerDiceFunctionTool, registerDiceSlashCommand, installInterceptor, getNarrativeBlocks, onGenerationStarted, onGenerationEnded, ensureRelTagRegex, resetRouterTick, getRouterTick, makeRngQueue, buildRngBlock, RNG_QUEUE_LEN, parseAndApplyNarrativeRelTags } from './narrative-hooks.js';
 import { deduplicateMemo, mergeMemo, computeDelta, escapeHtml, escapeRegex, highlightParens, cleanToolCallMessage, cleanMessageContent, getLastUserAction, buildLorebookContext, buildModulesInstructionText, buildModuleFormatInstruction, parseQuestsFromMemo, syncQuestsFromMemo, syncQuestsToMemo, writeQuestsToMemo, getQuestMood, extractCurrentTimeStr, stripCompletedQuestsFromMemo, parseInWorldTime } from './memo-processor.js';
 import { renderSubFieldByRule, tryRenderMarker, renderCustomBlockLine, stripMemoHtml, escapeHtmlWithColor, parseMemoBlocks, getPageSize, loadCollapsed, saveCollapsed, loadDetached, saveDetached, blockToItems, renderMemoAsCards, renderQuestLog, renderLorebookTerminal } from './renderer.js';
 import { registerLogQuestTool, checkQuestDeadlines, renderQuestsAsPlainText } from './quests.js';
@@ -3774,6 +3774,7 @@ function createPanel() {
                     </div>
                 </div>
                 <div class="rpg-tracker-footer" id="rt-agent-footer">
+                    <div id="rt-agent-last-run" style="text-align: center; font-size: 0.692em; opacity: 0.45; color: var(--rt-text-muted); padding: 2px 0 4px; line-height: 1.3; flex-shrink: 0;"></div>
                     <div class="rpg-tracker-nav">
                         <button class="rpg-tracker-nav-btn" id="rt-agent-nav-back" title="Undo last lorebook pass">←</button>
                         <span class="rpg-tracker-nav-label" id="rt-agent-nav-label">[ LIVE ]</span>
@@ -7741,6 +7742,34 @@ Rules:
 
     updateUndoLabel();
 
+    // ── Last Run status display ────────────────────────────────────────────
+    const lastRunEl = agentPanel.querySelector('#rt-agent-last-run');
+    function syncLastRunDisplay() {
+        if (!lastRunEl) return;
+        const s = getSettings();
+        const { chat } = SillyTavern.getContext();
+        const runEvery = s.routerRunEvery || 1;
+        const tick = getRouterTick();          // msgs since last auto-run (in-memory)
+        const lastRunLength = s.routerLastRunChatLength || 0;
+        const currentLength = chat?.length ?? 0;
+        const msgsSinceRun = Math.max(0, currentLength - lastRunLength);
+
+        let parts = [];
+        if (lastRunLength === 0 && msgsSinceRun === 0) {
+            parts.push('Not run yet');
+        } else {
+            parts.push(msgsSinceRun === 0 ? 'Last Run: just now' : `Last Run: ${msgsSinceRun} msg${msgsSinceRun !== 1 ? 's' : ''} ago`);
+        }
+
+        if (runEvery > 1) {
+            const nextIn = runEvery - tick;
+            parts.push(`Next in: ${nextIn} msg${nextIn !== 1 ? 's' : ''}`);
+        }
+
+        lastRunEl.textContent = parts.join(' · ');
+    }
+    syncLastRunDisplay();
+
     document.addEventListener('rt_lore_agent_updated', async () => {
         saveSettings();
         // Flush ST's in-memory lorebook cache before re-rendering so that
@@ -7751,6 +7780,11 @@ Rules:
         }
         await renderRouterUI();
         updateUndoLabel();
+        syncLastRunDisplay();
+    });
+
+    document.addEventListener('rt_generation_tick', () => {
+        syncLastRunDisplay();
     });
 
     // ── Lorebook Terminal Logic ──

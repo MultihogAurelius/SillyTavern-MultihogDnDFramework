@@ -1293,6 +1293,9 @@ export function resetRouterTick(clearKeywordPool = false) {
     }
 }
 
+/** Returns how many auto-generations have fired since the Lorebook Agent last ran. */
+export function getRouterTick() { return _routerAutoTick; }
+
 /**
  * Fires on GENERATION_ENDED. Triggers the state model pass.
  * runStateModelPass is resolved via the module import below to avoid
@@ -1377,6 +1380,7 @@ export async function onGenerationEnded() {
 
     // Step 4: Run-every throttle — only fire the Lorebook Agent every N auto-generations.
     _routerAutoTick++;
+    document.dispatchEvent(new CustomEvent('rt_generation_tick'));
     const runEvery = settings.routerRunEvery || 1;
     if (_routerAutoTick < runEvery) return;
     _routerAutoTick = 0;
