@@ -713,11 +713,13 @@ Action: commit({"rewrite": [{"id": "Eldoria_Events::3", "content": "Compressed v
                 const callId = /** @type {any} */ (resolvedToolCall).id || `call_cleanup_${Date.now()}_${cleanupTurns}`;
                 broadcastStep('tool', `${toolName}(...)`);
 
-                cleanupMessages.push({
+                const _asstCleanup = {
                     role: 'assistant',
                     content: result.content || null,
                     tool_calls: [{ id: callId, type: 'function', function: { name: toolName, arguments: JSON.stringify(args) } }]
-                });
+                };
+                if (result.reasoning) _asstCleanup.reasoning_content = result.reasoning;
+                cleanupMessages.push(_asstCleanup);
 
                 let observation = '';
                 if (toolName === 'commit') {
@@ -1177,8 +1179,9 @@ ${sharedContext}`;
                 const callId = /** @type {any} */ (resolvedToolCall).id || `call_${Date.now()}_${turns}`;
                 broadcastStep('tool', `${toolName}(...)`);
 
-                // Append the assistant turn (with tool_calls) to the conversation
-                messages.push({
+                // Append the assistant turn (with tool_calls) to the conversation.
+                // DeepSeek thinking models require reasoning_content to be passed back.
+                const _asstMsg = {
                     role: 'assistant',
                     content: result.content || null,
                     tool_calls: [{
@@ -1186,7 +1189,9 @@ ${sharedContext}`;
                         type: 'function',
                         function: { name: toolName, arguments: JSON.stringify(args) }
                     }]
-                });
+                };
+                if (result.reasoning) _asstMsg.reasoning_content = result.reasoning;
+                messages.push(_asstMsg);
 
                 let observation = '';
 

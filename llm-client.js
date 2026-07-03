@@ -572,14 +572,15 @@ export async function sendAgentTurn(settings, messages, tools = null, signal = n
         if (!resp.ok) throw new Error(`OpenAI request failed (${resp.status})`);
         const data = await resp.json();
         const msg = data.choices?.[0]?.message;
+        const _reasoning = msg?.reasoning_content ?? msg?.reasoning ?? null;
         if (msg?.tool_calls?.length) {
             const tc = msg.tool_calls[0];
             let args;
             try { args = JSON.parse(tc.function.arguments); } catch (_) { args = {}; }
-            return { content: msg.content || '', toolCall: { name: tc.function.name, args, id: tc.id } };
+            return { content: msg.content || '', reasoning: _reasoning, toolCall: { name: tc.function.name, args, id: tc.id } };
         }
         const text = msg?.content ?? data.choices?.[0]?.text ?? '';
-        return { content: text, toolCall: null };
+        return { content: text, reasoning: _reasoning, toolCall: null };
     }
 
     // ── Ollama ───────────────────────────────────────────────────────────────
