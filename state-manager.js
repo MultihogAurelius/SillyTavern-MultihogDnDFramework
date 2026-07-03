@@ -105,6 +105,7 @@ export function getSettings() {
         enabled: true,
         trackerCollapsed: false,
         agentCollapsed: false,
+        agentKeysCollapsed: false,
         agentSettingsOpen: true,
         agentConsoleOpen: true,
         agentModulesOpen: true,
