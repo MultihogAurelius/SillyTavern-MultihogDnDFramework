@@ -728,6 +728,14 @@ Example: [[FAC: Iron Syndicate | ...]]  NOT  [[FAC: Khelt :: Iron Syndicate | ..
         s.settingsVersion = '3.16.17';
     }
 
+    // Force rebuild of NPC instruction to restore length targets that were incorrectly stripped by a previous bug (v3.16.18)
+    if (!s.settingsVersion || s.settingsVersion < '3.16.18') {
+        if (s.routerModules?.npc) {
+            s.routerModules.npc.instruction = buildNpcInstruction(s.npcMajorWords, s.npcMinorWords, false);
+        }
+        s.settingsVersion = '3.16.18';
+    }
+
 
 
     // ── MIGRATION: Update system prompts with keywords instructions (v3.2.3+) ──────
