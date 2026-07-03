@@ -2224,6 +2224,11 @@ globalThis._rpgStateModelRunning = () => _stateModelRunning;
 globalThis._rpgCurrentChatId = () => _currentChatId;
 // Expose live prefix derivation for any module that needs the current prefix.
 globalThis._rpgGetCurrentPrefix = () => getEffectiveRouterCampaignPrefix(SillyTavern.getContext().chatId || '');
+globalThis._rpgUpdateUIMemo = (text) => {
+    if (typeof updateUIMemo === 'function') updateUIMemo(text);
+    if (typeof syncMemoView === 'function') syncMemoView();
+    if (typeof refreshRenderedView === 'function') refreshRenderedView();
+};
 
 function handleLevelUp() {
     const { sendSystemMessage } = SillyTavern.getContext();
