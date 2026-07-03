@@ -214,7 +214,7 @@ export function registerLogQuestTool() {
             toolDescription +=
                 ' If the quest is time-sensitive, you MUST calculate and supply deadline_time in the format ' +
                 (s.useDdMmYyFormat ?
-                    (s.use24hTime ? '"HH:MM, DD/MM/YY"' : '"HH:MM AM/PM, DD/MM/YY"') :
+                    (s.use24hTime ? '"HH:MM, DD/MM/YYYY"' : '"HH:MM AM/PM, DD/MM/YYYY"') :
                     (s.use24hTime ? '"HH:MM, Day N"' : '"HH:MM AM/PM, Day N"')
                 ) + '. ' +
                 (isFrustration
@@ -294,11 +294,11 @@ export function registerLogQuestTool() {
                 description:
                     'The exact in-world timestamp when the quest must be completed (e.g. ' +
                     (s.useDdMmYyFormat ?
-                        (s.use24hTime ? '"18:00, 04/01/26"' : '"06:00 PM, 04/01/26"') :
+                        (s.use24hTime ? '"18:00, 04/01/2026"' : '"06:00 PM, 04/01/2026"') :
                         (s.use24hTime ? '"18:00, Day 4"' : '"06:00 PM, Day 4"')
                     ) + '). ' +
                     'If the narrative specifies a duration (e.g., "four days"), you MUST calculate the absolute ' +
-                    (s.useDdMmYyFormat ? 'DD/MM/YY' : 'Day N') +
+                    (s.useDdMmYyFormat ? 'DD/MM/YYYY' : 'Day N') +
                     ' timestamp based on the current time. ' +
                     'Omit only if the quest has no time pressure whatsoever.'
             };

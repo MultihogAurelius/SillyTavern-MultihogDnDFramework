@@ -342,7 +342,7 @@ export async function runRouterPass(narrativeOutput, manualPrompt = null, custom
 
 
         // Extract Current Context (Time & Location)
-        const timeRegex = /(\d{1,2}:\d{2}\s*(?:AM|PM)?,\s*(?:Day\s*\d+|\d{1,2}\/\d{1,2}\/\d{2,4}))/i;
+        const timeRegex = /(\d{1,2}:\d{2}\s*(?:AM|PM)?,\s*(?:Day\s*\d+|\d{1,2}\/\d{1,2}\/\d+))/i;
         const narrativeTimeMatch = recentChatString.match(timeRegex);
         const memoTimeMatch = settings.currentMemo?.match(/\[TIME\]([\s\S]*?)\[\/TIME\]/i);
         const cleanMemoTime = memoTimeMatch ? extractCurrentTimeStr(memoTimeMatch[1]) : '';
@@ -1313,7 +1313,7 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
     let changed = false;
     const errors = [];
     const allBookNames = Object.keys(allBooks);
-    const TIMESTAMP_REGEX = /(?:\[Day\s+\d+|\[\d{1,2}\/\d{1,2}\/\d{2,4})\b/i;
+    const TIMESTAMP_REGEX = /(?:\[Day\s+\d+|\[\d{1,2}\/\d{1,2}\/\d+)\b/i;
 
     const timePrefix = currentTime ? `[${currentTime}] ` : '';
 
@@ -1377,7 +1377,7 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
             // Strip [ID:] stamp from anywhere in the delta (model sometimes echoes it)
             let delta = (up.content || '').replace(/\[ID:[^\]]+\]\n?/gi, '').trim();
             // Ensure each [Day X,...] or [DD/MM/YY,...] timestamp begins on its own line
-            delta = delta.replace(/(.)\s+(\[(?:Day\s+\d+|\d{1,2}\/\d{1,2}\/\d{2,4}))/gi, '$1\n$2');
+            delta = delta.replace(/(.)\s+(\[(?:Day\s+\d+|\d{1,2}\/\d{1,2}\/\d+))/gi, '$1\n$2');
             // Append delta to the existing chronicle
             const existing = (book.entries[uid].content || '').replace(/^\[ID:[^\]]+\]\n?/i, '').trimEnd();
             delta = deduplicateContent(existing, delta);
@@ -1602,7 +1602,7 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
                     // Append delta to existing chronicle (dedup path)
                     const existing = (bookData.entries[existingUid].content || '').replace(/^\[ID:[^\]]+\]\n?/i, '').trimEnd();
                     // Ensure each [Day X,...] or [DD/MM/YY,...] timestamp begins on its own line
-                    delta = delta.replace(/(.)\s+(\[(?:Day\s+\d+|\d{1,2}\/\d{1,2}\/\d{2,4}))/gi, '$1\n$2');
+                    delta = delta.replace(/(.)\s+(\[(?:Day\s+\d+|\d{1,2}\/\d{1,2}\/\d+))/gi, '$1\n$2');
                     delta = deduplicateContent(existing, delta);
                     bookData.entries[existingUid].content = existing && delta ? `${existing}\n${delta}` : (existing || delta);
 

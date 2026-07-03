@@ -117,7 +117,7 @@ export function extractCurrentTimeStr(timeBlockContent) {
 
 /**
  * Converts in-world time strings to a comparable numeric value (minutes since Day 1/epoch date, 00:00).
- * Expected formats: "08:00 AM, Day 1", "08:00 AM, 01/01/26", "Day 4", "10:00 PM"
+ * Expected formats: "08:00 AM, Day 1", "08:00 AM, 01/01/2026", "Day 4", "10:00 PM"
  * @param {string} str 
  * @returns {number}
  */
@@ -126,7 +126,7 @@ export function parseInWorldTime(str) {
     if (str.includes('\n')) {
         str = extractCurrentTimeStr(str);
     }
-    const ddmmyyMatch = str.match(/\b(\d{1,2})\/(\d{1,2})\/(\d{2,4})\b/);
+    const ddmmyyMatch = str.match(/\b(\d{1,2})\/(\d{1,2})\/(\d+)\b/);
     const dayMatch = str.match(/(?:Day|D)\s*(\d+)/i);
     const timeMatch = str.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
     
@@ -136,8 +136,23 @@ export function parseInWorldTime(str) {
         const mm = parseInt(ddmmyyMatch[2], 10);
         let yy = parseInt(ddmmyyMatch[3], 10);
         if (yy < 100) yy += 2000;
-        const dateObj = new Date(yy, mm - 1, dd);
-        const epochObj = new Date(2026, 0, 1);
+
+        let baseDay = 1, baseMonth = 1, baseYear = 2026;
+        const settings = getSettings();
+        const initial = settings.initialDate || '';
+        const initMatch = initial.match(/^(\d{1,2})\/(\d{1,2})\/(\d+)$/);
+        if (initMatch) {
+            baseDay = parseInt(initMatch[1], 10);
+            baseMonth = parseInt(initMatch[2], 10);
+            let y = parseInt(initMatch[3], 10);
+            if (y < 100) y += 2000;
+            baseYear = y;
+        }
+
+        const dateObj = new Date(0, 0, 1);
+        dateObj.setFullYear(yy, mm - 1, dd);
+        const epochObj = new Date(0, 0, 1);
+        epochObj.setFullYear(baseYear, baseMonth - 1, baseDay);
         const diffDays = Math.round((dateObj - epochObj) / (1000 * 60 * 60 * 24));
         d = diffDays + 1;
     } else if (dayMatch) {
@@ -177,11 +192,26 @@ export function formatInWorldTime(totalMins) {
 
     let dateStr = '';
     if (useDdMmYy) {
-        const date = new Date(2026, 0, 1 + (dayIndex - 1));
+        let baseDay = 1, baseMonth = 1, baseYear = 2026;
+        const initial = settings.initialDate || '';
+        const initMatch = initial.match(/^(\d{1,2})\/(\d{1,2})\/(\d+)$/);
+        if (initMatch) {
+            baseDay = parseInt(initMatch[1], 10);
+            baseMonth = parseInt(initMatch[2], 10);
+            let y = parseInt(initMatch[3], 10);
+            if (y < 100) y += 2000;
+            baseYear = y;
+        }
+
+        const date = new Date(0, 0, 1);
+        date.setFullYear(baseYear, baseMonth - 1, baseDay + (dayIndex - 1));
         const dd = String(date.getDate()).padStart(2, '0');
         const mm = String(date.getMonth() + 1).padStart(2, '0');
-        const yy = String(date.getFullYear() % 100).padStart(2, '0');
-        dateStr = `${dd}/${mm}/${yy}`;
+        let yyyy = String(date.getFullYear());
+        if (yyyy.length < 4) {
+            yyyy = yyyy.padStart(4, '0');
+        }
+        dateStr = `${dd}/${mm}/${yyyy}`;
     } else {
         dateStr = `Day ${dayIndex}`;
     }
@@ -1082,9 +1112,9 @@ export function buildModulesInstructionText(settings) {
                     p = (promptsMap['quests_legacy'] || DEFAULT_STOCK_PROMPTS.quests_legacy);
                     if (settings.useDdMmYyFormat) {
                         p = p
-                            .replace(/Day 1/g, '01/01/26')
-                            .replace(/Day 4/g, '04/01/26')
-                            .replace(/Day N/g, 'DD/MM/YY');
+                            .replace(/Day 1/g, '01/01/2026')
+                            .replace(/Day 4/g, '04/01/2026')
+                            .replace(/Day N/g, 'DD/MM/YYYY');
                     }
                     if (!isDeadlines) p = p.replace(/\n\s*DEADLINE:.*?\n/g, '\n');
                     if (!isFrustration) p = p.replace(/\n\s*FRUSTRATION_COEFF:.*?\n/g, '\n');

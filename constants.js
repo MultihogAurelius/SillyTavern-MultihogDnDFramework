@@ -161,18 +161,18 @@ Last Rest: HH:MM, Day N
 Current Time: HH:MM, Day N
 
 'Last Rest' is ONLY triggered on Long Rest, NOT Short Rest (when Hit Dice, etc, are spent.) If the [TIME] delta between PREVIOUS STATE MEMO and your current update is only an hour, it is a Short Rest.`,
-  time_ddmmyy: `Current time and date grabbed from the status footer. Also track time of the last rest (only on Long Rest, e.g. 'Last Rest: 10:00 PM, 01/01/26'). Use this to track out-of-combat buff durations by comparing to the PRIOR MEMO's time.
+  time_ddmmyy: `Current time and date grabbed from the status footer. Also track time of the last rest (only on Long Rest, e.g. 'Last Rest: 10:00 PM, 01/01/2026'). Use this to track out-of-combat buff durations by comparing to the PRIOR MEMO's time.
 
 Format:
-Last Rest: HH:MM AM/PM, DD/MM/YY
-Current Time: HH:MM AM/PM, DD/MM/YY
+Last Rest: HH:MM AM/PM, DD/MM/YYYY
+Current Time: HH:MM AM/PM, DD/MM/YYYY
 
 'Last Rest' is ONLY triggered on Long Rest, NOT Short Rest (when Hit Dice, etc, are spent.) If the [TIME] delta between PREVIOUS STATE MEMO and your current update is only an hour, it is a Short Rest.`,
-  time_ddmmyy_24h: `Current time and date grabbed from the status footer. Also track time of the last rest (only on Long Rest, e.g. 'Last Rest: 22:00, 01/01/26'). Use this to track out-of-combat buff durations by comparing to the PRIOR MEMO's time.
+  time_ddmmyy_24h: `Current time and date grabbed from the status footer. Also track time of the last rest (only on Long Rest, e.g. 'Last Rest: 22:00, 01/01/2026'). Use this to track out-of-combat buff durations by comparing to the PRIOR MEMO's time.
 
 Format (24-hour clock, NO AM/PM):
-Last Rest: HH:MM, DD/MM/YY
-Current Time: HH:MM, DD/MM/YY
+Last Rest: HH:MM, DD/MM/YYYY
+Current Time: HH:MM, DD/MM/YYYY
 
 'Last Rest' is ONLY triggered on Long Rest, NOT Short Rest (when Hit Dice, etc, are spent.) If the [TIME] delta between PREVIOUS STATE MEMO and your current update is only an hour, it is a Short Rest.`,
 };

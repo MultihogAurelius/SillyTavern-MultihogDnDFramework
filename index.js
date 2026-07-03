@@ -471,11 +471,11 @@ function syncOnboardingUI() {
     const initialDateInput = /** @type {HTMLInputElement|null} */ (onboarding.querySelector('#rt_onboarding_initial_date_input'));
     const initialDateLabel = /** @type {HTMLElement|null} */ (onboarding.querySelector('#rt_onboarding_initial_date_label'));
     if (initialDateInput) {
-        initialDateInput.value = s.initialDate || (s.useDdMmYyFormat ? '01/01/26' : 'Day 1');
+        initialDateInput.value = s.initialDate || (s.useDdMmYyFormat ? '01/01/2026' : 'Day 1');
         if (initialDateLabel) {
             initialDateLabel.textContent = s.useDdMmYyFormat ? 'Initial Date:' : 'Initial Day:';
         }
-        initialDateInput.placeholder = s.useDdMmYyFormat ? '01/01/26' : 'Day 1';
+        initialDateInput.placeholder = s.useDdMmYyFormat ? '01/01/2026' : 'Day 1';
     }
 }
 // ── Renderer / navigation state ──
@@ -2006,16 +2006,16 @@ async function runStateModelPass(narrativeOutput, isFullContext = false, overrid
         let systemPrompt = settings.systemPromptTemplate.replace('{{modulesText}}', modulesText);
         if (settings.useDdMmYyFormat) {
             systemPrompt = systemPrompt
-                .replace(/\[Day\s+X,\s+HH:MM\]/g, '[DD/MM/YY, HH:MM]')
-                .replace(/Day\s+3,\s+14:00/g, '03/01/26, 14:00')
-                .replace(/Day\s+1,\s+11:52/g, '01/01/26, 11:52')
-                .replace(/Day\s+1/g, '01/01/26')
-                .replace(/Day\s+2/g, '02/01/26')
-                .replace(/Day\s+3/g, '03/01/26')
-                .replace(/Day\s+4/g, '04/01/26')
-                .replace(/Day\s+6/g, '06/01/26')
-                .replace(/Day\s+N/g, 'DD/MM/YY')
-                .replace(/Day\s+X/g, 'DD/MM/YY');
+                .replace(/\[Day\s+X,\s+HH:MM\]/g, '[DD/MM/YYYY, HH:MM]')
+                .replace(/Day\s+3,\s+14:00/g, '03/01/2026, 14:00')
+                .replace(/Day\s+1,\s+11:52/g, '01/01/2026, 11:52')
+                .replace(/Day\s+1/g, '01/01/2026')
+                .replace(/Day\s+2/g, '02/01/2026')
+                .replace(/Day\s+3/g, '03/01/2026')
+                .replace(/Day\s+4/g, '04/01/2026')
+                .replace(/Day\s+6/g, '06/01/2026')
+                .replace(/Day\s+N/g, 'DD/MM/YYYY')
+                .replace(/Day\s+X/g, 'DD/MM/YYYY');
         }
         if (isFullContext) {
             systemPrompt = systemPrompt
@@ -2284,16 +2284,16 @@ async function sendDirectPrompt(message) {
         let systemPrompt = settings.systemPromptTemplate.replace('{{modulesText}}', modulesText);
         if (settings.useDdMmYyFormat) {
             systemPrompt = systemPrompt
-                .replace(/\[Day\s+X,\s+HH:MM\]/g, '[DD/MM/YY, HH:MM]')
-                .replace(/Day\s+3,\s+14:00/g, '03/01/26, 14:00')
-                .replace(/Day\s+1,\s+11:52/g, '01/01/26, 11:52')
-                .replace(/Day\s+1/g, '01/01/26')
-                .replace(/Day\s+2/g, '02/01/26')
-                .replace(/Day\s+3/g, '03/01/26')
-                .replace(/Day\s+4/g, '04/01/26')
-                .replace(/Day\s+6/g, '06/01/26')
-                .replace(/Day\s+N/g, 'DD/MM/YY')
-                .replace(/Day\s+X/g, 'DD/MM/YY');
+                .replace(/\[Day\s+X,\s+HH:MM\]/g, '[DD/MM/YYYY, HH:MM]')
+                .replace(/Day\s+3,\s+14:00/g, '03/01/2026, 14:00')
+                .replace(/Day\s+1,\s+11:52/g, '01/01/2026, 11:52')
+                .replace(/Day\s+1/g, '01/01/2026')
+                .replace(/Day\s+2/g, '02/01/2026')
+                .replace(/Day\s+3/g, '03/01/2026')
+                .replace(/Day\s+4/g, '04/01/2026')
+                .replace(/Day\s+6/g, '06/01/2026')
+                .replace(/Day\s+N/g, 'DD/MM/YYYY')
+                .replace(/Day\s+X/g, 'DD/MM/YYYY');
         }
 
         const sanitizedCurrent = stripMemoHtml(settings.currentMemo.replace(/<\/?memo>/gi, '').trim());
@@ -2847,8 +2847,8 @@ Gear: Weapon (stats), AC: Z (Armor Name)
 Attr: STR X (mod), DEX X (mod), CON X (mod), INT X (mod), WIS X (mod), CHA X (mod)
 Saves: Fort +X | Ref +X | Will +X`;
 
-            const initDateVal = getSettings().initialDate || (getSettings().useDdMmYyFormat ? '01/01/26' : 'Day 1');
-            const initRestVal = getSettings().useDdMmYyFormat ? '01/01/26' : 'Day 0';
+            const initDateVal = getSettings().initialDate || (getSettings().useDdMmYyFormat ? '01/01/2026' : 'Day 1');
+            const initRestVal = getSettings().useDdMmYyFormat ? '01/01/2026' : 'Day 0';
             const TIME_FORMAT_HINT = ` Also output a [TIME] block initialized with Current Time at "08:00 AM, ${initDateVal}" and Last Rest at "12:00 AM, ${initRestVal}".`;
 
             const prompts = {
@@ -3154,9 +3154,9 @@ Saves: Fort +X | Ref +X | Will +X`;
             const isChecked = !!onboardingTimeDdMmyyCb.checked;
             syncSettingsAndUI(settings => {
                 settings.useDdMmYyFormat = isChecked;
-                if (isChecked && settings.initialDate === "Day 1") {
-                    settings.initialDate = "01/01/26";
-                } else if (!isChecked && settings.initialDate === "01/01/26") {
+                if (isChecked && (settings.initialDate === "Day 1" || !settings.initialDate)) {
+                    settings.initialDate = "01/01/2026";
+                } else if (!isChecked && (settings.initialDate === "01/01/2026" || settings.initialDate === "01/01/26")) {
                     settings.initialDate = "Day 1";
                 }
                 if (settings.routerModules?.npc) {
@@ -5824,14 +5824,15 @@ function createPanel() {
                         
                         if (isEventsBook) {
                             // Check for DD/MM/YY
-                            const dateRegex = /\[([^\]]*\b(\d{1,2})\/(\d{1,2})\/(\d{2,4})\b[^\]]*)\](.*)/i;
+                            const dateRegex = /\[([^\]]*\b(\d{1,2})\/(\d{1,2})\/(\d+)\b[^\]]*)\](.*)/i;
                             const dateMatch = item.label.match(dateRegex);
                             if (dateMatch) {
                                 const dd = dateMatch[2].padStart(2, '0');
                                 const mm = dateMatch[3].padStart(2, '0');
                                 let yy = dateMatch[4];
                                 if (yy.length === 2) yy = '20' + yy;
-                                const dateStr = `${dd}/${mm}/${yy.slice(-2)}`;
+                                if (yy.length < 4) yy = yy.padStart(4, '0');
+                                const dateStr = `${dd}/${mm}/${yy}`;
                                 let bracketContent = dateMatch[1]
                                     .replace(new RegExp(`(?:,\\s*)?${dateMatch[2]}\\/${dateMatch[3]}\\/${dateMatch[4]}(?:\\s*,)?`, 'i'), '')
                                     .trim();
@@ -5872,8 +5873,8 @@ function createPanel() {
                             if (bDayMatch) return 1;
 
                             // Check if keys start with DD/MM/YY
-                            const aDateMatch = a.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
-                            const bDateMatch = b.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+                            const aDateMatch = a.match(/^(\d{1,2})\/(\d{1,2})\/(\d+)$/);
+                            const bDateMatch = b.match(/^(\d{1,2})\/(\d{1,2})\/(\d+)$/);
                             if (aDateMatch && bDateMatch) {
                                 const aD = parseInt(aDateMatch[1], 10);
                                 const aM = parseInt(aDateMatch[2], 10);
@@ -5883,9 +5884,11 @@ function createPanel() {
                                 const bM = parseInt(bDateMatch[2], 10);
                                 let bY = parseInt(bDateMatch[3], 10);
                                 if (bY < 100) bY += 2000;
-                                const aTime = new Date(aY, aM - 1, aD).getTime();
-                                const bTime = new Date(bY, bM - 1, bD).getTime();
-                                return aTime - bTime;
+                                const aTime = new Date(0, 0, 1);
+                                aTime.setFullYear(aY, aM - 1, aD);
+                                const bTime = new Date(0, 0, 1);
+                                bTime.setFullYear(bY, bM - 1, bD);
+                                return aTime.getTime() - bTime.getTime();
                             }
                             if (aDateMatch) return -1;
                             if (bDateMatch) return 1;
@@ -5969,7 +5972,7 @@ function createPanel() {
                         // Status dot
                         const bookNameLower = (bookName || '').toLowerCase();
                         const isEventsBook = bookNameLower.includes('events') || bookNameLower.includes('event');
-                        const isDayNode = isEventsBook && (/^Day\s+\d+$/i.test(node.name) || /^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(node.name));
+                        const isDayNode = isEventsBook && (/^Day\s+\d+$/i.test(node.name) || /^\d{1,2}\/\d{1,2}\/\d+$/.test(node.name));
 
                         let statusDotHtml = '';
                         if (node.item) {
@@ -9549,7 +9552,7 @@ function refreshOrderList() {
             item.appendChild(pill);
 
             const pillDate = document.createElement('label');
-            pillDate.title = 'Toggle between [Day X] and [DD/MM/YY] date format for the time displays and prompts.';
+            pillDate.title = 'Toggle between [Day X] and [DD/MM/YYYY] date format for the time displays and prompts.';
             pillDate.style.cssText = 'display:inline-flex; align-items:center; gap:4px; font-size:10px; opacity:0.8; cursor:pointer; user-select:none; margin-right:4px; white-space:nowrap;';
 
             const cbDate = document.createElement('input');
@@ -9560,9 +9563,9 @@ function refreshOrderList() {
             cbDate.onchange = () => {
                 syncSettingsAndUI(fresh => {
                     fresh.useDdMmYyFormat = cbDate.checked;
-                    if (cbDate.checked && fresh.initialDate === "Day 1") {
-                        fresh.initialDate = "01/01/26";
-                    } else if (!cbDate.checked && fresh.initialDate === "01/01/26") {
+                    if (cbDate.checked && (fresh.initialDate === "Day 1" || !fresh.initialDate)) {
+                        fresh.initialDate = "01/01/2026";
+                    } else if (!cbDate.checked && (fresh.initialDate === "01/01/2026" || fresh.initialDate === "01/01/26")) {
                         fresh.initialDate = "Day 1";
                     }
                     if (fresh.routerModules?.npc) {
@@ -9577,7 +9580,7 @@ function refreshOrderList() {
             };
 
             const lblDate = document.createElement('span');
-            lblDate.textContent = 'DD/MM/YY';
+            lblDate.textContent = 'DD/MM/YYYY';
 
             pillDate.appendChild(cbDate);
             pillDate.appendChild(lblDate);
@@ -12681,9 +12684,9 @@ RULES:
             const isChecked = !!$(this).prop('checked');
             syncSettingsAndUI(s => {
                 s.useDdMmYyFormat = isChecked;
-                if (isChecked && s.initialDate === "Day 1") {
-                    s.initialDate = "01/01/26";
-                } else if (!isChecked && s.initialDate === "01/01/26") {
+                if (isChecked && (s.initialDate === "Day 1" || !s.initialDate)) {
+                    s.initialDate = "01/01/2026";
+                } else if (!isChecked && (s.initialDate === "01/01/2026" || s.initialDate === "01/01/26")) {
                     s.initialDate = "Day 1";
                 }
                 if (s.routerModules?.npc) {
@@ -13098,12 +13101,12 @@ RULES:
             const currentNextMins = currentLastMins >= 0 ? currentLastMins + intervalMinutes : intervalMinutes;
 
             function fmtHint(totalMins) {
-                if (totalMins < 0) return s.useDdMmYyFormat ? '01/01/26, 08:00 AM' : (s.use24hTime ? 'Day 1, 00:00' : 'Day 1, 12:00 AM');
+                if (totalMins < 0) return s.useDdMmYyFormat ? '01/01/2026, 08:00 AM' : (s.use24hTime ? 'Day 1, 00:00' : 'Day 1, 12:00 AM');
                 return formatInWorldTime(totalMins);
             }
 
             const acceptedFormats = s.useDdMmYyFormat
-                ? 'Accepted formats: "06/01/26, 08:00 AM", "06/01/26, 08:00", "06/01/26"'
+                ? 'Accepted formats: "06/01/2026, 08:00 AM", "06/01/2026, 08:00", "06/01/2026"'
                 : 'Accepted formats: "Day 6, 08:00 AM", "Day 6, 08:00", "Day 6"';
 
             const userInput = window.prompt(

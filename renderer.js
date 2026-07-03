@@ -1320,7 +1320,7 @@ function formatValueToCurrency(totalCp, detectedCurrency) {
                     <div style="display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; padding-left: 5px;">
                         <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
                             <input type="checkbox" id="rt_onboarding_time_ddmmyy" />
-                            <span>Use DD/MM/YY Format</span>
+                            <span>Use DD/MM/YYYY Format</span>
                         </label>
                         <div style="display: flex; align-items: center; gap: 8px; margin-top: 2px;">
                             <span id="rt_onboarding_initial_date_label" style="font-size: 0.8em; opacity: 0.75;">Initial Day:</span>
