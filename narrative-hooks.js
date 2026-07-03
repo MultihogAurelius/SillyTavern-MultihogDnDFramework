@@ -943,9 +943,6 @@ export async function parseAndApplyNarrativeRelTags() {
     if (_rpgIsGenerating) return; // Prevent scanning ghost text or early partial text during stream
     
     const settings = getSettings();
-    console.log('[RPG Tracker] parseAndApplyNarrativeRelTags: STARTING. Bars enabled:', !!settings.npcRelationshipBars);
-    if (!settings.npcRelationshipBars) return;
-
     const ctx = SillyTavern.getContext();
     const chat = ctx.chat;
     if (!chat || !chat.length) {
@@ -966,18 +963,74 @@ export async function parseAndApplyNarrativeRelTags() {
         return;
     }
     
-    console.log('[RPG Tracker] parseAndApplyNarrativeRelTags: Found AI message (index ' + chat.indexOf(lastAiMsg) + ') with text length:', lastAiMsg.mes?.length);
-
     let anyChanged = false;
+    let anyStateChanged = false;
+
+    // --- 1. STATE TRACKER SWIPE ROLLBACK & RESTORE ---
+    if (settings.stateTrackerSwipeRollback !== false) {
+        lastAiMsg.extra = lastAiMsg.extra || {};
+        const swipeId = lastAiMsg.swipe_id ?? 0;
+        const prevSwipeId = lastAiMsg.extra.rpgActiveSwipe;
+        if (prevSwipeId !== undefined && prevSwipeId !== swipeId) {
+            // Determine the target memo for the new swipe
+            let targetMemo = lastAiMsg.extra.rpgMemoResult?.[swipeId];
+            // Fallback to base memo if not processed yet
+            if (typeof targetMemo !== 'string') {
+                targetMemo = lastAiMsg.extra.rpgMemoRollback?.[prevSwipeId] || lastAiMsg.extra.rpgMemoRollback?.[swipeId];
+            }
+            
+            if (typeof targetMemo === 'string') {
+                console.log(`[RPG Tracker] State swipe detected (${prevSwipeId}→${swipeId}): restoring memo snapshot.`);
+                settings.currentMemo = targetMemo;
+                
+                // Keep memoHistory consistent
+                if (Array.isArray(settings.memoHistory)) {
+                    const baseMemo = lastAiMsg.extra.rpgMemoRollback?.[prevSwipeId] || lastAiMsg.extra.rpgMemoRollback?.[swipeId];
+                    if (targetMemo === baseMemo) {
+                        if (settings.memoHistory[0] !== baseMemo) {
+                            settings.memoHistory.shift();
+                            if (settings.historyIndex !== undefined && settings.historyIndex > 0) settings.historyIndex--;
+                        }
+                    } else {
+                        settings.memoHistory[0] = targetMemo;
+                    }
+                }
+                
+                // Update UI immediately
+                if (typeof globalThis._rpgUpdateUIMemo === 'function') {
+                    globalThis._rpgUpdateUIMemo(targetMemo);
+                }
+                anyStateChanged = true;
+            }
+        }
+    }
+
     const triggerUIUpdate = () => {
         if (typeof ctx.saveChatDebounced === 'function') ctx.saveChatDebounced();
         ctx.saveSettingsDebounced?.();
-        // Skip dispatching 'rt_lore_agent_updated' to avoid full lorebook hard-drive scans.
-        // The DOM is refreshed manually via refreshRelationshipBarsDOM below.
         refreshRelationshipBarsDOM(settings);
     };
 
-    // --- 1. SWIPE ROLLBACK & INITIALIZATION ---
+    const triggerStateOnlyUIUpdate = () => {
+        if (typeof ctx.saveChatDebounced === 'function') ctx.saveChatDebounced();
+        ctx.saveSettingsDebounced?.();
+    };
+
+    // If Relationship Bars are disabled, we only handle State Tracker swipe updates
+    console.log('[RPG Tracker] parseAndApplyNarrativeRelTags: STARTING. Bars enabled:', !!settings.npcRelationshipBars);
+    if (!settings.npcRelationshipBars) {
+        if (anyStateChanged) {
+            triggerStateOnlyUIUpdate();
+        }
+        // Save the active swipe marker
+        lastAiMsg.extra = lastAiMsg.extra || {};
+        lastAiMsg.extra.rpgActiveSwipe = lastAiMsg.swipe_id ?? 0;
+        return;
+    }
+
+    console.log('[RPG Tracker] parseAndApplyNarrativeRelTags: Found AI message (index ' + chat.indexOf(lastAiMsg) + ') with text length:', lastAiMsg.mes?.length);
+
+    // --- 2. RELATIONSHIP SWIPE ROLLBACK & RESTORE ---
     lastAiMsg.extra = lastAiMsg.extra || {};
     const swipeId = lastAiMsg.swipe_id ?? 0;
 
@@ -989,40 +1042,72 @@ export async function parseAndApplyNarrativeRelTags() {
     }
     lastAiMsg.extra.rpgRollbackData = lastAiMsg.extra.rpgRollbackData || {};
 
-    // Detect swipe change and perform rollback
+    const alreadyScanned = lastAiMsg.extra.rpgProcessedTags[swipeId] !== undefined;
+
+    // Detect swipe change and perform rollback / re-application
     if (lastAiMsg.extra.rpgActiveSwipe !== undefined && lastAiMsg.extra.rpgActiveSwipe !== swipeId) {
         const prevSwipeId = lastAiMsg.extra.rpgActiveSwipe;
-        console.log(`[RPG Tracker] Swipe changed from ${prevSwipeId} to ${swipeId}. Rolling back previous allocations.`);
+        console.log(`[RPG Tracker] Relationship swipe change: prev=${prevSwipeId}, current=${swipeId}`);
         
+        // Rollback previous swipe
         if (lastAiMsg.extra.rpgRollbackData[prevSwipeId]) {
+            console.log(`[RPG Tracker] Rolling back previous swipe ${prevSwipeId} relationship allocations.`);
             for (const rb of lastAiMsg.extra.rpgRollbackData[prevSwipeId]) {
-                // Reverse the exact delta that was successfully applied
                 if (settings.npcRelationshipValues && settings.npcRelationshipValues[rb.npcId]) {
                     const current = settings.npcRelationshipValues[rb.npcId][rb.field] ?? 0;
-                    
-                    // State Integrity Check: If the user manually edited the UI slider,
-                    // the current value won't match our expected value. If so, abort the rollback
-                    // so we don't penalize them or undo their manual reset!
                     if (rb.expectedValue !== undefined && current !== rb.expectedValue) {
-                        console.log(`[RPG Tracker] Aborting rollback for ${rb.npcId}: User manually edited slider from ${rb.expectedValue} to ${current}.`);
+                        console.log(`[RPG Tracker] Aborting rollback for ${rb.npcId}: User manually edited slider.`);
                         continue;
                     }
-
                     settings.npcRelationshipValues[rb.npcId][rb.field] = Math.max(-100, Math.min(100, current - rb.actualAppliedDelta));
                 }
-                
-                // Remove the exact log entry
                 if (settings.npcRelationshipLog && Array.isArray(settings.npcRelationshipLog[rb.npcId])) {
                     settings.npcRelationshipLog[rb.npcId] = settings.npcRelationshipLog[rb.npcId].filter(l => l.timestamp !== rb.logTimestamp);
                 }
-                console.log(`[RPG Tracker] Rolled back ${rb.field} delta (${rb.actualAppliedDelta}) for ${rb.npcId}`);
             }
             anyChanged = true;
         }
-
-        // We are entering a new swipe. Clear its tracking data so it gets evaluated fresh.
-        lastAiMsg.extra.rpgProcessedTags[swipeId] = [];
-        lastAiMsg.extra.rpgRollbackData[swipeId] = [];
+        
+        // Re-apply current swipe if we have already scanned/processed it
+        if (alreadyScanned) {
+            if (lastAiMsg.extra.rpgRollbackData[swipeId] && lastAiMsg.extra.rpgRollbackData[swipeId].length > 0) {
+                console.log(`[RPG Tracker] Re-applying saved allocations for swipe ${swipeId}`);
+                for (const rb of lastAiMsg.extra.rpgRollbackData[swipeId]) {
+                    if (settings.npcRelationshipValues && settings.npcRelationshipValues[rb.npcId]) {
+                        const current = settings.npcRelationshipValues[rb.npcId][rb.field] ?? 0;
+                        const newValue = Math.max(-100, Math.min(100, current + rb.actualAppliedDelta));
+                        settings.npcRelationshipValues[rb.npcId][rb.field] = newValue;
+                        
+                        rb.expectedValue = newValue;
+                        rb.newValue = newValue;
+                    }
+                    if (settings.npcRelationshipLog) {
+                        settings.npcRelationshipLog[rb.npcId] = settings.npcRelationshipLog[rb.npcId] || [];
+                        const hasLog = settings.npcRelationshipLog[rb.npcId].some(l => l.timestamp === rb.logTimestamp);
+                        if (!hasLog) {
+                            settings.npcRelationshipLog[rb.npcId].push({
+                                timestamp: rb.logTimestamp,
+                                field: rb.field,
+                                delta: rb.delta,
+                                newValue: settings.npcRelationshipValues[rb.npcId][rb.field],
+                                source: 'Swipe restore'
+                            });
+                            if (settings.npcRelationshipLog[rb.npcId].length > 50) {
+                                settings.npcRelationshipLog[rb.npcId].shift();
+                            }
+                        }
+                    }
+                }
+                anyChanged = true;
+            }
+            lastAiMsg.extra.rpgActiveSwipe = swipeId;
+            if (anyChanged || anyStateChanged) triggerUIUpdate();
+            return; // Bail out - we already re-applied the saved deltas for this scanned swipe!
+        } else {
+            // New/unprocessed swipe: initialize empty arrays
+            lastAiMsg.extra.rpgProcessedTags[swipeId] = [];
+            lastAiMsg.extra.rpgRollbackData[swipeId] = [];
+        }
     }
 
     lastAiMsg.extra.rpgActiveSwipe = swipeId;

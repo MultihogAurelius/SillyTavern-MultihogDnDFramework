@@ -2186,7 +2186,7 @@ async function runStateModelPass(narrativeOutput, isFullContext = false, overrid
                 // ── FULL COMMIT: treat this chunk as a completed turn ──
                 lastDelta = commitChunkResult(merged, memoBeforeThisChunk);
 
-                // Stamp the pre-commit memo snapshot on the message for swipe rollback
+                // Stamp the pre-commit memo snapshot and result on the message for swipe rollback/restore
                 if (getSettings().stateTrackerSwipeRollback !== false) {
                     const { chat: _sc } = SillyTavern.getContext();
                     const _lastAi = _sc ? [..._sc].reverse().find(m => !m.is_user) : null;
@@ -2195,6 +2195,8 @@ async function runStateModelPass(narrativeOutput, isFullContext = false, overrid
                         const _sid = _lastAi.swipe_id ?? 0;
                         _lastAi.extra.rpgMemoRollback = _lastAi.extra.rpgMemoRollback || {};
                         _lastAi.extra.rpgMemoRollback[_sid] = memoBeforeThisChunk;
+                        _lastAi.extra.rpgMemoResult = _lastAi.extra.rpgMemoResult || {};
+                        _lastAi.extra.rpgMemoResult[_sid] = merged;
                     }
                 }
 
