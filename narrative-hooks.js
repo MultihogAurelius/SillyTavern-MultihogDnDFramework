@@ -1087,6 +1087,7 @@ export async function parseAndApplyNarrativeRelTags() {
 
     if (anyChanged) {
         triggerUIUpdate();
+        SillyTavern.getContext().saveSettingsDebounced?.();
     }
 }
 
