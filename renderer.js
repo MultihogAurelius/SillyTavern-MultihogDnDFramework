@@ -724,9 +724,26 @@ function formatValueToCurrency(totalCp, detectedCurrency) {
                 for (let i = 0; i < lines.length; i++) {
                     const rawLine = lines[i];
                     const mm = rawLine.match(MARKER_RX);
-                    const markerCode = mm ? mm[1].toUpperCase() : null;
+                    let markerCode = mm ? mm[1].toUpperCase() : null;
                     const explicitType = mm ? MARKER_TYPE_MAP[markerCode] : null;
-                    const line = mm ? mm[2].trim() : rawLine;
+                    let line = mm ? mm[2].trim() : rawLine;
+
+                    // Detect inline hp-bar marker: "Entity Name ((BARGREEN)) 12/20"
+                    // Uses tokenizeMarkers (the same engine used for sub-field lines) so ALL
+                    // color-variant bar markers (BARGREEN, BARRED, BARPURPLE, etc.) work here,
+                    // not just the handful in the old hardcoded regex.
+                    // Only fires when the marker is NOT at line-start (MARKER_RX already handles that).
+                    let inlineEntityName = null;
+                    let inlineBarRule = null;
+                    if (!mm) {
+                        const segs = tokenizeMarkers(rawLine);
+                        if (segs.length > 0 && segs[0].preText && segs[0].rule?.renderType === 'hp_bar') {
+                            inlineEntityName = segs[0].preText.trim();
+                            inlineBarRule    = segs[0].rule;          // carries color, renderType, etc.
+                            line = segs[0].content.trim();            // just the value: "12/20" or "HP: 12/20"
+                            markerCode = segs[0].markerType;          // e.g. "BARGREEN"
+                        }
+                    }
 
                     // 1. Combat Round header
                     if (tag === 'COMBAT' && /Combat Round\s*\d+/i.test(line)) {
@@ -744,22 +761,45 @@ function formatValueToCurrency(totalCp, detectedCurrency) {
                         hpMatch = line.match(/^(.+?):\s*([\d,]+)(?:\/([\d,]+))?(?:\s*HP)?\s*[:|,]?\s*(.*)$/i);
                     }
 
+                    // Inline-marker fallback: line was rewritten to just the value portion
+                    // (e.g. "HP: 20/20" or bare "20/20"). Use a flexible regex that makes the
+                    // label prefix ("HP:") optional so both forms parse correctly.
+                    if (!hpMatch && inlineEntityName) {
+                        hpMatch = line.match(/^(?:(.+?):\s*)?(\d[\d,]*)(?:\/(\d[\d,]*))?(?:\s*HP)?\s*[:|,]?\s*(.*)$/i);
+                    }
+
                     if (hpMatch) {
-                        const [, name, curRaw, maxRaw, rest] = hpMatch;
+                        const [, nameRaw, curRaw, maxRaw, rest] = hpMatch;
+                        // inlineEntityName takes priority (set when "Name ((BARGREEN)) x/y" format used)
+                        const name = (inlineEntityName || nameRaw || '').trim();
                         const cur = Number(curRaw.replace(/,/g, ''));
                         const max = maxRaw ? Number(maxRaw.replace(/,/g, '')) : undefined;
                         const hasMax = max !== undefined;
                         const pct = hasMax ? Math.max(0, Math.min(100, (cur / max) * 100)) : 100;
-                        const hpColor = !hasMax ? DEFAULT_HP_COLOR : pct > 60 ? DEFAULT_HP_COLOR : pct > 30 ? '#ffaa00' : '#ff5555';
+                        // If an inline color-bar rule was detected (e.g. ((BARGREEN))), use its
+                        // color directly — don't override it with the damage-based red/yellow/green.
+                        const hpColor = inlineBarRule?.color
+                            ? inlineBarRule.color
+                            : (!hasMax ? DEFAULT_HP_COLOR : pct > 60 ? DEFAULT_HP_COLOR : pct > 30 ? '#ffaa00' : '#ff5555');
                         const status = (rest || '').trim().replace(/^\|\s*/, '');
                         const label = hasMax ? `${curRaw}/${maxRaw}` : `${curRaw}`;
 
-                        currentEntity = name.trim();
+                        currentEntity = name;
                         const barId = `${tag}:${currentEntity}:HP`;
                         const barBg = getBarBackground(barId, hpColor, pct);
 
                         lastEntityIdx = results.length;
-                        results.push(`<div class="rt-entity-row"><div class="rt-entity-name">${escapeHtmlWithColor(currentEntity)}</div><div class="rt-hp-bar-wrap" title="Click to recolor HP" data-recolor-id="${escapeHtml(barId)}" data-recolor-current="${escapeHtml(barBg)}"><div class="rt-hp-bar" style="width:${pct.toFixed(1)}%;background:${barBg};"></div></div><span class="rt-hp-label">${label}</span></div>`);
+                        if (inlineEntityName) {
+                            results.push(`<div class="rt-entity-row" style="display:block; border-bottom:1px solid rgba(255,255,255,0.06); padding-bottom:6px;">
+                                <div class="rt-entity-name" style="font-size:1.1em; margin-bottom:6px;">${escapeHtmlWithColor(currentEntity)}</div>
+                                <div class="rt-hp-bar-wrap" title="Click to recolor HP" data-recolor-id="${escapeHtml(barId)}" data-recolor-current="${escapeHtml(barBg)}" style="position:relative; height:14px; border-radius:4px; overflow:hidden; background:rgba(255,255,255,0.1); margin-bottom:4px; width:100%;">
+                                    <div class="rt-hp-bar" style="width:${pct.toFixed(1)}%; height:100%; border-radius:4px; background:${barBg}; transition:width 0.3s;"></div>
+                                </div>
+                                <span class="rt-hp-label" style="display:block; font-size:0.82em; opacity:0.85; text-align:left; line-height:1.2;">${label}</span>
+                            </div>`);
+                        } else {
+                            results.push(`<div class="rt-entity-row"><div class="rt-entity-name">${escapeHtmlWithColor(currentEntity)}</div><div class="rt-hp-bar-wrap" title="Click to recolor HP" data-recolor-id="${escapeHtml(barId)}" data-recolor-current="${escapeHtml(barBg)}"><div class="rt-hp-bar" style="width:${pct.toFixed(1)}%;background:${barBg};"></div></div><span class="rt-hp-label">${label}</span></div>`);
+                        }
 
                         if (status) {
                             const parts = status.split('|').map(p => p.trim()).filter(Boolean);
@@ -784,7 +824,33 @@ function formatValueToCurrency(totalCp, detectedCurrency) {
                         continue;
                     }
 
+                    // 2b. CHARACTER/PARTY plain-name fallback anchor:
+                    // If no HP pattern matched and this is a CHARACTER or PARTY block
+                    // and we have no active entity yet, treat the first line as the entity name
+                    // header (without an HP bar). This decouples portrait rendering from the
+                    // strict "Name: X/Y HP" format requirement.
+                    if (!hpMatch && (tag === 'CHARACTER' || tag === 'PARTY') && lastEntityIdx === -1) {
+                        // Extract name: if the line is "Name: something", strip the colon part for the name
+                        // Otherwise use the entire line as the display header.
+                        const plainNameColonMatch = line.match(/^(.+?):\s*(.*)/);
+                        const entityLabel = plainNameColonMatch ? plainNameColonMatch[1].trim() : line.trim();
+                        const restOfHeader = plainNameColonMatch ? plainNameColonMatch[2].trim() : '';
+
+                        currentEntity = entityLabel;
+                        lastEntityIdx = results.length;
+
+                        // Render as entity-name header with optional rest as a sub-label (e.g. class info)
+                        let headerHtml = `<div class="rt-entity-row"><div class="rt-entity-name">${escapeHtmlWithColor(currentEntity)}</div>`;
+                        if (restOfHeader) {
+                            headerHtml += `<span class="rt-hp-label" style="opacity:0.75; font-size:0.9em;">${escapeHtmlWithColor(restOfHeader)}</span>`;
+                        }
+                        headerHtml += `</div>`;
+                        results.push(headerHtml);
+                        continue;
+                    }
+
                     // 3. Sub-field Logic (Sticky Context)
+
                     if (lastEntityIdx !== -1) {
                         results[lastEntityIdx] += renderLineInEntityContext(tag, line, currentEntity, rawLine);
                     } else {
