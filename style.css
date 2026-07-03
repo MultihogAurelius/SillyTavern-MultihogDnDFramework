@@ -311,10 +311,18 @@
 .rpg-tracker-panel.is-disabled {
     opacity: 0.68;
     filter: grayscale(0.6) brightness(0.8);
+}
+/* Block interaction on the content area only — the header (and overflow menu)
+   stay clickable so the user can re-enable. The panel shell itself keeps
+   pointer-events so scroll events don't bleed through to the chat behind it. */
+.rpg-tracker-panel.is-disabled .rpg-tracker-content,
+.rpg-tracker-panel.is-disabled .rpg-tracker-delta-panel,
+.rpg-tracker-panel.is-disabled .rpg-tracker-footer {
     pointer-events: none;
 }
-/* The header and its buttons must always be clickable so the user can re-enable */
-.rpg-tracker-panel.is-disabled .rpg-tracker-header {
+/* Ensure floating menus (appended to the panel root) stay interactive */
+.rpg-tracker-panel.is-disabled .rt-overflow-menu,
+.rpg-tracker-panel.is-disabled .rt-update-menu {
     pointer-events: auto;
 }
 
