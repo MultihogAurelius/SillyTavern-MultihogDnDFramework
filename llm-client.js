@@ -557,19 +557,20 @@ export async function sendAgentTurn(settings, messages, tools = null, signal = n
         if (tools?.length) body.tools = tools;
         if (settings.maxTokens > 0) body.max_tokens = settings.maxTokens;
 
-        const isLocal = /^https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+|10\.\d|172\.(1[6-9]|2\d|3[01])\.)/i.test(endpoint);
+        // PATCH: always route through ST's server-side CORS proxy (requires enableCorsProxy).
+        // Browser-direct fetches to remote endpoints (e.g. opencode.ai) fail CORS preflight.
         let resp;
-        if (isLocal) {
-            try {
-                resp = await fetch(proxiedUrl(endpoint), { method: 'POST', headers: { ...headers, ...getProxyHeaders() }, body: JSON.stringify(body), signal });
-                if (!resp.ok && resp.status === 404) throw new Error('proxy 404');
-            } catch (_) {
-                resp = await fetch(endpoint, { method: 'POST', headers, body: JSON.stringify(body), credentials: 'omit', signal });
-            }
-        } else {
+        try {
+            resp = await fetch(proxiedUrl(endpoint), { method: 'POST', headers: { ...headers, ...getProxyHeaders() }, body: JSON.stringify(body), signal });
+            if (!resp.ok && resp.status === 404) throw new Error('proxy 404');
+        } catch (_) {
             resp = await fetch(endpoint, { method: 'POST', headers, body: JSON.stringify(body), credentials: 'omit', signal });
         }
-        if (!resp.ok) throw new Error(`OpenAI request failed (${resp.status})`);
+        if (!resp.ok) {
+            let _body = '';
+            try { _body = await resp.text(); } catch (_) {}
+            throw new Error(`OpenAI request failed (${resp.status}): ${_body.slice(0, 600)}`);
+        }
         const data = await resp.json();
         const msg = data.choices?.[0]?.message;
         if (msg?.tool_calls?.length) {
