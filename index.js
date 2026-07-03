@@ -10013,8 +10013,6 @@ function buildSysprompt(rawText) {
         eventSource.on(event_types.GENERATION_STARTED, onGenerationStarted);
         eventSource.on(event_types.GENERATION_ENDED, onGenerationEnded);
         eventSource.on(event_types.GENERATION_STOPPED, onGenerationEnded);
-        eventSource.on(event_types.MESSAGE_UPDATED, parseAndApplyNarrativeRelTags);
-        eventSource.on(event_types.MESSAGE_RECEIVED, parseAndApplyNarrativeRelTags);
         if (event_types.MESSAGE_EDITED) eventSource.on(event_types.MESSAGE_EDITED, parseAndApplyNarrativeRelTags);
         if (event_types.MESSAGE_SWIPED) eventSource.on(event_types.MESSAGE_SWIPED, parseAndApplyNarrativeRelTags);
 
