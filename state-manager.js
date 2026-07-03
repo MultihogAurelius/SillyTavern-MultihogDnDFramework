@@ -393,7 +393,7 @@ When recording a new entry, keep the lorebook category separate from the entity 
 - Use the "category" field for the type (NPC, LOC, FAC, QUEST, EVENT, or a custom tag).
 - Use the "label" field for the entity name only. Do NOT prefix labels with the category tag.
 - **IMPORTANT FOR KEYWORDS (KEYS):** Always include the entity's own name/title (without any timestamps like "Day 1", "Day 2", "12:15 AM", etc.) in the list of keywords. The title itself (stripped of timestamps) is the most reliable trigger, so it must be present as a keyword. For example, if the entry title is "[12:15 AM, Day 2] Defense of Ironbelly's Workshop", the keys list MUST include "Defense of Ironbelly's Workshop".
-- **DO NOT INCLUDE `{{user}}`, `{{char}}`, or general player references** in the keyword list (`keys`). The user/player is present in all events/locations, so including them as a keyword causes false matches and wastes context tokens.
+- **DO NOT INCLUDE \`{{user}}\`, \`{{char}}\`, or general player references** in the keyword list (\`keys\`). The user/player is present in all events/locations, so including them as a keyword causes false matches and wastes context tokens.
 
 Correct examples:
 - {"label": "Iron Syndicate", "category": "FAC", "keys": ["Iron Syndicate", "faction"]}
