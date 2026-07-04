@@ -1215,7 +1215,7 @@ function formatValueToCurrency(totalCp, detectedCurrency) {
                             <span style="font-weight: bold; font-style: italic;">Start:</span>
                             <select id="rt-onboarding-date-type" class="text_pole" style="width: auto; min-width: 65px; padding: 2px 4px; font-size: 11px; height: 22px; border-radius: 4px; background: var(--black70a);">
                                 <option value="day">Day 1</option>
-                                <option value="date">Date</option>
+                                <option value="date">Date (DD/MM/YYYY)</option>
                             </select>
                             <input type="text" id="rt-onboarding-start-date" class="text_pole" value="01/01/2026" placeholder="01/01/2026" style="width: 75px; text-align: center; height: 22px; font-size: 11px; border-radius: 4px; background: var(--black70a); display: none;" />
                         </label>

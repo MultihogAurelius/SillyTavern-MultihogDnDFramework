@@ -477,6 +477,17 @@ function syncOnboardingUI() {
         }
         initialDateInput.placeholder = s.useDdMmYyFormat ? '01/01/2026' : 'Day 1';
     }
+
+    // Character Creator Start Date & Toggle Sync
+    const creatorDateType = /** @type {HTMLSelectElement|null} */ (onboarding.querySelector('#rt-onboarding-date-type'));
+    const creatorStartDate = /** @type {HTMLInputElement|null} */ (onboarding.querySelector('#rt-onboarding-start-date'));
+    if (creatorDateType) {
+        creatorDateType.value = s.useDdMmYyFormat ? 'date' : 'day';
+    }
+    if (creatorStartDate) {
+        creatorStartDate.value = s.initialDate && s.initialDate !== 'Day 1' ? s.initialDate : '01/01/2026';
+        creatorStartDate.style.display = s.useDdMmYyFormat ? 'inline-block' : 'none';
+    }
 }
 // ── Renderer / navigation state ──
 let _historyViewIndex = -1;    // -1 = live, 0 = most recent snapshot, higher = older
@@ -2857,7 +2868,30 @@ function bindRenderedCardEvents(el, memo, isDetachedContext = false, onRefresh =
     if (dateTypeSelect && startDateInput) {
         dateTypeSelect.addEventListener('change', () => {
             const isDate = dateTypeSelect.value === 'date';
-            startDateInput.style.display = isDate ? 'inline-block' : 'none';
+            syncSettingsAndUI(s => {
+                s.useDdMmYyFormat = isDate;
+                if (isDate) {
+                    if (s.initialDate === "Day 1" || !s.initialDate) {
+                        s.initialDate = "01/01/2026";
+                    }
+                } else {
+                    s.initialDate = "Day 1";
+                }
+                if (s.routerModules?.npc) {
+                    s.routerModules.npc.instruction = buildNpcInstruction(s.npcMajorWords, s.npcMinorWords, false);
+                }
+            });
+            syncOnboardingUI();
+        });
+
+        startDateInput.addEventListener('input', () => {
+            const val = startDateInput.value.trim();
+            if (val) {
+                syncSettingsAndUI(s => {
+                    s.initialDate = val;
+                });
+                syncOnboardingUI();
+            }
         });
     }
 
