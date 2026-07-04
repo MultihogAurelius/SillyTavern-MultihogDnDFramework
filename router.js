@@ -1,4 +1,4 @@
-import { getSettings, getEffectiveRouterCampaignPrefix, saveChatState } from './state-manager.js';
+import { getSettings, getEffectiveRouterCampaignPrefix, persistWorldProgressionTimer } from './state-manager.js';
 import { sendStateRequest, sendAgentTurn } from './llm-client.js';
 import { getRequestHeaders } from '../../../../script.js';
 import { extractCurrentTimeStr, cleanMessageContent, parseInWorldTime, formatInWorldTime } from './memo-processor.js';
@@ -28,6 +28,75 @@ export function stopRouterPass() {
 function getLivePrefix() {
     const ctx = SillyTavern.getContext();
     return getEffectiveRouterCampaignPrefix(ctx.chatId || '');
+}
+
+/** World Skeleton lorebooks are only visible to World Progression / skeleton generation. */
+function isSkeletonBookName(bookName) {
+    return (bookName || '').toLowerCase().endsWith('_skeleton');
+}
+
+function isSkeletonEntryId(entryId) {
+    if (!entryId || typeof entryId !== 'string' || !entryId.includes('::')) return false;
+    return isSkeletonBookName(entryId.split('::')[0]);
+}
+
+/** Remove any skeleton IDs that leaked into Lorebook Agent active pools. @returns {boolean} */
+function stripSkeletonFromRouterPools() {
+    const settings = getSettings();
+    const strip = (arr) => (arr || []).filter(id => !isSkeletonEntryId(id));
+    const beforeRouter = JSON.stringify(settings.activeRouterKeys || []);
+    const beforeKw = JSON.stringify(settings.keywordActivatedKeys || []);
+    settings.activeRouterKeys = strip(settings.activeRouterKeys);
+    settings.keywordActivatedKeys = strip(settings.keywordActivatedKeys);
+    return beforeRouter !== JSON.stringify(settings.activeRouterKeys)
+        || beforeKw !== JSON.stringify(settings.keywordActivatedKeys);
+}
+
+/**
+ * Lorebook Agent archive fetch — excludes World Skeleton books.
+ * @param {string} prefix
+ * @param {object} ctx
+ * @param {object} settings
+ */
+async function fetchRouterArchiveBooks(prefix, ctx, settings) {
+    if (typeof ctx.updateWorldInfoList === 'function') {
+        try { await ctx.updateWorldInfoList(); } catch (_) {}
+    }
+    const allBookNames = await getWorldInfoNamesSafe();
+    const inScope = (n) => !prefix || bookBelongsToPrefix(n, prefix);
+    const scoped = new Set(prefix ? allBookNames.filter(inScope) : allBookNames);
+
+    const logBookNames = (settings.routerLog || [])
+        .flatMap(e => [...(e.record || []), ...(e.activate || [])].map(id => id.split('::')[0]))
+        .filter(Boolean);
+    for (const n of logBookNames) {
+        if (inScope(n) && !isSkeletonBookName(n)) scoped.add(n);
+    }
+
+    const books = {};
+    for (const n of scoped) {
+        if (isSkeletonBookName(n)) continue;
+        const b = await ctx.loadWorldInfo(n);
+        if (b?.entries) books[n] = b;
+    }
+    return books;
+}
+
+/**
+ * grep_lore / inspect_book helper — never surface skeleton entries to the agent.
+ */
+function grepLoreInBooks(allBooks, query) {
+    const q = (query || '').toLowerCase();
+    const hits = [];
+    for (const [name, book] of Object.entries(allBooks)) {
+        if (isSkeletonBookName(name)) continue;
+        for (const [uid, entry] of Object.entries(book.entries || {})) {
+            if ((entry.content || '').toLowerCase().includes(q) || (entry.comment || '').toLowerCase().includes(q)) {
+                hits.push(`[${name}::${uid}] "${entry.comment || uid}": ${(entry.content || '').substring(0, 120)}...`);
+            }
+        }
+    }
+    return hits;
 }
 
 /**
@@ -166,6 +235,7 @@ function buildKeyringText(allBooks, activeKeys = []) {
     const activeSet = new Set(activeKeys);
     let lines = [];
     for (const [bookName, bookData] of Object.entries(allBooks)) {
+        if (isSkeletonBookName(bookName)) continue;
         if (!bookData || !bookData.entries) continue;
         for (const [uid, entry] of Object.entries(bookData.entries)) {
             if (activeSet.has(`${bookName}::${uid}`)) continue; // shown in ACTIVE MEMORY
@@ -203,30 +273,13 @@ export async function runRouterPass(narrativeOutput, manualPrompt = null, custom
             return;
         }
         let basicSummary = '';
-        
+
+        if (stripSkeletonFromRouterPools()) {
+            ctx.saveSettingsDebounced();
+        }
+
         async function fetchArchiveBooks() {
-            // Flush ST's in-memory registry so books written via HTTP API in prior passes are visible
-            if (typeof ctx.updateWorldInfoList === 'function') {
-                try { await ctx.updateWorldInfoList(); } catch (_) {}
-            }
-            const allBookNames = await getWorldInfoNamesSafe();
-            const inScope = (n) => !prefix || bookBelongsToPrefix(n, prefix);
-            const scoped = new Set(prefix ? allBookNames.filter(inScope) : allBookNames);
-
-            // Also sweep books referenced in routerLog (catches books not yet formally indexed)
-            const logBookNames = (settings.routerLog || [])
-                .flatMap(e => [...(e.record || []), ...(e.activate || [])].map(id => id.split('::')[0]))
-                .filter(Boolean);
-            for (const n of logBookNames) {
-                if (inScope(n)) scoped.add(n);
-            }
-
-            const books = {};
-            for (const n of scoped) {
-                const b = await ctx.loadWorldInfo(n);
-                if (b?.entries) books[n] = b;
-            }
-            return books;
+            return fetchRouterArchiveBooks(prefix, ctx, settings);
         }
 
         let archiveBooks = await fetchArchiveBooks();
@@ -257,6 +310,7 @@ export async function runRouterPass(narrativeOutput, manualPrompt = null, custom
             newlyTriggeredFull = [];
             const relValues = settings.npcRelationshipValues || {};
             for (const [name, book] of Object.entries(archiveBooks)) {
+                if (isSkeletonBookName(name)) continue;
                 for (const [uid, entry] of Object.entries(book.entries)) {
                     const fullId = `${name}::${uid}`;
                     if (settings.activeRouterKeys?.includes(fullId)) {
@@ -736,23 +790,21 @@ Action: commit({"rewrite": [{"id": "Eldoria_Events::3", "content": "Compressed v
                     }
                 } else if (toolName === 'read_entry') {
                     const uid = args.uid || '';
-                    const [bookName, id] = uid.split('::');
-                    const book = await ctx.loadWorldInfo(bookName);
-                    observation = book?.entries?.[id] ? book.entries[id].content : `Entry "${uid}" not found.`;
-                } else if (toolName === 'grep_lore') {
-                    const query = (args.query || '').toLowerCase();
-                    const hits = [];
-                    for (const [name, book] of Object.entries(archiveBooks)) {
-                        for (const [uid, entry] of Object.entries(book.entries)) {
-                            if ((entry.content || '').toLowerCase().includes(query) || (entry.comment || '').toLowerCase().includes(query)) {
-                                hits.push(`[${name}::${uid}] "${entry.comment || uid}": ${(entry.content || '').substring(0, 120)}...`);
-                            }
-                        }
+                    if (isSkeletonEntryId(uid)) {
+                        observation = 'World Skeleton entries are not accessible to the Lorebook Agent.';
+                    } else {
+                        const [bookName, id] = uid.split('::');
+                        const book = await ctx.loadWorldInfo(bookName);
+                        observation = book?.entries?.[id] ? book.entries[id].content : `Entry "${uid}" not found.`;
                     }
+                } else if (toolName === 'grep_lore') {
+                    const hits = grepLoreInBooks(archiveBooks, args.query);
                     observation = hits.length > 0 ? hits.join('\n') : `No entries found for "${args.query}".`;
                 } else if (toolName === 'inspect_book') {
                     const bookName = args.book_name || '';
-                    if (archiveBooks[bookName]) {
+                    if (isSkeletonBookName(bookName)) {
+                        observation = 'World Skeleton lorebooks are not accessible to the Lorebook Agent.';
+                    } else if (archiveBooks[bookName]) {
                         observation = Object.entries(archiveBooks[bookName].entries)
                             .map(([uid, e]) => `${bookName}::${uid} -- ${e.comment || e.key?.[0] || uid}`)
                             .join('\n');
@@ -1073,6 +1125,9 @@ Maximum Active Entities: **${settings.routerMaxActivations || 8}**.
 - Entries whose keywords appeared in the latest narrator output may already appear under **NEWLY ACTIVATED THIS TURN** with full content — you do not need to activate those again.
 - Always use exact Book::UID format (e.g. "Eldoria_NPCs::0") for activate/update/deactivate/delete_ids.
 
+## WORLD SKELETON (OFF-LIMITS)
+World Skeleton lorebooks (names ending in _Skeleton) are hidden seed data for World Progression only. They are NOT in your archive, tools cannot access them, and you must NEVER activate, read, update, or commit changes to Skeleton entries.
+
 ## CAMPAIGN CONTEXT
 Campaign Root: "${prefix || 'World Archive'}"
   NPCs -> "${prefix ? prefix + '_NPCs' : 'NPCs'}"
@@ -1224,19 +1279,13 @@ ${sharedContext}`;
                         observation = `Committed successfully. ${details.join(' | ')}`;
                     }
                 } else if (toolName === 'grep_lore') {
-                    const query = (args.query || '').toLowerCase();
-                    const hits = [];
-                    for (const [name, book] of Object.entries(archiveBooks)) {
-                        for (const [uid, entry] of Object.entries(book.entries)) {
-                            if ((entry.content || '').toLowerCase().includes(query) || (entry.comment || '').toLowerCase().includes(query)) {
-                                hits.push(`[${name}::${uid}] "${entry.comment || uid}": ${(entry.content || '').substring(0, 120)}...`);
-                            }
-                        }
-                    }
+                    const hits = grepLoreInBooks(archiveBooks, args.query);
                     observation = hits.length > 0 ? hits.join('\n') : `No entries found for "${args.query}".`;
                 } else if (toolName === 'inspect_book') {
                     const bookName = args.book_name || '';
-                    if (archiveBooks[bookName]) {
+                    if (isSkeletonBookName(bookName)) {
+                        observation = 'World Skeleton lorebooks are not accessible to the Lorebook Agent.';
+                    } else if (archiveBooks[bookName]) {
                         observation = Object.entries(archiveBooks[bookName].entries)
                             .map(([uid, e]) => `${bookName}::${uid} -- ${e.comment || e.key?.[0] || uid}`)
                             .join('\n');
@@ -1245,9 +1294,13 @@ ${sharedContext}`;
                     }
                 } else if (toolName === 'read_entry') {
                     const uid = args.uid || '';
-                    const [bookName, id] = uid.split('::');
-                    const book = await ctx.loadWorldInfo(bookName);
-                    observation = book?.entries?.[id] ? book.entries[id].content : `Entry "${uid}" not found.`;
+                    if (isSkeletonEntryId(uid)) {
+                        observation = 'World Skeleton entries are not accessible to the Lorebook Agent.';
+                    } else {
+                        const [bookName, id] = uid.split('::');
+                        const book = await ctx.loadWorldInfo(bookName);
+                        observation = book?.entries?.[id] ? book.entries[id].content : `Entry "${uid}" not found.`;
+                    }
                 } else {
                     observation = `Unknown tool: ${toolName}`;
                 }
@@ -1348,6 +1401,10 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
             errors.push(`Invalid ID format: ${k}`);
             continue;
         }
+        if (isSkeletonEntryId(k)) {
+            errors.push(`Cannot activate World Skeleton entry (hidden from Lorebook Agent): ${k}`);
+            continue;
+        }
         const [bookName, uid] = k.split('::');
         const exists = allBooks[bookName]?.entries?.[uid];
         
@@ -1386,6 +1443,10 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
     // 2. Update existing
     const updates = action.update || [];
     for (const up of updates) {
+        if (isSkeletonEntryId(up.id)) {
+            errors.push(`Cannot update World Skeleton entry: ${up.id}`);
+            continue;
+        }
         const [bookName, uid] = up.id.split('::');
         const book = await ctx.loadWorldInfo(bookName);
         if (book?.entries?.[uid]) {
@@ -1408,6 +1469,10 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
     // 2b. Rewrite (full content replacement — no append, no dedup)
     const rewriteIds = [];
     for (const rw of (action.rewrite || [])) {
+        if (isSkeletonEntryId(rw.id)) {
+            errors.push(`Cannot rewrite World Skeleton entry: ${rw.id}`);
+            continue;
+        }
         const [bookName, uid] = rw.id.split('::');
         const book = await ctx.loadWorldInfo(bookName);
         if (book?.entries?.[uid]) {
@@ -1428,6 +1493,10 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
             errors.push(`Invalid rename ID format: ${rn.id}`);
             continue;
         }
+        if (isSkeletonEntryId(rn.id)) {
+            errors.push(`Cannot rename World Skeleton entry: ${rn.id}`);
+            continue;
+        }
         const [bookName, uid] = rn.id.split('::');
         const book = await ctx.loadWorldInfo(bookName);
         if (book?.entries?.[uid]) {
@@ -1444,6 +1513,10 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
     // 2d. Consolidate (many-to-one merge with deletion)
     const consolidateIds = [];
     for (const op of (action.consolidate || [])) {
+        if (isSkeletonEntryId(op.survivor) || (op.targets || []).some(isSkeletonEntryId)) {
+            errors.push('Cannot consolidate World Skeleton entries.');
+            continue;
+        }
         // Update the survivor with merged content
         const [sBook, sUid] = op.survivor.split('::');
         const sBookData = await ctx.loadWorldInfo(sBook);
@@ -1513,6 +1586,10 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
                 targetBook = known;
                 break;
             }
+        }
+        if (isSkeletonBookName(targetBook)) {
+            errors.push(`Cannot record to World Skeleton lorebook: ${targetBook}`);
+            continue;
         }
 
         // Strip any accidental "TAG: " prefix the model may have included in the label
@@ -1714,6 +1791,10 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
     // 4. Delete
     const deleteIds = action.delete_ids || [];
     for (const id of deleteIds) {
+        if (isSkeletonEntryId(id)) {
+            errors.push(`Cannot delete World Skeleton entry: ${id}`);
+            continue;
+        }
         const parts = id.split('::');
         if (parts.length < 2) continue;
         const [bookName, uid] = parts;
@@ -1766,6 +1847,10 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
         const { id, field, delta } = item;
         if (!id || !field || typeof delta !== 'number') {
             errors.push(`Invalid rel item: ${JSON.stringify(item)}`);
+            continue;
+        }
+        if (isSkeletonEntryId(id)) {
+            errors.push(`Cannot update relationship on World Skeleton entry: ${id}`);
             continue;
         }
         const f = field.toLowerCase();
@@ -1845,6 +1930,10 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
         const { id, field, content: newContent } = item;
         if (!id || !field || !newContent) {
             errors.push(`Invalid core update item: ${JSON.stringify(item)}`);
+            continue;
+        }
+        if (isSkeletonEntryId(id)) {
+            errors.push(`Cannot update core on World Skeleton entry: ${id}`);
             continue;
         }
         const [bookName, uid] = id.split('::');
@@ -2356,6 +2445,7 @@ export async function getLorebookManifest(skipUpdate = false) {
         .map(k => k.split('::')[0])
         .filter(Boolean);
     for (const n of activeBookNames) {
+        if (isSkeletonBookName(n)) continue;
         if (!scoped.includes(n) && bookBelongsToPrefix(n, prefix)) {
             scoped.push(n);
         }
@@ -2367,6 +2457,7 @@ export async function getLorebookManifest(skipUpdate = false) {
         .flatMap(e => [...(e.record || []), ...(e.activate || [])].map(id => id.split('::')[0]))
         .filter(Boolean);
     for (const n of logBookNames) {
+        if (isSkeletonBookName(n)) continue;
         if (!scoped.includes(n) && bookBelongsToPrefix(n, prefix)) {
             scoped.push(n);
         }
@@ -2374,6 +2465,7 @@ export async function getLorebookManifest(skipUpdate = false) {
     
     const manifest = [];
     for (const n of scoped) {
+        if (isSkeletonBookName(n)) continue;
         const b = await ctx.loadWorldInfo(n);
         if (!b?.entries) continue;
         for (const [uid, entry] of Object.entries(b.entries)) {
@@ -2495,7 +2587,7 @@ export async function scanAssistantOutputForKeywords(narrativeText, opts = {}) {
             .filter(Boolean);
         const scopedSet = new Set(scoped);
         for (const n of logBookNames) {
-            if (bookBelongsToPrefix(n, prefix)) scopedSet.add(n);
+            if (bookBelongsToPrefix(n, prefix) && !isSkeletonBookName(n)) scopedSet.add(n);
         }
         booksToScan = [...scopedSet];
     }
@@ -2506,7 +2598,7 @@ export async function scanAssistantOutputForKeywords(narrativeText, opts = {}) {
     const chat = ctx.chat || [];
     const recentMessages = chat.filter(m => !m.is_system); // exclude system messages
 
-    const currentActive = new Set(settings.activeRouterKeys || []);
+    const currentActive = new Set((settings.activeRouterKeys || []).filter(id => !isSkeletonEntryId(id)));
     const currentKeyword = new Set(settings.keywordActivatedKeys || []);
     const newlyTriggered = [];
 
@@ -2518,8 +2610,7 @@ export async function scanAssistantOutputForKeywords(narrativeText, opts = {}) {
     const bookCache = new Map();
 
     for (const bookName of booksToScan) {
-        // _Skeleton books are strictly for World Progression engine — never inject into narrative
-        if (bookName.toLowerCase().endsWith('_skeleton')) continue;
+        if (isSkeletonBookName(bookName)) continue;
         const book = await ctx.loadWorldInfo(bookName);
         if (!book?.entries) continue;
         bookCache.set(bookName, book);
@@ -2901,12 +2992,7 @@ export async function runWorldProgressionPass(timeStr, currentMinutes, extraInst
             if (existingLabel === cleanPeriod) {
                 broadcastStep('thought', `\uD83C\uDF0D World Progression: "${periodLabel}" already exists - advancing timer.`);
                 settings.worldProgressionLastFiredPeriodLabel = periodLabel;
-                const activeChatId = ctx.chatId || ctx.getCurrentChatId?.() || null;
-                if (settings.chatLinkEnabled && activeChatId) {
-                    saveChatState(activeChatId);
-                } else {
-                    ctx.saveSettingsDebounced();
-                }
+                persistWorldProgressionTimer();
                 return;
             }
         }
@@ -3396,12 +3482,7 @@ ${historicalDump}`;
 
     // 9. Advance the timer — only the period label is stored; numeric field is legacy.
     settings.worldProgressionLastFiredPeriodLabel = periodLabel;
-    const activeChatId = ctx.chatId || ctx.getCurrentChatId?.() || null;
-    if (settings.chatLinkEnabled && activeChatId) {
-        saveChatState(activeChatId);
-    } else {
-        ctx.saveSettingsDebounced();
-    }
+    persistWorldProgressionTimer();
 
     broadcastStep('finish', `\uD83C\uDF0D World Progression: "${periodLabel}" report saved.`);
     if (typeof globalThis._rpgRenderRouterUI === 'function') {
@@ -4145,4 +4226,4 @@ Generate the Atmosphere Summary:`;
     }
 
     return summary;
-}
+}

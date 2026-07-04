@@ -974,6 +974,41 @@ export function migrateCustomFields() {
 
 // ── Chat-linked state persistence ─────────────────────────────────────────────
 
+/** Active chat id — prefer tracker-tracked id over raw ST context. */
+export function getActiveChatId() {
+    const ctx = SillyTavern.getContext();
+    const tracked = typeof globalThis._rpgCurrentChatId === 'function' ? globalThis._rpgCurrentChatId() : null;
+    return tracked || ctx.getCurrentChatId?.() || ctx.chatId || null;
+}
+
+/**
+ * When Chat Link is on, restore the WP timer label from chatStates if the live
+ * field was cleared (e.g. after debounced settings reload) but the partition still has it.
+ * @returns {boolean} true if a label was hydrated
+ */
+export function hydrateWorldProgressionFromChatState() {
+    const s = getSettings();
+    if (!s.chatLinkEnabled) return false;
+    const chatId = getActiveChatId();
+    if (!chatId) return false;
+    const stored = s.chatStates?.[chatId];
+    if (!stored?.worldProgressionLastFiredPeriodLabel) return false;
+    if (s.worldProgressionLastFiredPeriodLabel) return false;
+    s.worldProgressionLastFiredPeriodLabel = stored.worldProgressionLastFiredPeriodLabel;
+    return true;
+}
+
+/** Persist the WP timer to the active chat partition or global settings. */
+export function persistWorldProgressionTimer() {
+    const s = getSettings();
+    const chatId = getActiveChatId();
+    if (s.chatLinkEnabled && chatId) {
+        saveChatState(chatId);
+    } else {
+        SillyTavern.getContext().saveSettingsDebounced();
+    }
+}
+
 /**
  * Snapshots the current live settings into chatStates[chatId].
  * Pure write — no shared mutable state, no DOM.

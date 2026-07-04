@@ -984,14 +984,22 @@ function loadChatState(chatId) {
         function _fmtWpMins(totalMins) {
             return formatInWorldTime(totalMins);
         }
-        const mins = s.worldProgressionLastFiredAtMinutes ?? -1;
         const label = s.worldProgressionLastFiredPeriodLabel || '';
-        const lastText = label || (mins >= 0 ? _fmtWpMins(mins) : 'Never');
+        const labelMins = label ? parseInWorldTime(label) : -1;
+        const lastText = label || 'Never';
         $('#rpg_world_progression_last_fired').text(lastText);
         $('#rpg_world_progression_last_report_val').text(lastText);
         const intervalMinutes = (s.worldProgressionIntervalHours || 24) * 60;
-        const nextMins = mins >= 0 ? mins + intervalMinutes : intervalMinutes;
-        $('#rpg_world_progression_next_report_val').text(_fmtWpMins(nextMins));
+        let nextMins = -1;
+        if (labelMins >= 0) {
+            nextMins = labelMins + intervalMinutes;
+        } else {
+            const tMatch = (s.currentMemo || '').match(/\[TIME\]([\s\S]*?)\[\/TIME\]/i);
+            const tStr = tMatch ? extractCurrentTimeStr(tMatch[1]) : '';
+            const tMins = tStr ? parseInWorldTime(tStr) : -1;
+            if (tMins >= 0) nextMins = tMins + intervalMinutes;
+        }
+        $('#rpg_world_progression_next_report_val').text(nextMins >= 0 ? _fmtWpMins(nextMins) : '—');
 
         // Sync consolidation fields
         $('#rpg_world_progression_consolidate_enabled').prop('checked', !!s.worldProgressionConsolidateEnabled);

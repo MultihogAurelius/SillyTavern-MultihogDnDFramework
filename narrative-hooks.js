@@ -12,7 +12,7 @@
  * circular import. This will be cleaned up when index.js is split.
  */
 
-import { getSettings, saveChatState } from './state-manager.js';
+import { getSettings, hydrateWorldProgressionFromChatState, persistWorldProgressionTimer } from './state-manager.js';
 import { parseQuestsFromMemo, extractCurrentTimeStr, cleanMessageContent, formatInWorldTime } from './memo-processor.js';
 import { runRouterPass, saveSceneToLorebook, scanAssistantOutputForKeywords, parseInWorldMinutes, runWorldProgressionPass, updateLorebookEntry, getLorebookManifest } from './router.js';
 import { logTransaction } from './debug-viewer.js';
@@ -1511,6 +1511,10 @@ export async function onGenerationEnded() {
     const triggeredForAgent = [..._pendingKeywordTriggered];
     _pendingKeywordTriggered = []; // reset accumulator now that the agent is about to process them
     await runRouterPass(combinedNarrative, null, null, false, triggeredForAgent);
+
+    // Step 6: Re-check World Progression after the Lorebook Agent — an overlapping agent
+    // run from a prior generation may have blocked the pre-agent check.
+    await maybeRunWorldProgression();
 }
 
 // ── World Progression deterministic trigger ─────────────────────────────────────────
@@ -1531,6 +1535,7 @@ async function maybeRunWorldProgression() {
     const currentMinutes = parseInWorldMinutes(timeStr);
     if (currentMinutes < 0) return; // can't parse time → skip
 
+    hydrateWorldProgressionFromChatState();
     const lastFiredLabel = settings.worldProgressionLastFiredPeriodLabel || '';
     const lastFired = lastFiredLabel ? parseInWorldMinutes(lastFiredLabel) : null;
     const intervalMinutes = (settings.worldProgressionIntervalHours || 24) * 60;
@@ -1538,13 +1543,8 @@ async function maybeRunWorldProgression() {
     if (lastFired === null) {
         // Never fired — record current time as start of the first interval, don't fire yet.
         settings.worldProgressionLastFiredPeriodLabel = formatInWorldTime(currentMinutes);
-        const ctx = SillyTavern.getContext();
-        const activeChatId = ctx.chatId || ctx.getCurrentChatId?.() || null;
-        if (settings.chatLinkEnabled && activeChatId) {
-            saveChatState(activeChatId);
-        } else {
-            ctx.saveSettingsDebounced();
-        }
+        persistWorldProgressionTimer();
+        if (typeof globalThis._rpgRenderRouterUI === 'function') globalThis._rpgRenderRouterUI();
         return;
     }
 
