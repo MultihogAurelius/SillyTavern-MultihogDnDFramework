@@ -4608,8 +4608,20 @@ function createPanel() {
             const lastEl = agentPanel.querySelector('#rt-agent-world-last-fired');
             const nextEl = agentPanel.querySelector('#rt-agent-world-next-fire');
             const badge  = agentPanel.querySelector('#rt-agent-world-enabled-badge');
-            if (lastEl) lastEl.textContent = label || fmtWP(mins);
-            if (nextEl) nextEl.textContent = fmtWP(mins >= 0 ? mins + intervalMins : intervalMins);
+            if (lastEl) lastEl.textContent = label || 'Never';
+
+            let nextMins = -1;
+            if (mins >= 0) {
+                nextMins = mins + intervalMins;
+            } else {
+                const timeMatch = (s.currentMemo || '').match(/\[TIME\]([\s\S]*?)\[\/TIME\]/i);
+                const timeStr = timeMatch ? extractCurrentTimeStr(timeMatch[1]) : '';
+                const currentMins = timeStr ? parseInWorldTime(timeStr) : -1;
+                if (currentMins >= 0) {
+                    nextMins = currentMins + intervalMins;
+                }
+            }
+            if (nextEl) nextEl.textContent = nextMins >= 0 ? fmtWP(nextMins) : '—';
             if (badge) {
                 badge.textContent = s.worldProgressionEnabled ? 'ON' : 'OFF';
                 badge.style.cssText = s.worldProgressionEnabled
@@ -13080,7 +13092,18 @@ RULES:
 
             const intervalHours = s.worldProgressionIntervalHours || 24;
             const intervalMinutes = intervalHours * 60;
-            const nextMins = mins >= 0 ? mins + intervalMinutes : -1;
+            
+            let nextMins = -1;
+            if (mins >= 0) {
+                nextMins = mins + intervalMinutes;
+            } else {
+                const timeMatch = (s.currentMemo || '').match(/\[TIME\]([\s\S]*?)\[\/TIME\]/i);
+                const timeStr = timeMatch ? extractCurrentTimeStr(timeMatch[1]) : '';
+                const currentMins = timeStr ? parseInWorldTime(timeStr) : -1;
+                if (currentMins >= 0) {
+                    nextMins = currentMins + intervalMinutes;
+                }
+            }
             $wpNextReportVal.text(nextMins >= 0 ? formatInWorldTime(nextMins) : '—');
             if (typeof updateAgentWorldStatusRef === 'function') {
                 updateAgentWorldStatusRef();
