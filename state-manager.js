@@ -136,7 +136,7 @@ export function getSettings() {
         inventoryWorthMode: "hover",   // 'hover' = worth shown as tooltip only | 'display' = coin badge shown inline
         npcMajorWords: 25,
         npcMinorWords: 15,
-        npcRelationshipBars: false,
+        npcRelationshipBars: true,
         npcRelationshipToast: true,
         stateTrackerSwipeRollback: true,        // auto-roll back State Tracker memo on swipe           // emit toast notification when relationship values change
         npcRelationshipValues: {},
