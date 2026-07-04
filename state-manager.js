@@ -29,13 +29,20 @@ export function buildNpcInstruction(majorWords = 25, minorWords = 15, ignoreLimi
     let instruction = `Significant named characters the party interacts with (do NOT record every random enemy or nameless bartender, only characters who are somehow significant). Do NOT create an entry for {{user}}. Mention {{user}} in EVENT or QUEST entries as needed. Always use the exact macro string \`{{user}}\` when referring to the player; do NOT write the plain word "user" or "player".
 
 <CORE_FORMAT>
-IMPORTANT: The Description field inside the [[ ]] tags MUST start directly with the [CORE] tag. Do NOT prepend any timestamps, dates, or other text before the [CORE] tag under any circumstances (e.g. do NOT write "[4:47 PM, ${useDdMmYy ? '01/01/2026' : 'Day 1'}] [CORE]" or "[${useDdMmYy ? 'DD/MM/YYYY' : 'Day X'}, HH:MM] [CORE]"). The very first character of the Description MUST be the "[" of the "[CORE]" tag. Wrap the immutable identity sections (Appearance/Species, Personality, Brief Background, Habits/Behaviors) inside a single \`[CORE]\` and \`[/CORE]\` tag block. These sections are permanent — once written they must NOT be rewritten, overwritten, or updated through normal entry update/record operations.
+IMPORTANT: The Description field inside the [[ ]] tags MUST start directly with the [CORE] tag. Do NOT prepend any timestamps, dates, or other text before the [CORE] tag under any circumstances (e.g. do NOT write "[4:47 PM, ${useDdMmYy ? '01/01/2026' : 'Day 1'}] [CORE]" or "[${useDdMmYy ? 'DD/MM/YYYY' : 'Day X'}, HH:MM] [CORE]"). The very first character of the Description MUST be the "[" of the "[CORE]" tag. Wrap the identity sections (Appearance/Species, Personality, Brief Background, Habits/Behaviors) inside a single \`[CORE]\` and \`[/CORE]\` tag block.
+
+CRITICAL — CORE fields represent the character's full identity, NOT a snapshot of the current scene. When writing them, extrapolate sensibly beyond what was directly observed. Treat them as a character bible entry, not a scene summary:
+- Do NOT merely describe what you saw this turn ("was bleeding", "hid behind the anvil", "seemed nervous").
+- DO infer enduring traits, history, and tendencies. If the character showed fear, infer their general disposition, likely background, and consistent behavioral patterns — don't just repeat the immediate circumstance.
+- Brief Background especially must describe who this character IS in the world (their role, origin, relationships, motivations) rather than what they did in this one scene.
+- Personality must capture enduring temperament — not a momentary emotional state.
+- Habits/Behaviors must describe consistent recurring patterns — not a single action taken once.
 
 [CORE]
-Appearance/Species: Visual identifiers — species/race, build, distinctive features, weapon/armor if relevant.
-Personality: Core temperament and primary motivation.
-Brief Background: Role in the world, why they matter to the story.
-Habits/Behaviors: Defining behaviors or combat tendencies.
+Appearance/Species: Physical identity — species/race, build, age, notable features, typical attire or equipment.
+Personality: Enduring temperament, core drives, and how they relate to others — infer from behavior, not just the immediate moment.
+Brief Background: Who they are in the world — their history, role, motivations, and relationships. Extrapolate sensibly from available clues; do NOT merely summarize the current scene.
+Habits/Behaviors: Recurring patterns of behavior, speech mannerisms, combat style, or decision-making tendencies — not one-time actions.
 [/CORE]
 
 After the [/CORE] block, append timestamped narrative updates as usual ([${useDdMmYy ? 'DD/MM/YYYY' : 'Day X'}, HH:MM] ...).
