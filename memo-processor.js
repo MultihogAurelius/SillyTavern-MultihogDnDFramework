@@ -373,7 +373,11 @@ export function mergeMemo(currentMemo, aiOutput) {
 export function mergeQuestUpdates(jsonText, memoText = null) {
     const settings = getSettings();
     const target = (memoText !== null) ? memoText : settings.currentMemo;
-    const quests = parseQuestsFromMemo(target);
+    // Use the in-memory quest state (which includes completed quests) as the base.
+    // Fall back to parsing from memo text only if settings.quests is empty.
+    const quests = (settings.quests && settings.quests.length > 0)
+        ? settings.quests.slice()  // shallow copy so we mutate safely
+        : parseQuestsFromMemo(target);
 
     let parsed;
     try {
@@ -515,6 +519,9 @@ export function mergeQuestUpdates(jsonText, memoText = null) {
 
     if (changed) {
         if (settings.debugMode) console.log('[RPG Tracker] mergeQuestUpdates: applied quest state changes.');
+        // Persist the full quest array (including completed) to settings so the UI
+        // can still display completed quests even after they leave the memo text.
+        settings.quests = quests;
         const result = writeQuestsToMemo(quests, target);
         if (memoText === null) {
             SillyTavern.getContext().saveSettingsDebounced();
