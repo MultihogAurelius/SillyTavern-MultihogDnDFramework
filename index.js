@@ -10460,6 +10460,24 @@ function buildSysprompt(rawText) {
             saveSettings();
         });
 
+        const combatPresetSelect = $('#rpg_combat_completion_preset');
+        if (pm && typeof pm.getAllPresets === 'function') {
+            const presets = pm.getAllPresets();
+            combatPresetSelect.empty().append('<option value="">-- Use Profile Preset --</option>');
+            presets.forEach(p => combatPresetSelect.append($('<option></option>').val(p).text(p)));
+            combatPresetSelect.val(settings.combatCompletionPresetId || '');
+        } else {
+            combatPresetSelect.empty().append('<option value="">-- Use Profile Preset --</option>');
+            if (settings.combatCompletionPresetId) {
+                combatPresetSelect.append($('<option></option>').val(settings.combatCompletionPresetId).text(settings.combatCompletionPresetId));
+                combatPresetSelect.val(settings.combatCompletionPresetId);
+            }
+        }
+        combatPresetSelect.on('change', function () {
+            settings.combatCompletionPresetId = String($(this).val() || '');
+            saveSettings();
+        });
+
         // RNG Help Popup Trigger (Settings)
         $('.rt-rng-help-icon').on('click', (e) => {
             e.stopPropagation();

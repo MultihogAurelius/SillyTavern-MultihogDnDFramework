@@ -31,18 +31,14 @@ export function buildNpcInstruction(majorWords = 25, minorWords = 15, ignoreLimi
 <CORE_FORMAT>
 IMPORTANT: The Description field inside the [[ ]] tags MUST start directly with the [CORE] tag. Do NOT prepend any timestamps, dates, or other text before the [CORE] tag under any circumstances (e.g. do NOT write "[4:47 PM, ${useDdMmYy ? '01/01/2026' : 'Day 1'}] [CORE]" or "[${useDdMmYy ? 'DD/MM/YYYY' : 'Day X'}, HH:MM] [CORE]"). The very first character of the Description MUST be the "[" of the "[CORE]" tag. Wrap the identity sections (Appearance/Species, Personality, Brief Background, Habits/Behaviors) inside a single \`[CORE]\` and \`[/CORE]\` tag block.
 
-CRITICAL — CORE fields represent the character's full identity, NOT a snapshot of the current scene. When writing them, extrapolate sensibly beyond what was directly observed. Treat them as a character bible entry, not a scene summary:
-- Do NOT merely describe what you saw this turn ("was bleeding", "hid behind the anvil", "seemed nervous").
-- DO infer enduring traits, history, and tendencies. If the character showed fear, infer their general disposition, likely background, and consistent behavioral patterns — don't just repeat the immediate circumstance.
-- Brief Background especially must describe who this character IS in the world (their role, origin, relationships, motivations) rather than what they did in this one scene.
-- Personality must capture enduring temperament — not a momentary emotional state.
-- Habits/Behaviors must describe consistent recurring patterns — not a single action taken once.
+CRITICAL — [CORE] is permanent identity, still true after this arc ends. Extrapolate enduring traits from behavior; never recap this turn, voyage, or crisis.
+BANNED in [CORE]: momentary actions/states; plot progress ("increasingly…", "first to notice…", "this voyage"); roles defined by ongoing events ("crewman on X who became unhinged by Y"). Scene facts go in timestamped lines after [/CORE] only.
 
 [CORE]
-Appearance/Species: Physical identity — species/race, build, age, notable features, typical attire or equipment.
-Personality: Enduring temperament, core drives, and how they relate to others — infer from behavior, not just the immediate moment.
-Brief Background: Who they are in the world — their history, role, motivations, and relationships. Extrapolate sensibly from available clues; do NOT merely summarize the current scene.
-Habits/Behaviors: Recurring patterns of behavior, speech mannerisms, combat style, or decision-making tendencies — not one-time actions.
+Appearance/Species: Species, build, age, features, usual attire — not current pose or activity.
+Personality: Stable temperament and drives — not today's mood, fear, or stress.
+Brief Background: Standing role, origin, history — not their part in the current plot.
+Habits/Behaviors: Recurring mannerisms and patterns — not one scene's behavior.
 [/CORE]
 
 After the [/CORE] block, append timestamped narrative updates as usual ([${useDdMmYy ? 'DD/MM/YYYY' : 'Day X'}, HH:MM] ...).
@@ -479,6 +475,7 @@ Example: [[FAC: Iron Syndicate | ...]]  NOT  [[FAC: Khelt :: Iron Syndicate | ..
         categoryRenderOptions: {},
         combatProfileAutoSwitch: false,
         combatConnectionProfileId: "",
+        combatCompletionPresetId: "",
         portraitConnectionSource: "default",
         portraitConnectionProfileId: "",
         portraitCompletionPresetId: "",
@@ -758,7 +755,13 @@ Example: [[FAC: Iron Syndicate | ...]]  NOT  [[FAC: Khelt :: Iron Syndicate | ..
         s.settingsVersion = '3.16.18';
     }
 
-
+    // Tighten perennial [CORE] guidance — ban plot-tied scene recaps (v3.16.19)
+    if (!s.settingsVersion || s.settingsVersion < '3.16.19') {
+        if (s.routerModules?.npc) {
+            s.routerModules.npc.instruction = buildNpcInstruction(s.npcMajorWords, s.npcMinorWords, false);
+        }
+        s.settingsVersion = '3.16.19';
+    }
 
     // ── MIGRATION: Update system prompts with keywords instructions (v3.2.3+) ──────
     if (s.routerSystemPromptTemplate && !s.routerSystemPromptTemplate.includes('IMPORTANT FOR KEYWORDS')) {

@@ -45,6 +45,8 @@ const MAIN_PROFILE_NONE = '<None>';
 
 /** @type {string|null} Profile name to restore when combat ends. */
 let _combatBaselineProfileName = null;
+/** @type {string|null} Preset name to restore when combat ends. */
+let _combatBaselinePresetName = null;
 /** @type {boolean} Whether the extension currently owns a combat profile override. */
 let _combatProfileOverrideActive = false;
 /** @type {Promise<void>|null} Serializes concurrent profile switches. */
@@ -95,6 +97,26 @@ async function switchMainConnectionProfileByName(profileName) {
     await executeSlashCommandsWithOptions(`/profile "${arg}"`);
 }
 
+async function applyCombatOverrides(combatProfileName, combatPresetId) {
+    await switchMainConnectionProfileByName(combatProfileName);
+    if (combatPresetId) {
+        await setCompletionPreset(combatPresetId);
+    }
+}
+
+async function restoreCombatBaseline(baselineProfile, baselinePreset) {
+    await switchMainConnectionProfileByName(baselineProfile);
+    if (baselinePreset) {
+        await setCompletionPreset(baselinePreset);
+    }
+}
+
+function combatOverridesMatch(currentProfile, currentPreset, combatProfileName, combatPresetId) {
+    if (currentProfile !== combatProfileName) return false;
+    if (!combatPresetId) return true;
+    return currentPreset === combatPresetId;
+}
+
 function runSerializedCombatSwitch(fn) {
     const run = async () => {
         if (_combatProfileSwitchChain) await _combatProfileSwitchChain.catch(() => { });
@@ -110,14 +132,16 @@ export async function resetCombatProfileOverride(settings) {
     if (!_combatProfileOverrideActive) return;
 
     const baseline = _combatBaselineProfileName;
+    const baselinePreset = _combatBaselinePresetName;
     _combatProfileOverrideActive = false;
     _combatBaselineProfileName = null;
+    _combatBaselinePresetName = null;
 
     await runSerializedCombatSwitch(async () => {
         try {
-            await switchMainConnectionProfileByName(baseline);
+            await restoreCombatBaseline(baseline, baselinePreset);
             if (settings.debugMode) {
-                console.log(`[RPG Tracker] Combat profile override reset → ${baseline ?? MAIN_PROFILE_NONE}`);
+                console.log(`[RPG Tracker] Combat profile override reset → ${baseline ?? MAIN_PROFILE_NONE}${baselinePreset ? ` / preset: ${baselinePreset}` : ''}`);
             }
         } catch (e) {
             console.warn('[RPG Tracker] Failed to reset combat profile override:', e);
@@ -147,25 +171,28 @@ export async function syncCombatProfile(memo, settings) {
     const combatProfileName = getProfileNameById(combatProfileId);
     if (!combatProfileName) return;
 
+    const combatPresetId = String(settings.combatCompletionPresetId || '').trim();
     const combatActive = isCombatActive(memo);
 
     await runSerializedCombatSwitch(async () => {
         try {
             const currentName = await getCurrentMainProfileName();
+            const currentPreset = await getCurrentCompletionPreset();
 
             if (combatActive) {
                 if (!_combatProfileOverrideActive) {
-                    if (currentName === combatProfileName) return;
+                    if (combatOverridesMatch(currentName, currentPreset, combatProfileName, combatPresetId)) return;
                     _combatBaselineProfileName = currentName;
+                    _combatBaselinePresetName = currentPreset;
                     _combatProfileOverrideActive = true;
-                    await switchMainConnectionProfileByName(combatProfileName);
+                    await applyCombatOverrides(combatProfileName, combatPresetId);
                     if (settings.debugMode) {
-                        console.log(`[RPG Tracker] Combat profile activated: ${combatProfileName} (baseline: ${_combatBaselineProfileName ?? MAIN_PROFILE_NONE})`);
+                        console.log(`[RPG Tracker] Combat profile activated: ${combatProfileName}${combatPresetId ? ` / preset: ${combatPresetId}` : ''} (baseline: ${_combatBaselineProfileName ?? MAIN_PROFILE_NONE}${_combatBaselinePresetName ? ` / ${_combatBaselinePresetName}` : ''})`);
                     }
-                } else if (currentName !== combatProfileName) {
-                    await switchMainConnectionProfileByName(combatProfileName);
+                } else if (!combatOverridesMatch(currentName, currentPreset, combatProfileName, combatPresetId)) {
+                    await applyCombatOverrides(combatProfileName, combatPresetId);
                     if (settings.debugMode) {
-                        console.log(`[RPG Tracker] Re-applied combat profile: ${combatProfileName}`);
+                        console.log(`[RPG Tracker] Re-applied combat profile: ${combatProfileName}${combatPresetId ? ` / preset: ${combatPresetId}` : ''}`);
                     }
                 }
                 return;
@@ -174,13 +201,15 @@ export async function syncCombatProfile(memo, settings) {
             if (!_combatProfileOverrideActive) return;
 
             const baseline = _combatBaselineProfileName;
+            const baselinePreset = _combatBaselinePresetName;
             _combatProfileOverrideActive = false;
             _combatBaselineProfileName = null;
+            _combatBaselinePresetName = null;
 
-            if (currentName !== baseline) {
-                await switchMainConnectionProfileByName(baseline);
+            if (!combatOverridesMatch(currentName, currentPreset, baseline, baselinePreset || null)) {
+                await restoreCombatBaseline(baseline, baselinePreset);
                 if (settings.debugMode) {
-                    console.log(`[RPG Tracker] Combat ended — restored profile: ${baseline ?? MAIN_PROFILE_NONE}`);
+                    console.log(`[RPG Tracker] Combat ended — restored profile: ${baseline ?? MAIN_PROFILE_NONE}${baselinePreset ? ` / preset: ${baselinePreset}` : ''}`);
                 }
             }
         } catch (e) {
