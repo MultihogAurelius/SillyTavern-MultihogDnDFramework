@@ -1268,6 +1268,12 @@ function onChatChanged(newChatId) {
     }
 
     if (!s.chatLinkEnabled) {
+        // World Progression "last fired" is operational per-chat state and must never bleed
+        // between scenarios regardless of chatLinkEnabled. Reset it unconditionally on actual switch.
+        if (isActualChange) {
+            s.worldProgressionLastFiredAtMinutes = -1;
+            s.worldProgressionLastFiredPeriodLabel = '';
+        }
         updateChatLinkUI();
         return;
     }
@@ -1282,6 +1288,8 @@ function onChatChanged(newChatId) {
         s.activeRouterKeys = [];
         s.activeWorldKeys = [];
         s.routerLog = [];
+        s.worldProgressionLastFiredAtMinutes = -1;
+        s.worldProgressionLastFiredPeriodLabel = '';
 
         _historyViewIndex = -1;
 
@@ -3891,6 +3899,9 @@ function createPanel() {
                         <button id="rt-agent-world-fire-extra" style="width:100%; background:rgba(0,180,216,0.15); border:1px solid rgba(0,180,216,0.3); color:#00b4d8; border-radius:4px; padding:5px; font-size:0.769em; font-weight:bold; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:5px; margin-top:5px;">
                             <i class="fa-solid fa-wand-magic-sparkles"></i> Fire with Extra Instructions
                         </button>
+                        <button id="rt-agent-world-reset-timeline" title="Clears the last-fired timestamp so World Progression starts fresh from now" style="width:100%; background:rgba(234,67,53,0.1); border:1px solid rgba(234,67,53,0.25); color:rgba(234,67,53,0.75); border-radius:4px; padding:4px; font-size:0.692em; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:5px; margin-top:5px;">
+                            <i class="fa-solid fa-clock-rotate-left"></i> Reset Timeline
+                        </button>
                     </div>
 
                     <div id="rt-agent-keys-toggle" style="display: flex; align-items: center; gap: 6px; margin-bottom: 5px; flex-shrink: 0; cursor: pointer; user-select: none;">
@@ -4692,6 +4703,21 @@ function createPanel() {
                     /** @type {HTMLButtonElement} */ (worldFireExtraBtn).disabled = false;
                     worldFireExtraBtn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Fire with Extra Instructions';
                 }
+            });
+        }
+
+        // ── Agent World Reset Timeline button ──
+        const worldResetBtn = agentPanel.querySelector('#rt-agent-world-reset-timeline');
+        if (worldResetBtn) {
+            worldResetBtn.addEventListener('click', () => {
+                const s = getSettings();
+                s.worldProgressionLastFiredAtMinutes = -1;
+                s.worldProgressionLastFiredPeriodLabel = '';
+                saveSettings();
+                if (s.chatLinkEnabled && _currentChatId) saveChatState(_currentChatId);
+                updateAgentWorldStatus();
+                if (typeof updateWorldProgressionLastFiredDisplayRef === 'function') updateWorldProgressionLastFiredDisplayRef();
+                toastr['info']('World Progression timeline reset. Next report will start from the current time.', 'World Progression');
             });
         }
 
@@ -13361,6 +13387,19 @@ RULES:
             } finally {
                 $wpFireWithInstructions.prop('disabled', false).html('<i class="fa-solid fa-wand-magic-sparkles"></i> Fire with Extra Instructions');
             }
+        });
+
+        // ── World Progression Reset Timeline ──
+        const $wpResetTimeline = $('#rpg_world_progression_reset_timeline');
+        $wpResetTimeline.on('click', function () {
+            const s = getSettings();
+            s.worldProgressionLastFiredAtMinutes = -1;
+            s.worldProgressionLastFiredPeriodLabel = '';
+            saveSettings();
+            if (s.chatLinkEnabled && _currentChatId) saveChatState(_currentChatId);
+            updateWorldProgressionLastFiredDisplay();
+            if (typeof updateAgentWorldStatusRef === 'function') updateAgentWorldStatusRef();
+            toastr['info']('World Progression timeline reset. Next report will start from the current time.', 'World Progression');
         });
 
         const $wpConsolidateCount = $('#rpg_world_progression_consolidate_count');
