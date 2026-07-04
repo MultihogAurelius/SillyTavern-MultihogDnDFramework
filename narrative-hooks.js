@@ -12,7 +12,7 @@
  * circular import. This will be cleaned up when index.js is split.
  */
 
-import { getSettings, saveSettings } from './state-manager.js';
+import { getSettings } from './state-manager.js';
 import { parseQuestsFromMemo, extractCurrentTimeStr, cleanMessageContent, formatInWorldTime } from './memo-processor.js';
 import { runRouterPass, saveSceneToLorebook, scanAssistantOutputForKeywords, parseInWorldMinutes, runWorldProgressionPass, updateLorebookEntry, getLorebookManifest } from './router.js';
 import { logTransaction } from './debug-viewer.js';
@@ -1538,7 +1538,7 @@ async function maybeRunWorldProgression() {
     if (lastFired === null) {
         // Never fired — record current time as start of the first interval, don't fire yet.
         settings.worldProgressionLastFiredPeriodLabel = formatInWorldTime(currentMinutes);
-        saveSettings();
+        SillyTavern.getContext().saveSettingsDebounced();
         return;
     }
 
