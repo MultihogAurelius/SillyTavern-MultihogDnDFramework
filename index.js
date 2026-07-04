@@ -2909,90 +2909,7 @@ Saves: Fort +X | Ref +X | Will +X`;
     // --- Onboarding Narrator Configuration (Salad Bar Sync) ---
     const s = getSettings();
 
-    /**
-     * Helper to update a setting, save it, and sync the UIs.
-     * This avoids the 'ghost click' problem where onboarding UI tries to
-     * trigger changes on non-existent settings panel elements.
-     */
-    const syncSettingsAndUI = (updateFn) => {
-        const fresh = getSettings();
-        updateFn(fresh);
-
-        // Sync the main settings panel if it exists
-        const rngHybrid = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_rng_hybrid'));
-        const rngLegacy = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_rng_legacy'));
-        const rngNone = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_rng_none'));
-        const questsCb = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_sysprompt_mod_quests'));
-        const deadlinesCb = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_quests_deadlines'));
-        const frustrationCb = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_quests_frustration'));
-        const qmStandard = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_quest_standard'));
-        const qmLegacy = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_quest_legacy'));
-
-        if (rngHybrid && rngLegacy && rngNone) {
-            rngHybrid.checked = fresh.rngEnabled && !!fresh.diceFunctionTool;
-            rngLegacy.checked = fresh.rngEnabled && !fresh.diceFunctionTool;
-            rngNone.checked = !fresh.rngEnabled;
-        }
-        if (questsCb) questsCb.checked = fresh.syspromptModules?.quests !== false;
-        if (deadlinesCb) deadlinesCb.checked = !!fresh.syspromptModules?.questsDeadlines;
-        if (frustrationCb) frustrationCb.checked = !!fresh.syspromptModules?.questsFrustration;
-        const frustrationWrapEl = /** @type {HTMLElement|null} */ (document.getElementById('rpg_quests_frustration_wrap'));
-        if (frustrationWrapEl) frustrationWrapEl.style.display = !!fresh.syspromptModules?.questsDeadlines ? '' : 'none';
-        const difficultyCb = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_quests_difficulty'));
-        if (difficultyCb) difficultyCb.checked = !!fresh.syspromptModules?.questsDifficulty;
-        if (qmStandard && qmLegacy) {
-            qmStandard.checked = !fresh.questLegacyMode;
-            qmLegacy.checked = !!fresh.questLegacyMode;
-        }
-
-        // Optional components
-        const mods = { 'loot': '#rpg_sysprompt_mod_loot', 'random_events': '#rpg_sysprompt_mod_random_events', 'resting': '#rpg_sysprompt_mod_resting' };
-        for (const [key, id] of Object.entries(mods)) {
-            const cb = /** @type {HTMLInputElement|null} */ (document.getElementById(id.replace('#', '')));
-            if (cb) cb.checked = !!fresh.syspromptModules?.[key];
-        }
-
-        // Relationship system sync
-        const relBarsCb = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_tracker_npc_rel_bars'));
-        if (relBarsCb) relBarsCb.checked = !!fresh.npcRelationshipBars;
-        const syspromptRelBarsCb = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_sysprompt_mod_npc_rel_bars'));
-        if (syspromptRelBarsCb) syspromptRelBarsCb.checked = !!fresh.npcRelationshipBars;
-        const onboardingRelBarsCb = /** @type {HTMLInputElement|null} */ (el.querySelector('#rt_onboarding_mod_npc_rel_bars'));
-        if (onboardingRelBarsCb) onboardingRelBarsCb.checked = !!fresh.npcRelationshipBars;
-        const relToastUICb = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_tracker_npc_rel_toast'));
-        if (relToastUICb) relToastUICb.checked = fresh.npcRelationshipToast !== false;
-        const stateSwipeRollbackUICb = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_tracker_state_swipe_rollback'));
-        if (stateSwipeRollbackUICb) stateSwipeRollbackUICb.checked = fresh.stateTrackerSwipeRollback !== false;
-
-        // Custom Sysprompt
-        const customSyspromptEl = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_tracker_custom_sysprompt'));
-        if (customSyspromptEl) customSyspromptEl.checked = !!fresh.customSysprompt;
-        const timeDdMmyyCb = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_time_ddmmyy_toggle'));
-        if (timeDdMmyyCb) timeDdMmyyCb.checked = !!fresh.useDdMmYyFormat;
-        const syspromptTimeDdMmyyCb = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_sysprompt_mod_time_ddmmyy'));
-        if (syspromptTimeDdMmyyCb) syspromptTimeDdMmyyCb.checked = !!fresh.useDdMmYyFormat;
-        const onboardingTimeDdMmyyCb = /** @type {HTMLInputElement|null} */ (document.getElementById('rt_onboarding_time_ddmmyy'));
-        if (onboardingTimeDdMmyyCb) onboardingTimeDdMmyyCb.checked = !!fresh.useDdMmYyFormat;
-        const narratorBlockEl = document.getElementById('rpg_narrator_config_block');
-        if (narratorBlockEl) narratorBlockEl.style.display = !!fresh.customSysprompt ? 'none' : '';
-
-        // Save and sync the onboarding view
-        saveSettings();
-
-        // Handle specific logic like tool registration
-        if (fresh.questLegacyMode) {
-            refreshQuestLegacyPrompt(fresh);
-        } else {
-            // Ensure modern prompt is in the quests slot
-            if (!fresh.stockPrompts) fresh.stockPrompts = {};
-            fresh.stockPrompts.quests = DEFAULT_STOCK_PROMPTS.quests;
-            registerLogQuestTool();
-        }
-        refreshOrderList();
-        saveSettings();
-        scheduleAutoApply();
-        refreshRenderedView();
-    };
+    // (Local syncSettingsAndUI function removed; using module-scoped syncSettingsAndUI instead)
 
     // RNG Mode Sync
     const onboardingRngInputs = el.querySelectorAll('input[name="rt_onboarding_rng_mode"]');
@@ -9335,6 +9252,90 @@ async function importModulesFromJson(jsonString) {
     refreshOrderList();
     syncMemoView();
     toastr['success'](`Imported ${importedCount} custom module(s).`, 'Multihog Framework');
+}
+/**
+ * Helper to update a setting, save it, and sync the UIs.
+ * This avoids the 'ghost click' problem where onboarding UI tries to
+ * trigger changes on non-existent settings panel elements.
+ */
+export function syncSettingsAndUI(updateFn) {
+    const fresh = getSettings();
+    updateFn(fresh);
+
+    // Sync the main settings panel if it exists
+    const rngHybrid = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_rng_hybrid'));
+    const rngLegacy = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_rng_legacy'));
+    const rngNone = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_rng_none'));
+    const questsCb = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_sysprompt_mod_quests'));
+    const deadlinesCb = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_quests_deadlines'));
+    const frustrationCb = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_quests_frustration'));
+    const qmStandard = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_quest_standard'));
+    const qmLegacy = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_quest_legacy'));
+
+    if (rngHybrid && rngLegacy && rngNone) {
+        rngHybrid.checked = fresh.rngEnabled && !!fresh.diceFunctionTool;
+        rngLegacy.checked = fresh.rngEnabled && !fresh.diceFunctionTool;
+        rngNone.checked = !fresh.rngEnabled;
+    }
+    if (questsCb) questsCb.checked = fresh.syspromptModules?.quests !== false;
+    if (deadlinesCb) deadlinesCb.checked = !!fresh.syspromptModules?.questsDeadlines;
+    if (frustrationCb) frustrationCb.checked = !!fresh.syspromptModules?.questsFrustration;
+    const frustrationWrapEl = /** @type {HTMLElement|null} */ (document.getElementById('rpg_quests_frustration_wrap'));
+    if (frustrationWrapEl) frustrationWrapEl.style.display = !!fresh.syspromptModules?.questsDeadlines ? '' : 'none';
+    const difficultyCb = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_quests_difficulty'));
+    if (difficultyCb) difficultyCb.checked = !!fresh.syspromptModules?.questsDifficulty;
+    if (qmStandard && qmLegacy) {
+        qmStandard.checked = !fresh.questLegacyMode;
+        qmLegacy.checked = !!fresh.questLegacyMode;
+    }
+
+    // Optional components
+    const mods = { 'loot': '#rpg_sysprompt_mod_loot', 'random_events': '#rpg_sysprompt_mod_random_events', 'resting': '#rpg_sysprompt_mod_resting' };
+    for (const [key, id] of Object.entries(mods)) {
+        const cb = /** @type {HTMLInputElement|null} */ (document.getElementById(id.replace('#', '')));
+        if (cb) cb.checked = !!fresh.syspromptModules?.[key];
+    }
+
+    // Relationship system sync
+    const relBarsCb = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_tracker_npc_rel_bars'));
+    if (relBarsCb) relBarsCb.checked = !!fresh.npcRelationshipBars;
+    const syspromptRelBarsCb = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_sysprompt_mod_npc_rel_bars'));
+    if (syspromptRelBarsCb) syspromptRelBarsCb.checked = !!fresh.npcRelationshipBars;
+    const onboardingRelBarsCb = /** @type {HTMLInputElement|null} */ (document.getElementById('rt_onboarding_mod_npc_rel_bars'));
+    if (onboardingRelBarsCb) onboardingRelBarsCb.checked = !!fresh.npcRelationshipBars;
+    const relToastUICb = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_tracker_npc_rel_toast'));
+    if (relToastUICb) relToastUICb.checked = fresh.npcRelationshipToast !== false;
+    const stateSwipeRollbackUICb = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_tracker_state_swipe_rollback'));
+    if (stateSwipeRollbackUICb) stateSwipeRollbackUICb.checked = fresh.stateTrackerSwipeRollback !== false;
+
+    // Custom Sysprompt
+    const customSyspromptEl = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_tracker_custom_sysprompt'));
+    if (customSyspromptEl) customSyspromptEl.checked = !!fresh.customSysprompt;
+    const timeDdMmyyCb = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_time_ddmmyy_toggle'));
+    if (timeDdMmyyCb) timeDdMmyyCb.checked = !!fresh.useDdMmYyFormat;
+    const syspromptTimeDdMmyyCb = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_sysprompt_mod_time_ddmmyy'));
+    if (syspromptTimeDdMmyyCb) syspromptTimeDdMmyyCb.checked = !!fresh.useDdMmYyFormat;
+    const onboardingTimeDdMmyyCb = /** @type {HTMLInputElement|null} */ (document.getElementById('rt_onboarding_time_ddmmyy'));
+    if (onboardingTimeDdMmyyCb) onboardingTimeDdMmyyCb.checked = !!fresh.useDdMmYyFormat;
+    const narratorBlockEl = document.getElementById('rpg_narrator_config_block');
+    if (narratorBlockEl) narratorBlockEl.style.display = !!fresh.customSysprompt ? 'none' : '';
+
+    // Save and sync the onboarding view
+    saveSettings();
+
+    // Handle specific logic like tool registration
+    if (fresh.questLegacyMode) {
+        refreshQuestLegacyPrompt(fresh);
+    } else {
+        // Ensure modern prompt is in the quests slot
+        if (!fresh.stockPrompts) fresh.stockPrompts = {};
+        fresh.stockPrompts.quests = DEFAULT_STOCK_PROMPTS.quests;
+        registerLogQuestTool();
+    }
+    refreshOrderList();
+    saveSettings();
+    scheduleAutoApply();
+    refreshRenderedView();
 }
 
 // ───────────────────────────────────────────────────────────────────────────
