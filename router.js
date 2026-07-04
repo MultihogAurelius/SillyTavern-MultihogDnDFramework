@@ -2864,11 +2864,12 @@ export async function runWorldProgressionPass(timeStr, currentMinutes, extraInst
         openaiModel: settings.worldOpenaiModel,
     };
 
-    const lastFired = settings.worldProgressionLastFiredAtMinutes ?? -1;
+    const lastFiredLabel = settings.worldProgressionLastFiredPeriodLabel || '';
+    const lastFired = lastFiredLabel ? parseInWorldMinutes(lastFiredLabel) : null;
     const intervalMinutes = intervalHours * 60;
 
     // Determine the start of the period we're reporting on
-    const periodStart = lastFired >= 0 ? lastFired : currentMinutes - intervalMinutes;
+    const periodStart = lastFired !== null ? lastFired : currentMinutes - intervalMinutes;
     const periodEnd = periodStart + intervalMinutes;
     const periodLabel = computePeriodLabel(periodStart, periodEnd, intervalHours);
 
@@ -3389,8 +3390,7 @@ ${historicalDump}`;
         }
     }
 
-    // 9. Advance the timer and persist
-    settings.worldProgressionLastFiredAtMinutes = periodEnd;
+    // 9. Advance the timer — only the period label is stored; numeric field is legacy.
     settings.worldProgressionLastFiredPeriodLabel = periodLabel;
     SillyTavern.getContext().saveSettingsDebounced();
 

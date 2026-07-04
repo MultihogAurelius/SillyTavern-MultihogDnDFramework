@@ -12,8 +12,8 @@
  * circular import. This will be cleaned up when index.js is split.
  */
 
-import { getSettings } from './state-manager.js';
-import { parseQuestsFromMemo, extractCurrentTimeStr, cleanMessageContent } from './memo-processor.js';
+import { getSettings, saveSettings } from './state-manager.js';
+import { parseQuestsFromMemo, extractCurrentTimeStr, cleanMessageContent, formatInWorldTime } from './memo-processor.js';
 import { runRouterPass, saveSceneToLorebook, scanAssistantOutputForKeywords, parseInWorldMinutes, runWorldProgressionPass, updateLorebookEntry, getLorebookManifest } from './router.js';
 import { logTransaction } from './debug-viewer.js';
 
@@ -1531,14 +1531,18 @@ async function maybeRunWorldProgression() {
     const currentMinutes = parseInWorldMinutes(timeStr);
     if (currentMinutes < 0) return; // can't parse time → skip
 
-    const lastFired = settings.worldProgressionLastFiredAtMinutes ?? -1;
+    const lastFiredLabel = settings.worldProgressionLastFiredPeriodLabel || '';
+    const lastFired = lastFiredLabel ? parseInWorldMinutes(lastFiredLabel) : null;
     const intervalMinutes = (settings.worldProgressionIntervalHours || 24) * 60;
 
-    // On first-ever firing: don't fire unless we've actually passed at least one full interval.
-    // This prevents a spurious Day 0 report on the very first turn of a brand-new campaign.
-    if (lastFired < 0 && currentMinutes < intervalMinutes) return;
+    if (lastFired === null) {
+        // Never fired — record current time as start of the first interval, don't fire yet.
+        settings.worldProgressionLastFiredPeriodLabel = formatInWorldTime(currentMinutes);
+        saveSettings();
+        return;
+    }
 
-    const elapsed = lastFired < 0 ? intervalMinutes : currentMinutes - lastFired;
+    const elapsed = currentMinutes - lastFired;
     if (elapsed < intervalMinutes) return;
 
     // Guard: don't start a World Progression pass while the Lorebook Agent is already running

@@ -137,22 +137,12 @@ export function parseInWorldTime(str) {
         let yy = parseInt(ddmmyyMatch[3], 10);
         if (yy < 100) yy += 2000;
 
-        let baseDay = 1, baseMonth = 1, baseYear = 2026;
-        const settings = getSettings();
-        const initial = settings.initialDate || '';
-        const initMatch = initial.match(/^(\d{1,2})\/(\d{1,2})\/(\d+)$/);
-        if (initMatch) {
-            baseDay = parseInt(initMatch[1], 10);
-            baseMonth = parseInt(initMatch[2], 10);
-            let y = parseInt(initMatch[3], 10);
-            if (y < 100) y += 2000;
-            baseYear = y;
-        }
-
+        // Fixed ancient epoch: 0001-01-01 — independent of any user config.
+        // All reasonable calendar years (500–9999 AD) map to large positive numbers.
         const dateObj = new Date(0, 0, 1);
         dateObj.setFullYear(yy, mm - 1, dd);
         const epochObj = new Date(0, 0, 1);
-        epochObj.setFullYear(baseYear, baseMonth - 1, baseDay);
+        epochObj.setFullYear(1, 0, 1);
         const diffDays = Math.round((dateObj - epochObj) / (1000 * 60 * 60 * 24));
         d = diffDays + 1;
     } else if (dayMatch) {
@@ -192,25 +182,13 @@ export function formatInWorldTime(totalMins) {
 
     let dateStr = '';
     if (useDdMmYy) {
-        let baseDay = 1, baseMonth = 1, baseYear = 2026;
-        const initial = settings.initialDate || '';
-        const initMatch = initial.match(/^(\d{1,2})\/(\d{1,2})\/(\d+)$/);
-        if (initMatch) {
-            baseDay = parseInt(initMatch[1], 10);
-            baseMonth = parseInt(initMatch[2], 10);
-            let y = parseInt(initMatch[3], 10);
-            if (y < 100) y += 2000;
-            baseYear = y;
-        }
-
+        // Fixed ancient epoch: 0001-01-01 — same reference as parseInWorldTime.
         const date = new Date(0, 0, 1);
-        date.setFullYear(baseYear, baseMonth - 1, baseDay + (dayIndex - 1));
+        date.setFullYear(1, 0, 1 + (dayIndex - 1));
         const dd = String(date.getDate()).padStart(2, '0');
         const mm = String(date.getMonth() + 1).padStart(2, '0');
         let yyyy = String(date.getFullYear());
-        if (yyyy.length < 4) {
-            yyyy = yyyy.padStart(4, '0');
-        }
+        if (yyyy.length < 4) yyyy = yyyy.padStart(4, '0');
         dateStr = `${dd}/${mm}/${yyyy}`;
     } else {
         dateStr = `Day ${dayIndex}`;
@@ -1167,7 +1145,9 @@ export function buildModulesInstructionText(settings) {
         }
     }
 
-    if (settings.initialDate) {
+    // Only inject timing anchor on first turn of new campaign (before [TIME] block exists in memo).
+    // Once the State Tracker has written the initial [TIME] block, it manages time itself.
+    if (settings.initialDate && !settings.currentMemo?.match(/\[TIME\]/i)) {
         modulesText += `\n### CAMPAIGN TIMING RULES\n- The campaign starting date is ${settings.initialDate}. Ensure the very first [TIME] block and all early timeline entries align with this starting anchor.\n`;
     }
 

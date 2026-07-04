@@ -4584,8 +4584,8 @@ function createPanel() {
         // ── Agent World Progression status display helper ──
         function updateAgentWorldStatus() {
             const s = getSettings();
-            const mins = s.worldProgressionLastFiredAtMinutes ?? -1;
             const label = s.worldProgressionLastFiredPeriodLabel || '';
+            const mins = label ? parseInWorldTime(label) : -1;
             const intervalHours = s.worldProgressionIntervalHours || 24;
             const intervalMins = intervalHours * 60;
             function fmtWP(m) {
@@ -13058,25 +13058,16 @@ RULES:
         function updateWorldProgressionLastFiredDisplay() {
             const s = getSettings();
             const label = s.worldProgressionLastFiredPeriodLabel || '';
-            const mins = s.worldProgressionLastFiredAtMinutes ?? -1;
+            const mins = label ? parseInWorldTime(label) : -1;
 
-            function formatInWorldMinutes(totalMins) {
-                return formatInWorldTime(totalMins);
-            }
-
-            let lastReportText = 'Never';
-            if (label) {
-                lastReportText = label;
-            } else if (mins >= 0) {
-                lastReportText = formatInWorldMinutes(mins);
-            }
+            const lastReportText = label || 'Never';
             $wpLastFired.text(lastReportText);
             $wpLastReportVal.text(lastReportText);
 
             const intervalHours = s.worldProgressionIntervalHours || 24;
             const intervalMinutes = intervalHours * 60;
-            const nextMins = mins >= 0 ? mins + intervalMinutes : intervalMinutes;
-            $wpNextReportVal.text(formatInWorldMinutes(nextMins));
+            const nextMins = mins >= 0 ? mins + intervalMinutes : -1;
+            $wpNextReportVal.text(nextMins >= 0 ? formatInWorldTime(nextMins) : '—');
             if (typeof updateAgentWorldStatusRef === 'function') {
                 updateAgentWorldStatusRef();
             }
@@ -13302,10 +13293,9 @@ RULES:
                 return;
             }
 
-            // Back-calculate lastFired so that next = lastFired + interval
-            s.worldProgressionLastFiredAtMinutes = parsedNextMins - intervalMinutes;
-            // Clear the period label to avoid duplicate-check conflicts on the next run
-            s.worldProgressionLastFiredPeriodLabel = '';
+            // Back-calculate: set label to what the period-end date would be at nextMins - interval
+            const lastFiredMins = parsedNextMins - intervalMinutes;
+            s.worldProgressionLastFiredPeriodLabel = formatInWorldTime(lastFiredMins);
             saveSettings();
             updateWorldProgressionLastFiredDisplay();
             toastr['success'](`Next report set to ${fmtHint(parsedNextMins)}.`, 'World Progression');
