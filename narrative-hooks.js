@@ -1418,6 +1418,9 @@ export function resetRouterTick(clearKeywordPool = false) {
 /** Returns how many auto-generations have fired since the Lorebook Agent last ran. */
 export function getRouterTick() { return _routerAutoTick; }
 
+/** Reset the auto-run throttle counter (e.g. after a manual agent pass). */
+export function resetRouterAutoTick() { _routerAutoTick = 0; }
+
 /**
  * Fires on GENERATION_ENDED. Triggers the state model pass.
  * runStateModelPass is resolved via the module import below to avoid

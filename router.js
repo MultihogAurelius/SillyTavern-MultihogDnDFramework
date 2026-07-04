@@ -1328,6 +1328,12 @@ ${sharedContext}`;
         // Cleanup passes never reach this line (they return earlier), so no extra guard is needed.
         persistRouterLastRunTimestamp();
 
+        // Manual passes don't go through onGenerationEnded's throttle reset — treat like an auto run.
+        if (typeof globalThis._rpgResetRouterAutoTick === 'function') {
+            globalThis._rpgResetRouterAutoTick();
+        }
+        document.dispatchEvent(new CustomEvent('rt_generation_tick'));
+
         // Non-blocking bloat hint and auto-cleanup check
         {
             const CLEANUP_TOKEN_THRESHOLD = settings.routerCleanupTokenThreshold || 300;
