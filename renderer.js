@@ -1201,40 +1201,46 @@ function formatValueToCurrency(totalCp, detectedCurrency) {
                         <label style="display: flex; align-items: center; gap: 4px; font-size: 11px; opacity: 0.85; cursor: pointer; user-select: none;">
                             <span style="font-weight: bold; font-style: italic;">Level:</span>
                             <select id="rt-starting-level" class="text_pole" style="width: auto; min-width: 60px; padding: 2px 4px; font-size: 11px; height: 22px; border-radius: 4px; background: var(--black70a);">
-                                ${[...Array(20).keys()].map(i => `<option value="${i + 1}">Level ${i + 1}</option>`).join('')}
+                                ${[...Array(20).keys()].map(i => {
+                                    const lvl = i + 1;
+                                    const isSel = lvl === parseInt(getSettings().onboardingLevel || '1') ? 'selected' : '';
+                                    return `<option value="${lvl}" ${isSel}>Level ${lvl}</option>`;
+                                }).join('')}
                             </select>
                         </label>
                         <label style="display: flex; align-items: center; gap: 4px; font-size: 11px; opacity: 0.85; cursor: pointer; user-select: none;">
                             <span style="font-weight: bold; font-style: italic;">Genre:</span>
                             <select id="rt-onboarding-genre" class="text_pole" style="width: auto; min-width: 90px; padding: 2px 4px; font-size: 11px; height: 22px; border-radius: 4px; background: var(--black70a);">
-                                <option value="fantasy">⚔️ Fantasy RPG</option>
-                                <option value="realistic">🏙️ Modern / Realistic</option>
+                                <option value="fantasy" ${getSettings().onboardingGenre === 'fantasy' ? 'selected' : ''}>⚔️ Fantasy RPG</option>
+                                <option value="realistic" ${getSettings().onboardingGenre === 'realistic' ? 'selected' : ''}>🏙️ Modern / Realistic</option>
                             </select>
                         </label>
                         <label style="display: flex; align-items: center; gap: 4px; font-size: 11px; opacity: 0.85; cursor: pointer; user-select: none;">
                             <span style="font-weight: bold; font-style: italic;">Start:</span>
                             <select id="rt-onboarding-date-type" class="text_pole" style="width: auto; min-width: 65px; padding: 2px 4px; font-size: 11px; height: 22px; border-radius: 4px; background: var(--black70a);">
-                                <option value="day">Day 1</option>
-                                <option value="date">Date (DD/MM/YYYY)</option>
+                                <option value="day" ${!getSettings().useDdMmYyFormat ? 'selected' : ''}>Day 1</option>
+                                <option value="date" ${getSettings().useDdMmYyFormat ? 'selected' : ''}>Date (DD/MM/YYYY)</option>
                             </select>
-                            <input type="text" id="rt-onboarding-start-date" class="text_pole" value="01/01/2026" placeholder="01/01/2026" style="width: 75px; text-align: center; height: 22px; font-size: 11px; border-radius: 4px; background: var(--black70a); display: none;" />
+                            <input type="text" id="rt-onboarding-start-date" class="text_pole" value="${getSettings().initialDate && getSettings().initialDate !== 'Day 1' ? getSettings().initialDate : '01/01/2026'}" placeholder="01/01/2026" style="width: 75px; text-align: center; height: 22px; font-size: 11px; border-radius: 4px; background: var(--black70a); display: ${getSettings().useDdMmYyFormat ? 'inline-block' : 'none'};" />
                         </label>
                     </div>
-                    <textarea id="rt-onboarding-custom-instructions" class="text_pole" placeholder="Custom setting/character instructions (e.g. Victorian London, space marine, gritty realism, cyberpunk decker...)" style="width: 100%; min-height: 40px; max-height: 120px; font-size: 11px; padding: 4px 6px; border-radius: 4px; background: var(--black70a); resize: vertical; margin-top: 2px;"></textarea>
+                    <textarea id="rt-onboarding-custom-instructions" class="text_pole" placeholder="Custom setting/character instructions (e.g. Victorian London, space marine, gritty realism, cyberpunk decker...)" style="width: 100%; min-height: 40px; max-height: 120px; font-size: 11px; padding: 4px 6px; border-radius: 4px; background: var(--black70a); resize: vertical; margin-top: 2px;">${escapeHtml(getSettings().onboardingCustomInstructions || '')}</textarea>
                 </div>
 
                 <!-- Archetype Buttons -->
-                <div class="rt-onboarding-buttons rt-fantasy-buttons" style="width: 100%; display: flex; justify-content: center; gap: 4px; margin: 4px 0; flex-shrink: 0;">
+                <div class="rt-onboarding-buttons rt-fantasy-buttons" style="width: 100%; display: ${getSettings().onboardingGenre === 'realistic' ? 'none' : 'flex'}; justify-content: center; gap: 4px; margin: 4px 0; flex-shrink: 0;">
                     <button class="rt-random-char-btn" data-archetype="magic">✨ Magic</button>
                     <button class="rt-random-char-btn" data-archetype="melee">⚔️ Melee</button>
                     <button class="rt-random-char-btn" data-archetype="rogue">🗡️ Rogue</button>
                     <button class="rt-random-char-btn" data-archetype="persona">🎭 Persona</button>
+                    <button class="rt-random-char-btn" data-archetype="custom">⚙️ Custom</button>
                 </div>
-                <div class="rt-onboarding-buttons rt-realistic-buttons" style="width: 100%; display: none; justify-content: center; gap: 4px; margin: 4px 0; flex-shrink: 0;">
+                <div class="rt-onboarding-buttons rt-realistic-buttons" style="width: 100%; display: ${getSettings().onboardingGenre === 'realistic' ? 'flex' : 'none'}; justify-content: center; gap: 4px; margin: 4px 0; flex-shrink: 0;">
                     <button class="rt-random-char-btn" data-archetype="professional">💼 Professional</button>
                     <button class="rt-random-char-btn" data-archetype="survivor">🏃 Survivor</button>
                     <button class="rt-random-char-btn" data-archetype="scholar">🧠 Scholar</button>
                     <button class="rt-random-char-btn" data-archetype="persona">🎭 Persona</button>
+                    <button class="rt-random-char-btn" data-archetype="custom">⚙️ Custom</button>
                 </div>
 
                 <div style="font-size: 13px; opacity: 0.9; display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; line-height: 1.4;">

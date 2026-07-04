@@ -2850,15 +2850,36 @@ async function showPortraitSettingsMenu(entityName, onRefresh, npcContent = null
 function bindRenderedCardEvents(el, memo, isDetachedContext = false, onRefresh = null) {
     const refresh = onRefresh || refreshRenderedView;
 
-    // Genre tab toggle listener
+    // Genre tab toggle listener & persistent preference save
     const genreSelect = el.querySelector('#rt-onboarding-genre');
     const fantasyGroup = el.querySelector('.rt-fantasy-buttons');
     const realisticGroup = el.querySelector('.rt-realistic-buttons');
-    if (genreSelect && fantasyGroup && realisticGroup) {
+    if (genreSelect) {
         genreSelect.addEventListener('change', () => {
-            const isRealistic = genreSelect.value === 'realistic';
-            fantasyGroup.style.display = isRealistic ? 'none' : 'flex';
-            realisticGroup.style.display = isRealistic ? 'flex' : 'none';
+            const val = genreSelect.value;
+            getSettings().onboardingGenre = val;
+            saveSettings();
+            const isRealistic = val === 'realistic';
+            if (fantasyGroup) fantasyGroup.style.display = isRealistic ? 'none' : 'flex';
+            if (realisticGroup) realisticGroup.style.display = isRealistic ? 'flex' : 'none';
+        });
+    }
+
+    // Starting Level change & persistent preference save
+    const levelSelect = el.querySelector('#rt-starting-level');
+    if (levelSelect) {
+        levelSelect.addEventListener('change', () => {
+            getSettings().onboardingLevel = parseInt(levelSelect.value) || 1;
+            saveSettings();
+        });
+    }
+
+    // Custom Instructions input & persistent preference save
+    const customInstructionsInput = el.querySelector('#rt-onboarding-custom-instructions');
+    if (customInstructionsInput) {
+        customInstructionsInput.addEventListener('input', () => {
+            getSettings().onboardingCustomInstructions = customInstructionsInput.value;
+            saveSettings();
         });
     }
 
@@ -2922,7 +2943,8 @@ function bindRenderedCardEvents(el, memo, isDetachedContext = false, onRefresh =
                 professional: '💼 Analyzing...',
                 survivor: '🏃 Surviving...',
                 scholar: '🧠 Researching...',
-                persona: '🎭 Embodying...'
+                persona: '🎭 Embodying...',
+                custom: '⚙️ Customizing...'
             };
 
             const CHARACTER_FORMAT_HINT = `\n\nUse this exact format for the [CHARACTER] block:
@@ -2949,6 +2971,22 @@ Saves: Fort +X | Ref +X | Will +X`;
                 survivor: `Generate a random Level ${level} survivor character (e.g. survivalist, soldier, athlete, or civilian). Give them a realistic name (do NOT use {{user}}). Output [CHARACTER], [INVENTORY], [ABILITIES], and [TIME] blocks. Focus on physical resilience, survival/scavenged gear, and attributes consistent with a Level ${level} survivor.${CHARACTER_FORMAT_HINT}${TIME_FORMAT_HINT}${REALISTIC_HINT}`,
                 scholar: `Generate a random Level ${level} intellectual/scholar character (e.g. occultist, inventor, academic, hacker, or historian). Give them a realistic name (do NOT use {{user}}). Output [CHARACTER], [INVENTORY], [ABILITIES], and [TIME] blocks. Focus on intelligence, knowledge-based traits, research tools/gear, and attributes consistent with an intellectual Level ${level} scholar.${CHARACTER_FORMAT_HINT}${TIME_FORMAT_HINT}${REALISTIC_HINT}`
             };
+
+            // ── Custom archetype: freeform character based entirely on custom instructions ──
+            if (archetype === 'custom') {
+                if (!customInstructions) {
+                    toastr['warning']('Please enter custom setting/character instructions first.', 'RPG Tracker');
+                    return;
+                }
+                el.querySelectorAll('.rt-random-char-btn').forEach(b => b.disabled = true);
+                btn.textContent = labels.custom;
+                let customPrompt = `Generate a random Level ${level} character based entirely on these custom instructions: "${customInstructions}". Output [CHARACTER], [INVENTORY], [ABILITIES], and [TIME] blocks. Adapt all attributes, skills, saves, descriptions, and gear to match the setting and instructions perfectly.${CHARACTER_FORMAT_HINT}${TIME_FORMAT_HINT}`;
+                if (isCalendar) {
+                    customPrompt += `\n\nCRITICAL REALISM RULE: This is a realistic/non-fantasy setting. Do NOT output a [SPELLS] block. Use realistic modern/historical currencies instead of GP/SP/CP.`;
+                }
+                await sendDirectPrompt(customPrompt);
+                return;
+            }
 
             // ── Persona archetype: derive character from the active SillyTavern persona ──
             if (archetype === 'persona') {
