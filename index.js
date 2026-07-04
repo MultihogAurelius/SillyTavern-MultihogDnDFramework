@@ -4283,8 +4283,8 @@ function createPanel() {
         // Refresh World Progression status display (reads agentPanel from outer scope)
         {
             const wpS = getSettings();
-            const wpMins = wpS.worldProgressionLastFiredAtMinutes ?? -1;
             const wpLabel = wpS.worldProgressionLastFiredPeriodLabel || '';
+            const wpMins = wpLabel ? parseInWorldTime(wpLabel) : -1;
             const wpIntervalMins = (wpS.worldProgressionIntervalHours || 24) * 60;
             function _fmtWP(m) {
                 return formatInWorldTime(m);
@@ -4292,8 +4292,18 @@ function createPanel() {
             const wpLastEl = agentPanel.querySelector('#rt-agent-world-last-fired');
             const wpNextEl = agentPanel.querySelector('#rt-agent-world-next-fire');
             const wpBadge  = agentPanel.querySelector('#rt-agent-world-enabled-badge');
-            if (wpLastEl) wpLastEl.textContent = wpLabel || _fmtWP(wpMins);
-            if (wpNextEl) wpNextEl.textContent = _fmtWP(wpMins >= 0 ? wpMins + wpIntervalMins : wpIntervalMins);
+            if (wpLastEl) wpLastEl.textContent = wpLabel || 'Never';
+
+            let wpNextMins = -1;
+            if (wpMins >= 0) {
+                wpNextMins = wpMins + wpIntervalMins;
+            } else {
+                const tMatch = (wpS.currentMemo || '').match(/\[TIME\]([\s\S]*?)\[\/TIME\]/i);
+                const tStr = tMatch ? extractCurrentTimeStr(tMatch[1]) : '';
+                const tMins = tStr ? parseInWorldTime(tStr) : -1;
+                if (tMins >= 0) wpNextMins = tMins + wpIntervalMins;
+            }
+            if (wpNextEl) wpNextEl.textContent = wpNextMins >= 0 ? _fmtWP(wpNextMins) : '—';
             if (wpBadge) {
                 wpBadge.textContent = wpS.worldProgressionEnabled ? 'ON' : 'OFF';
                 wpBadge.style.cssText = wpS.worldProgressionEnabled
