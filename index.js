@@ -833,8 +833,8 @@ function loadChatState(chatId) {
     if (saved.stockPrompts) s.stockPrompts = JSON.parse(JSON.stringify(saved.stockPrompts));
     if (saved.customFields) s.customFields = JSON.parse(JSON.stringify(saved.customFields));
     s.customPortraits = JSON.parse(JSON.stringify(saved.customPortraits || {}));
-    // quests are derived from currentMemo, do not load independently
-    s.quests = [];
+    // Restore persisted quests (incl. completed) so the UI can display them
+    s.quests = JSON.parse(JSON.stringify(saved.quests || []));
     s.historyIndex = saved.historyIndex ?? -1;
 
     s.activeRouterKeys = JSON.parse(JSON.stringify(saved.activeRouterKeys || []));
@@ -3438,7 +3438,9 @@ function refreshRenderedView() {
 
         // Append quest log section if module is enabled and we are not on the onboarding screen
         if (s.syspromptModules?.quests !== false && memo && memo.trim()) {
-            const snapshotQuests = parseQuestsFromMemo(memo);
+            const snapshotQuests = (_historyViewIndex === -1 && s.quests && s.quests.length > 0)
+                ? s.quests
+                : parseQuestsFromMemo(memo);
             html += renderQuestLog(snapshotQuests, currentTime, collapsed, detached);
         }
 
@@ -3476,7 +3478,9 @@ function refreshRenderedView() {
             const body = panel.querySelector('.rpg-tracker-detached-body');
             if (body) {
                 if (tag === 'QUESTS') {
-                    const snapshotQuests = parseQuestsFromMemo(memo);
+                    const snapshotQuests = (_historyViewIndex === -1 && s.quests && s.quests.length > 0)
+                        ? s.quests
+                        : parseQuestsFromMemo(memo);
                     body.innerHTML = renderQuestLog(snapshotQuests, currentTime, collapsed, detached, 'QUESTS');
                 } else {
                     body.innerHTML = renderMemoAsCards(memo, tag, _sectionPages);

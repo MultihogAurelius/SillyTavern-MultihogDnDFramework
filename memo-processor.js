@@ -517,6 +517,21 @@ export function mergeQuestUpdates(jsonText, memoText = null) {
         }
     }
 
+    // Auto-complete quests if all required objectives are completed
+    for (const q of quests) {
+        if (q.status === 'active' || q.status === 'past deadline') {
+            const reqObjs = q.objectives?.filter(o => o.required !== false) || [];
+            const targetObjs = reqObjs.length > 0 ? reqObjs : (q.objectives || []);
+            if (targetObjs.length > 0 && targetObjs.every(o => o.status === 'completed')) {
+                q.status = 'completed';
+                changed = true;
+                if (settings.debugMode) {
+                    console.log(`[RPG Tracker] mergeQuestUpdates: auto-completed quest "${q.title}" since all objectives are complete.`);
+                }
+            }
+        }
+    }
+
     if (changed) {
         if (settings.debugMode) console.log('[RPG Tracker] mergeQuestUpdates: applied quest state changes.');
         // Persist the full quest array (including completed) to settings so the UI
