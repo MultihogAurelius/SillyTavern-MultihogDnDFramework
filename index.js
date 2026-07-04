@@ -2851,14 +2851,23 @@ function bindRenderedCardEvents(el, memo, isDetachedContext = false, onRefresh =
         });
     }
 
+    // Start Date type toggle listener (Day 1 vs. Explicit Date)
+    const dateTypeSelect = el.querySelector('#rt-onboarding-date-type');
+    const startDateInput = el.querySelector('#rt-onboarding-start-date');
+    if (dateTypeSelect && startDateInput) {
+        dateTypeSelect.addEventListener('change', () => {
+            const isDate = dateTypeSelect.value === 'date';
+            startDateInput.style.display = isDate ? 'inline-block' : 'none';
+        });
+    }
+
     el.querySelectorAll('.rt-random-char-btn').forEach(btn => {
         btn.addEventListener('click', async () => {
             const archetype = btn.dataset.archetype;
             const level = el.querySelector('#rt-starting-level')?.value || 1;
-            const startDateVal = el.querySelector('#rt-onboarding-start-date')?.value.trim() || '01/01/2026';
+            const isCalendar = dateTypeSelect?.value === 'date';
+            const startDateVal = isCalendar ? (startDateInput?.value.trim() || '01/01/2026') : 'Day 1';
             const customInstructions = el.querySelector('#rt-onboarding-custom-instructions')?.value.trim() || '';
-
-            const isCalendar = /\d+\/\d+\/\d+/.test(startDateVal);
 
             // Sync the start date and format selection back to the core settings
             syncSettingsAndUI(s => {

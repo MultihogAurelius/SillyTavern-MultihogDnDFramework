@@ -1212,8 +1212,12 @@ function formatValueToCurrency(totalCp, detectedCurrency) {
                             </select>
                         </label>
                         <label style="display: flex; align-items: center; gap: 4px; font-size: 11px; opacity: 0.85; cursor: pointer; user-select: none;">
-                            <span style="font-weight: bold; font-style: italic;">Start Date:</span>
-                            <input type="text" id="rt-onboarding-start-date" class="text_pole" value="01/01/2026" placeholder="01/01/2026" style="width: 80px; text-align: center; height: 22px; font-size: 11px; border-radius: 4px; background: var(--black70a);" />
+                            <span style="font-weight: bold; font-style: italic;">Start:</span>
+                            <select id="rt-onboarding-date-type" class="text_pole" style="width: auto; min-width: 65px; padding: 2px 4px; font-size: 11px; height: 22px; border-radius: 4px; background: var(--black70a);">
+                                <option value="day">Day 1</option>
+                                <option value="date">Date</option>
+                            </select>
+                            <input type="text" id="rt-onboarding-start-date" class="text_pole" value="01/01/2026" placeholder="01/01/2026" style="width: 75px; text-align: center; height: 22px; font-size: 11px; border-radius: 4px; background: var(--black70a); display: none;" />
                         </label>
                     </div>
                     <textarea id="rt-onboarding-custom-instructions" class="text_pole" placeholder="Custom setting/character instructions (e.g. Victorian London, space marine, gritty realism, cyberpunk decker...)" style="width: 100%; min-height: 40px; max-height: 120px; font-size: 11px; padding: 4px 6px; border-radius: 4px; background: var(--black70a); resize: vertical; margin-top: 2px;"></textarea>
