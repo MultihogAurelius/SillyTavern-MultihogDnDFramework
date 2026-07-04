@@ -830,10 +830,10 @@ ${modularPrompt}
 4. **RECALL**: To read or update an archive entry, use [[ACTIVATE: Name]]. Its full content becomes visible next turn.
 5. **LIMIT**: You are limited to **${settings.routerMaxActivations || 8} active entries**. Nothing is archived automatically. If you exceed this limit you will see a **BUDGET VIOLATION** line and you MUST use [[DEACTIVATE: Name]] on the least relevant active entries to return within budget before this pass ends.
 ${relSection}
-## NPC APPEARANCE UPDATES
-If an NPC's physical appearance changes significantly (major injury, permanent outfit change, etc.), output:
-  [[UPDATE_APPEARANCE: Book::UID | New appearance text here]]
-Do NOT log appearance changes as event/update entries. The [CORE] block is the single source of truth.
+## NPC CORE UPDATES
+If any field inside the permanent [CORE] block changes, is updated, or new information is revealed (Appearance/Species, Personality, Brief Background, Habits/Behaviors), output:
+  [[UPDATE_CORE: Book::UID | FieldName | New field text]]
+Use the exact FieldName (e.g. Personality, Brief Background, Appearance/Species, Habits/Behaviors). Do NOT log core updates as normal event/update entries.
 
 ## RULES
 1. Only record persistent or significant entities/events.
@@ -867,11 +867,12 @@ Habits/Behaviors: Wipes his brow with a greasy rag.
             broadcastStep('thought', 'Parsing tags...');
             const basicAction = parseBasicTags(basicResp, archiveBooks);
 
-            if (basicAction.record.length > 0 || basicAction.update.length > 0 || basicAction.activate.length > 0 || basicAction.delete_ids?.length > 0 || basicAction.rel?.length > 0 || basicAction.appearance?.length > 0) {
+            if (basicAction.record.length > 0 || basicAction.update.length > 0 || basicAction.activate.length > 0 || basicAction.delete_ids?.length > 0 || basicAction.rel?.length > 0 || basicAction.appearance?.length > 0 || basicAction.core?.length > 0) {
                 const summaries = [];
                 if (basicAction.record.length) summaries.push(`New: ${basicAction.record.length}`);
                 if (basicAction.update.length) summaries.push(`Updates: ${basicAction.update.length}`);
                 if (basicAction.activate.length) summaries.push(`Activations: ${basicAction.activate.length}`);
+                if (basicAction.core?.length || basicAction.appearance?.length) summaries.push(`Core: ${(basicAction.core?.length || 0) + (basicAction.appearance?.length || 0)}`);
                 basicAction.reason = (thoughtMatchB ? thoughtMatchB[1].trim() : 'Tag-based update.') + ` (${summaries.join(', ')})`;
                 await applyAction(basicAction, archiveBooks, currentTime, breadcrumb);
                 basicSummaryText = summaries.join(', ');
@@ -993,6 +994,20 @@ Habits/Behaviors: Wipes his brow with a greasy rag.
                 }
             };
 
+            commitProperties.core = {
+                type: 'array',
+                description: 'Surgically update one of the fields inside an NPC\'s [CORE] block (Appearance/Species, Personality, Brief Background, Habits/Behaviors). Only use when new information is revealed or permanent changes occur.',
+                items: {
+                    type: 'object',
+                    properties: {
+                        id:      { type: 'string', description: 'Book::UID of the NPC entry.' },
+                        field:   { type: 'string', enum: ['Appearance/Species', 'Personality', 'Brief Background', 'Habits/Behaviors'], description: 'The exact field inside [CORE] to update.' },
+                        content: { type: 'string', description: 'New field content text.' }
+                    },
+                    required: ['id', 'field', 'content']
+                }
+            };
+
             /** @type {Array<object>} */
             const agentTools = [
                 {
@@ -1075,8 +1090,8 @@ Include the entity name/title itself (without timestamps like "[Day 1]") as a ke
 ${Object.values(settings.routerModules || {}).filter(m => m.enabled).map(m => `- ${m.tag}: ${m.instruction}`).join('\n')}${(settings.routerCustomTags || []).length ? '\n\n### CUSTOM CATEGORIES\n' + (settings.routerCustomTags || []).map(m => `- ${m.tag.toUpperCase()}: ${m.instruction}`).join('\n') : ''}`;
 
             const commitActionSchema = settings.npcRelationshipBars
-                ? `commit({"record": [...], "update": [...], "rename": [...], "activate": [...], "deactivate": [...], "delete_ids": [...], "rel": [...], "appearance": [...]}) ? write all changes and finish`
-                : `commit({"record": [...], "update": [...], "rename": [...], "activate": [...], "deactivate": [...], "delete_ids": [...], "appearance": [...]}) ? write all changes and finish`;
+                ? `commit({"record": [...], "update": [...], "rename": [...], "activate": [...], "deactivate": [...], "delete_ids": [...], "rel": [...], "core": [...]}) ? write all changes and finish`
+                : `commit({"record": [...], "update": [...], "rename": [...], "activate": [...], "deactivate": [...], "delete_ids": [...], "core": [...]}) ? write all changes and finish`;
 
             const commitRelDescription = settings.npcRelationshipBars
                 ? `\ncommit rel items: {"id": "Book::UID or NPC Name", "field": "friendship"|"affection", "delta": ±N} — set INITIAL relationship values for newly recorded NPCs only (signed integer delta)`
@@ -1107,12 +1122,12 @@ Available actions:
 - grep_lore({"query": "..."}) ? search lorebooks for entries matching a keyword
 - inspect_book({"book_name": "..."}) ? list UIDs in a lorebook
 - read_entry({"uid": "Book::0"}) ? read full content of an entry
-- commit({${settings.npcRelationshipBars ? '"record": [...], "update": [...], "rename": [...], "activate": [...], "deactivate": [...], "delete_ids": [...], "rel": [...], "appearance": [...]' : '"record": [...], "update": [...], "rename": [...], "activate": [...], "deactivate": [...], "delete_ids": [...], "appearance": [...]'}}) ? write all changes and finish
+- commit({${settings.npcRelationshipBars ? '"record": [...], "update": [...], "rename": [...], "activate": [...], "deactivate": [...], "delete_ids": [...], "rel": [...], "core": [...]' : '"record": [...], "update": [...], "rename": [...], "activate": [...], "deactivate": [...], "delete_ids": [...], "core": [...]'}}) ? write all changes and finish
 
 commit record items: {"label": "Name only (NO tag prefix)", "keys": ["kw1","kw2"], "content": "...", "category": "NPC|LOC|FAC|QUEST|EVENT"}
 commit update items: {"id": "Book::UID", "content": "new text to append"}
 commit rename items: {"id": "Book::UID", "label": "New Name (optional)", "keys": ["kw1","kw2"] (optional, max 6)}${commitRelDescription}
-commit appearance items: {"id": "Book::UID", "content": "new appearance text"} — surgically updates the Appearance field inside [CORE]}
+commit core items: {"id": "Book::UID", "field": "Appearance/Species|Personality|Brief Background|Habits/Behaviors", "content": "new field content"} — surgically updates a field inside [CORE]
 
 ## EXAMPLE
 Thought: I see a new faction called Iron Syndicate. I will record it.
@@ -1820,32 +1835,72 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
         changed = true;
     }
 
-    // 6. Appearance updates — surgical replacement of the Appearance field inside [CORE]
-    for (const item of (action.appearance || [])) {
-        const { id, content: newAppearance } = item;
-        if (!id || !newAppearance) {
-            errors.push(`Invalid appearance item: ${JSON.stringify(item)}`);
+    // 6. Core identity updates — surgical replacement of specified fields inside [CORE]
+    const coreUpdates = [
+        ...(action.appearance || []).map(item => ({ id: item.id, field: 'Appearance/Species', content: item.content })),
+        ...(action.core || [])
+    ];
+
+    for (const item of coreUpdates) {
+        const { id, field, content: newContent } = item;
+        if (!id || !field || !newContent) {
+            errors.push(`Invalid core update item: ${JSON.stringify(item)}`);
             continue;
         }
         const [bookName, uid] = id.split('::');
         const book = await ctx.loadWorldInfo(bookName);
         if (!book?.entries?.[uid]) {
-            errors.push(`Appearance target not found: ${id}`);
+            errors.push(`Core update target not found: ${id}`);
             continue;
         }
         const entryContent = book.entries[uid].content || '';
-        // Replace the Appearance/Species field value within the [CORE] block.
-        // Matches from "Appearance/Species:" or "Appearance:" to the next known section header or [/CORE].
-        const updated = entryContent.replace(
-            /((?:Appearance\/Species|Appearance):)[^\n]*/i,
-            `$1 ${newAppearance.trim()}`
-        );
-        if (updated === entryContent) {
-            // No Appearance field found — append inside [CORE] if present, else note error
-            errors.push(`Appearance/Species field not found inside [CORE] for ${id} — no update made.`);
+        
+        // Match the [CORE]...[/CORE] block
+        const coreMatch = entryContent.match(/\[CORE\]([\s\S]*?)\[\/CORE\]/i);
+        if (!coreMatch) {
+            errors.push(`[CORE] block not found for ${id} — no update made.`);
             continue;
         }
-        book.entries[uid].content = updated;
+        
+        const coreBody = coreMatch[1];
+        
+        // Define field aliases for matching
+        let fieldPatterns = [];
+        const normField = field.trim().toLowerCase();
+        if (normField.includes('appearance') || normField.includes('species')) {
+            fieldPatterns = ['Appearance/Species', 'Appearance'];
+        } else if (normField.includes('personality')) {
+            fieldPatterns = ['Personality'];
+        } else if (normField.includes('background')) {
+            fieldPatterns = ['Brief Background', 'Background'];
+        } else if (normField.includes('habit') || normField.includes('behavior')) {
+            fieldPatterns = ['Habits/Behaviors', 'Habits', 'Behaviors'];
+        } else {
+            fieldPatterns = [field];
+        }
+
+        const escapedPatterns = fieldPatterns.map(p => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+        const otherHeaders = ['Appearance/Species', 'Appearance', 'Personality', 'Brief Background', 'Background', 'Habits/Behaviors', 'Habits', 'Behaviors', 'Relationship'];
+        const otherHeadersRegexStr = otherHeaders.map(h => h.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+
+        // Match from the target field's colon to the next core field header or the end of the string
+        const targetFieldRegex = new RegExp(`(?:(${escapedPatterns.join('|')})\\s*:)([\\s\\S]*?)(?=(?:${otherHeadersRegexStr})\\s*:|$)`, 'i');
+        const fieldMatch = coreBody.match(targetFieldRegex);
+        
+        if (!fieldMatch) {
+            errors.push(`Core field "${field}" not found inside [CORE] block for ${id} — no update made.`);
+            continue;
+        }
+
+        const matchedFieldName = fieldMatch[1];
+        const targetSubstring = `${matchedFieldName}:${fieldMatch[2]}`;
+        
+        // Perform replacement
+        const replacement = `${matchedFieldName}: ${newContent.trim()}\n`;
+        const newCoreBody = coreBody.replace(targetSubstring, replacement);
+        
+        // Update entry content
+        book.entries[uid].content = entryContent.replace(coreMatch[0], `[CORE]${newCoreBody}[/CORE]`);
         await ctx.saveWorldInfo(bookName, book);
         changed = true;
     }
@@ -2009,7 +2064,7 @@ export async function reapplyRouterPass(prePassSnapshot, postPassState) {
  * Parses basic narrative tags [[TAG: ...]]
  */
 function parseBasicTags(text, archiveBooks) {
-    const action = { record: [], update: [], activate: [], deactivate: [], delete_ids: [], rewrite: [], consolidate: [], rel: [], appearance: [] };
+    const action = { record: [], update: [], activate: [], deactivate: [], delete_ids: [], rewrite: [], consolidate: [], rel: [], appearance: [], core: [] };
     const settings = getSettings();
 
     // REWRITE tag parser
@@ -2054,6 +2109,18 @@ function parseBasicTags(text, archiveBooks) {
         }
     }
 
+    // UPDATE_CORE tag parser: [[UPDATE_CORE: Book::UID | field | new content]]
+    const coreRegex = /\[\[UPDATE_CORE:\s*([^|]+)\|\s*([^|]+)\|\s*([\s\S]*?)\]\]/gi;
+    let co;
+    while ((co = coreRegex.exec(text)) !== null) {
+        const id      = co[1].trim();
+        const field   = co[2].trim();
+        const content = co[3].trim();
+        if (id && field && content) {
+            action.core.push({ id, field, content });
+        }
+    }
+
     const processMatch = (name, content, keywords, category) => {
         name = name.trim().replace(/^[A-Z_]{2,10}:\s+/i, '').trim();
         content = content.trim();
@@ -2086,7 +2153,7 @@ function parseBasicTags(text, archiveBooks) {
 
     while ((match = tagRegex.exec(text)) !== null) {
         const tagName = match[1].toUpperCase();
-        if (tagName === 'REWRITE' || tagName === 'CONSOLIDATE' || tagName === 'REL' || tagName === 'UPDATE_APPEARANCE') continue; // Collision protection
+        if (tagName === 'REWRITE' || tagName === 'CONSOLIDATE' || tagName === 'REL' || tagName === 'UPDATE_APPEARANCE' || tagName === 'UPDATE_CORE') continue; // Collision protection
 
         const inner = match[2];
         const parts = inner.split('|').map(p => p.trim());

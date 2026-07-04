@@ -40,10 +40,10 @@ Habits/Behaviors: Defining behaviors or combat tendencies.
 
 After the [/CORE] block, append timestamped narrative updates as usual ([${useDdMmYy ? 'DD/MM/YYYY' : 'Day X'}, HH:MM] ...).
 </CORE_FORMAT>
-## APPEARANCE UPDATES
-If the NPC's physical appearance changes significantly (major injury, permanent outfit change, etc.), output:
-  [[UPDATE_APPEARANCE: Book::UID | New appearance text]]
-This surgically replaces only the Appearance/Species field inside [CORE]. Do NOT write appearance changes as event/update entries.`;
+## CORE IDENTITY UPDATES
+If any field inside the permanent [CORE] block changes, is updated, or new information is revealed (Appearance/Species, Personality, Brief Background, Habits/Behaviors), output:
+  [[UPDATE_CORE: Book::UID | FieldName | New field text]]
+Use the exact FieldName (e.g. Personality, Brief Background, Appearance/Species, Habits/Behaviors). Do NOT log core updates as normal event/update entries.`;
 
     let enableRelBars = false;
     try {
