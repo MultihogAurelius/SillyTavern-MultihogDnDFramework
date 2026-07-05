@@ -12,7 +12,7 @@
  * circular import. This will be cleaned up when index.js is split.
  */
 
-import { getSettings, hydrateWorldProgressionFromChatState, persistWorldProgressionTimer, persistRouterLastRunWatermark } from './state-manager.js';
+import { getSettings, hydrateWorldProgressionFromChatState, persistWorldProgressionTimer, persistRouterLastRunWatermark, getNpcRelationshipMax, clampRelationshipValue, relationshipBarPct, getFriendshipTier, getAffectionTier } from './state-manager.js';
 import { syncCombatProfile } from './llm-client.js';
 import { parseQuestsFromMemo, extractCurrentTimeStr, cleanMessageContent, formatInWorldTime } from './memo-processor.js';
 import { runRouterPass, saveSceneToLorebook, scanAssistantOutputForKeywords, parseInWorldMinutes, runWorldProgressionPass, updateLorebookEntry, getLorebookManifest } from './router.js';
@@ -332,10 +332,10 @@ function buildInjectedEntryText(id, entry, settings) {
     let content = entry.content || '';
     const rel = settings.npcRelationshipValues?.[id];
     if (rel && settings.npcRelationshipBars) {
+        const relMax = getNpcRelationshipMax(settings);
         const friendship = rel.friendship ?? 0;
         const affection = rel.affection ?? 0;
-        // Inject relationship values immediately below the entity header
-        content = `Relationship with {{user}}: Friendship: ${friendship}/100, Affection: ${affection}/100\n${content}`;
+        content = `Relationship with {{user}}: Friendship: ${friendship}/${relMax}, Affection: ${affection}/${relMax}\n${content}`;
     }
 const label = entry.key?.[0] || entry.comment || id.split('::')[1];
     return `### [${label}]\n${content}\n\n`;
@@ -352,34 +352,6 @@ const label = entry.key?.[0] || entry.comment || id.split('::')[1];
  * @param {ReturnType<typeof import('./state-manager.js').getSettings>} settings
  * @returns {Promise<string>}
  */
-/**
- * Maps a friendship value (-100..+100) to a tier label and short behavioral hint.
- * Pure code — no LLM dependency.
- */
-function getFriendshipTier(v) {
-    if (v <= -60) return { label: 'HOSTILE',            hint: 'open contempt, refuses cooperation, may sabotage or attack' };
-    if (v <= -30) return { label: 'COLD/DISTRUSTFUL',   hint: 'curt and guarded, answers with bare minimum, visible irritation' };
-    if (v <= -1)  return { label: 'WARY/UNEASY',        hint: 'polite but distant, avoids personal topics, second-guesses motives' };
-    if (v <= 15)  return { label: 'NEUTRAL/ACQUAINTANCE',hint: 'civil and transactional, neither warm nor cold' };
-    if (v <= 40)  return { label: 'FRIENDLY',            hint: 'genuine warmth, light humor, willing to help when asked' };
-    if (v <= 70)  return { label: 'CLOSE FRIEND',        hint: 'deep trust, confides worries, stands up for {{user}}, proactive help' };
-    return                { label: 'BONDED/FAMILY',      hint: 'unbreakable loyalty, would risk life without hesitation, shares deepest secrets' };
-}
-
-/**
- * Maps an affection value (-100..+100) to a tier label and short behavioral hint.
- * Pure code — no LLM dependency.
- */
-function getAffectionTier(v) {
-    if (v <= -60) return { label: 'REVULSION',              hint: 'finds {{user}} repulsive, recoils from proximity, hostile to any advance' };
-    if (v <= -30) return { label: 'AVERSION',               hint: 'clearly uninterested, dismisses flirtation coldly, steers away from intimacy' };
-    if (v <= -1)  return { label: 'INDIFFERENT/UNINTERESTED',hint: 'no romantic spark, gentle deflection of any advances' };
-    if (v <= 15)  return { label: 'NEUTRAL CURIOSITY',      hint: 'no feelings formed yet, might notice {{user}} but won\'t act on it' };
-    if (v <= 40)  return { label: 'INTERESTED',             hint: 'steals glances, responds warmly to compliments, comfortable with proximity' };
-    if (v <= 70)  return { label: 'ATTRACTED',              hint: 'seeks {{user}}\'s company, flustered by bold compliments, visible tension' };
-    return                { label: 'DEEPLY IN LOVE',        hint: 'emotionally devoted, craves closeness, expresses tenderness openly' };
-}
-
 async function buildNpcRelationsBlock(settings) {
     if (!settings.npcRelationshipBars) {
         return '';
@@ -416,12 +388,13 @@ async function buildNpcRelationsBlock(settings) {
         if (!relVals[id]) continue;
 
         const rel = relVals[id];
+        const relMax = getNpcRelationshipMax(settings);
         const f = rel.friendship ?? 0;
         const a = rel.affection ?? 0;
         const fStr = `Friendship ${f >= 0 ? '+' : ''}${f}`;
         const aStr = `Affection ${a >= 0 ? '+' : ''}${a}`;
-        const fTier = getFriendshipTier(f);
-        const aTier = getAffectionTier(a);
+        const fTier = getFriendshipTier(f, relMax);
+        const aTier = getAffectionTier(a, relMax);
         lines.push(`${displayName}: ${fStr}, ${aStr}\n  Friendship tier: ${fTier.label} — ${fTier.hint}\n  Affection tier: ${aTier.label} — ${aTier.hint}`);
     }
 
@@ -429,7 +402,8 @@ async function buildNpcRelationsBlock(settings) {
         return `[NPC_RELATIONS]\nNo established relationships yet.\n[/NPC_RELATIONS]\n\n`;
     }
     
-    const header = `Current relationship standings between the protagonist and present NPCs. Both axes range from -100 to +100. Let the tier descriptions below each NPC guide how they behave toward {{user}} this turn.`;
+    const relMax = getNpcRelationshipMax(settings);
+    const header = `Current relationship standings between the protagonist and present NPCs. Both axes range from -${relMax} to +${relMax}. Let the tier descriptions below each NPC guide how they behave toward {{user}} this turn.`;
 
     return `[NPC_RELATIONS]\n${header}\n\n${lines.join('\n\n')}\n[/NPC_RELATIONS]\n\n`;
 }
@@ -1032,6 +1006,8 @@ export async function parseAndApplyNarrativeRelTags() {
 
     console.log('[RPG Tracker] parseAndApplyNarrativeRelTags: Found AI message (index ' + chat.indexOf(lastAiMsg) + ') with text length:', lastAiMsg.mes?.length);
 
+    const relMax = getNpcRelationshipMax(settings);
+
     // --- 2. RELATIONSHIP SWIPE ROLLBACK & RESTORE ---
     lastAiMsg.extra = lastAiMsg.extra || {};
     const swipeId = lastAiMsg.swipe_id ?? 0;
@@ -1061,7 +1037,7 @@ export async function parseAndApplyNarrativeRelTags() {
                         console.log(`[RPG Tracker] Aborting rollback for ${rb.npcId}: User manually edited slider.`);
                         continue;
                     }
-                    settings.npcRelationshipValues[rb.npcId][rb.field] = Math.max(-100, Math.min(100, current - rb.actualAppliedDelta));
+                    settings.npcRelationshipValues[rb.npcId][rb.field] = clampRelationshipValue(current - rb.actualAppliedDelta, relMax);
                 }
                 if (settings.npcRelationshipLog && Array.isArray(settings.npcRelationshipLog[rb.npcId])) {
                     settings.npcRelationshipLog[rb.npcId] = settings.npcRelationshipLog[rb.npcId].filter(l => l.timestamp !== rb.logTimestamp);
@@ -1077,7 +1053,7 @@ export async function parseAndApplyNarrativeRelTags() {
                 for (const rb of lastAiMsg.extra.rpgRollbackData[swipeId]) {
                     if (settings.npcRelationshipValues && settings.npcRelationshipValues[rb.npcId]) {
                         const current = settings.npcRelationshipValues[rb.npcId][rb.field] ?? 0;
-                        const newValue = Math.max(-100, Math.min(100, current + rb.actualAppliedDelta));
+                        const newValue = clampRelationshipValue(current + rb.actualAppliedDelta, relMax);
                         settings.npcRelationshipValues[rb.npcId][rb.field] = newValue;
                         
                         rb.expectedValue = newValue;
@@ -1169,7 +1145,7 @@ export async function parseAndApplyNarrativeRelTags() {
         }
 
         const prev = settings.npcRelationshipValues[resolvedId][m.field] ?? 0;
-        const newVal = Math.max(-100, Math.min(100, prev + m.delta));
+        const newVal = clampRelationshipValue(prev + m.delta, relMax);
         const actualAppliedDelta = newVal - prev;
         settings.npcRelationshipValues[resolvedId][m.field] = newVal;
 
@@ -1223,11 +1199,12 @@ export async function parseAndApplyNarrativeRelTags() {
 function refreshRelationshipBarsDOM(settings) {
     if (!settings.npcRelationshipBars) return;
 
+    const relMax = getNpcRelationshipMax(settings);
     const relVals = settings.npcRelationshipValues || {};
     const logData = settings.npcRelationshipLog || {};
 
     const updateCompactRelColor = (value, type) => {
-        const clamped = Math.max(-100, Math.min(100, value));
+        const clamped = clampRelationshipValue(value, relMax);
         if (type === 'friendship') {
             return clamped > 0 ? '#4ade80' : clamped < 0 ? '#ef4444' : 'rgba(255,255,255,0.45)';
         }
@@ -1242,7 +1219,7 @@ function refreshRelationshipBarsDOM(settings) {
         for (const type of ['friendship', 'affection']) {
             const span = container.querySelector(`.rt-agent-entry-rel-${type}`);
             if (!span) continue;
-            const value = Math.max(-100, Math.min(100, rel[type] ?? 0));
+            const value = clampRelationshipValue(rel[type] ?? 0, relMax);
             span.style.color = updateCompactRelColor(value, type);
             span.textContent = `${type === 'friendship' ? '🤝' : '💗'}${value > 0 ? '+' : ''}${value}`;
         }
@@ -1271,8 +1248,8 @@ function refreshRelationshipBarsDOM(settings) {
 
         for (let i = 0; i < barRows.length && i < types.length; i++) {
             const type = types[i];
-            const value = Math.max(-100, Math.min(100, rel[type] ?? 0));
-            const pct = Math.abs(value) / 2;
+            const value = clampRelationshipValue(rel[type] ?? 0, relMax);
+            const pct = relationshipBarPct(value, relMax);
             const isPositive = value >= 0;
 
             // Update fill bar width + classes + inline style overrides

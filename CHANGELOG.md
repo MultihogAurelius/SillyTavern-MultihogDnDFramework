@@ -2,6 +2,16 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [4.4.0] - 2026-07-06
+
+### Added
+- **Adjustable NPC relationship scale**: Friendship/Affection max (±N) is configurable per chat when chat linking is enabled, with a separate global default for new chats (Extension Settings + Campaign Records ⚙️ NPC Settings).
+- **Dynamic relationship prompts**: Lorebook Agent NPC/`rel` guidelines, router cap hints, `[NPC_RELATIONS]` header, and narrator `<relationship_tracking>` sysprompt block all reflect the active chat's configured range.
+
+### Changed
+- **Relationship tiers**: FRIENDLY, HOSTILE, etc. thresholds are proportional to the configured max instead of hardcoded ±25/±60 values.
+- **Narrative deltas unchanged**: Tag awards (+5 stays +5); only clamp, bar fill, tiers, and starting-value guidance scale with the range.
+
 ## [4.3.9] - 2026-07-06
 
 ### Changed

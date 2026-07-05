@@ -1,5 +1,5 @@
 import { EXAMPLES, COLOR_EXAMPLES, DEFAULT_STOCK_PROMPTS, RT_PROMPTS, BLOCK_ICONS, BLOCK_ORDER, PAGE_SIZE, NO_PAGINATE, QUESTS_NARRATOR, buildOnboardingXpHint, resolveTimePromptKey, resolveTimePromptDisplayTag } from './constants.js';
-import { MODULE_NAME, DEFAULT_MODULES, getSettings, getBarBackground, migrateCustomFields, saveChatState, saveProfile, deleteProfile, getEffectiveRouterCampaignPrefix, sanitizeCampaignPrefixString, buildNpcInstruction, loadStockPromptsFromProfile } from './state-manager.js';
+import { MODULE_NAME, DEFAULT_MODULES, getSettings, getBarBackground, migrateCustomFields, saveChatState, saveProfile, deleteProfile, getEffectiveRouterCampaignPrefix, sanitizeCampaignPrefixString, buildNpcInstruction, loadStockPromptsFromProfile, getNpcRelationshipMax, getNpcRelationshipMaxDefault, clampRelationshipValue, relationshipBarPct, buildRelationshipTrackingSysprompt } from './state-manager.js';
 import { sendStateRequest, fetchOllamaModels, fetchOpenAIModels, testOpenAIConnection, getConnectionProfiles, getCurrentCompletionPreset, setCompletionPreset, syncCombatProfile, resetCombatProfileOverride } from './llm-client.js';
 import { getDiceToolName, getDiceCommandName, getDiceCommandAliases, doDiceRoll, registerDiceFunctionTool, registerDiceSlashCommand, installInterceptor, getNarrativeBlocks, onGenerationStarted, onGenerationEnded, ensureRelTagRegex, resetRouterTick, getRouterTick, resetRouterAutoTick, makeRngQueue, buildRngBlock, RNG_QUEUE_LEN, parseAndApplyNarrativeRelTags } from './narrative-hooks.js';
 import { deduplicateMemo, mergeMemo, computeDelta, escapeHtml, escapeRegex, highlightParens, cleanToolCallMessage, cleanMessageContent, getLastUserAction, buildLorebookContext, buildModulesInstructionText, buildModuleFormatInstruction, parseQuestsFromMemo, syncQuestsFromMemo, syncQuestsToMemo, writeQuestsToMemo, getQuestMood, extractCurrentTimeStr, stripArchivedQuestsFromMemo, stripCompletedQuestsFromMemo, applyQuestSyncAndStripMemo, isArchivedQuestStatus, removeArchivedQuest, parseInWorldTime, formatInWorldTime, sanitizeLorebookRecordContent } from './memo-processor.js';
@@ -478,6 +478,45 @@ function syncTimeFormatSettingsUi(s) {
 function persistChatTimeFormatIfLinked() {
     const s = getSettings();
     if (s.chatLinkEnabled && _currentChatId) saveChatState(_currentChatId);
+}
+
+function rebuildNpcInstructionIfNeeded() {
+    const s = getSettings();
+    if (s.routerModules?.npc) {
+        s.routerModules.npc.instruction = buildNpcInstruction(s.npcMajorWords, s.npcMinorWords, false);
+    }
+}
+
+/** Apply default or saved per-chat relationship max into live settings. */
+function applyChatNpcRelMaxSettings(saved) {
+    const s = getSettings();
+    s.npcRelationshipMax = saved?.npcRelationshipMax ?? getNpcRelationshipMaxDefault(s);
+    rebuildNpcInstructionIfNeeded();
+    scheduleAutoApply();
+}
+
+function persistChatNpcRelMaxIfLinked() {
+    const s = getSettings();
+    if (s.chatLinkEnabled && _currentChatId) saveChatState(_currentChatId);
+}
+
+/** Update this chat's relationship scale (not the global new-chat default). */
+function setNpcRelationshipMaxForCurrentChat(val) {
+    const s = getSettings();
+    s.npcRelationshipMax = getNpcRelationshipMax({ npcRelationshipMax: val });
+    saveSettings();
+    persistChatNpcRelMaxIfLinked();
+    rebuildNpcInstructionIfNeeded();
+    scheduleAutoApply();
+}
+
+/** Update the global default applied when opening chats with no saved value. */
+function setNpcRelationshipMaxDefault(val) {
+    const s = getSettings();
+    s.npcRelationshipMaxDefault = getNpcRelationshipMax({ npcRelationshipMax: val });
+    saveSettings();
+    const defaultEl = document.getElementById('rpg_tracker_npc_rel_max_default');
+    if (defaultEl) defaultEl.value = String(s.npcRelationshipMaxDefault);
 }
 
 /** Apply default or saved per-chat time/date format settings. */
@@ -1052,6 +1091,7 @@ function loadChatState(chatId) {
     s.worldOpenaiModel = saved.worldOpenaiModel || "";
 
     applyChatTimeFormatSettings(saved);
+    applyChatNpcRelMaxSettings(saved);
 
     // Update settings UI inputs if rendered
     $('#rpg_world_progression_randomize_npcs').prop('checked', !!s.worldProgressionRandomizeNPCs);
@@ -1488,6 +1528,7 @@ function onChatChanged(newChatId) {
         s.worldProgressionLastFiredPeriodLabel = '';
 
         applyChatTimeFormatSettings(null);
+        applyChatNpcRelMaxSettings(null);
         refreshOrderList();
         scheduleAutoApply();
 
@@ -5464,7 +5505,14 @@ function createPanel() {
                                              <span style="font-size:11px;color:rgba(255,255,255,0.5);">${curS.npcRelationshipToast !== false ? 'Enabled' : 'Disabled'}</span>
                                          </label>
                                      </div>
-                                     <div style="font-size:10px;color:rgba(255,255,255,0.35);margin-bottom:14px;">Emits a toast notification in the bottom-right corner when friendship or affection values change.</div>
+                                    <div style="font-size:10px;color:rgba(255,255,255,0.35);margin-bottom:14px;">Emits a toast notification in the bottom-right corner when friendship or affection values change.</div>
+
+                                    <div style="margin-bottom:14px;">
+                                        <label style="font-size:12px;color:rgba(255,255,255,0.7);display:block;margin-bottom:4px;">Relationship Max — this chat (± range)</label>
+                                        <input type="number" id="rt-npc-rel-max" value="${getNpcRelationshipMax(curS)}" min="10" max="10000" step="10"
+                                            style="width:100%;background:rgba(0,0,0,0.4);color:white;border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:6px 10px;font-size:13px;box-sizing:border-box;">
+                                        <div style="font-size:10px;color:rgba(255,255,255,0.35);margin-top:2px;">Per-story scale for this chat only. Friendship/Affection range −N to +N. New chats start from the default in Extension Settings (currently ${getNpcRelationshipMaxDefault(curS)}).</div>
+                                    </div>
 
                                     <div style="margin-bottom:6px;display:flex;align-items:center;gap:10px;">
                                         <label style="font-size:12px;color:rgba(255,255,255,0.7);flex:1;">Ignore Character Limits When Importing Character Cards</label>
@@ -5486,10 +5534,12 @@ function createPanel() {
                                 // leaving them unchanged correctly preserves the user's setting.
                                 let newMajor = curS.npcMajorWords ?? 25;
                                 let newMinor = curS.npcMinorWords ?? 15;
+                                let newRelMax = getNpcRelationshipMax(curS);
 
                                 setTimeout(() => {
                                     const majorEl = document.getElementById('rt-npc-major-words');
                                     const minorEl = document.getElementById('rt-npc-minor-words');
+                                    const relMaxEl = document.getElementById('rt-npc-rel-max');
                                     const relEl = document.getElementById('rt-npc-rel-bars');
                                     const ignoreEl = document.getElementById('rt-ignore-npc-limits');
 
@@ -5505,6 +5555,12 @@ function createPanel() {
                                         minorEl.addEventListener('input', () => {
                                             const parsed = parseInt(minorEl.value, 10);
                                             if (!isNaN(parsed) && parsed > 0) newMinor = parsed;
+                                        });
+                                    }
+                                    if (relMaxEl) {
+                                        relMaxEl.addEventListener('input', () => {
+                                            const parsed = parseInt(relMaxEl.value, 10);
+                                            if (!isNaN(parsed) && parsed >= 10) newRelMax = parsed;
                                         });
                                     }
                                     if (relEl) {
@@ -5542,11 +5598,13 @@ function createPanel() {
                                 if (result) {
                                     const finalMajor = Math.max(1, Math.min(1000, newMajor));
                                     const finalMinor = Math.max(1, Math.min(1000, newMinor));
+                                    const finalRelMax = getNpcRelationshipMax({ npcRelationshipMax: newRelMax });
 
                                     const updS = getSettings();
                                     updS.ignoreNpcImportLimits = newIgnoreLimits;
                                     updS.npcMajorWords = finalMajor;
                                     updS.npcMinorWords = finalMinor;
+                                    setNpcRelationshipMaxForCurrentChat(finalRelMax);
                                     updS.npcRelationshipBars = newRel;
                                     updS.npcRelationshipToast = newRelToast;
                                     applyNpcPortraitSetting(updS, newNpcPortraits);
@@ -5605,8 +5663,9 @@ function createPanel() {
 
                         // Helper: render a dual-direction bar (always renders, even at 0)
                         renderRelBar = (value, type, entryId) => {
-                            const clamped = Math.max(-100, Math.min(100, value));
-                            const pct = Math.abs(clamped) / 2; // 50% of track = full
+                            const relMax = getNpcRelationshipMax();
+                            const clamped = clampRelationshipValue(value, relMax);
+                            const pct = relationshipBarPct(clamped, relMax);
                             const icon = type === 'friendship' ? '🤝' : '💗';
                             const isPositive = clamped >= 0;
                             const fillClass = isPositive
@@ -5643,7 +5702,8 @@ function createPanel() {
                             if (!getSettings().npcRelationshipBars) return '';
                             const rel = parseRelationship(entryId);
                             const fmtVal = (val, type) => {
-                                const clamped = Math.max(-100, Math.min(100, val));
+                                const relMax = getNpcRelationshipMax();
+                                const clamped = clampRelationshipValue(val, relMax);
                                 const icon = type === 'friendship' ? '🤝' : '💗';
                                 let color = 'rgba(255,255,255,0.45)';
                                 if (type === 'friendship') {
@@ -5791,8 +5851,9 @@ function createPanel() {
 
                             // Friendship/Affection bars for popup (large version, with editable sliders)
                             const makeBigBar = (val, label, colorPos, colorNeg, icon, type) => {
-                                const clamped = Math.max(-100, Math.min(100, val));
-                                const pct = Math.abs(clamped) / 2;
+                                const relMax = getNpcRelationshipMax(s);
+                                const clamped = clampRelationshipValue(val, relMax);
+                                const pct = relationshipBarPct(clamped, relMax);
                                 const isPos = clamped >= 0;
                                 const bgColor = isPos ? colorPos : colorNeg;
                                 const valColor = clamped === 0 ? 'var(--SmartThemeEmColor, inherit)' : bgColor;
@@ -5806,7 +5867,7 @@ function createPanel() {
                                     <span id="rt-npc-detail-${type}-text" style="font-size:15px;font-weight:bold;text-align:right;color:${valColor};font-family:monospace;">${clamped > 0 ? '+' : ''}${clamped}</span>
                                     <div></div>
                                     <div></div>
-                                    <input type="range" id="rt-npc-detail-${type}-slider" min="-100" max="100" value="${clamped}" step="1"
+                                    <input type="range" id="rt-npc-detail-${type}-slider" min="-${relMax}" max="${relMax}" value="${clamped}" step="1"
                                         style="width:100%;margin:0;accent-color:${bgColor};height:4px;cursor:pointer;outline:none;">
                                     <div></div>
                                 </div>`;
@@ -5952,7 +6013,7 @@ function createPanel() {
                                 
                                 slider.addEventListener('input', () => {
                                     const val = parseInt(slider.value, 10) || 0;
-                                    const pct = Math.abs(val) / 2;
+                                    const pct = relationshipBarPct(val, getNpcRelationshipMax(s));
                                     const isPos = val >= 0;
                                     fill.style.width = pct + '%';
                                     fill.style.left = isPos ? '50%' : 'auto';
@@ -5968,7 +6029,7 @@ function createPanel() {
                                 });
                                 
                                 slider.addEventListener('change', () => {
-                                    const val = parseInt(slider.value, 10) || 0;
+                                    const val = clampRelationshipValue(parseInt(slider.value, 10) || 0, getNpcRelationshipMax(s));
                                     if (val === originalValue) return;
                                     
                                     // Update the setting
@@ -5989,7 +6050,7 @@ function createPanel() {
                                         
                                         const barFill = cardEl.querySelector(`.rt-npc-bar-fill.${type}-pos, .rt-npc-bar-fill.${type}-neg`);
                                         if (barFill) {
-                                            barFill.style.width = (Math.abs(val) / 2) + '%';
+                                            barFill.style.width = relationshipBarPct(val, getNpcRelationshipMax(s)) + '%';
                                             barFill.style.left = bgIsPos ? '50%' : 'auto';
                                             barFill.style.right = bgIsPos ? 'auto' : '50%';
                                             barFill.style.background = bgBarColor;
@@ -10158,6 +10219,8 @@ export function syncSettingsAndUI(updateFn) {
     if (onboardingRelBarsCb) onboardingRelBarsCb.checked = !!fresh.npcRelationshipBars;
     const relToastUICb = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_tracker_npc_rel_toast'));
     if (relToastUICb) relToastUICb.checked = fresh.npcRelationshipToast !== false;
+    const relMaxDefaultUICb = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_tracker_npc_rel_max_default'));
+    if (relMaxDefaultUICb) relMaxDefaultUICb.value = String(getNpcRelationshipMaxDefault(fresh));
     const npcPortraitsCb = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_tracker_npc_portraits'));
     if (npcPortraitsCb) npcPortraitsCb.checked = fresh.npcPortraits !== false;
     syncNpcPortraitDependentUi(fresh);
@@ -10459,7 +10522,10 @@ function buildSysprompt(rawText) {
     let content = rawText
         .replace(/<(\w[\w_-]*)>([\s\S]*?)<\/\1>/g, (match, tag) => {
             if (mods[tag] === false) return '';
-            if (tag === 'relationship_tracking' && !s.npcRelationshipBars) return '';
+            if (tag === 'relationship_tracking') {
+                if (!s.npcRelationshipBars) return '';
+                return `<relationship_tracking>\n${buildRelationshipTrackingSysprompt(getNpcRelationshipMax(s))}\n</relationship_tracking>`;
+            }
             if (tag === 'rng_system' && !s.rngEnabled) {
                 const contentOnly = match.replace(/<\/?rng_system>/g, '');
                 let fallbackText = "To resolve actions, simulate a fair d20 roll internally and maintain all ROLL FORMAT rules.\n\n";
@@ -10635,6 +10701,7 @@ function buildSysprompt(rawText) {
                         }
                         $('#rpg_tracker_npc_major_words').val(sTempTracker.npcMajorWords ?? 25);
                         $('#rpg_tracker_npc_minor_words').val(sTempTracker.npcMinorWords ?? 15);
+                        $('#rpg_tracker_npc_rel_max_default').val(getNpcRelationshipMaxDefault(sTempTracker));
                         $('#rpg_tracker_npc_portraits').prop('checked', sTempTracker.npcPortraits !== false);
                         syncNpcPortraitDependentUi(sTempTracker);
                         $('#rpg_tracker_npc_rel_bars').prop('checked', !!sTempTracker.npcRelationshipBars);
@@ -10830,6 +10897,7 @@ function buildSysprompt(rawText) {
                                     }
                                     $('#rpg_tracker_npc_major_words').val(sTempTracker.npcMajorWords ?? 25);
                                     $('#rpg_tracker_npc_minor_words').val(sTempTracker.npcMinorWords ?? 15);
+                                    $('#rpg_tracker_npc_rel_max_default').val(getNpcRelationshipMaxDefault(sTempTracker));
                                     $('#rpg_tracker_npc_portraits').prop('checked', sTempTracker.npcPortraits !== false);
                                     syncNpcPortraitDependentUi(sTempTracker);
                                     $('#rpg_tracker_npc_rel_bars').prop('checked', !!sTempTracker.npcRelationshipBars);
@@ -13544,6 +13612,11 @@ RULES:
         $('#rpg_tracker_npc_rel_toast').prop('checked', settings.npcRelationshipToast !== false).on('change', function () {
             settings.npcRelationshipToast = $(this).prop('checked');
             saveSettings();
+        });
+        $('#rpg_tracker_npc_rel_max_default').val(getNpcRelationshipMaxDefault(settings)).on('change', function () {
+            const raw = parseInt(String($(this).val() || ''), 10);
+            const val = isNaN(raw) ? getNpcRelationshipMaxDefault(settings) : raw;
+            setNpcRelationshipMaxDefault(val);
         });
         // Note: experimentalNpcImport removed — NPC Creator button is always visible.
         $('#rpg_tracker_ignore_npc_limits').prop('checked', !!settings.ignoreNpcImportLimits).on('change', function () {

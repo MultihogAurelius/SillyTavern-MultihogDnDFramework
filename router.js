@@ -1,4 +1,4 @@
-import { getSettings, getEffectiveRouterCampaignPrefix, persistWorldProgressionTimer, persistRouterLastRunWatermark, persistRouterLastRunTimestamp } from './state-manager.js';
+import { getSettings, getEffectiveRouterCampaignPrefix, persistWorldProgressionTimer, persistRouterLastRunWatermark, persistRouterLastRunTimestamp, getNpcRelationshipMax, clampRelationshipValue, buildRouterRelationshipInstruction } from './state-manager.js';
 import { sendStateRequest, sendAgentTurn } from './llm-client.js';
 import { getRequestHeaders } from '../../../../script.js';
 import { extractCurrentTimeStr, cleanMessageContent, parseInWorldTime, formatInWorldTime, findNthUserMessageStartIdx, formatAgentChatLogFromIndex, sanitizeLorebookRecordContent } from './memo-processor.js';
@@ -335,16 +335,17 @@ export async function runRouterPass(narrativeOutput, manualPrompt = null, custom
                         // so the agent knows further movement in that direction is futile.
                         const rel = relValues[fullId];
                         if (rel !== undefined) {
+                            const relMax = getNpcRelationshipMax(settings);
                             const fVal = rel.friendship ?? 0;
                             const aVal = rel.affection  ?? 0;
                             // Always inject current totals so the agent can calibrate delta magnitude
-                            block += `\n[Current Relations: Friendship ${fVal >= 0 ? '+' : ''}${fVal}, Affection ${aVal >= 0 ? '+' : ''}${aVal}]`;
+                            block += `\n[Current Relations: Friendship ${fVal >= 0 ? '+' : ''}${fVal}, Affection ${aVal >= 0 ? '+' : ''}${aVal} (range ±${relMax})]`;
                             // Cap-constraint hints (only when at limit)
                             const hints = [];
-                            if (fVal >= 100)  hints.push('Friendship is at maximum — do not award further positive increments');
-                            if (fVal <= -100) hints.push('Friendship is at minimum — do not award further negative increments');
-                            if (aVal >= 100)  hints.push('Affection is at maximum — do not award further positive increments');
-                            if (aVal <= -100) hints.push('Affection is at minimum — do not award further negative increments');
+                            if (fVal >= relMax)  hints.push('Friendship is at maximum — do not award further positive increments');
+                            if (fVal <= -relMax) hints.push('Friendship is at minimum — do not award further negative increments');
+                            if (aVal >= relMax)  hints.push('Affection is at maximum — do not award further positive increments');
+                            if (aVal <= -relMax) hints.push('Affection is at minimum — do not award further negative increments');
                             if (hints.length > 0) block += `\n⚠ Relationship constraint: ${hints.join('; ')}.`;
                         }
                         if (triggeredSet.has(fullId)) {
@@ -863,17 +864,7 @@ Action: commit({"rewrite": [{"id": "Eldoria_Events::3", "content": "Compressed v
             modularPrompt = modularPrompt.replace(/\{\{#if_world\}\}|\{\{\/if_world\}\}|\{\{dayStr\}\}|\{\{prevDay\}\}/g, '');
 
             const relSection = settings.npcRelationshipBars ? `
-## NPC INITIAL RELATIONSHIP VALUES
-When you record a NEW NPC, you MUST set their starting relationship values using [[REL:]] tags based on narrative context. This is ONLY for initial values when first recording an NPC — ongoing relationship changes are tracked automatically by the system. Examples:
-  [[REL: NameOrUID | friendship | +30]]
-  [[REL: NameOrUID | affection | -5]]
-Starting value guidelines:
-- Long-time friends, regular companions, mentors, or close partners: set a strong starting friendship (e.g., +30 to +60).
-- Casual friends, helpful acquaintances, or positive encounters: set a minor starting friendship (e.g., +10 to +25).
-- Romantically interested or close loved ones: set starting affection and/or friendship (e.g., +20 to +50).
-- Minor foes, hostile rivals, or unfriendly targets: set a minor negative starting friendship (e.g., -5 to -15).
-- Direct enemies, antagonist figures, or deadly threats: set a strong negative starting friendship (e.g., -20 to -60).
-- Unknown/neutral: default to 0 (no delta).
+${buildRouterRelationshipInstruction(getNpcRelationshipMax(settings))}
 ` : '';
 
             const basicSystemPrompt = `You are the Research Assistant. Your task is to identify and record important narrative entities and events.
@@ -1030,15 +1021,16 @@ A squat iron building managing mining contracts; soot-stained walls and a clangi
             };
 
             if (settings.npcRelationshipBars) {
+                const relMax = getNpcRelationshipMax(settings);
                 commitProperties.rel = {
                     type: 'array',
-                    description: 'Set INITIAL/STARTING relationship values for NEWLY RECORDED NPCs only. When you record a new NPC, infer an appropriate starting delta from narrative context (e.g. +30 to +60 for close friends/companions, +10 to +25 for acquaintances, -20 to -60 for enemies, 0 for neutral). Do NOT use this for ongoing relationship changes — those are tracked automatically by the system from the narrative output. Output only the delta, not the total.',
+                    description: `Set INITIAL/STARTING relationship values for NEWLY RECORDED NPCs only. When you record a new NPC, infer an appropriate starting delta from narrative context (see NPC relationship guidelines — values scale to ±${relMax}). Do NOT use this for ongoing relationship changes — those are tracked automatically by the system from the narrative output. Output only the delta, not the total.`,
                     items: {
                         type: 'object',
                         properties: {
                             id:    { type: 'string', description: 'Book::UID or plain NPC name.' },
                             field: { type: 'string', enum: ['friendship', 'affection'], description: 'Which relationship axis to update.' },
-                            delta: { type: 'integer', description: 'Signed integer delta (e.g. 15 or -20). Range: -100 to 100.' }
+                            delta: { type: 'integer', description: `Signed integer delta (e.g. 15 or -20). Range: -${relMax} to +${relMax}.` }
                         },
                         required: ['id', 'field', 'delta']
                     }
@@ -1931,7 +1923,8 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
         if (!settings.npcRelationshipValues) settings.npcRelationshipValues = {};
         if (!settings.npcRelationshipValues[resolvedId]) settings.npcRelationshipValues[resolvedId] = { friendship: 0, affection: 0 };
         const current = settings.npcRelationshipValues[resolvedId][f] ?? 0;
-        const newValue = Math.max(-100, Math.min(100, current + delta));
+        const relMax = getNpcRelationshipMax(settings);
+        const newValue = clampRelationshipValue(current + delta, relMax);
         settings.npcRelationshipValues[resolvedId][f] = newValue;
         // Append to relationship change log (capped at 50 entries per NPC)
         if (!settings.npcRelationshipLog) settings.npcRelationshipLog = {};

@@ -14,6 +14,175 @@ import { DEFAULT_STOCK_PROMPTS, BLOCK_ORDER } from './constants.js';
 // ── Module name (shared constant, settings key) ────────────────────────────────
 export const MODULE_NAME = 'rpg_tracker';
 
+/** @param {number} raw */
+function normalizeNpcRelationshipMax(raw) {
+    const n = Number(raw);
+    if (!Number.isFinite(n)) return 100;
+    return Math.max(10, Math.min(10000, Math.round(n)));
+}
+
+/** Global default for new chats / chats without a saved per-chat value. */
+export function getNpcRelationshipMaxDefault(settings) {
+    const s = settings || getSettings();
+    return normalizeNpcRelationshipMax(s.npcRelationshipMaxDefault ?? 100);
+}
+
+/** Effective max for the active chat (live `npcRelationshipMax`, else default). */
+export function getNpcRelationshipMax(settings) {
+    const s = settings || getSettings();
+    if (settings != null && Object.prototype.hasOwnProperty.call(settings, 'npcRelationshipMax') && settings.npcRelationshipMax != null) {
+        return normalizeNpcRelationshipMax(settings.npcRelationshipMax);
+    }
+    return normalizeNpcRelationshipMax(s.npcRelationshipMax ?? s.npcRelationshipMaxDefault ?? 100);
+}
+
+/** @param {number} value @param {number} [max] */
+export function clampRelationshipValue(value, max) {
+    const m = max ?? getNpcRelationshipMax();
+    const n = Number(value);
+    if (!Number.isFinite(n)) return 0;
+    return Math.max(-m, Math.min(m, Math.round(n)));
+}
+
+/** Bar fill width in percent (50% of track = full scale). @param {number} value @param {number} [max] */
+export function relationshipBarPct(value, max) {
+    const m = max ?? getNpcRelationshipMax();
+    if (m <= 0) return 0;
+    return (Math.abs(clampRelationshipValue(value, m)) / m) * 50;
+}
+
+/** @param {number} fraction @param {number} [max] */
+export function relPctOfMax(fraction, max) {
+    return Math.round((max ?? getNpcRelationshipMax()) * fraction);
+}
+
+/**
+ * Lorebook Agent NPC module — starting relationship deltas scaled to configured max.
+ * @param {number} [max]
+ * @returns {string}
+ */
+export function buildNpcRelationshipInstruction(max) {
+    const m = max ?? getNpcRelationshipMax();
+    const p = (f) => relPctOfMax(f, m);
+    return `## NPC RELATIONSHIPS
+When recording a NEW NPC, set their starting relationship values using the \`rel\` parameter in your commit call. Infer appropriate starting deltas from the narrative context. Valid range: -${m} to +${m}.
+- Long-time friends, regular companions, mentors, or close partners: set a strong starting friendship (e.g., +${p(0.30)} to +${p(0.60)}).
+- Casual friends, helpful acquaintances, or positive encounters: set a minor starting friendship (e.g., +${p(0.10)} to +${p(0.25)}).
+- Romantically interested or close loved ones: set starting affection and/or friendship (e.g., +${p(0.20)} to +${p(0.50)}).
+- Minor foes, hostile rivals, or unfriendly targets: set a minor negative starting friendship (e.g., ${p(-0.05)} to ${p(-0.15)}).
+- Direct enemies, antagonist figures, or deadly threats: set a strong negative starting friendship (e.g., ${p(-0.20)} to ${p(-0.60)}).
+- Unknown/neutral: default to 0 (no delta).
+Ongoing relationship changes are tracked automatically by the system from the narrative output. Do NOT emit relationship deltas for existing NPCs.`;
+}
+
+/**
+ * Basic-mode router prompt block for [[REL:]] tags — same scaled guidelines.
+ * @param {number} [max]
+ * @returns {string}
+ */
+export function buildRouterRelationshipInstruction(max) {
+    const m = max ?? getNpcRelationshipMax();
+    const p = (f) => relPctOfMax(f, m);
+    return `## NPC INITIAL RELATIONSHIP VALUES
+When you record a NEW NPC, you MUST set their starting relationship values using [[REL:]] tags based on narrative context. This is ONLY for initial values when first recording an NPC — ongoing relationship changes are tracked automatically by the system. Valid range: -${m} to +${m}. Examples:
+  [[REL: NameOrUID | friendship | +${p(0.30)}]]
+  [[REL: NameOrUID | affection | ${p(-0.05)}]]
+Starting value guidelines:
+- Long-time friends, regular companions, mentors, or close partners: set a strong starting friendship (e.g., +${p(0.30)} to +${p(0.60)}).
+- Casual friends, helpful acquaintances, or positive encounters: set a minor starting friendship (e.g., +${p(0.10)} to +${p(0.25)}).
+- Romantically interested or close loved ones: set starting affection and/or friendship (e.g., +${p(0.20)} to +${p(0.50)}).
+- Minor foes, hostile rivals, or unfriendly targets: set a minor negative starting friendship (e.g., ${p(-0.05)} to ${p(-0.15)}).
+- Direct enemies, antagonist figures, or deadly threats: set a strong negative starting friendship (e.g., ${p(-0.20)} to ${p(-0.60)}).
+- Unknown/neutral: default to 0 (no delta).`;
+}
+
+/**
+ * Narrator sysprompt <relationship_tracking> block — scale line tied to configured max.
+ * Delta guide magnitudes stay absolute (same point awards at any range width).
+ * @param {number} [max]
+ * @returns {string}
+ */
+export function buildRelationshipTrackingSysprompt(max) {
+    const m = max ?? getNpcRelationshipMax();
+    return `RELATIONSHIP TRACKING — only active when [NPC_RELATIONS] appears in context.
+
+[NPC_RELATIONS] at the top of each turn shows current standings with active NPCs. Scale: -${m} (deep hostility) to +${m} (deep bond). Friendship = platonic trust. Affection = romantic/emotional warmth. Point changes are absolute increments clamped to ±${m}.
+
+WHEN TO EMIT:
+Be selective and natural. Only emit when {{user}} directly and meaningfully interacted with an NPC — a real moment worth noting. Magnitude MUST reflect the NPC's personality: a stoic warrior shifts less than a warm innkeeper for the same act.
+
+DO NOT EMIT when: the interaction has no emotional weight (buying supplies, directions), the NPC is absent, or nothing meaningful happened between {{user}} and that NPC this turn.
+
+INLINE ANNOTATION (visible — place immediately after the triggering moment):
+*(Friendship: Marcus +10 — saved his life in the alley)*
+*(Affection: Elena +2 — she seemed touched by the compliment)*
+
+FRIENDSHIP scale (guides, not hard rules):
++1/+2 ... Casual warmth, shared laugh, pleasant campfire talk, small kindness
++2/+5 ... Compliment, meaningful help, bonding over shared memories or interests
++5/+10 .. Surviving danger together, heartfelt conversation, completing a shared goal
++10/+15 . Defending/protecting them, act of loyalty, keeping a difficult promise
++15/+25 . Saving their life, major self-sacrifice
++25/+30 . Blood oath, brotherhood/sisterhood pact
+-1/-3 ... Dismissiveness, mild rudeness, forgetting something important to them
+-3/-5 ... Small broken promise, ignoring them in a group, letting them down
+-5/-10 .. Insult, belittling, disrespecting their values or beliefs
+-10/-20 . Public humiliation, badmouthing them (if overheard)
+-20/-30 . Abandoning them in danger, breaking a major promise
+-40/-60 . Betraying them to an enemy
+
+AFFECTION scale (guides, not hard rules):
++1 ...... Subtle kind gesture, noticing a small detail about them
++2/+3 ... Sincere compliment on appearance, wit, or spirit; flirtatious banter (if receptive)
++5/+10 .. Meaningful gift, intimate conversation, shared vulnerability, romantic gesture
++10/+20 . Protective act in romantic context, vulnerable confession of feelings
++20/+30 . Romantic proposal (if receptive)
+-1/-2 ... Awkward or tone-deaf comment, mild social blunder
+-2/-3 ... Cold or dismissive behavior
+-5/-10 .. Public rejection or embarrassment
+-8/-15 .. Flirting with someone else in their presence
+-40/-60 . Romantic betrayal or cheating
+
+Typical range: 1-5 for minor moments, 5-15 for major events. Only use 15+ for life-altering ones.
+
+EXAMPLE — end of a response where {{user}} complimented Elena:
+*(Affection: Elena +2 — she seemed genuinely moved by the words)*`;
+}
+
+/**
+ * Maps a friendship value to a tier label and behavioral hint (thresholds are % of max).
+ * @param {number} value
+ * @param {number} [max]
+ */
+export function getFriendshipTier(value, max) {
+    const m = max ?? getNpcRelationshipMax();
+    const v = clampRelationshipValue(value, m);
+    if (v <= -0.60 * m) return { label: 'HOSTILE',             hint: 'open contempt, refuses cooperation, may sabotage or attack' };
+    if (v <= -0.30 * m) return { label: 'COLD/DISTRUSTFUL',    hint: 'curt and guarded, answers with bare minimum, visible irritation' };
+    if (v <= -0.01 * m) return { label: 'WARY/UNEASY',        hint: 'polite but distant, avoids personal topics, second-guesses motives' };
+    if (v <=  0.15 * m) return { label: 'NEUTRAL/ACQUAINTANCE', hint: 'civil and transactional, neither warm nor cold' };
+    if (v <=  0.40 * m) return { label: 'FRIENDLY',            hint: 'genuine warmth, light humor, willing to help when asked' };
+    if (v <=  0.70 * m) return { label: 'CLOSE FRIEND',        hint: 'deep trust, confides worries, stands up for {{user}}, proactive help' };
+    return                      { label: 'BONDED/FAMILY',       hint: 'unbreakable loyalty, would risk life without hesitation, shares deepest secrets' };
+}
+
+/**
+ * Maps an affection value to a tier label and behavioral hint (thresholds are % of max).
+ * @param {number} value
+ * @param {number} [max]
+ */
+export function getAffectionTier(value, max) {
+    const m = max ?? getNpcRelationshipMax();
+    const v = clampRelationshipValue(value, m);
+    if (v <= -0.60 * m) return { label: 'REVULSION',               hint: 'finds {{user}} repulsive, recoils from proximity, hostile to any advance' };
+    if (v <= -0.30 * m) return { label: 'AVERSION',                hint: 'clearly uninterested, dismisses flirtation coldly, steers away from intimacy' };
+    if (v <= -0.01 * m) return { label: 'INDIFFERENT/UNINTERESTED', hint: 'no romantic spark, gentle deflection of any advances' };
+    if (v <=  0.15 * m) return { label: 'NEUTRAL CURIOSITY',       hint: 'no feelings formed yet, might notice {{user}} but won\'t act on it' };
+    if (v <=  0.40 * m) return { label: 'INTERESTED',              hint: 'steals glances, responds warmly to compliments, comfortable with proximity' };
+    if (v <=  0.70 * m) return { label: 'ATTRACTED',               hint: 'seeks {{user}}\'s company, flustered by bold compliments, visible tension' };
+    return                      { label: 'DEEPLY IN LOVE',         hint: 'emotionally devoted, craves closeness, expresses tenderness openly' };
+}
+
 /**
  * Builds the NPC instruction string based on current NPC settings.
  * @param {number} majorWords
@@ -55,15 +224,7 @@ Use the exact FieldName (e.g. Personality, Brief Background, Appearance/Species,
     } catch (_) {}
 
     if (enableRelBars) {
-        instruction += `\n\n## NPC RELATIONSHIPS
-When recording a NEW NPC, set their starting relationship values using the \`rel\` parameter in your commit call. Infer appropriate starting deltas from the narrative context:
-- Long-time friends, regular companions, mentors, or close partners: set a strong starting friendship (e.g., +30 to +60).
-- Casual friends, helpful acquaintances, or positive encounters: set a minor starting friendship (e.g., +10 to +25).
-- Romantically interested or close loved ones: set starting affection and/or friendship (e.g., +20 to +50).
-- Minor foes, hostile rivals, or unfriendly targets: set a minor negative starting friendship (e.g., -5 to -15).
-- Direct enemies, antagonist figures, or deadly threats: set a strong negative starting friendship (e.g., -20 to -60).
-- Unknown/neutral: default to 0 (no delta).
-Ongoing relationship changes are tracked automatically by the system from the narrative output. Do NOT emit relationship deltas for existing NPCs.`;
+        instruction += `\n\n${buildNpcRelationshipInstruction(getNpcRelationshipMax())}`;
     }
 
     instruction += `\n\nBe concise and functional — every word should serve gameplay or characterization. Avoid adjective dumps and purple prose.`;
@@ -170,6 +331,8 @@ export function getSettings() {
         inventoryWorthMode: "hover",   // 'hover' = worth shown as tooltip only | 'display' = coin badge shown inline
         npcMajorWords: 25,
         npcMinorWords: 15,
+        npcRelationshipMaxDefault: 100,
+        npcRelationshipMax: 100,
         npcPortraits: true,
         npcRelationshipBars: true,
         npcRelationshipToast: true,
@@ -827,6 +990,17 @@ Example: [[FAC: Iron Syndicate | ...]]  NOT  [[FAC: Khelt :: Iron Syndicate | ..
         s.settingsVersion = '4.3.9';
     }
 
+    // NPC relationship max: global default + per-chat live value (v4.4.0)
+    if (!s.settingsVersion || s.settingsVersion < '4.4.0') {
+        if (s.npcRelationshipMaxDefault === undefined) {
+            s.npcRelationshipMaxDefault = s.npcRelationshipMax ?? 100;
+        }
+        if (s.npcRelationshipMax === undefined) {
+            s.npcRelationshipMax = s.npcRelationshipMaxDefault;
+        }
+        s.settingsVersion = '4.4.0';
+    }
+
     // ── MIGRATION: Update system prompts with keywords instructions (v3.2.3+) ──────
     if (s.routerSystemPromptTemplate && !s.routerSystemPromptTemplate.includes('IMPORTANT FOR KEYWORDS')) {
         if (s.routerSystemPromptTemplate.includes('<formatting>')) {
@@ -1197,6 +1371,7 @@ export function saveChatState(chatId) {
         use24hTime: !!s.use24hTime,
         useDdMmYyFormat: !!s.useDdMmYyFormat,
         initialDate: s.initialDate || 'Day 1',
+        npcRelationshipMax: getNpcRelationshipMax(s),
 
         // Preserve lorebook stack link — written by Link button and router, not by normal state saves
         campaignBooks: existing.campaignBooks || [],

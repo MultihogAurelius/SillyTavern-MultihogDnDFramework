@@ -555,6 +555,10 @@
                                         <i class="fa-solid fa-circle-question interactable" style="font-size: 0.85em; opacity: 0.7; margin-left: 4px;" title="Emits a toast notification in the bottom-right corner when friendship or affection values change."></i>
                                     </label>
 
+                                    <label style="font-size: 11px; opacity: 0.7;">Default Relationship Max for new chats (± range)</label>
+                                    <input id="rpg_tracker_npc_rel_max_default" type="text" inputmode="numeric" pattern="[0-9]*" class="text_pole" value="100" min="10" max="10000" title="Starting scale for chats without a saved per-chat value. Default: 100. Higher = slower burn." />
+                                    <div style="font-size: 10px; opacity: 0.55; line-height: 1.35; margin-top: -2px;">Per-chat overrides are set from the ⚙️ NPC Settings popup in Campaign Records.</div>
+
                                     <label class="checkbox_label">
                                         <input id="rpg_tracker_ignore_npc_limits" type="checkbox" />
                                         <span>Ignore Character Limits When Importing Character Cards</span>
