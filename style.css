@@ -2830,6 +2830,29 @@
     opacity: 1 !important;
 }
 
+/* Lorebook manifest: plain [CORE] block for non-NPC entries (locations, etc.) */
+.rt-agent-core-block {
+    border-left: 3px solid rgba(212, 169, 64, 0.35);
+    padding: 4px 0 4px 10px;
+    margin: 2px 0 4px;
+}
+.rt-agent-core-label {
+    font-size: 9px;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: rgba(212, 169, 64, 0.75);
+    margin-bottom: 3px;
+}
+.rt-agent-core-text {
+    font-size: 10px;
+    line-height: 1.45;
+    color: var(--rt-text);
+    white-space: pre-wrap;
+    word-break: break-word;
+    opacity: 0.92;
+}
+
 /* ════════════════════════════════════════════════════════════════════════════
    NPC CAMPAIGN RECORDS — Visual Overhaul
    ════════════════════════════════════════════════════════════════════════════ */

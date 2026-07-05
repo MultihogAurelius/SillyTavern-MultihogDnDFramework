@@ -887,7 +887,12 @@ ${modularPrompt}
 4. **RECALL**: To read or update an archive entry, use [[ACTIVATE: Name]]. Its full content becomes visible next turn.
 5. **LIMIT**: You are limited to **${settings.routerMaxActivations || 8} active entries**. Nothing is archived automatically. If you exceed this limit you will see a **BUDGET VIOLATION** line and you MUST use [[DEACTIVATE: Name]] on the least relevant active entries to return within budget before this pass ends.
 ${relSection}
-## NPC CORE UPDATES
+## [CORE] BY CATEGORY
+- **NPC** only: structured \`[CORE]\` with Appearance/Species, Personality, Brief Background, Habits/Behaviors (see NPC field instructions below).
+- **LOC**: plain \`[CORE]\` with 1–2 sentences describing the place. No field headers.
+- **FAC, QUEST, EVENT**: do NOT use \`[CORE]\`. Use timestamped chronicle lines only.
+
+## NPC CORE UPDATES (NPC only)
 If any field inside the permanent [CORE] block changes, is updated, or new information is revealed (Appearance/Species, Personality, Brief Background, Habits/Behaviors), output:
   [[UPDATE_CORE: Book::UID | FieldName | New field text]]
 Use the exact FieldName (e.g. Personality, Brief Background, Appearance/Species, Habits/Behaviors). Do NOT log core updates as normal event/update entries.
@@ -907,7 +912,9 @@ Personality: Gruff but reliable.
 Brief Background: Retired from the militia to open his own forge.
 Habits/Behaviors: Wipes his brow with a greasy rag.
 [/CORE] | Barnaby, blacksmith, ally]]
-[[LOC: Khelt :: Rust-Lantern District :: Barnaby's Forge | Barnaby's old workshop, still smelling of soot. | forge, Khelt, Rust-Lantern]]
+[[LOC: Khelt :: Rust-Lantern District :: Barnaby's Forge | [CORE]
+A squat iron building managing mining contracts; soot-stained walls and a clanging workshop floor.
+[/CORE] | Barnaby's Forge, forge, Khelt, Rust-Lantern]]
 [[FAC: Iron Syndicate | Wary of outsiders after the forge raid; still dominant in the industrial quarter. | Founded by ex-mercenaries forty years ago; controls scrap tariffs and smuggling. Lieutenant Marna Voss handles street enforcement. | Iron Syndicate, Khelt, faction, smuggling]]`;
 
             const finalBasicSystemPrompt = basicSystemPrompt;
@@ -957,7 +964,7 @@ Habits/Behaviors: Wipes his brow with a greasy rag.
                         properties: {
                             label: { type: 'string', description: 'Entity name only. NO tag prefix (e.g. "Iron Syndicate", NOT "FAC: Iron Syndicate").' },
                             keys:  { type: 'array', items: { type: 'string' }, description: 'Search keywords. Include the entity name/title itself (without timestamps like "[Day 1]") as a keyword, plus any ancestor location names.' },
-                            content:  { type: 'string', description: 'Full description.' },
+                            content:  { type: 'string', description: 'Full entry body. NPC: structured [CORE] with Appearance/Species, Personality, Brief Background, Habits/Behaviors. LOC: plain [CORE] with 1–2 sentences (no field headers). FAC/QUEST/EVENT: no [CORE]; use chronicle format.' },
                             category: { type: 'string', enum: categoryEnum, description: 'Determines which lorebook the entry goes into.' }
                         },
                         required: ['label', 'keys', 'content', 'category']
@@ -1145,6 +1152,7 @@ Include the entity name/title itself (without timestamps like "[Day 1]") as a ke
 - Each time-stamped event must start on its own line. Do NOT chain multiple '[Day X, ...]' entries on the same line.
 - Correct: '[Day 2, 10:42] Corruption manifests.\n[Day 2, 10:44] Sentry targets Rozach.'
 - Wrong:   '[Day 2, 10:42] Corruption manifests. [Day 2, 10:44] Sentry targets Rozach.'
+- **[CORE] by category:** NPC = structured fields inside [CORE] (see NPC instructions). LOC = plain [CORE], 1–2 sentences, no field headers. FAC/QUEST/EVENT = no [CORE].
 
 ## FIELD INSTRUCTIONS
 ${Object.values(settings.routerModules || {}).filter(m => m.enabled).map(m => `- ${m.tag}: ${m.instruction}`).join('\n')}${(settings.routerCustomTags || []).length ? '\n\n### CUSTOM CATEGORIES\n' + (settings.routerCustomTags || []).map(m => `- ${m.tag.toUpperCase()}: ${m.instruction}`).join('\n') : ''}`;
@@ -1187,7 +1195,7 @@ Available actions:
 commit record items: {"label": "Name only (NO tag prefix)", "keys": ["kw1","kw2"], "content": "...", "category": "NPC|LOC|FAC|QUEST|EVENT"}
 commit update items: {"id": "Book::UID", "content": "new text to append"}
 commit rename items: {"id": "Book::UID", "label": "New Name (optional)", "keys": ["kw1","kw2"] (optional, max 6)}${commitRelDescription}
-commit core items: {"id": "Book::UID", "field": "Appearance/Species|Personality|Brief Background|Habits/Behaviors", "content": "new field content"} — surgically updates a field inside [CORE]
+commit core items: {"id": "Book::UID", "field": "Appearance/Species|Personality|Brief Background|Habits/Behaviors", "content": "new field content"} — surgically updates a field inside [CORE] on NPC entries only
 
 ## EXAMPLE
 Thought: I see a new faction called Iron Syndicate. I will record it.

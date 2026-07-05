@@ -28,7 +28,7 @@ export function buildNpcInstruction(majorWords = 25, minorWords = 15, ignoreLimi
 
     let instruction = `Significant named characters the party interacts with (do NOT record every random enemy or nameless bartender, only characters who are somehow significant). Do NOT create an entry for {{user}}. Mention {{user}} in EVENT or QUEST entries as needed. Always use the exact macro string \`{{user}}\` when referring to the player; do NOT write the plain word "user" or "player".
 
-<CORE_FORMAT>
+<CORE_FORMAT — NPC only>
 IMPORTANT: The Description field inside the [[ ]] tags MUST start directly with the [CORE] tag. Do NOT prepend any timestamps, dates, or other text before the [CORE] tag under any circumstances (e.g. do NOT write "[4:47 PM, ${useDdMmYy ? '01/01/2026' : 'Day 1'}] [CORE]" or "[${useDdMmYy ? 'DD/MM/YYYY' : 'Day X'}, HH:MM] [CORE]"). The very first character of the Description MUST be the "[" of the "[CORE]" tag. Wrap the identity sections (Appearance/Species, Personality, Brief Background, Habits/Behaviors) inside a single \`[CORE]\` and \`[/CORE]\` tag block.
 
 CRITICAL — [CORE] is permanent identity, still true after this arc ends. Extrapolate enduring traits from behavior; never recap this turn, voyage, or crisis.
@@ -83,11 +83,42 @@ Do NOT record per-round combat updates (e.g., creature HP changes, turn-by-turn 
     return instruction;
 }
 
+/**
+ * Builds the LOC module instruction string (plain [CORE] for places — no NPC field headers).
+ * @returns {string}
+ */
+export function buildLocInstruction() {
+    let useDdMmYy = false;
+    try {
+        useDdMmYy = !!getSettings().useDdMmYyFormat;
+    } catch (_) {}
+
+    return `Named places and sub-locations. The Name MUST be the full hierarchical path using " :: " as the separator (e.g. "Khelt :: Rust-Lantern District :: Marrow-Deep Mines Office"). Include each ancestor name as a keyword (e.g. "Khelt", "Rust-Lantern District", "mines").
+
+<CORE_FORMAT — LOC only>
+When FIRST recording a location, wrap a short permanent description (1–2 sentences: what the place is, notable features, typical atmosphere) inside a plain \`[CORE]\` … \`[/CORE]\` block. Do NOT use NPC field headers (Appearance/Species, Personality, Brief Background, Habits/Behaviors) — those structured sections are NPC-only.
+
+Correct:
+[CORE]
+A well-worn dusty track through Mulgore's golden savannah, lined with sparse trees; the main trade route to Thunder Bluff.
+[/CORE]
+
+Wrong:
+[CORE]
+Appearance/Species: A dusty track...
+Personality: A vital artery...
+[/CORE]
+
+The Description MUST start directly with \`[CORE]\`. Do NOT prepend timestamps before the opening tag (e.g. do NOT write "[${useDdMmYy ? '01/01/2026' : 'Day 1'}, 08:00] [CORE]").
+After \`[/CORE]\`, append timestamped deltas when the place changes ([${useDdMmYy ? 'DD/MM/YYYY' : 'Day X'}, HH:MM] ...).
+</CORE_FORMAT>`;
+}
+
 
 // ── Default module definitions (single source of truth for reset logic) ─────────
 export const DEFAULT_MODULES = {
     npc:   { enabled: true, tag: 'NPC',   format: 'Name | Description | Keywords',                    instruction: buildNpcInstruction() },
-    loc:   { enabled: true, tag: 'LOC',   format: 'Name | Description | Keywords',                    instruction: 'Named places. The Name MUST be the full hierarchical path using " :: " as the separator (e.g. "Khelt :: Rust-Lantern District :: Marrow-Deep Mines Office"). Include each ancestor name as a keyword (e.g. "Khelt, Rust-Lantern District, mines").' },
+    loc:   { enabled: true, tag: 'LOC',   format: 'Name | Description | Keywords',                    instruction: buildLocInstruction() },
     fac:   { enabled: true, tag: 'FAC',   format: 'Name | Status | Description | Keywords',           instruction: 'Named factions, guilds, organisations. **Status**: short current-state line (standing with the party, active conflicts, what changed recently). **Description**: longer narrative (history, ideology, schemes, notable members). **Keywords**: comma-separated terms for discovery.' },
     quest: { enabled: true, tag: 'QUEST', format: 'Name | Location | Description | Keywords',         instruction: 'ONLY record a quest if the tag [QUEST ACCEPTED] is outputted in the narrative. A quest being mentioned or offered is NOT enough.' },
     event: { enabled: true, tag: 'EVENT', format: 'Name | Details | Keywords',                        instruction: 'Significant narrative events. The Name is a SHORT, STABLE identifier (e.g. "Siege of Ashford") — no timestamps in the name, no "Final"/"Update" suffixes. Put timestamps in the Details field. Reuse the exact same Name when adding new information — entries are chronicles that accumulate automatically. COMBAT GRANULARITY: Do NOT record turn-by-turn status, round-by-round HP changes, or granular actions. For long combats, limit updates to the initiation (e.g., when they became hostile and attacked {{user}}), a high-level progress update every ~5 rounds to capture major shifts, and the final resolution.' },
@@ -470,6 +501,7 @@ Examples:
   --> [[LOC: Khelt :: Rust-Lantern District :: The Guilded Anvil Tavern | A noisy tavern with a job bulletin board. | The Guilded Anvil Tavern, tavern, jobs, Khelt, Rust-Lantern]]
 
 Also include each ancestor name (Khelt, Rust-Lantern District) as a plain keyword in the Keywords field.
+**LOC [CORE]:** When first recording a place, wrap 1–2 permanent sentences in plain \`[CORE] … [/CORE]\`. Do NOT use NPC field headers (Appearance/Species, Personality, etc.).
 **IMPORTANT FOR KEYWORDS:** Always include the entry's own title/name (without any timestamps like "Day 1", "Day 2", "12:15 AM", etc.) in the keywords field. The title itself (stripped of timestamps) is the most reliable trigger, so it must be present as a keyword. For example, for a tag representing a "Defense of Ironbelly's Workshop" event, the keywords MUST contain "Defense of Ironbelly's Workshop". DO NOT INCLUDE \`{{user}}\`, \`{{char}}\`, or general player references in the keywords field — the player is present in all events and locations, so tagging them is redundant and wastes context tokens.
 
 NPC / FAC / QUEST / EVENT labels: Name only — NO " :: " hierarchy, NO tag prefix.
@@ -785,6 +817,14 @@ Example: [[FAC: Iron Syndicate | ...]]  NOT  [[FAC: Khelt :: Iron Syndicate | ..
             s.syspromptModules.questsShowArchive = true;
         }
         s.settingsVersion = '3.16.22';
+    }
+
+    // LOC module: plain [CORE] without NPC field headers (v4.3.9)
+    if (!s.settingsVersion || s.settingsVersion < '4.3.9') {
+        if (s.routerModules?.loc) {
+            s.routerModules.loc.instruction = buildLocInstruction();
+        }
+        s.settingsVersion = '4.3.9';
     }
 
     // ── MIGRATION: Update system prompts with keywords instructions (v3.2.3+) ──────

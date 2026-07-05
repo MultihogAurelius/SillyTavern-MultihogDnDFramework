@@ -2,6 +2,12 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [4.3.9] - 2026-07-06
+
+### Changed
+- **LOC [CORE] format**: Lorebook Agent now uses plain `[CORE]` with 1–2 sentences for locations — no NPC field headers (Appearance/Personality/Habits). FAC/QUEST/EVENT explicitly do not use `[CORE]`.
+- **Campaign Records rendering**: Non-NPC expanded entries show a styled Permanent block for `[CORE]` content, with timestamped chronicle lines below.
+
 ## [4.3.8] - 2026-07-05
 
 ### Fixed

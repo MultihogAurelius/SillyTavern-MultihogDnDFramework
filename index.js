@@ -5042,9 +5042,10 @@ function createPanel() {
 
         /**
          * @param {object} item - manifest row from getLorebookManifest
-         * @param {{ stale?: boolean, dirty?: {content:string, keys:string, comment:string} | null }} [opts]
+         * @param {{ stale?: boolean, dirty?: {content:string, keys:string, comment:string} | null, isNpcEntry?: boolean }} [opts]
          */
         const buildEntryBody = (item, entryHdr, opts = {}) => {
+            const isNpcEntry = !!opts.isNpcEntry;
             const body = document.createElement('div');
             body.style.cssText = 'display:none; padding:4px 4px 6px 12px; flex-direction:column; gap:5px;';
             body.dataset.entryId = item.id;
@@ -5064,27 +5065,51 @@ function createPanel() {
             keysRead.style.cssText = 'font-size:9px; opacity:0.55; color:var(--rt-text-muted); font-family:var(--rt-font-mono);';
             keysRead.textContent = '[' + item.keys.join(', ') + ']';
 
+            const coreRead = document.createElement('div');
+            coreRead.className = 'rt-agent-core-block';
+            coreRead.style.display = 'none';
+
             const contentRead = document.createElement('div');
+            contentRead.className = 'rt-agent-dynamic-block';
             contentRead.style.cssText = 'font-size:10px; opacity:0.88; color:var(--rt-text); line-height:1.45; white-space:pre-wrap; word-break:break-word; overflow-y:auto;';
-            const _stripCoreTagsForDisplay = (s) => {
-                if (!s) return '';
-                const stripped = s.replace(/\[CORE\][\s\S]*?\[\/CORE\]/gi, '').trim();
-                return stripped || '(No campaign history recorded yet)';
+
+            const syncReadFromItem = () => {
+                keysRead.textContent = '[' + item.keys.join(', ') + ']';
+                const raw = item.content || '';
+                const coreMatch = raw.match(/\[CORE\]([\s\S]*?)\[\/CORE\]/i);
+                const dynamic = raw.replace(/\[CORE\][\s\S]*?\[\/CORE\]/gi, '').trim();
+
+                if (!isNpcEntry && coreMatch) {
+                    coreRead.style.display = 'block';
+                    coreRead.innerHTML = `<div class="rt-agent-core-label">Permanent</div><div class="rt-agent-core-text">${escapeHtml(coreMatch[1].trim())}</div>`;
+                } else {
+                    coreRead.style.display = 'none';
+                    coreRead.innerHTML = '';
+                }
+
+                if (isNpcEntry) {
+                    contentRead.textContent = dynamic || '(No campaign history recorded yet)';
+                    contentRead.style.display = 'block';
+                } else if (dynamic) {
+                    contentRead.textContent = dynamic;
+                    contentRead.style.display = 'block';
+                } else if (coreMatch) {
+                    contentRead.style.display = 'none';
+                } else {
+                    contentRead.textContent = raw || '(Empty)';
+                    contentRead.style.display = 'block';
+                }
             };
-            contentRead.textContent = _stripCoreTagsForDisplay(item.content);
+            syncReadFromItem();
 
             const cleanBtn = entryHdr.querySelector('.rt-agent-entry-clean');
             const editBtn = entryHdr.querySelector('.rt-agent-entry-edit');
             const delBtn = entryHdr.querySelector('.rt-agent-entry-delete');
 
             readPane.appendChild(keysRead);
+            readPane.appendChild(coreRead);
             readPane.appendChild(contentRead);
             body.appendChild(readPane);
-
-            const syncReadFromItem = () => {
-                keysRead.textContent = '[' + item.keys.join(', ') + ']';
-                contentRead.textContent = _stripCoreTagsForDisplay(item.content);
-            };
 
             // ── Edit form (hidden until Edit) ─────────────────────────────
             const editPane = document.createElement('div');
@@ -6089,6 +6114,7 @@ function createPanel() {
                                 entryBody = buildEntryBody(item, fakeHdr, {
                                     stale: !!isDirty,
                                     dirty: dirtySnap || null,
+                                    isNpcEntry: true,
                                 });
                                 entryBody.classList.add('rt-npc-card-entry');
                                 entryBody.style.display = 'none';
@@ -6465,6 +6491,7 @@ function createPanel() {
                             entryBody = buildEntryBody(node.item, entryHdr, {
                                 stale: !!isDirty,
                                 dirty: dirtySnap || null,
+                                isNpcEntry: isNpcBook,
                             });
                             if (_openEntries.has(node.item.id)) {
                                 entryBody.style.display = 'flex';
