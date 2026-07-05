@@ -837,6 +837,43 @@ EXAMPLE — end of a response where {{user}} complimented Elena:
 </constraints>`,
 };
 
+/** Cumulative XP required to reach each level (index 0 = Level 1). */
+export const XP_LEVEL_THRESHOLDS = [0, 300, 900, 2700, 6500, 14000, 23000, 34000, 48000, 64000];
+
+export const XP_LEVEL_THRESHOLDS_TEXT = `Level 1 — 0 XP
+Level 2 — 300 XP
+Level 3 — 900 XP
+Level 4 — 2,700 XP
+Level 5 — 6,500 XP
+Level 6 — 14,000 XP
+Level 7 — 23,000 XP
+Level 8 — 34,000 XP
+Level 9 — 48,000 XP
+Level 10 — 64,000 XP`;
+
+/** @param {number|string} level Starting level (1–20); thresholds cap at Level 10. */
+export function getOnboardingLevelXpValues(level) {
+    const lvl = Math.max(1, Math.min(20, parseInt(String(level), 10) || 1));
+    const tableLevel = Math.min(lvl, 10);
+    const currentXp = XP_LEVEL_THRESHOLDS[tableLevel - 1] ?? 0;
+    const nextXp = tableLevel >= 10 ? XP_LEVEL_THRESHOLDS[9] : XP_LEVEL_THRESHOLDS[tableLevel];
+    return { level: lvl, currentXp, nextXp };
+}
+
+/** Prompt fragment requiring an [XP] block for onboarding character creation. */
+export function buildOnboardingXpHint(level) {
+    const { level: lvl, currentXp, nextXp } = getOnboardingLevelXpValues(level);
+    const fmt = (n) => n.toLocaleString('en-US');
+    return `\n\nMANDATORY [XP] BLOCK — DO NOT OMIT:
+The character MUST be Level ${lvl}. Output an [XP] block using exactly this format:
+[XP]
+Level: ${lvl} | XP: ${fmt(currentXp)}/${fmt(nextXp)}
+[/XP]
+
+Set current XP to ${fmt(currentXp)} (the Level ${Math.min(lvl, 10)} threshold). LEVEL THRESHOLDS:
+${XP_LEVEL_THRESHOLDS_TEXT}`;
+}
+
 // ── Renderer / block layout constants ─────────────────────────────────────────
 
 export const BLOCK_ICONS = {
