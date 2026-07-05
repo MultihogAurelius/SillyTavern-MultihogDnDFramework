@@ -1221,15 +1221,40 @@ export async function parseAndApplyNarrativeRelTags() {
  * Falls back to the heavy `_rpgRefreshAgentManifest` if no cards exist yet.
  */
 function refreshRelationshipBarsDOM(settings) {
-    const cards = document.querySelectorAll('.rt-npc-card[data-entry-id]');
-    if (!cards.length) {
-        // No cards rendered yet — fall back to full reload
-        if (typeof globalThis._rpgRefreshAgentManifest === 'function') globalThis._rpgRefreshAgentManifest();
-        return;
-    }
+    if (!settings.npcRelationshipBars) return;
 
     const relVals = settings.npcRelationshipValues || {};
     const logData = settings.npcRelationshipLog || {};
+
+    const updateCompactRelColor = (value, type) => {
+        const clamped = Math.max(-100, Math.min(100, value));
+        if (type === 'friendship') {
+            return clamped > 0 ? '#4ade80' : clamped < 0 ? '#ef4444' : 'rgba(255,255,255,0.45)';
+        }
+        return clamped > 0 ? '#f472b6' : clamped < 0 ? '#a855f7' : 'rgba(255,255,255,0.45)';
+    };
+
+    // Compact NPC list rows (portraits-off view)
+    for (const container of document.querySelectorAll('.rt-agent-entry-rel-stats[data-entry-id]')) {
+        const entryId = container.dataset.entryId;
+        if (!entryId) continue;
+        const rel = relVals[entryId] || { friendship: 0, affection: 0 };
+        for (const type of ['friendship', 'affection']) {
+            const span = container.querySelector(`.rt-agent-entry-rel-${type}`);
+            if (!span) continue;
+            const value = Math.max(-100, Math.min(100, rel[type] ?? 0));
+            span.style.color = updateCompactRelColor(value, type);
+            span.textContent = `${type === 'friendship' ? '🤝' : '💗'}${value > 0 ? '+' : ''}${value}`;
+        }
+    }
+
+    const cards = document.querySelectorAll('.rt-npc-card[data-entry-id]');
+    if (!cards.length) {
+        if (!document.querySelector('.rt-agent-entry-rel-stats[data-entry-id]') && typeof globalThis._rpgRefreshAgentManifest === 'function') {
+            globalThis._rpgRefreshAgentManifest();
+        }
+        return;
+    }
 
     for (const card of cards) {
         const entryId = card.dataset.entryId;

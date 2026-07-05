@@ -154,7 +154,7 @@ export async function generatePortraitPrompt(entityName) {
     // Also check active router keys for lorebook context
     try {
         if (s.activeRouterKeys?.length > 0) {
-            const manifest = typeof getLorebookManifest === 'function' ? await getLorebookManifest() : null;
+            const manifest = typeof getLorebookManifest === 'function' ? await getLorebookManifest(true) : null;
             if (manifest) {
                 const matchingActive = manifest.filter(entry => {
                     const keys = entry.keys || [];
@@ -1123,10 +1123,6 @@ export async function checkAndTriggerAutoGenerations(refresh) {
             const bookName = prefix ? `${prefix}_NPCs` : 'NPCs';
             console.log('[RPG Tracker] checkAndTriggerAutoGenerations: resolving bookName:', bookName);
             try {
-                if (typeof ctx.updateWorldInfoList === 'function') {
-                    console.log('[RPG Tracker] checkAndTriggerAutoGenerations: calling ctx.updateWorldInfoList() to clear cache...');
-                    await ctx.updateWorldInfoList();
-                }
                 const book = await ctx.loadWorldInfo(bookName);
                 if (book && book.entries) {
                     npcEntries = Object.values(book.entries).filter(e => (e.comment || '').trim());

@@ -62,6 +62,9 @@ let _stateModelRunning = false;
 let _stateController = null;   // To abort ongoing state updates
 let _currentChatId = null;
 let _prefixDeriveTimer = null; // Pending CHAT_CHANGED → prefix-derivation timer
+/** Set during init BOOTSTRAP so the immediate CHAT_CHANGED does not repeat /world scans. */
+let _sessionBootstrapChatId = null;
+let _bootstrapSyncPromise = null;
 let themeUndoStack = [];
 let _pillDeselectHandler = null;
 let renderRouterUI = null;
@@ -80,6 +83,32 @@ const refreshAll = () => {
         void refreshNpcManifest().catch(() => {});
     }
 };
+
+function isAgentPanelVisible() {
+    const el = document.getElementById('rpg-tracker-agent');
+    return !!el && el.style.display !== 'none';
+}
+
+function scheduleDeferred(fn) {
+    if (typeof requestIdleCallback === 'function') {
+        requestIdleCallback(() => { void fn(); }, { timeout: 2500 });
+    } else {
+        setTimeout(() => { void fn(); }, 0);
+    }
+}
+
+/** Refresh CAMPAIGN RECORDS only when the Lorebook Agent panel is open (avoids heavy load on F5). */
+function scheduleAgentManifestRefresh(force = false) {
+    if (!force && !isAgentPanelVisible()) return;
+    void refreshAgentManifest().catch(() => {});
+}
+
+/** Reload CAMPAIGN RECORDS — safe from settings UI outside createPanel(). */
+async function refreshAgentManifestNow() {
+    if (typeof globalThis._rpgRefreshAgentManifest === 'function') {
+        await globalThis._rpgRefreshAgentManifest();
+    }
+}
 
 let updateAgentWorldStatusRef = null;
 let updateWorldProgressionLastFiredDisplayRef = null;
@@ -317,7 +346,7 @@ async function syncCampaignPrefixAndWorldsForChat(newChatId, source) {
     if (!prefix) {
         s2.routerCampaignPrefix = '';
         syncRouterPrefixDisplays('');
-        void refreshAgentManifest().catch(() => { });
+        void scheduleAgentManifestRefresh();
         _loreActivationDebugLast = {
             ts: new Date().toISOString(),
             source,
@@ -365,7 +394,12 @@ async function syncCampaignPrefixAndWorldsForChat(newChatId, source) {
     saveSettings();
     if (s2.chatLinkEnabled && _currentChatId) saveChatState(_currentChatId);
     try {
-        await activateCampaignBooks({ debugSource: source, syncMeta: { newChatId, matchingBooksCount: matchingBooks.length } });
+        await activateCampaignBooks({
+            debugSource: source,
+            syncMeta: { newChatId, matchingBooksCount: matchingBooks.length },
+            registry: reg,
+            allNames,
+        });
     } catch (e) {
         _loreActivationDebugLast = {
             ...(_loreActivationDebugLast || {}),
@@ -383,7 +417,7 @@ async function syncCampaignPrefixAndWorldsForChat(newChatId, source) {
             void syncCampaignPrefixAndWorldsForChat(newChatId, `${source}(registry-followup)`).catch(() => { });
         }, 450);
     }
-    void refreshAgentManifest().catch(() => { });
+    void scheduleAgentManifestRefresh();
 }
 
 /**
@@ -532,7 +566,7 @@ function bookBelongsToPrefix(bookName, prefix) {
  * world-info system (equivalent to toggling them ON in the World Info panel).
  * Uses the full ST lorebook registry filtered by campaign prefix, so keyless
  * lorebooks that never appear in activeRouterKeys are still caught.
- * @param {{ debugSource?: string, syncMeta?: Record<string, any> }} [opts]
+ * @param {{ debugSource?: string, syncMeta?: Record<string, any>, registry?: object, allNames?: string[] }} [opts]
  * @returns {Promise<number>} Count of books turned on.
  */
 async function activateCampaignBooks(opts = {}) {
@@ -584,8 +618,8 @@ async function activateCampaignBooks(opts = {}) {
         return 0;
     }
 
-    const reg = await refreshWorldInfoRegistry();
-    const allNames = resolveAllWorldNames(ctx, reg);
+    const reg = opts.registry || await refreshWorldInfoRegistry();
+    const allNames = opts.allNames || resolveAllWorldNames(ctx, reg);
 
     const worldBookName = prefix ? `${prefix}_World` : 'World';
     let bookNames = allNames.filter(n => bookBelongsToPrefix(n, prefix));
@@ -1045,12 +1079,14 @@ function loadChatState(chatId) {
     if (typeof renderRouterUI === 'function') {
         renderRouterUI();
     }
-    void refreshAgentManifest().catch(() => { });
+    scheduleAgentManifestRefresh();
 
     // Patch any managed entries that don't yet have disable:true so ST's
     // native keyword scanner cannot inject them on user-message send.
     if (s.routerEnabled) {
-        disableManagedEntries().catch(e => console.warn('[RPG Tracker] disableManagedEntries on chat change failed:', e));
+        scheduleDeferred(() => {
+            disableManagedEntries().catch(e => console.warn('[RPG Tracker] disableManagedEntries on chat change failed:', e));
+        });
     }
 
     if (typeof globalThis._rpgUpdateSkeletonStatus === 'function') {
@@ -1218,6 +1254,19 @@ function onChatChanged(newChatId) {
     s.routerCampaignPrefix = prefix || '';
     syncRouterPrefixDisplays(prefix || '');
 
+    // F5 / same-chat reload: init BOOTSTRAP already activated lorebooks and loadChatState ran.
+    if (!isActualChange) {
+        updateChatLinkUI();
+        return;
+    }
+
+    // Init BOOTSTRAP may have just finished activation for this chat — skip duplicate /world pass.
+    if (newChatId && newChatId === _sessionBootstrapChatId) {
+        _sessionBootstrapChatId = null;
+        updateChatLinkUI();
+        return;
+    }
+
     const chatBooks = s.chatStates?.[newChatId]?.campaignBooks;
 
     if (chatBooks?.length) {
@@ -1248,7 +1297,7 @@ function onChatChanged(newChatId) {
                     await ctx.executeSlashCommandsWithOptions(`/world state=off silent=true "${newWorldBookName}"`).catch(() => { });
                 }
                 // Re-render folder counts and active dots once the /world transitions complete
-                void refreshAgentManifest().catch(() => { });
+                scheduleAgentManifestRefresh();
             })();
         }
     } else if (s.routerEnabled && newChatId) {
@@ -1276,6 +1325,15 @@ function onChatChanged(newChatId) {
         _prefixDeriveTimer = setTimeout(async () => {
             _prefixDeriveTimer = null;
             if (newChatId !== _currentChatId) return;
+
+            // If init BOOTSTRAP is still running the registry scan, wait for it instead of duplicating.
+            if (_bootstrapSyncPromise) {
+                try { await _bootstrapSyncPromise; } catch (_) { }
+                if (getSettings().chatStates?.[newChatId]?.campaignBooks?.length) {
+                    await _deactivateOldBooks();
+                    return;
+                }
+            }
 
             // Pass 1 (~800ms): deactivate before the registry scan so books vanish fast.
             await _deactivateOldBooks();
@@ -1329,7 +1387,7 @@ function onChatChanged(newChatId) {
         if (typeof renderRouterUI === 'function') {
             renderRouterUI();
         }
-        void refreshAgentManifest().catch(() => { });
+        scheduleAgentManifestRefresh();
     }
 
     updateChatLinkUI();
@@ -1971,7 +2029,7 @@ function updatePanelStatus() {
     // Keep in-panel power button in sync
     if (enableBtn) {
         enableBtn.style.opacity = settings.enabled ? '' : '0.35';
-        enableBtn.title = settings.enabled ? 'Disable RPG Tracker' : 'Enable RPG Tracker';
+        enableBtn.title = settings.enabled ? 'Disable State Tracker' : 'Enable State Tracker';
     }
     // Keep settings sidebar checkbox in sync
     const sidebarEnableCheck = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_tracker_enabled'));
@@ -3550,7 +3608,7 @@ function refreshRenderedView() {
     });
 
     if (_historyViewIndex === -1) {
-        checkAndTriggerAutoGenerations(refreshAll);
+        scheduleDeferred(() => checkAndTriggerAutoGenerations(refreshAll));
     }
 }
 
@@ -3734,7 +3792,7 @@ function createPanel() {
                 </div>
                 <div class="rpg-tracker-header-center" id="rpg-tracker-pause-banner"></div>
                 <div class="rpg-tracker-header-right">
-                    <button class="rpg-tracker-icon-btn" id="rpg-tracker-enable-btn" title="${settings.enabled ? 'Disable RPG Tracker' : 'Enable RPG Tracker'}" style="${settings.enabled ? '' : 'opacity:0.4;'}" >⏻</button>
+                    <button class="rpg-tracker-icon-btn" id="rpg-tracker-enable-btn" title="${settings.enabled ? 'Disable State Tracker' : 'Enable State Tracker'}" style="${settings.enabled ? '' : 'opacity:0.4;'}" >⏻</button>
                     <button class="rpg-tracker-icon-btn" id="rpg-tracker-update-btn" title="Update State Now">🔄</button>
                     <button class="rpg-tracker-icon-btn" id="rpg-tracker-pause-btn" title="Pause Tracker">⏸</button>
                     <button class="rpg-tracker-icon-btn" id="rpg-tracker-prompt-btn" title="Toggle direct prompt">💬</button>
@@ -4231,8 +4289,15 @@ function createPanel() {
             if (parts.length > 1) neededBooks.add(parts[0]);
         }
 
-        for (const bookName of neededBooks) {
-            books[bookName] = await ctx.loadWorldInfo(bookName);
+        const bookLoads = await Promise.all([...neededBooks].map(async (bookName) => {
+            try {
+                return [bookName, await ctx.loadWorldInfo(bookName)];
+            } catch (_) {
+                return [bookName, null];
+            }
+        }));
+        for (const [bookName, book] of bookLoads) {
+            if (book) books[bookName] = book;
         }
 
         // Calculate total active tokens
@@ -4350,6 +4415,7 @@ function createPanel() {
     // Assigned below when the agent panel is wired. Declared here so
     // nav handlers outside the wiring block can always call it safely.
     let refreshManifest = async (_source = 'uninitialized') => { };
+    let _manifestRenderGen = 0;
     let updateAgentBtnUI = () => { };
 
     if (agentBtn && agentPanel && agentCloseBtn) {
@@ -5095,21 +5161,25 @@ function createPanel() {
             return body;
         };
 
-        refreshManifest = async () => {
+        refreshManifest = async (source = 'auto') => {
             const list = agentPanel.querySelector('#rt-agent-manifest-list');
             if (!list) return;
 
+            const gen = ++_manifestRenderGen;
             list.innerHTML = '<div style="text-align: center; opacity: 0.5; font-size: 0.769em; padding: 10px;">Loading...</div>';
 
             try {
                 const s = getSettings();
                 const prefix = (s.routerCampaignPrefix || '').trim();
                 if (!prefix) {
+                    if (gen !== _manifestRenderGen) return;
                     list.innerHTML = '<div style="text-align: center; opacity: 0.5; font-size: 0.769em; padding: 10px;">Set a Campaign Prefix to see records.</div>';
                     return;
                 }
 
-                const manifest = await getLorebookManifest();
+                const forceFullRefresh = source === 'manual-button';
+                const manifest = await getLorebookManifest(!forceFullRefresh);
+                if (gen !== _manifestRenderGen) return;
 
                 // Group entries by lorebook
                 /** @type {Map<string, typeof manifest>} */
@@ -5129,6 +5199,7 @@ function createPanel() {
                 list.innerHTML = '';
 
                 for (const [bookName, items] of byBook) {
+                    if (gen !== _manifestRenderGen) return;
                     // Strip campaign prefix from display name: "Eldoria_Factions" → "Factions"
                     const displayName = prefix && bookName.startsWith(prefix + '_')
                         ? bookName.slice(prefix.length + 1)
@@ -5339,15 +5410,23 @@ function createPanel() {
                     }
 
                     // ════════════════════════════════════════════════════════════
-                    //  NPC CARD GRID RENDERING
+                    //  NPC HELPERS (shared by card grid + compact list)
                     // ════════════════════════════════════════════════════════════
-                    if (useNpcCardView) {
+                    /** @type {((item: any, rel: any) => Promise<void>)|null} */
+                    let openNpcDetailPopup = null;
+                    /** @type {((entryId: string) => { friendship: number, affection: number })|null} */
+                    let parseRelationship = null;
+                    /** @type {((entryId: string) => string)|null} */
+                    let renderCompactRelStats = null;
+                    /** @type {((value: number, type: string, entryId: string) => string)|null} */
+                    let renderRelBar = null;
+                    /** @type {((content: string) => string)|null} */
+                    let getNpcDescription = null;
 
-                        const npcGrid = document.createElement('div');
-                        npcGrid.className = 'rt-npc-card-grid';
+                    if (isNpcBook) {
 
                         // Helper: parse relationship values — read from code-owned settings, not entry text
-                        const parseRelationship = (entryId) => {
+                        parseRelationship = (entryId) => {
                             const s = getSettings();
                             const rel = (s.npcRelationshipValues || {})[entryId];
                             return {
@@ -5357,7 +5436,7 @@ function createPanel() {
                         };
 
                         // Helper: render a dual-direction bar (always renders, even at 0)
-                        const renderRelBar = (value, type, entryId) => {
+                        renderRelBar = (value, type, entryId) => {
                             const clamped = Math.max(-100, Math.min(100, value));
                             const pct = Math.abs(clamped) / 2; // 50% of track = full
                             const icon = type === 'friendship' ? '🤝' : '💗';
@@ -5391,8 +5470,27 @@ function createPanel() {
                             </div>`;
                         };
 
+                        /** Compact friendship/affection labels for the tree list view. */
+                        renderCompactRelStats = (entryId) => {
+                            if (!getSettings().npcRelationshipBars) return '';
+                            const rel = parseRelationship(entryId);
+                            const fmtVal = (val, type) => {
+                                const clamped = Math.max(-100, Math.min(100, val));
+                                const icon = type === 'friendship' ? '🤝' : '💗';
+                                let color = 'rgba(255,255,255,0.45)';
+                                if (type === 'friendship') {
+                                    color = clamped > 0 ? '#4ade80' : clamped < 0 ? '#ef4444' : 'rgba(255,255,255,0.45)';
+                                } else {
+                                    color = clamped > 0 ? '#f472b6' : clamped < 0 ? '#a855f7' : 'rgba(255,255,255,0.45)';
+                                }
+                                const label = type === 'friendship' ? 'Friendship' : 'Affection';
+                                return `<span class="rt-agent-entry-rel-${type}" style="font-size:9px;font-family:monospace;color:${color};" title="${label}">${icon}${clamped > 0 ? '+' : ''}${clamped}</span>`;
+                            };
+                            return `<span class="rt-agent-entry-rel-stats" data-entry-id="${escapeHtml(entryId)}" style="display:inline-flex;align-items:center;gap:5px;margin-left:6px;flex-shrink:0;">${fmtVal(rel.friendship, 'friendship')}${fmtVal(rel.affection, 'affection')}</span>`;
+                        };
+
                         // Helper: get brief synopsis for the card (pulls from Appearance section or first text)
-                        const getNpcDescription = (content) => {
+                        getNpcDescription = (content) => {
                             if (!content) return '';
                             // Strip [CORE] and [/CORE] tags before parsing
                             const cleanContent = content.replace(/\[\/?CORE\]/gi, '');
@@ -5477,11 +5575,12 @@ function createPanel() {
                         };
 
                         // Helper: open NPC detail popup
-                        const openNpcDetailPopup = async (item, rel) => {
+                        openNpcDetailPopup = async (item, rel) => {
                             const ctx = SillyTavern.getContext();
                             if (!ctx.callGenericPopup) return;
                             const normLabel = item.label.replace(/\s*\(.*?\)/g, '').trim();
                             const portraitSrc = s.customPortraits?.[normLabel] || '';
+                            const hidePortrait = s.npcPortraits === false;
 
                             // Helper: build formatted sections HTML from raw content string
                             const renderSectionsHtml = (rawContent) => {
@@ -5603,7 +5702,7 @@ function createPanel() {
 
                             popupDom.innerHTML = `
                                 <div style="display:flex;gap:24px;margin-bottom:20px;align-items:flex-start;flex-wrap:wrap;">
-                                    <div style="flex-shrink:0;width:280px;">${portraitEl}</div>
+                                    ${hidePortrait ? '' : `<div style="flex-shrink:0;width:280px;">${portraitEl}</div>`}
                                     <div style="flex:1;min-width:220px;display:flex;flex-direction:column;gap:8px;">
                                         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
                                             <div style="font-size:24px;font-weight:bold;color:#d4a940;line-height:1.2;">${escapeHtml(item.label)}</div>
@@ -5792,10 +5891,19 @@ function createPanel() {
                             await ctx.callGenericPopup(popupDom, ctx.POPUP_TYPE?.TEXT ?? 1, '', popupOpts);
                         };
 
+                    }
+
+                    // ════════════════════════════════════════════════════════════
+                    //  NPC CARD GRID RENDERING
+                    // ════════════════════════════════════════════════════════════
+                    if (useNpcCardView) {
+
+                        const npcGrid = document.createElement('div');
+                        npcGrid.className = 'rt-npc-card-grid';
 
                         for (const item of items) {
-                            const rel = parseRelationship(item.id);
-                            const desc = getNpcDescription(item.content);
+                            const rel = parseRelationship ? parseRelationship(item.id) : { friendship: 0, affection: 0 };
+                            const desc = getNpcDescription ? getNpcDescription(item.content) : '';
                             const normLabel = item.label.replace(/\s*\(.*?\)/g, '').trim();
                             const portraitSrc = s.customPortraits?.[normLabel] || '';
                             const isDirty = _dirtyEntries.has(item.id);
@@ -5818,7 +5926,7 @@ function createPanel() {
                                     <div class="rt-npc-name">${escapeHtml(item.label)}${isDirty ? ' <span style="color:#ffa500; font-size:8px;" title="Unsaved edits">●</span>' : ''}</div>
                                     <div class="rt-npc-desc">${escapeHtml(desc)}</div>
                                     <span class="rt-npc-status-badge ${item.is_active ? 'active' : 'inactive'}">${item.is_active ? '● Active' : '○ Inactive'}</span>
-                                    ${s.npcRelationshipBars ? `<div class="rt-npc-bars">
+                                    ${s.npcRelationshipBars && renderRelBar ? `<div class="rt-npc-bars">
                                         ${renderRelBar(rel.friendship, 'friendship', item.id)}
                                         ${renderRelBar(rel.affection, 'affection', item.id)}
                                     </div>` : ''}
@@ -5831,25 +5939,35 @@ function createPanel() {
                                 </div>
                             `;
 
-                            // Entry body (edit pane) — reuse existing buildEntryBody
+                            // Entry body (edit pane) — built lazily on first expand to keep manifest snappy
                             let entryBody = null;
                             const dirtySnap = isDirty ? _dirtyEntries.get(item.id) : null;
-                            const fakeHdr = document.createElement('div'); // placeholder for buildEntryBody
-                            entryBody = buildEntryBody(item, fakeHdr, {
-                                stale: !!isDirty,
-                                dirty: dirtySnap || null,
-                            });
-                            entryBody.style.display = _openEntries.has(item.id) ? 'flex' : 'none';
-                            entryBody.style.marginTop = '6px';
-                            entryBody.style.borderTop = '1px solid rgba(212, 169, 64, 0.1)';
-                            entryBody.style.paddingTop = '6px';
-                            if (_openEntries.has(item.id)) card.classList.add('open');
+                            const ensureEntryBody = () => {
+                                if (entryBody) return entryBody;
+                                const fakeHdr = document.createElement('div');
+                                entryBody = buildEntryBody(item, fakeHdr, {
+                                    stale: !!isDirty,
+                                    dirty: dirtySnap || null,
+                                });
+                                entryBody.style.display = 'none';
+                                entryBody.style.marginTop = '6px';
+                                entryBody.style.borderTop = '1px solid rgba(212, 169, 64, 0.1)';
+                                entryBody.style.paddingTop = '6px';
+                                card.appendChild(entryBody);
+                                return entryBody;
+                            };
+
+                            if (_openEntries.has(item.id)) {
+                                ensureEntryBody().style.display = 'flex';
+                                card.classList.add('open');
+                            }
 
                             // Click card body → toggle inline view
                             card.addEventListener('click', (e) => {
                                 if (/** @type {HTMLElement} */ (e.target).closest('.rt-npc-portrait-wrap, .rt-npc-portrait-gen-overlay, .rt-npc-action-btn, .rt-npc-view, .rt-npc-edit, .rt-npc-clean, .rt-npc-delete, textarea, input, button, select')) return;
-                                const opening = entryBody.style.display === 'none';
-                                entryBody.style.display = opening ? 'flex' : 'none';
+                                const body = ensureEntryBody();
+                                const opening = body.style.display === 'none';
+                                body.style.display = opening ? 'flex' : 'none';
                                 if (opening) {
                                     _openEntries.add(item.id);
                                     card.classList.add('open');
@@ -5879,18 +5997,19 @@ function createPanel() {
                             const editBtn = card.querySelector('.rt-npc-edit');
                             if (editBtn) editBtn.addEventListener('click', (e) => {
                                 e.stopPropagation();
+                                const body = ensureEntryBody();
                                 // Always open the entry body
-                                entryBody.style.display = 'flex';
+                                body.style.display = 'flex';
                                 _openEntries.add(item.id);
                                 card.classList.add('open');
                                 // Trigger the internal edit mode (switch from readPane to editPane)
-                                const internalEditBtn = entryBody.querySelector('.rt-agent-entry-edit');
+                                const internalEditBtn = body.querySelector('.rt-agent-entry-edit');
                                 if (internalEditBtn) {
                                     internalEditBtn.click();
                                 } else {
                                     // Fallback: directly toggle panes if no internal button
-                                    const readPane = entryBody.querySelector('.rt-agent-manifest-read');
-                                    const editPane = entryBody.querySelector('.rt-agent-manifest-edit');
+                                    const readPane = body.querySelector('.rt-agent-manifest-read');
+                                    const editPane = body.querySelector('.rt-agent-manifest-edit');
                                     if (readPane) readPane.style.display = 'none';
                                     if (editPane) editPane.style.display = 'flex';
                                 }
@@ -5947,7 +6066,6 @@ function createPanel() {
                             }
 
                             npcGrid.appendChild(card);
-                            npcGrid.appendChild(entryBody);
                         }
 
                         folderBody.appendChild(npcGrid);
@@ -6158,6 +6276,8 @@ function createPanel() {
                         // Tokens and action buttons
                         let tokensHtml = '';
                         let cleanHtml = '';
+                        let viewNpcHtml = '';
+                        let relStatsHtml = '';
                         let editHtml = '';
                         let deleteHtml = '';
 
@@ -6166,6 +6286,12 @@ function createPanel() {
                         if (node.item) {
                             const entryTokens = Math.round((node.item.content || '').length / 4);
                             tokensHtml = `<span style="font-size:8px; opacity:0.5; color:var(--rt-text-muted); margin-right:5px; flex-shrink:0; background:rgba(255,255,255,0.06); padding:1px 4px; border-radius:4px;" title="Estimated tokens">${entryTokens}t</span>`;
+                            if (isNpcBook) {
+                                viewNpcHtml = `<button class="rt-agent-entry-view-npc" data-id="${node.item.id}" style="background:rgba(212,169,64,0.12); border:1px solid rgba(212,169,64,0.35); border-radius:3px; color:#d4a940; cursor:pointer; font-size:10px; padding:1px 5px; flex-shrink:0; line-height:1.2;" title="View NPC CORE card"><i class="fa-solid fa-address-card"></i></button>`;
+                                if (s.npcRelationshipBars && renderCompactRelStats) {
+                                    relStatsHtml = renderCompactRelStats(node.item.id);
+                                }
+                            }
                             cleanHtml = !isWorldBook ? `<button class="rt-agent-entry-clean" data-id="${node.item.id}" style="background:none; border:none; color:#e67e22; cursor:pointer; font-size:9px; padding:1px 3px; flex-shrink:0;" title="Run targeted cleanup for this entry"><i class="fa-solid fa-broom"></i></button>` : '';
                             editHtml = `<button class="rt-agent-entry-edit" data-id="${node.item.id}" style="background:none; border:none; color:var(--rt-accent); cursor:pointer; font-size:9px; padding:1px 3px; flex-shrink:0;" title="Edit this lore entry"><i class="fa-solid fa-pen-to-square"></i></button>`;
                             deleteHtml = `<button class="rt-agent-entry-delete" data-id="${node.item.id}" style="background:none; border:none; color:var(--rt-text-muted); cursor:pointer; font-size:9px; padding:1px 3px; flex-shrink:0;" title="Delete entry"><i class="fa-solid fa-trash"></i></button>`;
@@ -6173,13 +6299,23 @@ function createPanel() {
 
                         entryHdr.innerHTML = `
                             ${chevronHtml}
+                            ${viewNpcHtml}
                             ${statusDotHtml}
                             <span class="rt-agent-entry-label-span" style="${labelStyle}">${escapeHtml(node.name)}${isDirty ? ' <span style="color:#ffa500; font-size:8px;" title="Unsaved edits">●</span>' : ''}</span>
+                            ${relStatsHtml}
                             ${tokensHtml}
                             ${editHtml}
                             ${cleanHtml}
                             ${deleteHtml}
                         `;
+
+                        const viewNpcBtn = entryHdr.querySelector('.rt-agent-entry-view-npc');
+                        if (viewNpcBtn && node.item && openNpcDetailPopup && parseRelationship) {
+                            viewNpcBtn.addEventListener('click', (e) => {
+                                e.stopPropagation();
+                                openNpcDetailPopup(node.item, parseRelationship(node.item.id));
+                            });
+                        }
 
                         let entryBody = null;
                         if (node.item) {
@@ -6221,7 +6357,7 @@ function createPanel() {
 
                         if (node.item) {
                             entryHdr.addEventListener('click', (e) => {
-                                if (/** @type {HTMLElement} */ (e.target).closest('.rt-agent-subfolder-toggle, .rt-agent-entry-delete, .rt-agent-entry-clean, .rt-agent-entry-edit')) return;
+                                if (/** @type {HTMLElement} */ (e.target).closest('.rt-agent-subfolder-toggle, .rt-agent-entry-delete, .rt-agent-entry-clean, .rt-agent-entry-edit, .rt-agent-entry-view-npc')) return;
                                 const opening = entryBody.style.display === 'none';
                                 entryBody.style.display = opening ? 'flex' : 'none';
                                 entryHdr.style.background = opening ? 'rgba(255,255,255,0.05)' : '';
@@ -6274,6 +6410,8 @@ function createPanel() {
                     list.appendChild(folder);
                 }
             } catch (e) {
+                if (gen !== _manifestRenderGen) return;
+                console.error('[RPG Tracker] refreshManifest failed:', e);
                 list.innerHTML = '<div style="text-align: center; color: #ff5555; font-size: 0.769em; padding: 10px;">Error loading manifest.</div>';
             }
         };
@@ -7212,6 +7350,7 @@ Rules:
             try {
                 const count = await activateCampaignBooks({ debugSource: 'manual:agent-activate-books' });
                 toastr['success'](`Activated ${count} campaign lorebook${count === 1 ? '' : 's'}.`);
+                await refreshManifest('manual-button');
             } catch (e) {
                 toastr['error']('Failed to activate campaign lorebooks.');
             } finally {
@@ -7220,8 +7359,8 @@ Rules:
             }
         });
 
-        // Initial load so the list is populated without needing a manual click
-        refreshManifest();
+        // Initial manifest load is deferred until the Lorebook Agent panel is opened.
+        // refreshManifest() runs from the agent toggle handler and manual refresh button.
 
         /**
          * Shared slot bar: [[TAG: Name | [slot ×]... + | Keywords]]
@@ -10598,16 +10737,17 @@ function buildSysprompt(rawText) {
         ensureRelTagRegex();
 
         // ─── Chat Link ───
-        eventSource.on(event_types.CHAT_CHANGED, onChatChanged);
-        // Bootstrap: restore state for whichever chat is already open
+        // Bootstrap: restore state for whichever chat is already open (before CHAT_CHANGED can fire).
         const bootChatId = ctx.chatId || ctx.getCurrentChatId?.() || null;
         _currentChatId = bootChatId;
+        eventSource.on(event_types.CHAT_CHANGED, onChatChanged);
         if (bootChatId && settings.chatLinkEnabled) {
             loadChatState(bootChatId);
         }
         // Always run activation when routerEnabled — regardless of chatLinkEnabled —
         // so the correct lorebook stack is live from the very first message.
         if (settings.routerEnabled && bootChatId) {
+            _sessionBootstrapChatId = bootChatId;
             const bootBooks = settings.chatStates?.[bootChatId]?.campaignBooks;
             if (bootBooks?.length && typeof ctx.executeSlashCommandsWithOptions === 'function') {
                 // Fast path: exact book list known — skip the slow registry scan.
@@ -10615,10 +10755,18 @@ function buildSysprompt(rawText) {
                     for (const name of bootBooks) {
                         await ctx.executeSlashCommandsWithOptions(`/world state=on silent=true "${name}"`).catch(() => { });
                     }
+                    const bootPrefix = getEffectiveRouterCampaignPrefix(bootChatId);
+                    const worldBookName = bootPrefix ? `${bootPrefix}_World` : 'World';
+                    if (settings.worldProgressionEnabled) {
+                        await ctx.executeSlashCommandsWithOptions(`/world state=on silent=true "${worldBookName}"`).catch(() => { });
+                    } else {
+                        await ctx.executeSlashCommandsWithOptions(`/world state=off silent=true "${worldBookName}"`).catch(() => { });
+                    }
                 })();
             } else {
                 // Fallback for first-time chats where no saved book list exists yet.
-                syncCampaignPrefixAndWorldsForChat(bootChatId, 'BOOTSTRAP');
+                _bootstrapSyncPromise = syncCampaignPrefixAndWorldsForChat(bootChatId, 'BOOTSTRAP')
+                    .finally(() => { _bootstrapSyncPromise = null; });
             }
         }
 
@@ -10627,9 +10775,13 @@ function buildSysprompt(rawText) {
         installRouterInterceptor();
 
         // Ensure managed lorebook entries have disable:true so ST's native keyword
-        // scanner never injects them. Fire-and-forget — non-blocking on startup.
+        // scanner never injects them. Deferred so F5 startup stays responsive.
         const s = getSettings();
-        if (s.routerEnabled) disableManagedEntries().catch(e => console.warn('[RPG Tracker] disableManagedEntries on init failed:', e));
+        if (s.routerEnabled) {
+            scheduleDeferred(() => {
+                disableManagedEntries().catch(e => console.warn('[RPG Tracker] disableManagedEntries on init failed:', e));
+            });
+        }
 
         registerDiceFunctionTool();
         registerDiceSlashCommand();
@@ -12558,6 +12710,7 @@ RULES:
             try {
                 const count = await activateCampaignBooks({ debugSource: 'manual:settings-activate-books' });
                 toastr['success'](`Activated ${count} campaign lorebook${count === 1 ? '' : 's'}.`);
+                await refreshAgentManifestNow();
             } catch (e) {
                 toastr['error']('Failed to activate campaign lorebooks.');
             } finally {
@@ -12872,12 +13025,10 @@ RULES:
         });
 
         // NPC Settings Bindings
-        $('#rpg_tracker_npc_portraits').prop('checked', settings.npcPortraits !== false).on('change', function () {
+        $('#rpg_tracker_npc_portraits').prop('checked', settings.npcPortraits !== false).on('change', async function () {
             applyNpcPortraitSetting(settings, !!$(this).prop('checked'));
             saveSettings();
-            if (typeof renderRouterUI === 'function') {
-                renderRouterUI();
-            }
+            await refreshAgentManifestNow();
         });
         syncNpcPortraitDependentUi(settings);
 

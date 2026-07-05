@@ -74,10 +74,16 @@ async function fetchRouterArchiveBooks(prefix, ctx, settings) {
     }
 
     const books = {};
-    for (const n of scoped) {
-        if (isSkeletonBookName(n)) continue;
-        const b = await ctx.loadWorldInfo(n);
-        if (b?.entries) books[n] = b;
+    const loaded = await Promise.all([...scoped].map(async (n) => {
+        try {
+            const b = await ctx.loadWorldInfo(n);
+            return b?.entries ? [n, b] : null;
+        } catch (_) {
+            return null;
+        }
+    }));
+    for (const row of loaded) {
+        if (row) books[row[0]] = row[1];
     }
     return books;
 }
@@ -182,7 +188,8 @@ function broadcastStep(type, content, metadata = {}) {
  * Probes both the frontend cache AND the backend API for ground truth,
  * so that cloned/renamed lorebooks are always discovered.
  */
-async function getWorldInfoNamesSafe() {
+async function getWorldInfoNamesSafe(options = {}) {
+    const fullProbe = options.fullProbe !== false;
     const ctx = SillyTavern.getContext();
     const namesSet = new Set();
     
@@ -193,6 +200,10 @@ async function getWorldInfoNamesSafe() {
     } else if (typeof ctx.getLorebookList === 'function') {
         const res = await ctx.getLorebookList();
         if (Array.isArray(res)) res.forEach(n => namesSet.add(n));
+    }
+
+    if (!fullProbe) {
+        return [...namesSet];
     }
 
     // 2. Unconditionally probe the backend API (ground truth of what exists on disk).
@@ -2435,6 +2446,7 @@ Output a JSON object:
 
 /**
  * Fetches a manifest of all campaign-scoped lorebook entries for the UI.
+ * @param {boolean} skipUpdate When true, skips updateWorldInfoList and backend name probes (fast path).
  */
 export async function getLorebookManifest(skipUpdate = false) {
     const settings = getSettings();
@@ -2447,10 +2459,10 @@ export async function getLorebookManifest(skipUpdate = false) {
         try { await ctx.updateWorldInfoList(); } catch (_) {}
     }
 
-    const names = await getWorldInfoNamesSafe();
+    const names = await getWorldInfoNamesSafe({ fullProbe: !skipUpdate });
     // With no prefix, show nothing ? the user hasn't set a campaign yet.
     if (!prefix) return [];
-    const scoped = names.filter(n => bookBelongsToPrefix(n, prefix));
+    const scopedSet = new Set(names.filter(n => bookBelongsToPrefix(n, prefix)));
     
     // Fallback 1: books referenced in activeRouterKeys (not yet in registry)
     const activeBookNames = (settings.activeRouterKeys || [])
@@ -2458,8 +2470,8 @@ export async function getLorebookManifest(skipUpdate = false) {
         .filter(Boolean);
     for (const n of activeBookNames) {
         if (isSkeletonBookName(n)) continue;
-        if (!scoped.includes(n) && bookBelongsToPrefix(n, prefix)) {
-            scoped.push(n);
+        if (!scopedSet.has(n) && bookBelongsToPrefix(n, prefix)) {
+            scopedSet.add(n);
         }
     }
     
@@ -2470,25 +2482,37 @@ export async function getLorebookManifest(skipUpdate = false) {
         .filter(Boolean);
     for (const n of logBookNames) {
         if (isSkeletonBookName(n)) continue;
-        if (!scoped.includes(n) && bookBelongsToPrefix(n, prefix)) {
-            scoped.push(n);
+        if (!scopedSet.has(n) && bookBelongsToPrefix(n, prefix)) {
+            scopedSet.add(n);
         }
     }
-    
+
+    const activeRouterSet = new Set(settings.activeRouterKeys || []);
+    const activeWorldSet = new Set(settings.activeWorldKeys || []);
+    const booksToLoad = [...scopedSet].filter(n => !isSkeletonBookName(n));
+    const loadedBooks = await Promise.all(booksToLoad.map(async (n) => {
+        try {
+            const b = await ctx.loadWorldInfo(n);
+            return b?.entries ? { bookName: n, entries: b.entries } : null;
+        } catch (_) {
+            return null;
+        }
+    }));
+
     const manifest = [];
-    for (const n of scoped) {
-        if (isSkeletonBookName(n)) continue;
-        const b = await ctx.loadWorldInfo(n);
-        if (!b?.entries) continue;
-        for (const [uid, entry] of Object.entries(b.entries)) {
+    for (const row of loadedBooks) {
+        if (!row) continue;
+        const { bookName, entries } = row;
+        for (const [uid, entry] of Object.entries(entries)) {
+            const id = `${bookName}::${uid}`;
             manifest.push({
-                id: `${n}::${uid}`,
-                book: n,
+                id,
+                book: bookName,
                 uid: uid,
                 label: entry.comment || (entry.key?.[0]) || uid,
                 keys: entry.key || [],
                 content: entry.content,
-                is_active: settings.activeRouterKeys?.includes(`${n}::${uid}`) || settings.activeWorldKeys?.includes(`${n}::${uid}`)
+                is_active: activeRouterSet.has(id) || activeWorldSet.has(id)
             });
         }
     }
@@ -2787,22 +2811,33 @@ export async function disableManagedEntries() {
     if (!prefix) return;
 
     try {
-        const allNames = await getWorldInfoNamesSafe();
-        const scoped = allNames.filter(n => bookBelongsToPrefix(n, prefix));
-        for (const bookName of scoped) {
-            const book = await ctx.loadWorldInfo(bookName);
-            if (!book?.entries) continue;
-            let changed = false;
-            for (const entry of Object.values(book.entries)) {
-                if (!entry.disable) {
-                    entry.disable = true;
-                    changed = true;
-                }
-            }
-            if (changed) {
-                try { await ctx.saveWorldInfo(bookName, book); } catch (_) {}
-            }
+        /** @type {string[]} */
+        let scoped;
+        const chatId = ctx.chatId || '';
+        const savedBooks = chatId && settings.chatStates?.[chatId]?.campaignBooks;
+        if (savedBooks?.length) {
+            scoped = savedBooks.filter(n => bookBelongsToPrefix(n, prefix) && !isSkeletonBookName(n));
+        } else {
+            const allNames = await getWorldInfoNamesSafe({ fullProbe: false });
+            scoped = allNames.filter(n => bookBelongsToPrefix(n, prefix) && !isSkeletonBookName(n));
         }
+
+        await Promise.all(scoped.map(async (bookName) => {
+            try {
+                const book = await ctx.loadWorldInfo(bookName);
+                if (!book?.entries) return;
+                let changed = false;
+                for (const entry of Object.values(book.entries)) {
+                    if (!entry.disable) {
+                        entry.disable = true;
+                        changed = true;
+                    }
+                }
+                if (changed) {
+                    try { await ctx.saveWorldInfo(bookName, book); } catch (_) {}
+                }
+            } catch (_) { /* book may not exist yet */ }
+        }));
     } catch (e) {
         console.warn('[RPG Tracker] disableManagedEntries failed:', e);
     }
