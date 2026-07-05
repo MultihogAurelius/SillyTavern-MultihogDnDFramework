@@ -1062,7 +1062,7 @@ export async function forceCheckAutoGenerations(refresh) {
         }
     }
 
-    if (s.portraitAutoGenerateNpcs) {
+    if (s.portraitAutoGenerateNpcs && s.npcPortraits !== false) {
         const ctx = SillyTavern.getContext();
         console.log('[RPG Tracker] forceCheckAutoGenerations: checking NPCs. chatId:', ctx.chatId);
         if (ctx.chatId) {
@@ -1115,7 +1115,7 @@ export async function checkAndTriggerAutoGenerations(refresh) {
     // Fetch NPCs from lorebook if option enabled
     let npcEntries = [];
     console.log('[RPG Tracker] checkAndTriggerAutoGenerations: portraitAutoGenerateNpcs settings:', s.portraitAutoGenerateNpcs);
-    if (s.portraitAutoGenerateNpcs) {
+    if (s.portraitAutoGenerateNpcs && s.npcPortraits !== false) {
         const ctx = SillyTavern.getContext();
         console.log('[RPG Tracker] checkAndTriggerAutoGenerations: ctx.chatId:', ctx.chatId);
         if (ctx.chatId) {
@@ -1193,7 +1193,7 @@ export async function checkAndTriggerAutoGenerations(refresh) {
         }
     }
 
-    if (s.portraitAutoGenerateNpcs) {
+    if (s.portraitAutoGenerateNpcs && s.npcPortraits !== false) {
         for (const entry of npcEntries) {
             const name = entry.comment.trim();
             if (!hasPortrait(name)) {

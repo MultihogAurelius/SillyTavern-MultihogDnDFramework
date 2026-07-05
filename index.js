@@ -401,6 +401,26 @@ export function saveSettings() {
     syncOnboardingUI();
 }
 
+/** When NPC portraits are disabled, turn off NPC auto-generation and sync dependent UI. */
+function applyNpcPortraitSetting(settings, enabled) {
+    settings.npcPortraits = !!enabled;
+    if (!settings.npcPortraits) {
+        settings.portraitAutoGenerateNpcs = false;
+    }
+    syncNpcPortraitDependentUi(settings);
+}
+
+/** Sync NPC portrait toggle and disable auto-generate-NPCs when portraits are off. */
+function syncNpcPortraitDependentUi(settings) {
+    const enabled = settings.npcPortraits !== false;
+    $('#rpg_tracker_npc_portraits').prop('checked', enabled);
+    const autoNpcCb = $('#rpg_tracker_portrait_auto_npcs');
+    if (!enabled) {
+        autoNpcCb.prop('checked', false);
+    }
+    autoNpcCb.prop('disabled', !enabled);
+}
+
 /**
  * Synchronizes the onboarding UI elements with the current settings state.
  * This is called whenever a setting is saved to ensure both the main sidebar
@@ -917,6 +937,7 @@ function loadChatState(chatId) {
     $('#rpg_tracker_portrait_auto_party').prop('checked', !!s.portraitAutoGenerateParty);
     $('#rpg_tracker_portrait_auto_enemies').prop('checked', !!s.portraitAutoGenerateEnemies);
     $('#rpg_tracker_portrait_auto_npcs').prop('checked', !!s.portraitAutoGenerateNpcs);
+    syncNpcPortraitDependentUi(s);
     $('#rpg_tracker_show_total_value').prop('checked', s.showTotalInventoryValue !== false);
     $('#rpg_tracker_inventory_worth_mode').val(s.inventoryWorthMode || 'hover');
     $('#rpg_portrait_connection_source').val(s.portraitConnectionSource || 'default');
@@ -2550,6 +2571,7 @@ function loadProfile(name) {
     $('#rpg_tracker_portrait_auto_party').prop('checked', !!s.portraitAutoGenerateParty);
     $('#rpg_tracker_portrait_auto_enemies').prop('checked', !!s.portraitAutoGenerateEnemies);
     $('#rpg_tracker_portrait_auto_npcs').prop('checked', !!s.portraitAutoGenerateNpcs);
+    syncNpcPortraitDependentUi(s);
     $('#rpg_portrait_connection_source').val(s.portraitConnectionSource || 'default');
     $('#rpg_portrait_connection_profile').val(s.portraitConnectionProfileId || '');
     $('#rpg_portrait_completion_preset').val(s.portraitCompletionPresetId || '');
@@ -5121,15 +5143,16 @@ function createPanel() {
                     const displayNameLower = displayName.toLowerCase();
                     const isNpcBook = displayNameLower === 'npcs' || displayNameLower === 'npc' ||
                                       bookNameLowerFull.endsWith('_npcs') || bookNameLowerFull.endsWith('_npc');
+                    const useNpcCardView = isNpcBook && s.npcPortraits !== false;
 
                     const folder = document.createElement('div');
                     folder.style.cssText = 'flex-shrink: 0; margin-bottom: 2px;';
 
                     const folderHdr = document.createElement('div');
                     folderHdr.style.cssText = 'display:flex; align-items:center; gap:6px; padding:5px 6px; cursor:pointer; border-radius:4px; background:rgba(255,255,255,0.04);';
-                    if (isNpcBook) folderHdr.classList.add('rt-npc-folder-hdr');
+                    if (useNpcCardView) folderHdr.classList.add('rt-npc-folder-hdr');
                     folderHdr.innerHTML = `
-                            ${isNpcBook ? '<span class="rt-npc-folder-icon">👤</span>' : ''}
+                            ${useNpcCardView ? '<span class="rt-npc-folder-icon">👤</span>' : ''}
                             <span class="rt-mf-icon" style="font-size:9px; opacity:0.5; width:10px; flex-shrink:0; font-family:monospace;">${isOpen ? '▼' : '▶'}</span>
                             <span style="font-weight:bold; font-size:11px; flex:1; color:var(--rt-text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(displayName)}</span>
                             <span style="font-size:9px; opacity:0.45; color:var(--rt-text-muted); flex-shrink:0;">${activeCount}/${items.length} (${totalTokens}t)</span>
@@ -5137,7 +5160,7 @@ function createPanel() {
                         `;
 
                     const folderBody = document.createElement('div');
-                    folderBody.style.cssText = `display:${isOpen ? 'flex' : 'none'}; flex-direction:column; ${isNpcBook ? 'padding:4px 0;' : 'border-left:1px solid rgba(255,255,255,0.07); margin-left:10px; padding-left:6px;'} gap:${isNpcBook ? '4' : '1'}px; padding-top:3px; padding-bottom:3px;`;
+                    folderBody.style.cssText = `display:${isOpen ? 'flex' : 'none'}; flex-direction:column; ${useNpcCardView ? 'padding:4px 0;' : 'border-left:1px solid rgba(255,255,255,0.07); margin-left:10px; padding-left:6px;'} gap:${useNpcCardView ? '4' : '1'}px; padding-top:3px; padding-bottom:3px;`;
 
                     folderHdr.addEventListener('click', () => {
                         const opening = folderBody.style.display === 'none';
@@ -5159,6 +5182,16 @@ function createPanel() {
 
                                 const popupHtml = `<div style="padding:16px;width:320px;text-align:left;font-family:var(--rt-font, system-ui, sans-serif);">
                                     <div style="font-size:16px;font-weight:bold;color:#d4a940;margin-bottom:16px;">⚙️ NPC Settings</div>
+
+                                    <div style="margin-bottom:6px;display:flex;align-items:center;gap:10px;">
+                                        <label style="font-size:12px;color:rgba(255,255,255,0.7);flex:1;">Show NPC Portraits</label>
+                                        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+                                            <input type="checkbox" id="rt-npc-portraits" ${curS.npcPortraits !== false ? 'checked' : ''}
+                                                style="width:16px;height:16px;accent-color:#d4a940;cursor:pointer;">
+                                            <span style="font-size:11px;color:rgba(255,255,255,0.5);">${curS.npcPortraits !== false ? 'Enabled' : 'Disabled'}</span>
+                                        </label>
+                                    </div>
+                                    <div style="font-size:10px;color:rgba(255,255,255,0.35);margin-bottom:14px;">When disabled, NPCs use the compact list view (like Events/Locations) and NPC portrait auto-generation is turned off.</div>
 
                                     <div style="margin-bottom:14px;">
                                         <label style="font-size:12px;color:rgba(255,255,255,0.7);display:block;margin-bottom:4px;">Major NPC Section Word Target</label>
@@ -5208,6 +5241,7 @@ function createPanel() {
                                 let newRel = curS.npcRelationshipBars ?? false;
                                 let newIgnoreLimits = curS.ignoreNpcImportLimits ?? false;
                                 let newRelToast = curS.npcRelationshipToast !== false;
+                                let newNpcPortraits = curS.npcPortraits !== false;
                                 // Track word count values via closure — updated by input events,
                                 // read at save time. Initialized to current saved values so
                                 // leaving them unchanged correctly preserves the user's setting.
@@ -5253,6 +5287,13 @@ function createPanel() {
                                             if (relToastEl.nextElementSibling) relToastEl.nextElementSibling.textContent = newRelToast ? 'Enabled' : 'Disabled';
                                         });
                                     }
+                                    const portraitsEl = document.getElementById('rt-npc-portraits');
+                                    if (portraitsEl) {
+                                        portraitsEl.addEventListener('change', () => {
+                                            newNpcPortraits = portraitsEl.checked;
+                                            if (portraitsEl.nextElementSibling) portraitsEl.nextElementSibling.textContent = newNpcPortraits ? 'Enabled' : 'Disabled';
+                                        });
+                                    }
                                 }, 0);
 
                                 const result = await ctx.callGenericPopup(popupHtml, ctx.POPUP_TYPE?.CONFIRM ?? 3, '', {
@@ -5269,6 +5310,7 @@ function createPanel() {
                                     updS.npcMinorWords = finalMinor;
                                     updS.npcRelationshipBars = newRel;
                                     updS.npcRelationshipToast = newRelToast;
+                                    applyNpcPortraitSetting(updS, newNpcPortraits);
                                     $('#rpg_tracker_npc_rel_toast').prop('checked', newRelToast);
 
                                     // Update the main settings panel inputs if present
@@ -5299,7 +5341,7 @@ function createPanel() {
                     // ════════════════════════════════════════════════════════════
                     //  NPC CARD GRID RENDERING
                     // ════════════════════════════════════════════════════════════
-                    if (isNpcBook) {
+                    if (useNpcCardView) {
 
                         const npcGrid = document.createElement('div');
                         npcGrid.className = 'rt-npc-card-grid';
@@ -5909,28 +5951,12 @@ function createPanel() {
                         }
 
                         folderBody.appendChild(npcGrid);
-
-                        // ── "Add NPC to Story" button (always visible) ──
-                        {
-                            const addNpcBtn = document.createElement('div');
-                            addNpcBtn.className = 'rt-npc-add-btn';
-                            addNpcBtn.innerHTML = '<i class="fa-solid fa-user-plus"></i> Add NPC to Story';
-                            addNpcBtn.addEventListener('click', (e) => {
-                                e.stopPropagation();
-                                openNpcCreatorDialog(bookName, prefix);
-                            });
-                            folderBody.appendChild(addNpcBtn);
-                        }
-
-                        folder.appendChild(folderHdr);
-                        folder.appendChild(folderBody);
-                        list.appendChild(folder);
-                        continue; // skip default tree rendering for NPC books
                     }
 
                     // ════════════════════════════════════════════════════════════
-                    //  DEFAULT TREE RENDERING (non-NPC books)
+                    //  DEFAULT TREE RENDERING (compact view — non-NPC books, or NPCs with portraits off)
                     // ════════════════════════════════════════════════════════════
+                    if (!useNpcCardView) {
 
                     // Define TreeNode class locally
                     class TreeNode {
@@ -6228,6 +6254,19 @@ function createPanel() {
                     const sortedRootKeys = Array.from(rootNode.children.keys()).sort((a, b) => compareNodeKeys(a, b, bookName));
                     for (const key of sortedRootKeys) {
                         renderNode(rootNode.children.get(key), folderBody);
+                    }
+
+                    } // end !useNpcCardView
+
+                    if (isNpcBook) {
+                        const addNpcBtn = document.createElement('div');
+                        addNpcBtn.className = 'rt-npc-add-btn';
+                        addNpcBtn.innerHTML = '<i class="fa-solid fa-user-plus"></i> Add NPC to Story';
+                        addNpcBtn.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            openNpcCreatorDialog(bookName, prefix);
+                        });
+                        folderBody.appendChild(addNpcBtn);
                     }
 
                     folder.appendChild(folderHdr);
@@ -9524,6 +9563,9 @@ export function syncSettingsAndUI(updateFn) {
     if (onboardingRelBarsCb) onboardingRelBarsCb.checked = !!fresh.npcRelationshipBars;
     const relToastUICb = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_tracker_npc_rel_toast'));
     if (relToastUICb) relToastUICb.checked = fresh.npcRelationshipToast !== false;
+    const npcPortraitsCb = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_tracker_npc_portraits'));
+    if (npcPortraitsCb) npcPortraitsCb.checked = fresh.npcPortraits !== false;
+    syncNpcPortraitDependentUi(fresh);
     const stateSwipeRollbackUICb = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_tracker_state_swipe_rollback'));
     if (stateSwipeRollbackUICb) stateSwipeRollbackUICb.checked = fresh.stateTrackerSwipeRollback !== false;
 
@@ -10026,6 +10068,8 @@ function buildSysprompt(rawText) {
                         }
                         $('#rpg_tracker_npc_major_words').val(sTempTracker.npcMajorWords ?? 25);
                         $('#rpg_tracker_npc_minor_words').val(sTempTracker.npcMinorWords ?? 15);
+                        $('#rpg_tracker_npc_portraits').prop('checked', sTempTracker.npcPortraits !== false);
+                        syncNpcPortraitDependentUi(sTempTracker);
                         $('#rpg_tracker_npc_rel_bars').prop('checked', !!sTempTracker.npcRelationshipBars);
                         $('#rpg_sysprompt_mod_npc_rel_bars').prop('checked', !!sTempTracker.npcRelationshipBars);
                         $('#rpg_sysprompt_mod_time_ddmmyy').prop('checked', !!sTempTracker.useDdMmYyFormat);
@@ -10219,6 +10263,8 @@ function buildSysprompt(rawText) {
                                     }
                                     $('#rpg_tracker_npc_major_words').val(sTempTracker.npcMajorWords ?? 25);
                                     $('#rpg_tracker_npc_minor_words').val(sTempTracker.npcMinorWords ?? 15);
+                                    $('#rpg_tracker_npc_portraits').prop('checked', sTempTracker.npcPortraits !== false);
+                                    syncNpcPortraitDependentUi(sTempTracker);
                                     $('#rpg_tracker_npc_rel_bars').prop('checked', !!sTempTracker.npcRelationshipBars);
                                     $('#rpg_sysprompt_mod_npc_rel_bars').prop('checked', !!sTempTracker.npcRelationshipBars);
                                     $('#rpg_sysprompt_mod_time_ddmmyy').prop('checked', !!sTempTracker.useDdMmYyFormat);
@@ -10409,6 +10455,7 @@ function buildSysprompt(rawText) {
         });
 
         $('#rpg_tracker_portrait_auto_npcs').prop('checked', !!settings.portraitAutoGenerateNpcs).on('change', function () {
+            if (settings.npcPortraits === false) return;
             settings.portraitAutoGenerateNpcs = !!$(this).prop('checked');
             saveSettings();
             if (settings.portraitAutoGenerateNpcs) {
@@ -12825,6 +12872,15 @@ RULES:
         });
 
         // NPC Settings Bindings
+        $('#rpg_tracker_npc_portraits').prop('checked', settings.npcPortraits !== false).on('change', function () {
+            applyNpcPortraitSetting(settings, !!$(this).prop('checked'));
+            saveSettings();
+            if (typeof renderRouterUI === 'function') {
+                renderRouterUI();
+            }
+        });
+        syncNpcPortraitDependentUi(settings);
+
         $('#rpg_tracker_npc_major_words').val(settings.npcMajorWords ?? 25).on('change', function () {
             // Use 'change' instead of 'input' to only save once the user is done editing.
             // Fall back to the current saved value (not a hardcoded default) if the field is empty.

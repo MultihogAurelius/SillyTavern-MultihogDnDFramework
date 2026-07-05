@@ -139,6 +139,7 @@ export function getSettings() {
         inventoryWorthMode: "hover",   // 'hover' = worth shown as tooltip only | 'display' = coin badge shown inline
         npcMajorWords: 25,
         npcMinorWords: 15,
+        npcPortraits: true,
         npcRelationshipBars: true,
         npcRelationshipToast: true,
         stateTrackerSwipeRollback: true,        // auto-roll back State Tracker memo on swipe           // emit toast notification when relationship values change
@@ -769,6 +770,12 @@ Example: [[FAC: Iron Syndicate | ...]]  NOT  [[FAC: Khelt :: Iron Syndicate | ..
     if (!s.settingsVersion || s.settingsVersion < '3.16.20') {
         s.routerWatermarkBaselinePending = true;
         s.settingsVersion = '3.16.20';
+    }
+
+    // NPC portrait card view toggle (v3.16.21)
+    if (!s.settingsVersion || s.settingsVersion < '3.16.21') {
+        if (s.npcPortraits === undefined) s.npcPortraits = true;
+        s.settingsVersion = '3.16.21';
     }
 
     // ── MIGRATION: Update system prompts with keywords instructions (v3.2.3+) ──────
