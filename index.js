@@ -3525,7 +3525,7 @@ Gear:
     const onboardingBtnApply = el.querySelector('#rt_onboarding_btn_update_sysprompt');
     if (onboardingBtnApply) {
         onboardingBtnApply.addEventListener('click', async () => {
-            await autoApplySysprompt();
+            await autoApplySysprompt(true);
             toastr['success']('System prompt applied! \u2705', 'RPG Tracker');
         });
     }
@@ -4477,6 +4477,9 @@ function createPanel() {
             s.enabled = !s.enabled;
             saveSettings();
             updatePanelStatus();
+            if (s.enabled) {
+                scheduleAutoApply();
+            }
         });
     }
 
@@ -10646,9 +10649,9 @@ function refreshOrderList() {
  * @returns {string}
  */
 let _autoApplyTimer = null;
-async function autoApplySysprompt() {
+async function autoApplySysprompt(force = false) {
     const s = getSettings();
-    if (s.customSysprompt) return;
+    if (!force && (!s.enabled || s.customSysprompt)) return;
 
     const fileName = s.diceFunctionTool ? 'sysprompt.txt' : 'sysprompt_legacy.txt';
     let content;
@@ -10674,6 +10677,8 @@ async function autoApplySysprompt() {
 }
 
 function scheduleAutoApply() {
+    const s = getSettings();
+    if (!s.enabled || s.customSysprompt) return;
     if (_autoApplyTimer) clearTimeout(_autoApplyTimer);
     _autoApplyTimer = setTimeout(() => { _autoApplyTimer = null; autoApplySysprompt(); }, 400);
 }
@@ -10847,7 +10852,7 @@ function buildSysprompt(rawText) {
                             const narratorConfigBlock = document.getElementById('rpg_narrator_config_block');
                             if (narratorConfigBlock) narratorConfigBlock.style.display = '';
                         }
-                        await autoApplySysprompt();
+                        await autoApplySysprompt(true);
 
                         // 2. State Tracker
                         if (extensionSettings[MODULE_NAME]) {
@@ -11040,7 +11045,7 @@ function buildSysprompt(rawText) {
                                         const narratorConfigBlock = document.getElementById('rpg_narrator_config_block');
                                         if (narratorConfigBlock) narratorConfigBlock.style.display = '';
                                     }
-                                    await autoApplySysprompt();
+                                    await autoApplySysprompt(true);
                                     resetCount++;
                                     console.log('[RPG Tracker] Main system prompt reset to defaults.');
                                 }
@@ -11215,6 +11220,8 @@ function buildSysprompt(rawText) {
             updatePanelStatus();
             if (!settings.enabled) {
                 void resetCombatProfileOverride(settings);
+            } else {
+                scheduleAutoApply();
             }
         });
 

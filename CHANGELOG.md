@@ -2,6 +2,14 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [4.5.1] - 2026-07-06
+
+### Fixed
+- **System Prompt Injection Safeguards**: 
+  - Prevented the extension from automatically writing the D&D system prompt to SillyTavern's prompt editor when the extension is powered off via the panel's power button.
+  - Ensured that enabling **Custom Sysprompt Mode** prevents any automatic system prompt injection or overwriting on page refresh (F5) or settings updates, leaving manual buttons (Apply/Reset) as the only way to write the prompt.
+  - Toggling the extension back to ON now instantly writes the system prompt.
+
 ## [4.5.0] - 2026-07-06
 
 ### Added
