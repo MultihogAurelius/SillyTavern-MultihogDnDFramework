@@ -2669,7 +2669,9 @@ const GEOMETRY_KEY = 'rpg_tracker_geometry';
  * @param {HTMLElement} panel
  */
 function savePanelGeometry(panel) {
+    if (!panel || panel.style.display === 'none') return;
     const rect = panel.getBoundingClientRect();
+    if (rect.width === 0 && rect.height === 0) return;
     const isCollapsed = panel.classList.contains('rt-panel-collapsed');
     let savedGeo = {};
     try {
@@ -4298,6 +4300,11 @@ function createPanel() {
         makeDraggable(/** @type {HTMLElement} */(panel), header);
     }
     loadPanelGeometry(/** @type {HTMLElement} */(panel));
+
+    const isTrackerVisible = localStorage.getItem('rpg_tracker_visible') !== 'false';
+    if (!isTrackerVisible) {
+        panel.style.display = 'none';
+    }
     // Start the resize observer AFTER geometry is restored so the initial
     // ResizeObserver callback doesn't immediately overwrite the restored position.
     setupResizeObserver(/** @type {HTMLElement} */(panel));
@@ -4641,6 +4648,7 @@ function createPanel() {
             if (isHidden) {
                 const s = getSettings();
                 (/** @type {HTMLElement} */ (agentPanel)).style.display = 'flex';
+                localStorage.setItem('rpg_tracker_agent_visible', 'true');
                 // Auto-expand the main tracker if it's collapsed; agent panel is an absolute
                 // child, so overflow:hidden on the main panel would clip it otherwise.
                 if (s.trackerCollapsed) {
@@ -4675,6 +4683,7 @@ function createPanel() {
                 }
             } else {
                 (/** @type {HTMLElement} */ (agentPanel)).style.display = 'none';
+                localStorage.setItem('rpg_tracker_agent_visible', 'false');
                 // Restore Raw/Rendered view if docked
                 if (!isAgentDetached()) {
                     applyViewState();
@@ -4684,6 +4693,7 @@ function createPanel() {
         });
         agentCloseBtn.addEventListener('click', () => {
             (/** @type {HTMLElement} */ (agentPanel)).style.display = 'none';
+            localStorage.setItem('rpg_tracker_agent_visible', 'false');
             if (!isAgentDetached()) {
                 applyViewState();
             }
@@ -4695,7 +4705,15 @@ function createPanel() {
                 const content = `
                         <div style="text-align: left; font-size: 13px; line-height: 1.5; max-height: 65vh; overflow-y: auto; padding-right: 8px;">
                             <h3 style="margin-top: 0; color: var(--rt-custom-accent, #3498db);">The Lorebook Agent</h3>
-                            <p>An autonomous narrative librarian. After each generation it scans your recent chat, decides what has changed, and writes new or updated entries directly into your SillyTavern lorebooks — no manual data entry needed.</p>
+                            <p>An autonomous narrative librarian. It scans your recent chat, decides what has changed, and writes new or updated entries directly into your SillyTavern lorebooks — no manual data entry needed.</p>
+
+                            <h4 style="margin-bottom: 5px;">⏱️ How Often to Run Lorebook Agent?</h4>
+                            <p>By default, the Agent runs every 3 messages, but there are tradeoffs to consider:</p>
+                            <ul style="padding-left: 20px; margin-top: 0;">
+                                <li><b>Pros of running less often:</b> It can make more coherent entries without excess granularity (though the cleanup tool can retroactively fix this).</li>
+                                <li><b>Cons of running less often:</b> Activations will rely more on keywords and might not be quite as pinpoint.</li>
+                            </ul>
+                            <p style="margin-top:4px;">The recommended range is every <b>1-3</b> messages.</p>
 
                             <h4 style="margin-bottom: 5px;">🤖 Operating Modes</h4>
                             <ul style="padding-left: 20px; margin-top: 0;">
@@ -8216,7 +8234,8 @@ Rules:
             const applyDetachedState = () => {
                 if (isDetached()) {
                     agentPanel.classList.add('rt-detached-panel');
-                    agentPanel.style.display = 'flex'; // Force visibility if detached
+                    const isAgentVisible = localStorage.getItem('rpg_tracker_agent_visible') !== 'false';
+                    agentPanel.style.display = isAgentVisible ? 'flex' : 'none'; // Respect saved visibility
                     document.body.appendChild(agentPanel);
                     syncRouterPrefixDisplays(getSettings().routerCampaignPrefix || '');
                     renderRouterUI(); // Ensure it's populated
@@ -8309,6 +8328,7 @@ Rules:
 
             detachBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
+                localStorage.setItem('rpg_tracker_agent_visible', 'true');
                 localStorage.setItem(DETACHED_AGENT_KEY, isDetached() ? 'false' : 'true');
                 applyDetachedState();
             });
@@ -8709,6 +8729,7 @@ Rules:
     // Close panel
     panel.querySelector('#rpg-tracker-close-btn').addEventListener('click', () => {
         panel.style.display = 'none';
+        localStorage.setItem('rpg_tracker_visible', 'false');
         settings.closeCount = (settings.closeCount || 0) + 1;
         // Only show toast on the 1st close and every 10th close thereafter
         if (settings.closeCount === 1 || settings.closeCount % 10 === 0) {
@@ -14547,6 +14568,7 @@ RULES:
             if (panel) {
                 const isHidden = panel.style.display === 'none';
                 panel.style.display = isHidden ? 'flex' : 'none';
+                localStorage.setItem('rpg_tracker_visible', isHidden ? 'true' : 'false');
             }
         });
 
