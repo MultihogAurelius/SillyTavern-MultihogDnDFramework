@@ -2,6 +2,12 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [4.4.2] - 2026-07-06
+
+### Changed
+- **Hybrid RNG sysprompt**: RollTheDice (out of combat) is now rule #1 with clearer default-state wording; RNG queue reserved for post-initiative combat rounds only.
+- **RNG constraints**: Reinforced default-to-tool-call behavior and added tie-breaker when combat vs. non-combat is ambiguous (e.g. initiative transition).
+
 ## [4.4.1] - 2026-07-06
 
 ### Added
