@@ -3,7 +3,7 @@ import { MODULE_NAME, DEFAULT_MODULES, getSettings, getBarBackground, migrateCus
 import { sendStateRequest, fetchOllamaModels, fetchOpenAIModels, testOpenAIConnection, getConnectionProfiles, getCurrentCompletionPreset, setCompletionPreset, syncCombatProfile, resetCombatProfileOverride } from './llm-client.js';
 import { getDiceToolName, getDiceCommandName, getDiceCommandAliases, doDiceRoll, registerDiceFunctionTool, registerDiceSlashCommand, installInterceptor, getNarrativeBlocks, onGenerationStarted, onGenerationEnded, ensureRelTagRegex, resetRouterTick, getRouterTick, resetRouterAutoTick, makeRngQueue, buildRngBlock, RNG_QUEUE_LEN, parseAndApplyNarrativeRelTags } from './narrative-hooks.js';
 import { deduplicateMemo, mergeMemo, computeDelta, escapeHtml, escapeRegex, highlightParens, cleanToolCallMessage, cleanMessageContent, getLastUserAction, buildLorebookContext, buildModulesInstructionText, buildModuleFormatInstruction, parseQuestsFromMemo, syncQuestsFromMemo, syncQuestsToMemo, writeQuestsToMemo, getQuestMood, extractCurrentTimeStr, stripArchivedQuestsFromMemo, stripCompletedQuestsFromMemo, applyQuestSyncAndStripMemo, isArchivedQuestStatus, removeArchivedQuest, parseInWorldTime, formatInWorldTime, sanitizeLorebookRecordContent } from './memo-processor.js';
-import { renderSubFieldByRule, tryRenderMarker, renderCustomBlockLine, stripMemoHtml, escapeHtmlWithColor, parseMemoBlocks, getPageSize, loadCollapsed, saveCollapsed, loadDetached, saveDetached, blockToItems, renderMemoAsCards, renderQuestLog, renderLorebookTerminal } from './renderer.js';
+import { renderSubFieldByRule, tryRenderMarker, renderCustomBlockLine, stripMemoHtml, escapeHtmlWithColor, parseMemoBlocks, getPageSize, loadCollapsed, saveCollapsed, loadDetached, saveDetached, blockToItems, renderMemoAsCards, renderTabModeView, renderQuestLog, renderLorebookTerminal, loadActiveTab, saveActiveTab, getTimeOfDayInfo } from './renderer.js';
 import { unregisterLogQuestTool, checkQuestDeadlines, renderQuestsAsPlainText } from './quests.js';
 import { initializeDebugViewer, toggleDebugViewer } from './debug-viewer.js';
 import { runRouterPass, rollbackRouterPass, reapplyRouterPass, getLorebookManifest, deleteLorebookEntry, updateLorebookEntry, disableManagedEntries, isRouterRunning, stopRouterPass } from './router.js';
@@ -67,6 +67,7 @@ let _sessionBootstrapChatId = null;
 let _bootstrapSyncPromise = null;
 let themeUndoStack = [];
 let _pillDeselectHandler = null;
+let _tabModeMenuDeselectHandler = null;
 let renderRouterUI = null;
 globalThis._rpgRenderRouterUI = () => { if (typeof renderRouterUI === 'function') renderRouterUI(); };
 /** Rebuilds CAMPAIGN RECORDS; assigned in createPanel when the agent panel is wired. */
@@ -2178,11 +2179,19 @@ function updateChatLinkUI() {
     const on = s.chatLinkEnabled;
 
     const btn = document.getElementById('rpg-tracker-chat-link-btn');
+    const footerBtn = document.getElementById('rpg-tracker-chat-link-footer-btn');
+    const linkTitle = on
+        ? `Chat Link ON — state is bound to the active chat\n(Click to unlock / use global state)`
+        : `Chat Link OFF — using global state\n(Click to re-lock to current chat)`;
+    const linkLabel = on ? '🔗 Link' : '🔓 Unlinked';
+
     if (btn) {
         btn.textContent = on ? '🔗' : '🔓';
-        btn.title = on
-            ? `Chat Link ON — state is bound to the active chat\n(Click to unlock / use global state)`
-            : `Chat Link OFF — using global state\n(Click to re-lock to current chat)`;
+        btn.title = linkTitle;
+    }
+    if (footerBtn) {
+        footerBtn.textContent = linkLabel;
+        footerBtn.title = linkTitle;
     }
 
     const cb = document.getElementById('rpg_tracker_chat_link_enabled');
@@ -3620,6 +3629,81 @@ Gear:
         });
     });
 
+    // ── Tab Mode: tab strip, overflow "More" menu, vitals-strip jump, swipe ──
+    //
+    // Deliberately NOT touching scrollTop anywhere here. Any programmatic scroll on tab
+    // switch (even a "helpful" one) reads as a jarring auto-scroll/bounce, forcing the
+    // user to re-locate the content with their eyes every time. Instead, the scrollable
+    // area is padded (see .rt-tabmode-wrap / .rt-tabmode-content in style.css) with
+    // enough extra room below the content that the browser practically never needs to
+    // clamp scrollTop when a shorter tab is selected — so whatever position the user
+    // parked the viewport at stays exactly where it is across tab switches.
+    el.querySelectorAll('.rt-tab-btn[data-tag], .rt-tab-more-item[data-tag]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const tag = btn.dataset.tag;
+            if (!tag) return;
+            saveActiveTab(tag);
+            el.querySelector('#rt-tab-more-menu')?.classList.remove('open');
+            refresh();
+        });
+    });
+
+    const tabMoreToggle = el.querySelector('#rt-tab-more-toggle');
+    if (tabMoreToggle) {
+        tabMoreToggle.addEventListener('click', (e) => {
+            e.stopPropagation();
+            el.querySelector('#rt-tab-more-menu')?.classList.toggle('open');
+        });
+    }
+
+    if (!_tabModeMenuDeselectHandler) {
+        _tabModeMenuDeselectHandler = (e) => {
+            if (!e.target.closest('.rt-tab-more-wrap')) {
+                document.querySelectorAll('.rt-tab-more-menu.open').forEach(m => m.classList.remove('open'));
+            }
+        };
+        document.addEventListener('click', _tabModeMenuDeselectHandler);
+    }
+
+    el.querySelectorAll('.rt-vitals-member[data-jump-tag]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const tag = btn.dataset.jumpTag;
+            if (!tag) return;
+            saveActiveTab(tag);
+            refresh();
+        });
+    });
+
+    // Swipe left/right on the active tab's content pane to move to the adjacent tab (touch devices)
+    const tabModeWrap = el.querySelector('.rt-tabmode-wrap');
+    const tabModeContent = el.querySelector('.rt-tabmode-content');
+    if (tabModeWrap && tabModeContent) {
+        const tabOrder = (tabModeWrap.dataset.tabOrder || '').split(',').filter(Boolean);
+        let touchStartX = 0, touchStartY = 0;
+        tabModeContent.addEventListener('touchstart', (e) => {
+            if (e.touches.length !== 1) return;
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+        }, { passive: true });
+        tabModeContent.addEventListener('touchend', (e) => {
+            if (!tabOrder.length) return;
+            const touch = e.changedTouches[0];
+            const dx = touch.clientX - touchStartX;
+            const dy = touch.clientY - touchStartY;
+            // Require a mostly-horizontal swipe of at least 50px to avoid hijacking vertical scrolling
+            if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+            const activeTag = tabModeContent.dataset.activeTag;
+            const idx = tabOrder.indexOf(activeTag);
+            if (idx === -1) return;
+            const nextIdx = dx < 0 ? Math.min(tabOrder.length - 1, idx + 1) : Math.max(0, idx - 1);
+            if (nextIdx === idx) return;
+            saveActiveTab(tabOrder[nextIdx]);
+            refresh();
+        }, { passive: true });
+    }
+
     // Add toggle behavior for Unit Pills (Traits/Abilities)
     el.querySelectorAll('.rt-unit-pill').forEach(unit => {
         unit.addEventListener('click', (e) => {
@@ -3761,11 +3845,18 @@ function refreshRenderedView() {
 
     const el = document.getElementById('rpg-tracker-render');
     if (el) {
-        let html = renderMemoAsCards(memo, null, _sectionPages);
+        const questsEnabled = s.syspromptModules?.quests !== false && !!(memo && memo.trim());
+        let html;
 
-        // Append quest log section if module is enabled and we are not on the onboarding screen
-        if (s.syspromptModules?.quests !== false && memo && memo.trim()) {
-            html += renderQuestLog(getDisplayQuests(memo), currentTime, collapsed, detached);
+        if (s.panelLayoutMode === 'tabs') {
+            const questsCtx = questsEnabled ? { quests: getDisplayQuests(memo), currentTime } : null;
+            html = renderTabModeView(memo, _sectionPages, questsCtx);
+        } else {
+            html = renderMemoAsCards(memo, null, _sectionPages);
+            // Append quest log section if module is enabled and we are not on the onboarding screen
+            if (questsEnabled) {
+                html += renderQuestLog(getDisplayQuests(memo), currentTime, collapsed, detached);
+            }
         }
 
         el.innerHTML = html;
@@ -3792,6 +3883,21 @@ function refreshRenderedView() {
         if (footerLoc) {
             footerLoc.textContent = locText || 'Unknown Location';
             footerLoc.title = locText ? `Location: ${locText}` : 'Unknown Location';
+        }
+
+        // In Tab Mode, surface the current in-world time in the footer so it stays
+        // glanceable without needing to open the Time tab.
+        const footerTime = document.getElementById('rt-footer-time');
+        if (footerTime) {
+            if (s.panelLayoutMode === 'tabs' && currentTime) {
+                const { emoji, color } = getTimeOfDayInfo(currentTime);
+                footerTime.style.display = 'inline-flex';
+                footerTime.style.color = color !== 'inherit' ? color : '';
+                footerTime.textContent = emoji ? `${emoji} ${currentTime}` : currentTime;
+                footerTime.title = `Current Time: ${currentTime}`;
+            } else {
+                footerTime.style.display = 'none';
+            }
         }
     }
 
@@ -3991,19 +4097,20 @@ function createPanel() {
             <div class="rt-resizer-tr" id="rt-resizer-tr" title="Resize from top-right"></div>
             <div class="rpg-tracker-header" id="rpg-tracker-header">
                 <div class="rpg-tracker-header-left">
-                    <span>Multihog D&D Framework</span>
+                    <span class="rt-header-title-desktop">Multihog D&D Framework</span>
+                    <span class="rt-header-title-mobile" style="display: none;">Multihog D&D</span>
                     <div class="rpg-tracker-status-indicator active" id="rpg-tracker-status"></div>
                     <button class="rpg-tracker-stop-btn" id="rpg-tracker-stop-btn" title="Stop Generation" style="display:none;">■</button>
                     <button class="rpg-tracker-icon-btn" id="rpg-tracker-chat-link-btn" style="font-size:13px;" title="Chat Link ON">🔗</button>
                     <button class="rpg-tracker-icon-btn" id="rpg-tracker-agent-btn" title="Lorebook Agent">🤖</button>
+                    <button class="rpg-tracker-icon-btn" id="rpg-tracker-prompt-btn" title="Toggle direct prompt">💬</button>
+                    <button class="rpg-tracker-icon-btn" id="rpg-tracker-view-btn" title="Toggle rendered view">⊞</button>
                 </div>
                 <div class="rpg-tracker-header-center" id="rpg-tracker-pause-banner"></div>
                 <div class="rpg-tracker-header-right">
                     <button class="rpg-tracker-icon-btn" id="rpg-tracker-enable-btn" title="${settings.enabled ? 'Disable State Tracker' : 'Enable State Tracker'}" style="${settings.enabled ? '' : 'opacity:0.4;'}" >⏻</button>
                     <button class="rpg-tracker-icon-btn" id="rpg-tracker-update-btn" title="Update State Now">🔄</button>
                     <button class="rpg-tracker-icon-btn" id="rpg-tracker-pause-btn" title="Pause Tracker">⏸</button>
-                    <button class="rpg-tracker-icon-btn" id="rpg-tracker-prompt-btn" title="Toggle direct prompt">💬</button>
-                    <button class="rpg-tracker-icon-btn" id="rpg-tracker-view-btn" title="Toggle rendered view">⊞</button>
                     <button class="rpg-tracker-icon-btn" id="rpg-tracker-portraits-menu-btn" title="AI Portrait Actions">🖼️</button>
                     <button class="rpg-tracker-icon-btn" id="rpg-tracker-debug-btn" title="Context Debugger" style="display:none;">🛠️</button>
                     <button class="rpg-tracker-icon-btn rt-overflow-trigger" id="rt-overflow-btn" title="More actions">⋯</button>
@@ -4284,8 +4391,12 @@ function createPanel() {
                 <div class="flex-container gap-1 alignitemscenter rt-rng-footer-group" style="display:none;">
                     <!-- Removed inline RNG toggles, now located in extension settings -->
                 </div>
-                <div id="rt-footer-location" style="font-size: 0.769em; color: var(--rt-accent); flex: 1; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: 0.9; cursor: help;" title="Current Location (Main, Sub)"></div>
+                <div class="rt-footer-center-group" id="rt-footer-center-group" style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0;">
+                    <div id="rt-footer-time" style="display: none; font-size: 0.769em; color: var(--rt-accent); white-space: nowrap; flex-shrink: 0; opacity: 0.9; cursor: help;" title="Current in-world time"></div>
+                    <div id="rt-footer-location" style="font-size: 0.769em; color: var(--rt-accent); flex: 1; min-width: 0; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: 0.9; cursor: help;" title="Current Location (Main, Sub)"></div>
+                </div>
                 <div class="flex-container gap-1 alignitemscenter rt-utility-footer-group">
+                    <button class="rpg-tracker-nav-btn" id="rpg-tracker-chat-link-footer-btn" title="Chat Link ON" style="padding: 1px 8px; font-size: 0.85em;">🔗 Link</button>
                     <span id="rpg-tracker-count">~${Math.round(settings.currentMemo.length / 2.62)} tokens</span>
                     <button class="rpg-tracker-nav-btn" id="rpg-tracker-delta-btn" title="Toggle change log" style="padding: 1px 5px; font-size: 0.692em; opacity: 0.8; margin-left: 5px;">δ</button>
                     <button class="rpg-tracker-nav-btn" id="rpg-tracker-memo-clear" style="padding: 1px 5px; font-size: 0.692em; opacity: 0.8; margin-left: 5px;" title="Clear memo and history">CLEAR</button>
@@ -4472,6 +4583,14 @@ function createPanel() {
         });
     }
 
+    const chatLinkFooterBtn = panel.querySelector('#rpg-tracker-chat-link-footer-btn');
+    if (chatLinkFooterBtn && chatLinkBtn) {
+        chatLinkFooterBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            chatLinkBtn.click();
+        });
+    }
+
     // ── Router Agent UI ──
     const agentBtn = /** @type {HTMLElement} */ (panel.querySelector('#rpg-tracker-agent-btn'));
     const agentPanel = /** @type {HTMLElement} */ (panel.querySelector('#rpg-tracker-agent'));
@@ -4653,7 +4772,7 @@ function createPanel() {
                 // child, so overflow:hidden on the main panel would clip it otherwise.
                 if (s.trackerCollapsed) {
                     s.trackerCollapsed = false;
-                    saveSettings();
+                    localStorage.setItem('rpg_tracker_collapsed', 'false');
                     panel.classList.remove('rt-panel-collapsed');
                     const colIcon = panel.querySelector('#rpg-tracker-collapse-btn i');
                     if (colIcon) colIcon.className = 'fa-solid fa-chevron-up';
@@ -4790,7 +4909,7 @@ function createPanel() {
         const toggleAgentCollapse = () => {
             const s = getSettings();
             s.agentCollapsed = !s.agentCollapsed;
-            saveSettings();
+            localStorage.setItem('rpg_tracker_agent_collapsed', String(s.agentCollapsed));
 
             if (s.agentCollapsed) {
                 agentPanel.classList.add('rt-panel-collapsed');
@@ -4824,7 +4943,7 @@ function createPanel() {
         const toggleAgentSettings = () => {
             const s = getSettings();
             s.agentSettingsOpen = !s.agentSettingsOpen;
-            saveSettings();
+            localStorage.setItem('rpg_tracker_agent_settings_open', String(s.agentSettingsOpen));
 
             const drawer = agentPanel.querySelector('#rt-agent-settings-drawer');
             if (drawer) {
@@ -4849,7 +4968,7 @@ function createPanel() {
         const toggleAgentModules = () => {
             const s = getSettings();
             s.agentModulesOpen = !s.agentModulesOpen;
-            saveSettings();
+            localStorage.setItem('rpg_tracker_agent_modules_open', String(s.agentModulesOpen));
 
             const modulesDrawer = agentPanel.querySelector('#rt-agent-modules-drawer');
             if (modulesDrawer) {
@@ -4873,7 +4992,7 @@ function createPanel() {
         const toggleAgentConsole = () => {
             const s = getSettings();
             s.agentConsoleOpen = !s.agentConsoleOpen;
-            saveSettings();
+            localStorage.setItem('rpg_tracker_agent_console_open', String(s.agentConsoleOpen));
 
             const consoleSection = agentPanel.querySelector('#rt-agent-console-drawer');
             if (consoleSection) {
@@ -4897,7 +5016,7 @@ function createPanel() {
         const toggleAgentWorld = () => {
             const s = getSettings();
             s.agentWorldOpen = !s.agentWorldOpen;
-            saveSettings();
+            localStorage.setItem('rpg_tracker_agent_world_open', String(s.agentWorldOpen));
             const drawer = agentPanel.querySelector('#rt-agent-world-drawer');
             if (drawer) drawer.style.display = s.agentWorldOpen ? 'block' : 'none';
             const icon = agentPanel.querySelector('#rt-agent-world-toggle-icon');
@@ -8442,7 +8561,7 @@ Rules:
             }
             const s = getSettings();
             s.agentKeysCollapsed = !s.agentKeysCollapsed;
-            saveSettings();
+            localStorage.setItem('rpg_tracker_agent_keys_collapsed', String(s.agentKeysCollapsed));
 
             const keysContainer = agentPanel.querySelector('#rt-agent-router-active-keys');
             const chevron = agentPanel.querySelector('#rt-agent-keys-chevron');
@@ -8635,7 +8754,7 @@ Rules:
     _viewBtn.addEventListener('click', () => {
         _renderedViewActive = !_renderedViewActive;
         settings.renderedViewActive = _renderedViewActive;
-        saveSettings();
+        localStorage.setItem('rpg_tracker_rendered_view_active', String(_renderedViewActive));
         applyViewState();
     });
 
@@ -8702,7 +8821,7 @@ Rules:
     const toggleTrackerCollapse = () => {
         const s = getSettings();
         s.trackerCollapsed = !s.trackerCollapsed;
-        saveSettings();
+        localStorage.setItem('rpg_tracker_collapsed', String(s.trackerCollapsed));
 
         if (s.trackerCollapsed) {
             panel.classList.add('rt-panel-collapsed');
@@ -8847,11 +8966,8 @@ Rules:
     overflowMenu.style.display = 'none';
     overflowMenu.innerHTML = `
         <div class="rt-overflow-section-header">Actions</div>
-        <div class="rt-overflow-item" id="rt-ov-agent"><span class="rt-ov-icon">🤖</span><span>Lorebook Agent</span></div>
         <div class="rt-overflow-item" id="rt-ov-enable"><span class="rt-ov-icon">⏻</span><span id="rt-ov-enable-label">Enable / Disable</span></div>
         <div class="rt-overflow-item" id="rt-ov-pause"><span class="rt-ov-icon">⏸</span><span id="rt-ov-pause-label">Pause Tracker</span></div>
-        <div class="rt-overflow-item" id="rt-ov-prompt"><span class="rt-ov-icon">💬</span><span>Direct Prompt</span></div>
-        <div class="rt-overflow-item" id="rt-ov-view"><span class="rt-ov-icon">⊞</span><span>Toggle Rendered View</span></div>
         <div class="rt-overflow-item" id="rt-ov-portraits"><span class="rt-ov-icon">🖼️</span><span>Portrait Actions</span></div>
         <div class="rt-overflow-section-header">Update State</div>
         <div class="rt-overflow-item" id="rt-ov-upd-regular"><span class="rt-ov-icon">🔄</span><span>Regular Update</span><small>Since last user message</small></div>
@@ -8883,11 +8999,8 @@ Rules:
     });
 
     const _ovClose = () => { overflowMenu.style.display = 'none'; };
-    overflowMenu.querySelector('#rt-ov-agent').addEventListener('click', () => { _ovClose(); panel.querySelector('#rpg-tracker-agent-btn')?.click(); });
     overflowMenu.querySelector('#rt-ov-enable').addEventListener('click', () => { _ovClose(); panel.querySelector('#rpg-tracker-enable-btn')?.click(); });
     overflowMenu.querySelector('#rt-ov-pause').addEventListener('click', () => { _ovClose(); panel.querySelector('#rpg-tracker-pause-btn')?.click(); });
-    overflowMenu.querySelector('#rt-ov-prompt').addEventListener('click', () => { _ovClose(); panel.querySelector('#rpg-tracker-prompt-btn')?.click(); });
-    overflowMenu.querySelector('#rt-ov-view').addEventListener('click', () => { _ovClose(); panel.querySelector('#rpg-tracker-view-btn')?.click(); });
     overflowMenu.querySelector('#rt-ov-portraits').addEventListener('click', () => { _ovClose(); panel.querySelector('#rpg-tracker-portraits-menu-btn')?.click(); });
     overflowMenu.querySelector('#rt-ov-upd-regular').addEventListener('click', () => { _ovClose(); manualUpdate('regular'); });
     overflowMenu.querySelector('#rt-ov-upd-custom').addEventListener('click', () => { _ovClose(); manualUpdate('custom'); });
@@ -11876,6 +11989,20 @@ function buildSysprompt(rawText) {
         $('#rpg_tracker_lorebook_list_refresh').on('click', async function () {
             await refreshLorebookList();
         });
+
+        // Panel Layout Mode (Stacked vs Tab Mode)
+        const layoutModeSeg = document.getElementById('rpg_tracker_layout_mode_seg');
+        if (layoutModeSeg) {
+            syncSegToggle(layoutModeSeg, settings.panelLayoutMode || 'stack');
+            layoutModeSeg.querySelectorAll('button').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    settings.panelLayoutMode = btn.dataset.value;
+                    saveSettings();
+                    syncSegToggle(layoutModeSeg, settings.panelLayoutMode);
+                    refreshRenderedView();
+                });
+            });
+        }
 
         // Theme Select + Wizard
         const themeSelect = $('#rpg_tracker_theme_select');

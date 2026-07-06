@@ -8,6 +8,44 @@ import { BLOCK_ICONS, BLOCK_ORDER, PAGE_SIZE, NO_PAGINATE } from './constants.js
 const DEFAULT_HP_COLOR = '#00ffaa';
 const DEFAULT_XP_COLOR = 'linear-gradient(90deg, #0088ff, #00d4ff)';
 
+/**
+ * Extracts a time-of-day emoji + accent color from any free-form string containing
+ * an "HH:MM[ AM/PM]" clock pattern (e.g. a [TIME] block line, or a "Current Time" string).
+ * Shared by the TIME card renderer and the Tab Mode footer clock so both stay in sync.
+ * @param {string} str
+ * @returns {{hour: number, emoji: string, color: string}}  hour is -1 when no clock pattern is found
+ */
+export function getTimeOfDayInfo(str) {
+    const m = String(str || '').match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+    if (!m) return { hour: -1, emoji: '', color: 'inherit' };
+    let h = parseInt(m[1], 10);
+    if (m[3]) {
+        const mer = m[3].toUpperCase();
+        if (mer === 'AM' && h === 12) h = 0;
+        if (mer === 'PM' && h !== 12) h += 12;
+    }
+    if (!Number.isFinite(h) || h < 0 || h > 23) return { hour: -1, emoji: '', color: 'inherit' };
+
+    const emoji =
+        h < 5  ? '🌙' : // late night
+        h < 7  ? '🌅' : // dawn
+        h < 12 ? '☀️' : // morning
+        h < 14 ? '🌞' : // midday
+        h < 18 ? '🌤️' : // afternoon
+        h < 20 ? '🌇' : // sunset
+        '🌃';           // night
+    const color =
+        h < 5  ? '#9999ff' : // late night (cool blue)
+        h < 7  ? '#ffccaa' : // dawn (peach)
+        h < 12 ? '#ffffbb' : // morning (pale yellow)
+        h < 14 ? '#ffffff' : // midday (white)
+        h < 18 ? '#fff2cc' : // afternoon (warm cream)
+        h < 20 ? '#ffaa55' : // sunset (orange)
+        '#7777ee';           // night (indigo)
+
+    return { hour: h, emoji, color };
+}
+
     export const STOCK_FIELD_RULES = {
         'combat': 'numbers',
         'gear': 'highlight',
@@ -554,6 +592,18 @@ const DEFAULT_XP_COLOR = 'linear-gradient(90deg, #0088ff, #00d4ff)';
         localStorage.setItem(DETACHED_KEY, JSON.stringify([...set]));
     }
 
+    const ACTIVE_TAB_KEY = 'rpg_tracker_active_tab';
+
+    /** Returns the last-selected tab in Tab Mode, or '' if none set yet. */
+    export function loadActiveTab() {
+        try { return localStorage.getItem(ACTIVE_TAB_KEY) || ''; }
+        catch { return ''; }
+    }
+    export function saveActiveTab(tag) {
+        try { localStorage.setItem(ACTIVE_TAB_KEY, tag || ''); }
+        catch { /* ignore */ }
+    }
+
 
 
 // ── Portrait rendering helpers ──────────────────────────────────────────────
@@ -875,42 +925,6 @@ function formatValueToCurrency(totalCp, detectedCurrency) {
 
                 // parseTimeStr removed, using shared parseInWorldTime from memo-processor.js
 
-                // Extracts the 24-hour from a free-form "HH:MM[ AM/PM]" pattern in a line.
-                // Returns -1 if no clock pattern is found.
-                const hourOfLine = (s) => {
-                    const m = String(s || '').match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
-                    if (!m) return -1;
-                    let h = parseInt(m[1], 10);
-                    if (m[3]) {
-                        const mer = m[3].toUpperCase();
-                        if (mer === 'AM' && h === 12) h = 0;
-                        if (mer === 'PM' && h !== 12) h += 12;
-                    }
-                    if (!Number.isFinite(h) || h < 0 || h > 23) return -1;
-                    return h;
-                };
-                // Maps a 24-hour value to a time-of-day emoji.
-                const todEmoji = (h) => {
-                    if (h < 0) return '';
-                    if (h < 5)  return '🌙'; // late night
-                    if (h < 7)  return '🌅'; // dawn
-                    if (h < 12) return '☀️'; // morning
-                    if (h < 14) return '🌞'; // midday
-                    if (h < 18) return '🌤️'; // afternoon
-                    if (h < 20) return '🌇'; // sunset
-                    return '🌃';             // night
-                };
-                const todColor = (h) => {
-                    if (h < 0) return 'inherit';
-                    if (h < 5)  return '#9999ff'; // late night (cool blue)
-                    if (h < 7)  return '#ffccaa'; // dawn (peach)
-                    if (h < 12) return '#ffffbb'; // morning (pale yellow)
-                    if (h < 14) return '#ffffff'; // midday (white)
-                    if (h < 18) return '#fff2cc'; // afternoon (warm cream)
-                    if (h < 20) return '#ffaa55'; // sunset (orange)
-                    return '#7777ee';             // night (indigo)
-                };
-
                 for (let line of lines) {
                     if (line.toLowerCase().startsWith('last rest:')) continue;
                     if (!parsedCurrent) {
@@ -939,10 +953,8 @@ function formatValueToCurrency(totalCp, detectedCurrency) {
                     }
                     const asMarker = tryRenderMarker(line, tag);
                     if (asMarker !== null) return asMarker;
-                    const h = hourOfLine(line);
-                    const lineEmoji = todEmoji(h);
+                    const { emoji: lineEmoji, color } = getTimeOfDayInfo(line);
                     const linePrefix = lineEmoji ? `<span class="rt-tod-emoji" style="margin-right:4px;">${lineEmoji}</span>` : '';
-                    const color = todColor(h);
                     const content = (color !== 'inherit') 
                         ? `<span style="color: ${color};">${escapeHtmlWithColor(line)}</span>`
                         : escapeHtmlWithColor(line);
@@ -1431,102 +1443,285 @@ function formatValueToCurrency(totalCp, detectedCurrency) {
         const detached = loadDetached();
 
         // If filtering by a single tag (detached window context)
-        const tagsToRender = arguments[1] ? [arguments[1]] : sorted;
+        const tagsToRender = filterTag ? [filterTag] : sorted;
 
-        return tagsToRender.map(tag => {
-            if (tag === 'QUESTS') return ''; // Quest log has dedicated high-fidelity renderer, skip standard card
-            const content = blocks[tag];
-            if (content === undefined && arguments[1]) {
-                return `<div class="rt-empty">Waiting for ${tag} data...</div>`;
-            }
-            if (content === undefined) return '';
-
-            // If main panel context, filter out detached windows
-            if (!arguments[1] && detached.has(tag)) {
-                return `<div class="rt-detached-placeholder" data-tag="${tag}">
-                    <span class="rt-placeholder-icon">⧉</span> ${tag} is detached
-                    <button class="rt-reattach-btn-inline" data-tag="${tag}" title="Re-attach">↓</button>
-                </div>`;
-            }
-
-            const customField = (getSettings().customFields || []).find(f => f.tag.toUpperCase() === tag);
-            const icon = customField?.icon || BLOCK_ICONS[tag] || '📄';
-            const displayName = customField?.label || tag;
-            const items = blockToItems(tag, content);
-            const isCollapsed = collapsed.has(tag);
-
-            let totalValueBadge = '';
-            if (tag === 'INVENTORY' && items.totalValueGP && getSettings().showTotalInventoryValue !== false) {
-                const isModern = ['usd', 'eur', 'gbp'].includes(items.detectedCurrency);
-                const badgeColor = isModern ? '#85bb65' : '#ffd700';
-                const badgeBg = isModern ? 'rgba(133, 187, 101, 0.08)' : 'rgba(255, 215, 0, 0.08)';
-                const badgeBorder = isModern ? 'rgba(133, 187, 101, 0.3)' : 'rgba(255, 215, 0, 0.3)';
-                const badgeIcon = isModern ? '💵' : '💰';
-                totalValueBadge = `<span class="rt-total-value-badge" style="color: ${badgeColor}; font-weight: bold; background: ${badgeBg}; padding: 2px 8px; border-radius: 12px; border: 1px solid ${badgeBorder}; font-size: 0.85em; white-space: nowrap; text-transform: none; letter-spacing: 0;">${badgeIcon} ${items.totalValueGP}</span>`;
-            }
-
-            const renderType = customField?.renderType || tag;
-            const isFullView = getSettings().fullViewSections.includes(tag) || NO_PAGINATE.has(renderType);
-            const localPageSize = getPageSize(tag);
-
-            const page = isFullView ? 0 : (sectionPages[tag] ?? 0);
-            const totalPages = isFullView ? 1 : Math.ceil(items.length / localPageSize);
-            const safePage = Math.min(page, Math.max(0, totalPages - 1));
-            if (!isFullView) sectionPages[tag] = safePage;
-
-            const pageItems = isFullView ? items : items.slice(safePage * localPageSize, (safePage + 1) * localPageSize);
-            const bodyClass = `rt-section-body${renderType === 'ABILITIES' ? ' rt-abilities-body' : ''}`;
-
-            const pagination = totalPages > 1 ? `
-                <div class="rt-pagination">
-                    <button class="rt-page-btn" data-tag="${tag}" data-dir="-1"${safePage === 0 ? ' disabled' : ''}>&#8249;</button>
-                    <span>${safePage + 1}&thinsp;/&thinsp;${totalPages}</span>
-                    <button class="rt-page-btn" data-tag="${tag}" data-dir="1"${safePage >= totalPages - 1 ? ' disabled' : ''}>&#8250;</button>
-                </div>` : '';
-
-            // Don't show detach button if already in detached context (filterTag provided)
-            const detachBtn = !arguments[1] ? `
-                <button class="rt-detach-btn" data-tag="${tag}" title="Detach panel">
-                    ⧉
-                </button>
-            ` : '';
-
-            const fullViewBtn = NO_PAGINATE.has(renderType) ? '' : `
-                <button class="rt-fullview-btn${isFullView ? ' active' : ''}" data-tag="${tag}" title="${isFullView ? 'Switch to Paged View' : 'Switch to Full List'}">
-                    ${isFullView ? '📜' : '📑'}
-                </button>
-            `;
-
-            const renderOptions = getSettings().categoryRenderOptions?.[tag] || {};
-            const catStyles = [];
-            if (renderOptions.fontSize) catStyles.push(`--rt-cat-font-size: ${(renderOptions.fontSize / 13).toFixed(4)}em`);
-            if (renderOptions.italic) catStyles.push(`--rt-cat-font-style: italic`);
-            if (renderOptions.bold) catStyles.push(`--rt-cat-font-weight: bold`);
-            if (renderOptions.bullets === false) catStyles.push(`--rt-cat-bullet-display: none`);
-            if (renderOptions.bulletColor) catStyles.push(`--rt-cat-bullet-color: ${renderOptions.bulletColor}`);
-            if (renderOptions.bulletStyle) catStyles.push(`--rt-cat-bullet-style: "${renderOptions.bulletStyle}"`);
-            if (renderOptions.fontFamily) catStyles.push(`--rt-cat-font-family: ${renderOptions.fontFamily}`);
-            if (renderOptions.textColor && renderOptions.textColor !== 'inherit') catStyles.push(`--rt-cat-text-color: ${renderOptions.textColor}`);
-            const catStyleAttr = catStyles.length ? ` style='${catStyles.join('; ')}'` : '';
-
-            return `<div class="rt-section-card${isCollapsed ? ' rt-collapsed' : ''}" data-tag="${tag}">
-                <div class="rt-section-header" data-tag="${tag}">
-                    <span>${icon} ${displayName}</span>
-                    <div class="rt-section-header-right">
-                        ${totalValueBadge}
-                        ${detachBtn}
-                        ${fullViewBtn}
-                        <button class="rt-category-settings-btn" data-tag="${tag}" title="Category Rendering Options">
-                            <i class="fa-solid fa-cog"></i>
-                        </button>
-                        <span class="rt-item-count">${items.length} ${items.length === 1 ? 'entry' : 'entries'}</span>
-                        <span class="rt-collapse-icon">${isCollapsed ? '&#9656;' : '&#9662;'}</span>
-                    </div>
-                </div>
-                <div class="${bodyClass}"${catStyleAttr}>${pageItems.join('')}${pagination}</div>
-            </div>`;
-        }).join('');
+        return tagsToRender.map(tag => renderSectionCard(tag, blocks, collapsed, detached, sectionPages, filterTag)).join('');
     }
+
+    /**
+     * Renders a single tag's section card (header + body). Extracted from renderMemoAsCards
+     * so it can be reused both by the classic stacked view and by the compact Tab Mode view
+     * (which pins CHARACTER/COMBAT in full and renders exactly one tab's card at a time).
+     * @param {string} tag
+     * @param {object} blocks  parsed memo blocks (tag -> raw content)
+     * @param {Set<string>} collapsed
+     * @param {Set<string>} detached
+     * @param {object} sectionPages  mutable pagination state, keyed by tag
+     * @param {string|null} filterTag  when set, hides the detach button and skips the detached-placeholder check
+     * @returns {string}
+     */
+    function renderSectionCard(tag, blocks, collapsed, detached, sectionPages, filterTag) {
+        if (tag === 'QUESTS') return ''; // Quest log has dedicated high-fidelity renderer, skip standard card
+        const content = blocks[tag];
+        if (content === undefined && filterTag) {
+            return `<div class="rt-empty">Waiting for ${tag} data...</div>`;
+        }
+        if (content === undefined) return '';
+
+        // If main panel context, filter out detached windows
+        if (!filterTag && detached.has(tag)) {
+            return `<div class="rt-detached-placeholder" data-tag="${tag}">
+                <span class="rt-placeholder-icon">⧉</span> ${tag} is detached
+                <button class="rt-reattach-btn-inline" data-tag="${tag}" title="Re-attach">↓</button>
+            </div>`;
+        }
+
+        const customField = (getSettings().customFields || []).find(f => f.tag.toUpperCase() === tag);
+        const icon = customField?.icon || BLOCK_ICONS[tag] || '📄';
+        const displayName = customField?.label || tag;
+        const items = blockToItems(tag, content);
+        const isCollapsed = collapsed.has(tag);
+
+        let totalValueBadge = '';
+        if (tag === 'INVENTORY' && items.totalValueGP && getSettings().showTotalInventoryValue !== false) {
+            const isModern = ['usd', 'eur', 'gbp'].includes(items.detectedCurrency);
+            const badgeColor = isModern ? '#85bb65' : '#ffd700';
+            const badgeBg = isModern ? 'rgba(133, 187, 101, 0.08)' : 'rgba(255, 215, 0, 0.08)';
+            const badgeBorder = isModern ? 'rgba(133, 187, 101, 0.3)' : 'rgba(255, 215, 0, 0.3)';
+            const badgeIcon = isModern ? '💵' : '💰';
+            totalValueBadge = `<span class="rt-total-value-badge" style="color: ${badgeColor}; font-weight: bold; background: ${badgeBg}; padding: 2px 8px; border-radius: 12px; border: 1px solid ${badgeBorder}; font-size: 0.85em; white-space: nowrap; text-transform: none; letter-spacing: 0;">${badgeIcon} ${items.totalValueGP}</span>`;
+        }
+
+        const renderType = customField?.renderType || tag;
+        const isFullView = getSettings().fullViewSections.includes(tag) || NO_PAGINATE.has(renderType);
+        const localPageSize = getPageSize(tag);
+
+        const page = isFullView ? 0 : (sectionPages[tag] ?? 0);
+        const totalPages = isFullView ? 1 : Math.ceil(items.length / localPageSize);
+        const safePage = Math.min(page, Math.max(0, totalPages - 1));
+        if (!isFullView) sectionPages[tag] = safePage;
+
+        const pageItems = isFullView ? items : items.slice(safePage * localPageSize, (safePage + 1) * localPageSize);
+        const bodyClass = `rt-section-body${renderType === 'ABILITIES' ? ' rt-abilities-body' : ''}`;
+
+        const pagination = totalPages > 1 ? `
+            <div class="rt-pagination">
+                <button class="rt-page-btn" data-tag="${tag}" data-dir="-1"${safePage === 0 ? ' disabled' : ''}>&#8249;</button>
+                <span>${safePage + 1}&thinsp;/&thinsp;${totalPages}</span>
+                <button class="rt-page-btn" data-tag="${tag}" data-dir="1"${safePage >= totalPages - 1 ? ' disabled' : ''}>&#8250;</button>
+            </div>` : '';
+
+        // Don't show detach button if already in detached context (filterTag provided)
+        const detachBtn = !filterTag ? `
+            <button class="rt-detach-btn" data-tag="${tag}" title="Detach panel">
+                ⧉
+            </button>
+        ` : '';
+
+        const fullViewBtn = NO_PAGINATE.has(renderType) ? '' : `
+            <button class="rt-fullview-btn${isFullView ? ' active' : ''}" data-tag="${tag}" title="${isFullView ? 'Switch to Paged View' : 'Switch to Full List'}">
+                ${isFullView ? '📜' : '📑'}
+            </button>
+        `;
+
+        const renderOptions = getSettings().categoryRenderOptions?.[tag] || {};
+        const catStyles = [];
+        if (renderOptions.fontSize) catStyles.push(`--rt-cat-font-size: ${(renderOptions.fontSize / 13).toFixed(4)}em`);
+        if (renderOptions.italic) catStyles.push(`--rt-cat-font-style: italic`);
+        if (renderOptions.bold) catStyles.push(`--rt-cat-font-weight: bold`);
+        if (renderOptions.bullets === false) catStyles.push(`--rt-cat-bullet-display: none`);
+        if (renderOptions.bulletColor) catStyles.push(`--rt-cat-bullet-color: ${renderOptions.bulletColor}`);
+        if (renderOptions.bulletStyle) catStyles.push(`--rt-cat-bullet-style: "${renderOptions.bulletStyle}"`);
+        if (renderOptions.fontFamily) catStyles.push(`--rt-cat-font-family: ${renderOptions.fontFamily}`);
+        if (renderOptions.textColor && renderOptions.textColor !== 'inherit') catStyles.push(`--rt-cat-text-color: ${renderOptions.textColor}`);
+        const catStyleAttr = catStyles.length ? ` style='${catStyles.join('; ')}'` : '';
+
+        return `<div class="rt-section-card${isCollapsed ? ' rt-collapsed' : ''}" data-tag="${tag}">
+            <div class="rt-section-header" data-tag="${tag}">
+                <span>${icon} ${displayName}</span>
+                <div class="rt-section-header-right">
+                    ${totalValueBadge}
+                    ${detachBtn}
+                    ${fullViewBtn}
+                    <button class="rt-category-settings-btn" data-tag="${tag}" title="Category Rendering Options">
+                        <i class="fa-solid fa-cog"></i>
+                    </button>
+                    <span class="rt-item-count">${items.length} ${items.length === 1 ? 'entry' : 'entries'}</span>
+                    <span class="rt-collapse-icon">${isCollapsed ? '&#9656;' : '&#9662;'}</span>
+                </div>
+            </div>
+            <div class="${bodyClass}"${catStyleAttr}>${pageItems.join('')}${pagination}</div>
+        </div>`;
+    }
+
+// ── Tab Mode (compact layout for small screens) ─────────────────────────────
+//
+// CHARACTER and COMBAT (while active) are pinned above the tab strip in full,
+// unmodified detail — reusing renderSectionCard directly. Every other block
+// (Inventory, Abilities, Spells, XP, Time, Quests, Party, custom modules)
+// becomes a tab; only the active tab's card is rendered into the content pane.
+// A compact "party vitals" strip (portrait + HP) sits between the pinned area
+// and the tab strip so party HP stays glanceable without opening the Party tab.
+
+const TABMODE_PINNED_TAGS = ['CHARACTER', 'COMBAT'];
+const TABMODE_PIN_LIMIT = 6; // tabs shown as direct icons before collapsing into "More ▾"
+
+/**
+ * Lightweight line scan for "Name: cur/max HP ..." entries in a PARTY block,
+ * used only to feed the compact vitals strip. Deliberately simpler than the
+ * full blockToItems() entity parser — it only needs name + HP, not the whole
+ * rendered card.
+ * @param {string} content  raw PARTY block content
+ * @returns {{name: string, cur: number, max: number, pct: number}[]}
+ */
+function extractPartyVitals(content) {
+    if (!content) return [];
+    const lines = content.split('\n').map(l => l.trim()).filter(Boolean);
+    const results = [];
+    for (const rawLine of lines) {
+        const line = rawLine.replace(/^\s*[-*+•–—](?:\s+|(?=[A-Za-z]))/, '');
+        const hpMatch = line.match(/^(.+?):\s*([\d,]+)(?:\/([\d,]+))?\s*HP\s*[:|,]?\s*/i);
+        if (!hpMatch) continue;
+        const [, nameRaw, curRaw, maxRaw] = hpMatch;
+        const name = nameRaw.trim();
+        if (!name) continue;
+        const cur = Number(curRaw.replace(/,/g, ''));
+        const max = maxRaw ? Number(maxRaw.replace(/,/g, '')) : cur;
+        const pct = max > 0 ? Math.max(0, Math.min(100, (cur / max) * 100)) : 100;
+        results.push({ name, cur, max, pct });
+    }
+    return results;
+}
+
+/**
+ * Renders the compact party-vitals strip (portrait + slim HP ring per member).
+ * Returns '' when there's no PARTY block or no parseable HP entries.
+ * @param {object} blocks  parsed memo blocks
+ * @returns {string}
+ */
+function renderPartyVitalsStrip(blocks) {
+    const content = blocks['PARTY'];
+    if (!content) return '';
+    const members = extractPartyVitals(content);
+    if (!members.length) return '';
+
+    const items = members.map(m => {
+        const barId = `PARTY:${m.name}:HP`;
+        const ringColor = getBarBackground(barId, DEFAULT_HP_COLOR, m.pct);
+        return `<button class="rt-vitals-member" data-jump-tag="PARTY" title="${escapeHtml(m.name)}: ${m.cur}/${m.max} HP">
+            <span class="rt-vitals-portrait-wrap" style="--rt-vitals-ring: ${ringColor}; --rt-vitals-pct: ${m.pct}%;">
+                ${renderPortraitHtml(m.name)}
+            </span>
+            <span class="rt-vitals-name">${escapeHtml(m.name.split(' ')[0])}</span>
+        </button>`;
+    }).join('');
+
+    return `<div class="rt-vitals-strip" id="rt-party-vitals-strip">${items}</div>`;
+}
+
+/**
+ * Renders the full Tab Mode view: pinned CHARACTER/COMBAT cards, the party
+ * vitals strip, the tab strip (pinned icons + overflow "More ▾" menu), and a
+ * single content pane for the active tab.
+ * @param {string} memo
+ * @param {object} sectionPages  mutable pagination state, keyed by tag
+ * @param {{quests: object[], currentTime: string}|null} questsCtx  quest data, or null if the Quests module is off
+ * @returns {string}
+ */
+export function renderTabModeView(memo, sectionPages, questsCtx = null) {
+    if (!memo || !memo.trim()) return renderMemoAsCards(memo, null, sectionPages);
+
+    const blocks = parseMemoBlocks(memo);
+    if (Object.keys(blocks).length === 0) {
+        return `<div class="rt-empty">No structured blocks found.<br><small>Switch to Raw view to inspect the memo.</small></div>`;
+    }
+
+    const s = getSettings();
+    const order = s.blockOrder || BLOCK_ORDER;
+    const sorted = [
+        ...order.filter(k => blocks[k] !== undefined),
+        ...Object.keys(blocks).filter(k => !order.includes(k)).sort()
+    ];
+
+    const collapsed = loadCollapsed();
+    const detached = loadDetached();
+
+    const pinnedTags = sorted.filter(t => TABMODE_PINNED_TAGS.includes(t));
+    const pinnedHtml = pinnedTags.map(tag => renderSectionCard(tag, blocks, collapsed, detached, sectionPages, null)).join('');
+    const vitalsHtml = renderPartyVitalsStrip(blocks);
+
+    const tabTags = sorted.filter(t => !TABMODE_PINNED_TAGS.includes(t));
+    if (questsCtx && questsCtx.quests) tabTags.push('QUESTS');
+
+    if (tabTags.length === 0) {
+        return `<div class="rt-tabmode-wrap">
+            <div class="rt-tabmode-pinned">${pinnedHtml}</div>
+            ${vitalsHtml}
+            <div class="rt-empty">No additional modules to display.</div>
+        </div>`;
+    }
+
+    let activeTag = loadActiveTab();
+    if (!tabTags.includes(activeTag)) activeTag = tabTags[0];
+
+    const tabMeta = (tag) => {
+        if (tag === 'QUESTS') return { icon: BLOCK_ICONS.QUESTS || '📋', label: 'Quests' };
+        const customField = (s.customFields || []).find(f => f.tag.toUpperCase() === tag);
+        return { icon: customField?.icon || BLOCK_ICONS[tag] || '📄', label: customField?.label || tag };
+    };
+
+    const tabBadge = (tag) => {
+        if (tag === 'QUESTS') {
+            const count = questsCtx?.quests?.length || 0;
+            return count > 0 ? `<span class="rt-tab-badge">${count}</span>` : '';
+        }
+        if (blocks[tag] === undefined) return '';
+        const items = blockToItems(tag, blocks[tag]);
+        const count = Array.isArray(items) ? items.length : 0;
+        return count > 0 ? `<span class="rt-tab-badge">${count}</span>` : '';
+    };
+
+    const pinnedTabTags = tabTags.slice(0, TABMODE_PIN_LIMIT);
+    const overflowTabTags = tabTags.slice(TABMODE_PIN_LIMIT);
+
+    const tabBtnHtml = (tag) => {
+        const { icon, label } = tabMeta(tag);
+        const isActive = tag === activeTag;
+        return `<button class="rt-tab-btn${isActive ? ' active' : ''}" data-tag="${tag}" title="${escapeHtml(label)}">
+            <span class="rt-tab-icon">${icon}</span>${tabBadge(tag)}
+        </button>`;
+    };
+
+    let overflowHtml = '';
+    if (overflowTabTags.length > 0) {
+        const overflowActive = overflowTabTags.includes(activeTag);
+        const overflowItems = overflowTabTags.map(tag => {
+            const { icon, label } = tabMeta(tag);
+            return `<button class="rt-tab-more-item${tag === activeTag ? ' active' : ''}" data-tag="${tag}">
+                <span class="rt-tab-icon">${icon}</span> ${escapeHtml(label)}${tabBadge(tag)}
+            </button>`;
+        }).join('');
+        overflowHtml = `<div class="rt-tab-more-wrap">
+            <button class="rt-tab-btn rt-tab-more-btn${overflowActive ? ' active' : ''}" id="rt-tab-more-toggle" title="More modules">
+                <span class="rt-tab-icon">⋯</span>
+            </button>
+            <div class="rt-tab-more-menu" id="rt-tab-more-menu">${overflowItems}</div>
+        </div>`;
+    }
+
+    const tabStripHtml = `<div class="rt-tab-strip">${pinnedTabTags.map(tabBtnHtml).join('')}${overflowHtml}</div>`;
+
+    const contentHtml = activeTag === 'QUESTS'
+        ? renderQuestLog(questsCtx?.quests || [], questsCtx?.currentTime || '', collapsed, detached, 'QUESTS')
+        : renderSectionCard(activeTag, blocks, collapsed, detached, sectionPages, activeTag);
+
+    return `<div class="rt-tabmode-wrap" data-tab-order="${tabTags.join(',')}">
+        <div class="rt-tabmode-pinned">${pinnedHtml}</div>
+        ${vitalsHtml}
+        ${tabStripHtml}
+        <div class="rt-tabmode-content" data-active-tag="${activeTag}">${contentHtml}</div>
+    </div>`;
+}
 
 // ── Quest Log Renderer ─────────────────────────────────────────────────────
 

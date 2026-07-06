@@ -381,6 +381,14 @@
     gap: 8px;
 }
 
+.rpg-tracker-header-left .rt-header-title-desktop {
+    display: inline-block;
+}
+
+.rpg-tracker-header-left .rt-header-title-mobile {
+    display: none;
+}
+
 .rpg-tracker-header-right {
     display: flex;
     align-items: center;
@@ -704,6 +712,244 @@
 .rt-page-btn:disabled {
     opacity: 0.25;
     cursor: default;
+}
+
+/* ── Tab Mode (compact layout) ────────────────────────────────────────────── */
+
+.rt-tabmode-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    /* Guarantee at least one viewport's worth of height, and always leave a generous
+       block of blank, scrollable room below the content on top of that (see
+       padding-bottom below). Tab switches never programmatically move the scroll
+       position (see bindRenderedCardEvents in index.js) — instead, wherever the user
+       has parked the viewport should simply remain a valid scroll position no matter
+       which tab is short or tall, so the browser never needs to clamp scrollTop and
+       nothing visibly bounces when switching tabs. */
+    flex: 1 0 auto;
+    min-height: 100%;
+    padding-bottom: 280px;
+    box-sizing: border-box;
+}
+
+.rt-tabmode-pinned {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* Party vitals strip: glanceable portrait + HP per party member without opening the Party tab */
+.rt-vitals-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 6px 4px;
+}
+
+.rt-vitals-member {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    width: 46px;
+    flex-shrink: 0;
+}
+
+.rt-vitals-portrait-wrap {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    padding: 2px;
+    box-sizing: border-box;
+    background: conic-gradient(var(--rt-vitals-ring, #00ffaa) var(--rt-vitals-pct, 100%), rgba(255,255,255,0.12) 0);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.15s;
+}
+
+.rt-vitals-member:hover .rt-vitals-portrait-wrap {
+    transform: scale(1.08);
+}
+
+.rt-vitals-portrait-wrap .rt-entity-portrait,
+.rt-vitals-portrait-wrap .rt-entity-portrait-placeholder {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: var(--rt-bg);
+}
+
+.rt-vitals-portrait-wrap .rt-entity-portrait-placeholder {
+    font-size: 15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.rt-vitals-name {
+    font-size: 0.68em;
+    color: var(--rt-text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 46px;
+}
+
+/* Tab strip: sticks to the top of the scroll area so it stays reachable even
+   when the pinned Character/Combat cards above it grow tall */
+.rt-tab-strip {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 2px;
+    position: sticky;
+    top: -8px;
+    margin: 0 -8px;
+    padding-left: 8px;
+    padding-right: 8px;
+    background: var(--rt-bg);
+    backdrop-filter: var(--rt-blur);
+    z-index: 5;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.rt-tab-btn {
+    position: relative;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 6px;
+    color: var(--rt-text-muted);
+    cursor: pointer;
+    padding: 6px 10px;
+    font-size: 1.05em;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.rt-tab-btn:hover {
+    color: var(--rt-text);
+    border-color: rgba(255,255,255,0.25);
+}
+
+.rt-tab-btn.active {
+    background: rgba(0,255,170,0.12);
+    border-color: var(--rt-accent, #00ffaa);
+    color: var(--rt-text);
+}
+
+.rt-tab-badge {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background: var(--rt-accent, #00ffaa);
+    color: #06251c;
+    font-size: 0.42em;
+    font-weight: 700;
+    line-height: 1;
+    padding: 2px 4px;
+    border-radius: 8px;
+    min-width: 8px;
+    text-align: center;
+}
+
+.rt-tab-more-wrap {
+    position: relative;
+}
+
+.rt-tab-more-menu {
+    display: none;
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    flex-direction: column;
+    gap: 2px;
+    background: var(--rt-bg);
+    backdrop-filter: var(--rt-blur);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 6px;
+    padding: 4px;
+    min-width: 150px;
+    z-index: 10;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+}
+
+.rt-tab-more-menu.open {
+    display: flex;
+}
+
+.rt-tab-more-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: none;
+    border: none;
+    border-radius: 4px;
+    color: var(--rt-text-muted);
+    cursor: pointer;
+    padding: 6px 8px;
+    font-size: 0.88em;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.rt-tab-more-item .rt-tab-badge {
+    position: static;
+    margin-left: auto;
+    padding: 1px 6px;
+    font-size: 0.85em;
+}
+
+.rt-tab-more-item:hover {
+    background: rgba(255,255,255,0.07);
+    color: var(--rt-text);
+}
+
+.rt-tab-more-item.active {
+    color: var(--rt-accent, #00ffaa);
+}
+
+.rt-tabmode-content {
+    display: flex;
+    flex-direction: column;
+    /* Absorb the leftover space (see .rt-tabmode-wrap above) so short tab content
+       doesn't shrink the scrollable area — it just leaves blank room below it. */
+    flex: 1 0 auto;
+}
+
+/* Touch devices: bigger tap targets, and let the vitals strip scroll horizontally
+   in a single row instead of wrapping (vertical space is scarcer on phones, and
+   swipe-scroll is a natural touch gesture; desktop instead wraps to a new row). */
+@media (hover: none) and (pointer: coarse) {
+    .rt-vitals-strip {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scroll-snap-type: x proximity;
+    }
+
+    .rt-vitals-member {
+        scroll-snap-align: start;
+    }
+
+    .rt-tab-btn {
+        padding: 9px 13px;
+        font-size: 1.15em;
+    }
+
+    .rt-tab-more-item {
+        padding: 10px 10px;
+        font-size: 0.95em;
+    }
 }
 
 /* Onboarding empty state */
@@ -1805,16 +2051,36 @@
         flex-shrink: 0 !important;
     }
 
-    /* On mobile, collapse all action buttons into the ⋯ overflow menu */
-    #rpg-tracker-agent-btn,
+    /* On mobile, collapse action buttons into the ⋯ overflow menu.
+       Lorebook Agent, Direct Prompt, and Raw View stay in the header. */
+    #rpg-tracker-chat-link-btn,
     #rpg-tracker-enable-btn,
     #rt-agent-router-enable-btn,
     #rpg-tracker-update-btn,
     #rpg-tracker-pause-btn,
-    #rpg-tracker-prompt-btn,
-    #rpg-tracker-view-btn,
     #rpg-tracker-portraits-menu-btn {
         display: none !important;
+    }
+
+    /* Dedicated header buttons on mobile */
+    #rpg-tracker-agent-btn,
+    #rpg-tracker-prompt-btn,
+    #rpg-tracker-view-btn {
+        display: flex !important;
+        flex-shrink: 0 !important;
+    }
+
+    /* Toggle responsive title spans for mobile view */
+    .rpg-tracker-header-left .rt-header-title-desktop {
+        display: none !important;
+    }
+    .rpg-tracker-header-left .rt-header-title-mobile {
+        display: inline-block !important;
+    }
+
+    /* Chat Link: moved to the footer utility row / drawer (hidden in header above) */
+    #rpg-tracker-chat-link-footer-btn {
+        display: inline-block !important;
     }
 
     /* Show the overflow trigger button */
@@ -1829,6 +2095,13 @@
     .rpg-tracker-icon-btn {
         padding: 4px 6px !important;
         font-size: 1.05em !important;
+    }
+
+    /* Make collapse button much larger and add separation from close button */
+    #rpg-tracker-collapse-btn {
+        font-size: 1.4em !important;
+        padding: 4px 10px !important;
+        margin-right: 10px !important;
     }
 }
 
@@ -2041,6 +2314,11 @@
     display: none; /* Hide on desktop */
 }
 
+/* Chat Link footer button: desktop uses header button; mobile uses footer */
+#rpg-tracker-chat-link-footer-btn {
+    display: none;
+}
+
 @media (max-width: 600px) {
     /* Make the panel fill the screen between the ST toolbar and the input bar */
     .rpg-tracker-panel {
@@ -2103,17 +2381,26 @@
         margin-left: auto !important;
     }
 
-    /* Top row: nav only — toggle button is removed */
+    /* Top row: drawer toggle + snapshot nav */
     .rt-mobile-top-row {
         width: 100%;
         display: flex;
         align-items: center;
-        justify-content: center;
+        justify-content: space-between;
+        gap: 8px;
     }
 
-    /* Hide the green arrow footer-drawer toggle on mobile — no longer needed */
     .rt-footer-toggle-btn {
-        display: none !important;
+        display: flex !important;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        background: none;
+        border: none;
+        color: var(--rt-text-muted);
+        cursor: pointer;
+        padding: 4px 8px;
+        font-size: 0.9em;
     }
 
     /* Balance centering spacer no longer needed without toggle */

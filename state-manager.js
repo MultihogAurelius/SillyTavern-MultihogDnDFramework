@@ -441,6 +441,7 @@ export function getSettings() {
         connectionProfileId: "",
         completionPresetId: "",
         renderedViewActive: true,
+        panelLayoutMode: 'stack',   // 'stack' = classic vertical stack | 'tabs' = compact tab mode (Character/Combat pinned, rest behind tabs)
         maxTokens: 0,
         fontSize: 14,
         agentFontSize: 13,
@@ -841,8 +842,51 @@ Example: [[FAC: Iron Syndicate | ...]]  NOT  [[FAC: Khelt :: Iron Syndicate | ..
         }
     }
     
-    // ── MIGRATION: routerModules (v1.8.35+) ───────────────────────────────────
     const s = extensionSettings[MODULE_NAME];
+
+    // Load UI collapse and open/close states from localStorage to prevent expensive saveSettings/disk I/O calls
+    if (localStorage.getItem('rpg_tracker_collapsed') !== null) {
+        s.trackerCollapsed = localStorage.getItem('rpg_tracker_collapsed') === 'true';
+    } else {
+        localStorage.setItem('rpg_tracker_collapsed', String(s.trackerCollapsed));
+    }
+    if (localStorage.getItem('rpg_tracker_agent_collapsed') !== null) {
+        s.agentCollapsed = localStorage.getItem('rpg_tracker_agent_collapsed') === 'true';
+    } else {
+        localStorage.setItem('rpg_tracker_agent_collapsed', String(s.agentCollapsed));
+    }
+    if (localStorage.getItem('rpg_tracker_agent_keys_collapsed') !== null) {
+        s.agentKeysCollapsed = localStorage.getItem('rpg_tracker_agent_keys_collapsed') === 'true';
+    } else {
+        localStorage.setItem('rpg_tracker_agent_keys_collapsed', String(s.agentKeysCollapsed));
+    }
+    if (localStorage.getItem('rpg_tracker_rendered_view_active') !== null) {
+        s.renderedViewActive = localStorage.getItem('rpg_tracker_rendered_view_active') === 'true';
+    } else {
+        localStorage.setItem('rpg_tracker_rendered_view_active', String(s.renderedViewActive));
+    }
+    if (localStorage.getItem('rpg_tracker_agent_settings_open') !== null) {
+        s.agentSettingsOpen = localStorage.getItem('rpg_tracker_agent_settings_open') === 'true';
+    } else {
+        localStorage.setItem('rpg_tracker_agent_settings_open', String(s.agentSettingsOpen));
+    }
+    if (localStorage.getItem('rpg_tracker_agent_modules_open') !== null) {
+        s.agentModulesOpen = localStorage.getItem('rpg_tracker_agent_modules_open') === 'true';
+    } else {
+        localStorage.setItem('rpg_tracker_agent_modules_open', String(s.agentModulesOpen));
+    }
+    if (localStorage.getItem('rpg_tracker_agent_console_open') !== null) {
+        s.agentConsoleOpen = localStorage.getItem('rpg_tracker_agent_console_open') === 'true';
+    } else {
+        localStorage.setItem('rpg_tracker_agent_console_open', String(s.agentConsoleOpen));
+    }
+    if (localStorage.getItem('rpg_tracker_agent_world_open') !== null) {
+        s.agentWorldOpen = localStorage.getItem('rpg_tracker_agent_world_open') === 'true';
+    } else {
+        localStorage.setItem('rpg_tracker_agent_world_open', String(s.agentWorldOpen));
+    }
+    
+    // ── MIGRATION: routerModules (v1.8.35+) ───────────────────────────────────
 
     if (s.routerModules && typeof s.routerModules.npc === 'boolean') {
         const old = s.routerModules;

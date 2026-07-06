@@ -2,6 +2,15 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [4.4.3] - 2026-07-06
+
+### Added
+- **Optimized UI Toggles**: Moved all layout collapse/expand and view state flags (including panels, drawers, console, modular repertoire, world progression, active keys drawer, and Raw View toggle) to browser `localStorage` to completely bypass global settings serialization, resolving the 1-second lag post-click.
+- **Mobile UI Enhancements**:
+  - Added responsive headers that automatically abbreviate the text to "Multihog D&D" on mobile screens.
+  - Repositioned the **Direct Prompt** (💬) and **Raw View** (⊞) action buttons to the top header bar next to **Lorebook Agent** (🤖) for quick access.
+  - Enlarged the collapse chevron and added a safety spacing gap on mobile to prevent accidental triggers of the close button.
+
 ## [4.4.2] - 2026-07-06
 
 ### Changed
