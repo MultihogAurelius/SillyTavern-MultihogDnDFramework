@@ -2830,12 +2830,36 @@ async function generatePersonaBio(charName, wordCount) {
     const s = getSettings();
     const rawMemo = s.currentMemo || '';
     const cleanMemo = rawMemo.replace(/<\/?memo>/gi, '').replace(/<[^>]+>/g, ' ').trim();
+    
+    // Grab user preferences from the DOM to inject into the prompt
+    const nameVal        = document.querySelector('#rt-cr-name')?.value.trim()        || '';
+    const genderVal      = document.querySelector('#rt-cr-gender')?.value.trim()      || '';
+    const orientationVal = document.querySelector('#rt-cr-orientation')?.value.trim() || '';
+    const speciesVal     = document.querySelector('#rt-cr-species')?.value.trim()     || '';
+    const ethnicityVal   = document.querySelector('#rt-cr-ethnicity')?.value.trim()   || '';
+    const traitsVal      = document.querySelector('#rt-cr-traits')?.value.trim()       || '';
+    const backgroundVal  = document.querySelector('#rt-cr-background')?.value.trim()  || '';
+    const appearanceVal  = document.querySelector('#rt-cr-appearance')?.value.trim()  || '';
+
+    let extraHints = '';
+    if (nameVal || genderVal || orientationVal || speciesVal || ethnicityVal || traitsVal || backgroundVal || appearanceVal) {
+        extraHints = `\n\n--- PLAYER PREFERENCES & HINTS ---\n` +
+                     (nameVal ? `Name: ${nameVal}\n` : '') +
+                     (genderVal ? `Gender: ${genderVal}\n` : '') +
+                     (orientationVal ? `Orientation: ${orientationVal}\n` : '') +
+                     (speciesVal ? `Species: ${speciesVal}\n` : '') +
+                     (ethnicityVal ? `Ethnicity: ${ethnicityVal}\n` : '') +
+                     (traitsVal ? `Traits: ${traitsVal}\n` : '') +
+                     (appearanceVal ? `Appearance Hints: ${appearanceVal}\n` : '') +
+                     (backgroundVal ? `Background Hints: ${backgroundVal}\n` : '');
+    }
+
     const systemPrompt = `You are a persona writer for a roleplay system. Based on the character state card provided, write a persona description for ${charName || 'this character'} in third person.
 
 You MUST use this exact section format — each section on its own line with the label followed by a colon:
 
 Appearance/Species:
-[Describe physical features and species: body type, height, hair, eyes, skin tone, distinguishing marks, scars, and natural body language. You MUST explicitly state their Species, Ethnicity, and Gender based on the character card. You MUST explicitly incorporate any appearance notes provided in the card. Do NOT describe clothing, armor, or worn gear — those are handled dynamically elsewhere and will change.]
+[Describe physical features and species: body type, height, hair, eyes, skin tone, distinguishing marks, scars, and natural body language. You MUST explicitly state their Species, Ethnicity, and Gender based on the character card and Player Preferences. You MUST explicitly incorporate any appearance notes provided in the card/preferences. Do NOT describe clothing, armor, or worn gear — those are handled dynamically elsewhere and will change.]
 
 Personality:
 [Describe temperament, how they act around others, and emotional tendencies. You MUST incorporate any traits provided.]
@@ -2850,8 +2874,9 @@ Rules:
 - Use the exact section headers shown above. Do not add extra sections or merge them.
 - Total word count across all sections: approximately ${wordCount} words.
 - Write in third person (he/she/they).
-- Do not include a preamble, title, or closing statement. Output ONLY the four sections.`;
-    const userPrompt = `CHARACTER CARD:\n${cleanMemo.substring(0, 3000)}\n\nWrite the persona description for ${charName || 'this character'}.\nIMPORTANT REMINDER: The total word count across all sections MUST be approximately ${wordCount} words!`;
+- Do not include a preamble, title, or closing statement. Output ONLY the four sections.
+- CRITICAL: You MUST faithfully and explicitly incorporate ALL provided traits, background hints, species, gender, and appearance hints from the character card and the PLAYER PREFERENCES. Do not ignore user-provided details.`;
+    const userPrompt = `CHARACTER CARD:\n${cleanMemo.substring(0, 3000)}${extraHints}\n\nWrite the persona description for ${charName || 'this character'}.\nIMPORTANT REMINDER: The total word count across all sections MUST be approximately ${wordCount} words!`;
     try {
         const result = await sendStateRequest(s, systemPrompt, userPrompt);
         return (result || '').trim() || null;
