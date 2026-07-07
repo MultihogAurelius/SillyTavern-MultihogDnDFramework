@@ -506,11 +506,11 @@
                                         <input id="rpg_tracker_router_lookback_since_last_user" type="radio" name="router_lookback_mode" value="since_last_user" />
                                         Since last user message
                                     </label>
-                                    <div id="rpg_tracker_router_lookback_numeric_row" style="transition: opacity 0.2s; opacity: 0.35; pointer-events: none;">
-                                        <label class="checkbox_label" title="Read a fixed number of recent messages.">
-                                            <input id="rpg_tracker_router_lookback_fixed" type="radio" name="router_lookback_mode" value="fixed" />
-                                            Fixed turn count
-                                        </label>
+                                    <label class="checkbox_label" title="Read a fixed number of recent messages.">
+                                        <input id="rpg_tracker_router_lookback_fixed" type="radio" name="router_lookback_mode" value="fixed" />
+                                        Fixed turn count
+                                    </label>
+                                    <div id="rpg_tracker_router_lookback_numeric_row" style="transition: opacity 0.2s; opacity: 0.35; pointer-events: none; margin-left: 20px;">
                                         <input id="rpg_tracker_router_lookback" type="text" inputmode="numeric" pattern="[0-9]*" class="text_pole" min="1" max="100" title="Last N user turns (includes all assistant and tool messages in each turn) when 'Fixed turn count' is selected." />
                                     </div>
 

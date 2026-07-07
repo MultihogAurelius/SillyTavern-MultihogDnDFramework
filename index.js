@@ -4767,11 +4767,11 @@ function createPanel() {
                                 <input type="radio" name="rt-lookback-mode" id="rt-agent-lookback-mode-user" value="since_last_user" ${mode === 'since_last_user' ? 'checked' : ''}>
                                 <span>Since last user message</span>
                             </label>
-                            <div id="rt-agent-router-lookback-container" style="display: flex; align-items: center; gap: 6px; flex: 1; transition: opacity 0.2s; ${mode !== 'fixed' ? 'opacity: 0.35; pointer-events: none;' : ''}" title="Read the last N user turns (includes all tool messages in each turn).">
-                                <label style="display: flex; align-items: center; gap: 5px; cursor: pointer; font-size: 0.769em; opacity: 0.75; flex: none;">
-                                    <input type="radio" name="rt-lookback-mode" id="rt-agent-lookback-mode-fixed" value="fixed" ${mode === 'fixed' ? 'checked' : ''}>
-                                    <span>Fixed:</span>
-                                </label>
+                            <label style="display: flex; align-items: center; gap: 5px; margin-bottom: 4px; cursor: pointer; font-size: 0.769em; opacity: 0.75;" title="Read a fixed number of recent user turns.">
+                                <input type="radio" name="rt-lookback-mode" id="rt-agent-lookback-mode-fixed" value="fixed" ${mode === 'fixed' ? 'checked' : ''}>
+                                <span>Fixed turn count:</span>
+                            </label>
+                            <div id="rt-agent-router-lookback-container" style="display: inline-flex; align-items: center; gap: 6px; margin-left: 20px; transition: opacity 0.2s; ${mode !== 'fixed' ? 'opacity: 0.35; pointer-events: none;' : ''}" title="Read the last N user turns (includes all tool messages in each turn).">
                                 <input type="text" inputmode="numeric" pattern="[0-9]*" id="rt-agent-router-lookback" value="${settings.routerLookback || 4}" min="1" max="100" style="width: 40px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); color: white; border-radius: 3px; text-align: center; font-size: 0.769em; padding: 1px;">
                                 <span style="font-size: 0.769em; opacity: 0.5;">msgs</span>
                             </div>
@@ -8915,7 +8915,10 @@ Rules:
                 applyPanelLookbackContainer(mode);
 
                 // Sync settings drawer radio group
-                const drawerRadio = $(`#rpg_tracker_router_lookback_since_last_${mode === 'since_last_run' ? 'run' : mode === 'since_last_user' ? 'user' : 'fixed'}`);
+                const targetId = mode === 'since_last_run' ? 'rpg_tracker_router_lookback_since_last_run'
+                    : mode === 'since_last_user' ? 'rpg_tracker_router_lookback_since_last_user'
+                    : 'rpg_tracker_router_lookback_fixed';
+                const drawerRadio = $(`#${targetId}`);
                 if (drawerRadio.length) drawerRadio.prop('checked', true);
                 // Apply drawer numeric row state
                 const drawerRow = $('#rpg_tracker_router_lookback_numeric_row');
