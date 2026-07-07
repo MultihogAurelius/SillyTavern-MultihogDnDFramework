@@ -1263,29 +1263,29 @@ function formatValueToCurrency(totalCp, detectedCurrency) {
                 <div class="rt-onboarding-buttons rt-fantasy-buttons" style="width: 100%; display: ${onboardingGenre === 'fantasy' ? 'flex' : 'none'}; justify-content: center; gap: 4px; margin: 4px 0; flex-shrink: 0; flex-wrap: wrap;">
                     <button class="rt-random-char-btn" data-archetype="persona">🎭 Persona</button>
                     <button class="rt-random-char-btn" data-archetype="custom">⚙️ Custom</button>
-                    <button class="rt-random-char-btn rt-char-roll-trigger" data-archetype="char_roll">🎲 Character Roll</button>
+                    <button class="rt-random-char-btn rt-char-roll-trigger" data-archetype="char_roll">🎲 Character Creator</button>
                 </div>
                 <div class="rt-onboarding-buttons rt-realistic-buttons" style="width: 100%; display: ${onboardingGenre === 'realistic' ? 'flex' : 'none'}; justify-content: center; gap: 4px; margin: 4px 0; flex-shrink: 0; flex-wrap: wrap;">
                     <button class="rt-random-char-btn" data-archetype="persona">🎭 Persona</button>
                     <button class="rt-random-char-btn" data-archetype="custom">⚙️ Custom</button>
-                    <button class="rt-random-char-btn rt-char-roll-trigger" data-archetype="char_roll">🎲 Character Roll</button>
+                    <button class="rt-random-char-btn rt-char-roll-trigger" data-archetype="char_roll">🎲 Character Creator</button>
                 </div>
                 <div class="rt-onboarding-buttons rt-scifi-buttons" style="width: 100%; display: ${onboardingGenre === 'scifi' ? 'flex' : 'none'}; justify-content: center; gap: 4px; margin: 4px 0; flex-shrink: 0; flex-wrap: wrap;">
                     <button class="rt-random-char-btn" data-archetype="persona">🎭 Persona</button>
                     <button class="rt-random-char-btn" data-archetype="custom">⚙️ Custom</button>
-                    <button class="rt-random-char-btn rt-char-roll-trigger" data-archetype="char_roll">🎲 Character Roll</button>
+                    <button class="rt-random-char-btn rt-char-roll-trigger" data-archetype="char_roll">🎲 Character Creator</button>
                 </div>
                 <div class="rt-onboarding-buttons rt-horror-buttons" style="width: 100%; display: ${onboardingGenre === 'horror' ? 'flex' : 'none'}; justify-content: center; gap: 4px; margin: 4px 0; flex-shrink: 0; flex-wrap: wrap;">
                     <button class="rt-random-char-btn" data-archetype="persona">🎭 Persona</button>
                     <button class="rt-random-char-btn" data-archetype="custom">⚙️ Custom</button>
-                    <button class="rt-random-char-btn rt-char-roll-trigger" data-archetype="char_roll">🎲 Character Roll</button>
+                    <button class="rt-random-char-btn rt-char-roll-trigger" data-archetype="char_roll">🎲 Character Creator</button>
                 </div>
 
                 <!-- Character Roll Inline Panel (hidden until 🎲 is clicked) -->
                 <div id="rt-char-roll-panel" style="display:none; flex-direction:column; gap:7px; width:100%; flex-shrink:0;">
                     <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
                         <button id="rt-char-roll-back" style="background:none; border:1px solid rgba(255,255,255,0.2); border-radius:4px; color:inherit; font-size:0.8em; padding:2px 8px; cursor:pointer; opacity:0.75;">← Back</button>
-                        <span style="font-weight:bold; color:var(--rt-accent); font-size:0.95em;">🎲 Character Roll</span>
+                        <span style="font-weight:bold; color:var(--rt-accent); font-size:0.95em;">🎲 Character Creator</span>
                     </div>
                     <div class="rt-cr-row">
                         <div class="rt-cr-field">

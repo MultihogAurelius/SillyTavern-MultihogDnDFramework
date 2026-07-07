@@ -2939,7 +2939,7 @@ Rules:
         const result = await sendStateRequest(s, systemPrompt, userPrompt);
         return (result || '').trim() || null;
     } catch (e) {
-        toastr['warning']('Persona bio generation failed.', 'Character Roll');
+        toastr['warning']('Persona bio generation failed.', 'Character Creator');
         return null;
     }
 }
@@ -2993,7 +2993,7 @@ function showPersonaConfirmOverlay(bioText, charName, wordCount, extraHints = ''
             btn.textContent = '✅ Copied!';
             setTimeout(() => { btn.textContent = '📋 Copy Bio'; }, 1800);
         } catch (_) {
-            toastr['info']('Could not access clipboard — please select and copy manually.', 'Character Roll');
+            toastr['info']('Could not access clipboard — please select and copy manually.', 'Character Creator');
         }
     });
 
@@ -3072,68 +3072,68 @@ function showPersonaConfirmOverlay(bioText, charName, wordCount, extraHints = ''
             } catch (_) {}
 
             if (personaWritten) {
-                toastr['success'](`Persona "${safeName}" created with bio. Check User Settings → Personas to confirm.`, 'Character Roll');
+                toastr['success'](`Persona "${safeName}" created with bio. Check User Settings → Personas to confirm.`, 'Character Creator');
             } else {
                 // /persona ran (persona exists in ST) but we couldn't write the description
                 try { await navigator.clipboard.writeText(finalBio); } catch (_) {}
                 toastr['warning'](
                     `Persona "${safeName}" selected in ST but bio could not be auto-saved. Bio copied to clipboard — paste it into the persona description manually.`,
-                    'Character Roll', { timeOut: 8000 }
+                    'Character Creator', { timeOut: 8000 }
                 );
             }
         } catch (e) {
             try { await navigator.clipboard.writeText(finalBio); } catch (_) {}
             toastr['warning'](
                 `Could not auto-create persona. Bio copied to clipboard — go to User Settings → Personas, create "${safeName}", and paste the description.`,
-                'Character Roll', { timeOut: 8000 }
+                'Character Creator', { timeOut: 8000 }
             );
         }
         overlay.remove();
-    });
-
-    // ── Add as Player Character ──────────────────────────────────────────────
-    overlay.querySelector('#rt-pco-add-pc').addEventListener('click', async () => {
-        const finalBio = /** @type {HTMLTextAreaElement} */ (overlay.querySelector('#rt-pco-bio')).value.trim();
-        const safeName = charName.replace(/['"\\]/g, '').trim() || 'My Character';
-        
-        const s = getSettings();
-        if (!s.chatStates) s.chatStates = {};
-        if (_currentChatId) {
-            if (!s.chatStates[_currentChatId]) s.chatStates[_currentChatId] = {};
-            s.chatStates[_currentChatId].playerCharacter = {
-                name: safeName,
-                bio: finalBio,
-                wordCount: wordCount || 100,
-                timestamp: Date.now()
-            };
-            saveChatState(_currentChatId);
-            
-            // Force a refresh of Campaign Records so it appears immediately
-            if (typeof refreshAgentManifestNow === 'function') {
-                await refreshAgentManifestNow();
-            }
-            
-            toastr['success'](`"${safeName}" added as Player Character.`, 'Character Roll');
-        } else {
-            toastr['error']('No active chat found to link the Player Character.', 'Character Roll');
-        }
-        overlay.remove();
-    });
-
-    // ── Regenerate button ────────────────────────────────────────────────────
-    overlay.querySelector('#rt-pco-regen').addEventListener('click', async () => {
-        const regenBtn = /** @type {HTMLButtonElement} */ (overlay.querySelector('#rt-pco-regen'));
-        regenBtn.disabled = true;
-        regenBtn.textContent = '⏳ Regenerating...';
-        const newBio = await generatePersonaBio(charName, wordCount, extraHints);
-        if (newBio) {
-            /** @type {HTMLTextAreaElement} */ (overlay.querySelector('#rt-pco-bio')).value = newBio;
-        } else {
-            toastr['warning']('Regeneration failed. Please try again.', 'Character Roll');
-        }
-        regenBtn.disabled = false;
-        regenBtn.textContent = '🔄 Regenerate';
-    });
+     });
+ 
+     // ── Add as Player Character ──────────────────────────────────────────────
+     overlay.querySelector('#rt-pco-add-pc').addEventListener('click', async () => {
+         const finalBio = /** @type {HTMLTextAreaElement} */ (overlay.querySelector('#rt-pco-bio')).value.trim();
+         const safeName = charName.replace(/['"\\]/g, '').trim() || 'My Character';
+         
+         const s = getSettings();
+         if (!s.chatStates) s.chatStates = {};
+         if (_currentChatId) {
+             if (!s.chatStates[_currentChatId]) s.chatStates[_currentChatId] = {};
+             s.chatStates[_currentChatId].playerCharacter = {
+                 name: safeName,
+                 bio: finalBio,
+                 wordCount: wordCount || 100,
+                 timestamp: Date.now()
+             };
+             saveChatState(_currentChatId);
+             
+             // Force a refresh of Campaign Records so it appears immediately
+             if (typeof refreshAgentManifestNow === 'function') {
+                 await refreshAgentManifestNow();
+             }
+             
+             toastr['success'](`"${safeName}" added as Player Character.`, 'Character Creator');
+         } else {
+             toastr['error']('No active chat found to link the Player Character.', 'Character Creator');
+         }
+         overlay.remove();
+     });
+ 
+     // ── Regenerate button ────────────────────────────────────────────────────
+     overlay.querySelector('#rt-pco-regen').addEventListener('click', async () => {
+         const regenBtn = /** @type {HTMLButtonElement} */ (overlay.querySelector('#rt-pco-regen'));
+         regenBtn.disabled = true;
+         regenBtn.textContent = '⏳ Regenerating...';
+         const newBio = await generatePersonaBio(charName, wordCount, extraHints);
+         if (newBio) {
+             /** @type {HTMLTextAreaElement} */ (overlay.querySelector('#rt-pco-bio')).value = newBio;
+         } else {
+             toastr['warning']('Regeneration failed. Please try again.', 'Character Creator');
+         }
+         regenBtn.disabled = false;
+         regenBtn.textContent = '🔄 Regenerate';
+     });
 }
 
 
