@@ -2743,13 +2743,15 @@ async function handleCharRollGenerate(el, panel) {
 
     const isStoryFitting = classRaw === '__story__';
     const isOther        = classRaw === '__other__';
+    // Extract Character Card Info globally
+    const ctx2 = SillyTavern.getContext();
+    const charId = ctx2.characterId;
+    const card = charId !== undefined ? ctx2.characters?.[charId] : null;
+    const cardSnippet = card ? `\nActive Card: ${(card.name || '')} — ${(card.description || '').substring(0, 1000)}` : '';
+
     let classLine = '';
     if (isStoryFitting) {
-        const ctx2 = SillyTavern.getContext();
-        const charId = ctx2.characterId;
-        const card = charId !== undefined ? ctx2.characters?.[charId] : null;
-        const cardSnippet = card ? `\nActive Card: ${(card.name || '')} — ${(card.description || '').substring(0, 300)}` : '';
-        classLine = `Class: (choose a class that fits the current story, setting, and card naturally — be creative${cardSnippet})`;
+        classLine = `Class: (choose a class that fits the current story, setting, and card naturally — be creative)`;
     } else if (isOther && classOtherVal) {
         classLine = `Class: ${classOtherVal}`;
     } else if (!isOther && !isStoryFitting && classRaw) {
@@ -2809,6 +2811,7 @@ Abilities:    ${f(abilitiesVal, '(generate fitting, creative abilities)')}
 Background:   ${f(backgroundVal, '(invent a brief origin)')}
 Appearance:   ${f(appearanceVal, '(invent a memorable appearance)')}
 ${additionalVal ? `Additional:   ${additionalVal}` : ''}
+${cardSnippet ? `\n--- CHARACTER CARD CONTEXT ---${cardSnippet}` : ''}
 
 --- REQUIREMENTS ---
 • Fill every blank field above with creative, setting-appropriate content. No field may be empty, "Unknown", "N/A", or a placeholder.
@@ -2834,7 +2837,8 @@ ${CHARACTER_FORMAT_HINT}${xpHint}${TIME_FORMAT_HINT}${settingHint}`;
         const s2 = getSettings();
         const extractedName = extractCharNameFromMemo(s2.currentMemo);
         const charName = extractedName || nameVal || 'My Character';
-        const bio = await generatePersonaBio(charName, wordCount, extraHints);
+        const finalExtraHints = extraHints + (cardSnippet ? `\n\n--- CHARACTER CARD CONTEXT ---${cardSnippet}` : '');
+        const bio = await generatePersonaBio(charName, wordCount, finalExtraHints);
         if (bio) showPersonaConfirmOverlay(bio, charName, wordCount, extraHints);
     }
 }
@@ -2870,7 +2874,19 @@ Rules:
 - Keep the prose grounded and natural. Avoid purple prose, excessive em-dashes, or clichés (e.g. "deliberate step", "breath hitched").
 - Do not include a preamble, title, or closing statement. Output ONLY the four sections.
 - CRITICAL: You MUST faithfully and explicitly incorporate ALL provided traits, background hints, species, gender, and appearance hints from the character card and the PLAYER PREFERENCES. Do not ignore user-provided details.`;
-    const userPrompt = `CHARACTER CARD:\n${cleanMemo.substring(0, 3000)}\n\nWrite the persona description for ${charName || 'this character'}.\nIMPORTANT REMINDER: The total word count across all sections MUST be approximately ${wordCount} words!`;
+
+    const { chat } = SillyTavern.getContext();
+    let chatLog = '';
+    if (chat && chat.length > 0) {
+        const recentChat = chat.slice(-5);
+        chatLog = `## NARRATIVE HISTORY (Last ${recentChat.length} messages)\n` +
+            recentChat.map(m => {
+                const name = m.is_user ? 'Player' : (m.name || 'Narrator');
+                return `${name}: ${m.mes || m.content || ''}`;
+            }).join('\n\n');
+    }
+
+    const userPrompt = `CHARACTER CARD:\n${cleanMemo.substring(0, 3000)}\n\n${chatLog}\n\nWrite the persona description for ${charName || 'this character'}.\nIMPORTANT REMINDER: The total word count across all sections MUST be approximately ${wordCount} words!`;
     try {
         const result = await sendStateRequest(s, systemPrompt, userPrompt);
         return (result || '').trim() || null;
