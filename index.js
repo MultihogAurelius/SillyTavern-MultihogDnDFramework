@@ -2834,14 +2834,14 @@ async function generatePersonaBio(charName, wordCount) {
 
 You MUST use this exact section format — each section on its own line with the label followed by a colon:
 
-Appearance:
-[Describe physical features only: body type, height, hair, eyes, skin tone, distinguishing marks, scars, and natural body language. Do NOT describe clothing, armor, or worn gear — those are handled dynamically elsewhere and will change.]
+Appearance/Species:
+[Describe physical features and species: body type, height, hair, eyes, skin tone, distinguishing marks, scars, and natural body language. You MUST explicitly state their Species, Ethnicity, and Gender based on the character card. You MUST explicitly incorporate any appearance notes provided in the card. Do NOT describe clothing, armor, or worn gear — those are handled dynamically elsewhere and will change.]
 
 Personality:
-[Describe temperament, how they act around others, and emotional tendencies.]
+[Describe temperament, how they act around others, and emotional tendencies. You MUST incorporate any traits provided.]
 
 Background:
-[Provide backstory context grounded in the character card. Brief but meaningful.]
+[Provide backstory context grounded in the character card. You MUST incorporate any background hints provided. Brief but meaningful.]
 
 Habits & Behaviors:
 [Describe recurring mannerisms, habits, quirks, or behavioral patterns.]
