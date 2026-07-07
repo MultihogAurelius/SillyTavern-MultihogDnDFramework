@@ -1255,32 +1255,124 @@ function formatValueToCurrency(totalCp, detectedCurrency) {
 
                 <!-- Archetype Buttons -->
                 <div class="rt-onboarding-buttons rt-fantasy-buttons" style="width: 100%; display: ${onboardingGenre === 'fantasy' ? 'flex' : 'none'}; justify-content: center; gap: 4px; margin: 4px 0; flex-shrink: 0; flex-wrap: wrap;">
-                    <button class="rt-random-char-btn" data-archetype="magic">✨ Magic</button>
-                    <button class="rt-random-char-btn" data-archetype="melee">⚔️ Melee</button>
-                    <button class="rt-random-char-btn" data-archetype="rogue">🗡️ Rogue</button>
                     <button class="rt-random-char-btn" data-archetype="persona">🎭 Persona</button>
                     <button class="rt-random-char-btn" data-archetype="custom">⚙️ Custom</button>
+                    <button class="rt-random-char-btn rt-char-roll-trigger" data-archetype="char_roll">🎲 Character Roll</button>
                 </div>
                 <div class="rt-onboarding-buttons rt-realistic-buttons" style="width: 100%; display: ${onboardingGenre === 'realistic' ? 'flex' : 'none'}; justify-content: center; gap: 4px; margin: 4px 0; flex-shrink: 0; flex-wrap: wrap;">
-                    <button class="rt-random-char-btn" data-archetype="professional">💼 Professional</button>
-                    <button class="rt-random-char-btn" data-archetype="survivor">🏃 Survivor</button>
-                    <button class="rt-random-char-btn" data-archetype="scholar">🧠 Scholar</button>
                     <button class="rt-random-char-btn" data-archetype="persona">🎭 Persona</button>
                     <button class="rt-random-char-btn" data-archetype="custom">⚙️ Custom</button>
+                    <button class="rt-random-char-btn rt-char-roll-trigger" data-archetype="char_roll">🎲 Character Roll</button>
                 </div>
                 <div class="rt-onboarding-buttons rt-scifi-buttons" style="width: 100%; display: ${onboardingGenre === 'scifi' ? 'flex' : 'none'}; justify-content: center; gap: 4px; margin: 4px 0; flex-shrink: 0; flex-wrap: wrap;">
-                    <button class="rt-random-char-btn" data-archetype="scifi_pilot">🚀 Pilot</button>
-                    <button class="rt-random-char-btn" data-archetype="scifi_engineer">🤖 Engineer</button>
-                    <button class="rt-random-char-btn" data-archetype="scifi_marine">🔫 Marine</button>
                     <button class="rt-random-char-btn" data-archetype="persona">🎭 Persona</button>
                     <button class="rt-random-char-btn" data-archetype="custom">⚙️ Custom</button>
+                    <button class="rt-random-char-btn rt-char-roll-trigger" data-archetype="char_roll">🎲 Character Roll</button>
                 </div>
                 <div class="rt-onboarding-buttons rt-horror-buttons" style="width: 100%; display: ${onboardingGenre === 'horror' ? 'flex' : 'none'}; justify-content: center; gap: 4px; margin: 4px 0; flex-shrink: 0; flex-wrap: wrap;">
-                    <button class="rt-random-char-btn" data-archetype="horror_investigator">🕵️ Investigator</button>
-                    <button class="rt-random-char-btn" data-archetype="horror_occultist">👻 Occultist</button>
-                    <button class="rt-random-char-btn" data-archetype="horror_survivor">🔪 Survivor</button>
                     <button class="rt-random-char-btn" data-archetype="persona">🎭 Persona</button>
                     <button class="rt-random-char-btn" data-archetype="custom">⚙️ Custom</button>
+                    <button class="rt-random-char-btn rt-char-roll-trigger" data-archetype="char_roll">🎲 Character Roll</button>
+                </div>
+
+                <!-- Character Roll Inline Panel (hidden until 🎲 is clicked) -->
+                <div id="rt-char-roll-panel" style="display:none; flex-direction:column; gap:7px; width:100%; flex-shrink:0;">
+                    <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
+                        <button id="rt-char-roll-back" style="background:none; border:1px solid rgba(255,255,255,0.2); border-radius:4px; color:inherit; font-size:0.8em; padding:2px 8px; cursor:pointer; opacity:0.75;">← Back</button>
+                        <span style="font-weight:bold; color:var(--rt-accent); font-size:0.95em;">🎲 Character Roll</span>
+                    </div>
+                    <div class="rt-cr-row">
+                        <div class="rt-cr-field">
+                            <label class="rt-cr-label">Name</label>
+                            <input id="rt-cr-name" class="text_pole rt-cr-input" type="text" placeholder="e.g. Lyra Ashford, Kael Vane…" />
+                        </div>
+                        <div class="rt-cr-field">
+                            <label class="rt-cr-label">Gender</label>
+                            <input id="rt-cr-gender" class="text_pole rt-cr-input" type="text" placeholder="e.g. Female, Male, Non-binary…" />
+                        </div>
+                        <div class="rt-cr-field">
+                            <label class="rt-cr-label">Orientation</label>
+                            <input id="rt-cr-orientation" class="text_pole rt-cr-input" type="text" placeholder="e.g. Straight, Bisexual, Gay…" />
+                        </div>
+                    </div>
+                    <div class="rt-cr-row">
+                        <div class="rt-cr-field">
+                            <label class="rt-cr-label">Species</label>
+                            <input id="rt-cr-species" class="text_pole rt-cr-input" type="text" placeholder="e.g. Human, Orc, Goblin…" />
+                        </div>
+                        <div class="rt-cr-field">
+                            <label class="rt-cr-label">Ethnicity</label>
+                            <input id="rt-cr-ethnicity" class="text_pole rt-cr-input" type="text" placeholder="e.g. Caucasian, Asian, Hispanic…" />
+                        </div>
+                    </div>
+                    <div class="rt-cr-row">
+                        <div class="rt-cr-field">
+                            <label class="rt-cr-label">Genre</label>
+                            <select id="rt-cr-genre" class="text_pole rt-cr-input">
+                                <option value="">✨ None — AI decides from context</option>
+                                <option value="fantasy">⚔️ Fantasy RPG</option>
+                                <option value="realistic">🏙️ Modern</option>
+                                <option value="scifi">🚀 Sci-Fi</option>
+                                <option value="horror">👻 Horror</option>
+                            </select>
+                        </div>
+                        <div class="rt-cr-field">
+                            <label class="rt-cr-label">Level</label>
+                            <select id="rt-cr-level" class="text_pole rt-cr-input">
+                                ${[...Array(20).keys()].map(i => { const l = i + 1; return `<option value="${l}"${l === parseInt(obSettings.onboardingLevel || '1') ? ' selected' : ''}>Level ${l}</option>`; }).join('')}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="rt-cr-field" style="width:100%;">
+                        <label class="rt-cr-label">Class</label>
+                        <select id="rt-cr-class" class="text_pole rt-cr-input" style="width:100%;"></select>
+                        <input id="rt-cr-class-other" class="text_pole rt-cr-input" type="text" placeholder="Describe your custom class…" style="display:none; margin-top:3px; width:100%;" />
+                    </div>
+                    <div class="rt-cr-row">
+                        <div class="rt-cr-field">
+                            <label class="rt-cr-label">Traits</label>
+                            <textarea id="rt-cr-traits" class="text_pole rt-cr-input" placeholder="Leave blank — AI invents traits" rows="2" style="resize:vertical;"></textarea>
+                        </div>
+                        <div class="rt-cr-field">
+                            <label class="rt-cr-label">Abilities</label>
+                            <textarea id="rt-cr-abilities" class="text_pole rt-cr-input" placeholder="Leave blank — AI generates abilities" rows="2" style="resize:vertical;"></textarea>
+                        </div>
+                    </div>
+                    <div class="rt-cr-row">
+                        <div class="rt-cr-field">
+                            <label class="rt-cr-label">Background <span class="rt-cr-help-icon" title="You don't need to write a full backstory. A brief hint guides the AI (e.g. 'grew up on the streets', 'ex-soldier', 'noble exile'). Leave blank and the AI will invent a fitting background.">?</span></label>
+                            <input id="rt-cr-background" class="text_pole rt-cr-input" type="text" placeholder="e.g. ex-soldier, raised in the slums…" />
+                        </div>
+                        <div class="rt-cr-field">
+                            <label class="rt-cr-label">Appearance <span class="rt-cr-help-icon" title="Just a hint is enough (e.g. 'tall, red hair, scar on cheek'). Leave blank and the AI will create a full appearance description.">?</span></label>
+                            <input id="rt-cr-appearance" class="text_pole rt-cr-input" type="text" placeholder="e.g. tall, dark hair, green eyes…" />
+                        </div>
+                    </div>
+                    <div class="rt-cr-field" style="width:100%;">
+                        <label class="rt-cr-label">Additional Info</label>
+                        <textarea id="rt-cr-additional" class="text_pole rt-cr-input" placeholder="Extra constraints, setting notes…" rows="2" style="resize:vertical; width:100%;"></textarea>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:6px; flex-shrink:0; padding:4px 0;">
+                        <label style="display:flex; align-items:center; gap:5px; cursor:pointer; font-size:0.88em;">
+                            <input type="checkbox" id="rt-cr-persona-cb" />
+                            <span>Create Persona</span>
+                        </label>
+                        <span class="rt-cr-help-icon" title="When checked, the AI also generates an appearance, personality, habits, and backstory. A preview will appear — you can accept (which auto-creates a new SillyTavern persona locked to this chat) or regenerate just this part without re-rolling the whole character.">?</span>
+                        <span style="opacity:0.6; font-size:0.8em; margin-left:4px;">Word count:</span>
+                        <select id="rt-cr-persona-words" class="text_pole" style="width:65px; font-size:11px; height:22px; padding:2px 4px;">
+                            <option value="100">100</option>
+                            <option value="150" selected>150</option>
+                            <option value="200">200</option>
+                            <option value="300">300</option>
+                            <option value="400">400</option>
+                            <option value="500">500</option>
+                            <option value="750">750</option>
+                            <option value="1000">1000</option>
+                            <option value="other">Other...</option>
+                        </select>
+                        <input id="rt-cr-persona-words-custom" type="number" class="text_pole" style="display:none; width:65px; font-size:11px; height:22px; padding:2px 4px; margin-left:4px;" placeholder="e.g. 800" min="50" max="3000" />
+                    </div>
+                    <button id="rt-cr-generate-btn" style="width:100%; padding:8px 12px; background:rgba(120,80,220,0.2); border:1px solid rgba(120,80,220,0.6); border-radius:5px; color:var(--rt-text,#eee); font-size:0.92em; font-weight:bold; cursor:pointer; letter-spacing:0.03em;">🎲 Generate Character</button>
                 </div>
 
                 <div class="rt-onboarding-divider"><span>How It Works</span></div>

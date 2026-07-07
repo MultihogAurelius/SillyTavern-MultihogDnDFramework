@@ -547,6 +547,16 @@ export function installInterceptor() {
         // In Path 1 (addPromptManagerInterceptor), these are built and injected by that interceptor
         // into a dedicated system message at the configured depth, protecting the prefix cache.
         if (!skipInjection) {
+            // [PLAYER_CHARACTER] — always injected at the top of the core block
+            const curChatId = SillyTavern.getContext().chatId || globalThis._rpgCurrentChatId?.();
+            if (curChatId && settings.chatStates?.[curChatId]?.playerCharacter) {
+                const pc = settings.chatStates[curChatId].playerCharacter;
+                if (!content.includes("[PLAYER_CHARACTER]")) {
+                    injections += `[PLAYER_CHARACTER]\nName: ${pc.name}\n${pc.bio}\n[/PLAYER_CHARACTER]\n\n`;
+                    if (settings.debugMode) console.log("Player Character injected.");
+                }
+            }
+
         // [NPC_RELATIONS] — injected first, before RNG queue, same mechanism as RNG.
             const relBlock = await buildNpcRelationsBlock(settings);
             if (relBlock) injections += relBlock;

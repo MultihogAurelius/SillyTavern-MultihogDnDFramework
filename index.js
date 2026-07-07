@@ -2540,6 +2540,511 @@ function handleLevelUp() {
     }
 }
 
+// ── Character Roll class lists ──────────────────────────────────────────────
+const _CR_CLASS_LISTS = {
+    fantasy: [
+        ['⚔️ Fighter','Fighter'],['🗡️ Rogue','Rogue'],['🧙 Wizard','Wizard'],
+        ['🔥 Sorcerer','Sorcerer'],['🌑 Warlock','Warlock'],['🙏 Paladin','Paladin'],
+        ['🏹 Ranger','Ranger'],['🐻 Druid','Druid'],['🎵 Bard','Bard'],
+        ['☯️ Monk','Monk'],['🛡️ Barbarian','Barbarian'],['🧝 Cleric','Cleric'],
+        ['🔮 Artificer','Artificer'],['🩸 Blood Hunter','Blood Hunter'],
+        ['🐉 Draconic Bloodline','Draconic Bloodline'],['🌿 Nature Shaman','Nature Shaman'],
+        ['🔱 Death Knight','Death Knight'],['🎯 Arcane Archer','Arcane Archer'],
+        ['🌟 Celestial Chosen','Celestial Chosen'],['💀 Necromancer','Necromancer'],
+    ],
+    realistic: [
+        ['💼 Detective','Detective'],['🩺 Doctor','Doctor'],['💊 Medic','Medic'],
+        ['🔬 Scientist','Scientist'],['🔫 Soldier','Soldier'],['🕵️ Agent','Agent'],
+        ['🚑 Paramedic','Paramedic'],['⚖️ Lawyer','Lawyer'],['🔧 Mechanic','Mechanic'],
+        ['💻 Hacker','Hacker'],['🎤 Journalist','Journalist'],['🏋️ Athlete','Athlete'],
+        ['👮 Officer','Officer'],['🎭 Con Artist','Con Artist'],['📦 Smuggler','Smuggler'],
+        ['🧑‍🍳 Chef','Chef'],['💰 Entrepreneur','Entrepreneur'],
+        ['📡 Tech Specialist','Tech Specialist'],['🪖 Contractor','Contractor'],
+        ['🧠 Psychologist','Psychologist'],
+    ],
+    scifi: [
+        ['🚀 Starship Pilot','Starship Pilot'],['🔫 Space Marine','Space Marine'],
+        ['🤖 Cyberneticist','Cyberneticist'],['🌌 Navigator','Navigator'],
+        ['🧬 Xenobiologist','Xenobiologist'],['💻 Netrunner','Netrunner'],
+        ['⚡ Power Armor Trooper','Power Armor Trooper'],['🛰️ Recon Scout','Recon Scout'],
+        ['☢️ Reactor Tech','Reactor Tech'],['🩺 Combat Medic','Combat Medic'],
+        ['💀 Bounty Hunter','Bounty Hunter'],['📡 Comms Officer','Comms Officer'],
+        ['🔬 Research Scientist','Research Scientist'],['🛠️ Ship Engineer','Ship Engineer'],
+        ['🌍 Terraformer','Terraformer'],['🔮 Psyker','Psyker'],
+        ['🕵️ Intel Operative','Intel Operative'],['🏴‍☠️ Space Pirate','Space Pirate'],
+        ['🧙 Biopunk Shaman','Biopunk Shaman'],['⚖️ Colonial Administrator','Colonial Administrator'],
+    ],
+    horror: [
+        ['🕵️ Paranormal Investigator','Paranormal Investigator'],['📖 Occultist','Occultist'],
+        ['🔪 Survivor','Survivor'],['🏥 Traumatized Doctor','Traumatized Doctor'],
+        ['👮 Sheriff','Sheriff'],['🎤 Journalist','Journalist'],['🧠 Psychologist','Psychologist'],
+        ['🕯️ Cult Escapee','Cult Escapee'],['🔫 Vigilante','Vigilante'],
+        ['🧛 Reluctant Monster','Reluctant Monster'],['🌙 Cursed Bloodline','Cursed Bloodline'],
+        ['📜 Forbidden Scholar','Forbidden Scholar'],['⛪ Fallen Priest','Fallen Priest'],
+        ['🎲 Desperate Gambler','Desperate Gambler'],['🔧 Doomsday Prepper','Doomsday Prepper'],
+        ['💀 Ghost Whisperer','Ghost Whisperer'],['🩹 Haunted Soldier','Haunted Soldier'],
+        ['🏚️ Urban Explorer','Urban Explorer'],['🔍 Cold Case Detective','Cold Case Detective'],
+        ['🌊 Sea-Cursed Sailor','Sea-Cursed Sailor'],
+    ],
+};
+const _CR_CLASS_CONSTANTS = [
+    ['📝 Other — type below…','__other__'],
+    ['✨ Story-Fitting — AI decides','__story__'],
+];
+
+/**
+ * Shows the inline Character Roll panel inside the .rt-empty onboarding area.
+ * @param {HTMLElement} el - the .rt-empty element
+ */
+function showCharacterRollPanel(el) {
+    const panel = /** @type {HTMLElement|null} */ (el.querySelector('#rt-char-roll-panel'));
+    if (!panel) return;
+    const configWrap = /** @type {HTMLElement|null} */ (el.querySelector('.rt-onboarding-config-row')?.parentElement);
+    const allBtnGroups = /** @type {NodeListOf<HTMLElement>} */ (el.querySelectorAll('.rt-onboarding-buttons'));
+
+    // Hide config + button groups, show panel
+    if (configWrap) configWrap.style.display = 'none';
+    allBtnGroups.forEach(g => { g.style.display = 'none'; });
+    panel.style.display = 'flex';
+
+    const s = getSettings();
+    const genreSelect = /** @type {HTMLSelectElement|null} */ (panel.querySelector('#rt-cr-genre'));
+    const levelSelect = /** @type {HTMLSelectElement|null} */ (panel.querySelector('#rt-cr-level'));
+    const classSelect = /** @type {HTMLSelectElement|null} */ (panel.querySelector('#rt-cr-class'));
+    const classOther  = /** @type {HTMLInputElement|null}  */ (panel.querySelector('#rt-cr-class-other'));
+
+    // Default genre to '' (None — AI decides); do NOT carry over onboardingGenre here
+    if (genreSelect) genreSelect.value = '';
+    if (levelSelect) levelSelect.value = String(s.onboardingLevel || 1);
+
+    function populateClasses(genre) {
+        if (!classSelect) return;
+        // Empty genre (None) = only show Story-Fitting + Other; AI decides
+        const genreList = genre ? (_CR_CLASS_LISTS[genre] || _CR_CLASS_LISTS.fantasy) : [];
+        const list = [...genreList, ..._CR_CLASS_CONSTANTS];
+        classSelect.innerHTML = list.map(([label, val]) =>
+            `<option value="${escapeHtml(val)}">${escapeHtml(label)}</option>`
+        ).join('');
+        // Always default to Story-Fitting
+        classSelect.value = '__story__';
+    }
+    populateClasses('');
+
+    if (genreSelect && !genreSelect._crBound) {
+        genreSelect._crBound = true;
+        genreSelect.addEventListener('change', () => {
+            populateClasses(genreSelect.value);
+            if (classOther) classOther.style.display = 'none';
+        });
+    }
+    if (classSelect && !classSelect._crBound) {
+        classSelect._crBound = true;
+        classSelect.addEventListener('change', () => {
+            if (classOther) classOther.style.display = classSelect.value === '__other__' ? 'block' : 'none';
+        });
+    }
+
+    const wordsSelect = /** @type {HTMLSelectElement|null} */ (panel.querySelector('#rt-cr-persona-words'));
+    const wordsCustom = /** @type {HTMLInputElement|null} */ (panel.querySelector('#rt-cr-persona-words-custom'));
+    if (wordsSelect && !wordsSelect._crBound) {
+        wordsSelect._crBound = true;
+        wordsSelect.addEventListener('change', () => {
+            if (wordsCustom) wordsCustom.style.display = wordsSelect.value === 'other' ? 'inline-block' : 'none';
+        });
+    }
+
+    const backBtn = panel.querySelector('#rt-char-roll-back');
+    if (backBtn && !backBtn._crBound) {
+        backBtn._crBound = true;
+        backBtn.addEventListener('click', () => {
+            panel.style.display = 'none';
+            if (configWrap) configWrap.style.display = '';
+            const genre = getSettings().onboardingGenre || 'fantasy';
+            allBtnGroups.forEach(g => {
+                g.style.display = g.classList.contains(`rt-${genre}-buttons`) ? 'flex' : 'none';
+            });
+        });
+    }
+
+    const genBtn = panel.querySelector('#rt-cr-generate-btn');
+    if (genBtn && !genBtn._crBound) {
+        genBtn._crBound = true;
+        genBtn.addEventListener('click', () => { void handleCharRollGenerate(el, panel); });
+    }
+}
+
+/**
+ * Extracts the character's name from the current state memo.
+ * Handles both "Name (Class): HP" and "Name: value" formats.
+ * @param {string} memo
+ * @returns {string}
+ */
+function extractCharNameFromMemo(memo) {
+    if (!memo) return '';
+    // Strategy 1: first line of [CHARACTER] block — "Kael Veyne (Fighter): 24/24 HP"
+    const charBlock = memo.match(/\[CHARACTER\]([\s\S]*?)\[\/CHARACTER\]/i);
+    if (charBlock) {
+        const firstLine = charBlock[1].replace(/<[^>]+>/g, '').trim().split('\n')[0].trim();
+        // Extract name before the first "(" or ":"
+        const m = firstLine.match(/^([^(:\[\n]{2,50}?)(?:\s*\(|\s*:)/);
+        if (m) {
+            const candidate = m[1].trim();
+            // Reject generic fallbacks
+            if (candidate && !/^(character|unknown|user|name)$/i.test(candidate)) return candidate;
+        }
+    }
+    // Strategy 2: explicit "Name: value" field anywhere in memo
+    const nameField = memo.match(/(?:^|\n)\s*(?:Name|Character Name)\s*[:\|]\s*([^\n\|\[<]{2,60})/im);
+    if (nameField) {
+        const candidate = nameField[1].replace(/<[^>]+>/g, '').trim();
+        if (candidate && !/^(character|unknown|user)$/i.test(candidate)) return candidate;
+    }
+    return '';
+}
+
+/**
+ * Reads the Character Roll form, builds the prompt, calls sendDirectPrompt,
+ * and optionally triggers persona creation.
+ */
+async function handleCharRollGenerate(el, panel) {
+
+    const s = getSettings();
+    const nameVal        = /** @type {HTMLInputElement}   */ (panel.querySelector('#rt-cr-name'))?.value.trim()        || '';
+    const genderVal      = /** @type {HTMLInputElement}   */ (panel.querySelector('#rt-cr-gender'))?.value.trim()      || '';
+    const orientationVal = /** @type {HTMLInputElement}   */ (panel.querySelector('#rt-cr-orientation'))?.value.trim() || '';
+    const speciesVal     = /** @type {HTMLInputElement}   */ (panel.querySelector('#rt-cr-species'))?.value.trim()     || '';
+    const ethnicityVal   = /** @type {HTMLInputElement}   */ (panel.querySelector('#rt-cr-ethnicity'))?.value.trim()   || '';
+    const genre          = /** @type {HTMLSelectElement}  */ (panel.querySelector('#rt-cr-genre'))?.value              || s.onboardingGenre || 'fantasy';
+    const level          = parseInt(/** @type {HTMLSelectElement} */ (panel.querySelector('#rt-cr-level'))?.value      || String(s.onboardingLevel || 1), 10) || 1;
+    const classSelect    = /** @type {HTMLSelectElement|null} */ (panel.querySelector('#rt-cr-class'));
+    let   classRaw       = classSelect?.value || '__story__';
+    let   classOtherVal  = /** @type {HTMLInputElement} */ (panel.querySelector('#rt-cr-class-other'))?.value.trim()   || '';
+    const traitsVal      = /** @type {HTMLTextAreaElement}*/ (panel.querySelector('#rt-cr-traits'))?.value.trim()       || '';
+    const abilitiesVal   = /** @type {HTMLTextAreaElement}*/ (panel.querySelector('#rt-cr-abilities'))?.value.trim()    || '';
+    const backgroundVal  = /** @type {HTMLInputElement}   */ (panel.querySelector('#rt-cr-background'))?.value.trim()  || '';
+    const appearanceVal  = /** @type {HTMLInputElement}   */ (panel.querySelector('#rt-cr-appearance'))?.value.trim()  || '';
+    const additionalVal  = /** @type {HTMLTextAreaElement}*/ (panel.querySelector('#rt-cr-additional'))?.value.trim()   || '';
+    const personaCb      = /** @type {HTMLInputElement}   */ (panel.querySelector('#rt-cr-persona-cb'));
+    const wantPersona    = !!personaCb?.checked;
+    const wordsSelectEl  = /** @type {HTMLSelectElement} */ (panel.querySelector('#rt-cr-persona-words'));
+    const wordsCustomEl  = /** @type {HTMLInputElement} */ (panel.querySelector('#rt-cr-persona-words-custom'));
+    const wordsRaw       = wordsSelectEl?.value === 'other' ? wordsCustomEl?.value : wordsSelectEl?.value;
+    const wordCount      = parseInt(wordsRaw || '150', 10) || 150;
+
+    const isStoryFitting = classRaw === '__story__';
+    const isOther        = classRaw === '__other__';
+    let classLine = '';
+    if (isStoryFitting) {
+        const ctx2 = SillyTavern.getContext();
+        const charId = ctx2.characterId;
+        const card = charId !== undefined ? ctx2.characters?.[charId] : null;
+        const cardSnippet = card ? `\nActive Card: ${(card.name || '')} — ${(card.description || '').substring(0, 300)}` : '';
+        classLine = `Class: (choose a class that fits the current story, setting, and card naturally — be creative${cardSnippet})`;
+    } else if (isOther && classOtherVal) {
+        classLine = `Class: ${classOtherVal}`;
+    } else if (!isOther && !isStoryFitting && classRaw) {
+        classLine = `Class: ${classRaw}`;
+    } else {
+        classLine = `Class: (invent a class fitting the setting and era — do NOT use fantasy D&D class names in non-fantasy contexts)`;
+    }
+
+    const isCalendar = !!s.useDdMmYyFormat;
+    const startDateVal = isCalendar
+        ? (s.initialDate && s.initialDate !== 'Day 1' ? s.initialDate : '01/01/2026')
+        : 'Day 1';
+    const initRestVal = isCalendar ? startDateVal : 'Day 0';
+    const levelPrefix = `STARTING LEVEL: ${level} (mandatory — the character MUST be exactly Level ${level}).`;
+    const xpHint = buildOnboardingXpHint(level);
+    const CHARACTER_FORMAT_HINT = `\n\nCRITICAL TAG WRAPPING RULE: Every block you output MUST be enclosed in matching opening and closing tags (e.g. [/CHARACTER], [/INVENTORY], [/ABILITIES], [/SPELLS], [/XP], [/TIME]).`;
+    const TIME_FORMAT_HINT = `\n\n[TIME]\nLast Rest: 12:00 AM, ${initRestVal}\nCurrent Time: 08:00 AM, ${startDateVal}\n[/TIME]`;
+
+    const SETTING_HINTS = {
+        realistic: `\n\nCRITICAL REALISM RULE: This is a realistic/non-fantasy setting. Do NOT output a [SPELLS] block. Avoid fantasy classes and races. Use realistic currency (e.g. $, USD, GBP). Gear and weapons must be realistic.`,
+        scifi: `\n\nCRITICAL SCI-FI RULE: Science-fiction setting. No [SPELLS] block. No fantasy classes or races. Use Credits or equivalent currency. Gear should be futuristic.`,
+        horror: `\n\nCRITICAL HORROR RULE: Horror setting. No [SPELLS] block — occult abilities go in [ABILITIES]. No fantasy classes or races. Use realistic currency. Characters are grounded and vulnerable.`,
+        fantasy: '',
+    };
+    const settingHint = SETTING_HINTS[genre] || '';
+
+    const f = (val, fallback) => val || fallback;
+    const prompt = `${levelPrefix}
+
+Design a complete player character that fits naturally into the current scenario, card, and recent chat history. Be authentic to the setting, era, and tone.
+
+--- PLAYER PREFERENCES ---
+Name:         ${f(nameVal, '(invent a creative, setting-appropriate name — NEVER use "User", "Unknown", or any placeholder)')}
+Gender:       ${f(genderVal, '(your choice)')}
+Orientation:  ${f(orientationVal, '(your choice)')}
+Species:      ${f(speciesVal, '(your choice)')}
+Ethnicity:    ${f(ethnicityVal, '(your choice)')}
+${classLine}
+Traits:       ${f(traitsVal, '(invent 2–3 distinctive traits)')}
+Level:        ${level}
+Abilities:    ${f(abilitiesVal, '(generate fitting, creative abilities)')}
+Background:   ${f(backgroundVal, '(invent a brief origin)')}
+Appearance:   ${f(appearanceVal, '(invent a memorable appearance)')}
+${additionalVal ? `Additional:   ${additionalVal}` : ''}
+
+--- REQUIREMENTS ---
+• Fill every blank field above with creative, setting-appropriate content. No field may be empty, "Unknown", "N/A", or a placeholder.
+• The name must be original and fitting. NEVER write "User" or any variation.
+• Output every currently active state-memo field (custom and default). Only include [SPELLS] if the class genuinely uses magic.
+• ${isOther || isStoryFitting ? 'Invent the most fitting class for the setting and context.' : `Use the chosen class "${classRaw}" exactly as given — do not rename or substitute it.`}
+• If the setting is non-fantasy and no class was specified, create a class that feels natural to the world — not a fantasy D&D class name.
+• All stats, gear, saves, and XP must be consistent with Level ${level}.
+${CHARACTER_FORMAT_HINT}${xpHint}${TIME_FORMAT_HINT}${settingHint}`;
+
+    el.querySelectorAll('.rt-random-char-btn').forEach(b => { /** @type {HTMLButtonElement} */ (b).disabled = true; });
+    const genBtn = /** @type {HTMLButtonElement|null} */ (panel.querySelector('#rt-cr-generate-btn'));
+    if (genBtn) { genBtn.disabled = true; genBtn.textContent = '🎲 Generating...'; }
+
+    await sendDirectPrompt(prompt);
+
+    if (genBtn) { genBtn.disabled = false; genBtn.textContent = '🎲 Generate Character'; }
+    el.querySelectorAll('.rt-random-char-btn').forEach(b => { /** @type {HTMLButtonElement} */ (b).disabled = false; });
+
+    if (wantPersona) {
+        // Pull the name the AI actually generated from the memo — much better than
+        // falling back to the (possibly blank) form field value.
+        const s2 = getSettings();
+        const extractedName = extractCharNameFromMemo(s2.currentMemo);
+        const charName = extractedName || nameVal || 'My Character';
+        const bio = await generatePersonaBio(charName, wordCount);
+        if (bio) showPersonaConfirmOverlay(bio, charName, wordCount);
+    }
+}
+
+/**
+ * Sends a focused request to generate a SillyTavern persona bio from the current memo.
+ */
+async function generatePersonaBio(charName, wordCount) {
+    const s = getSettings();
+    const rawMemo = s.currentMemo || '';
+    const cleanMemo = rawMemo.replace(/<\/?memo>/gi, '').replace(/<[^>]+>/g, ' ').trim();
+    const systemPrompt = `You are a persona writer for a roleplay system. Based on the character state card provided, write a persona description for ${charName || 'this character'} in third person.
+
+You MUST use this exact section format — each section on its own line with the label followed by a colon:
+
+Appearance:
+[Describe physical features only: body type, height, hair, eyes, skin tone, distinguishing marks, scars, and natural body language. Do NOT describe clothing, armor, or worn gear — those are handled dynamically elsewhere and will change.]
+
+Personality:
+[Describe temperament, how they act around others, and emotional tendencies.]
+
+Background:
+[Provide backstory context grounded in the character card. Brief but meaningful.]
+
+Habits & Behaviors:
+[Describe recurring mannerisms, habits, quirks, or behavioral patterns.]
+
+Rules:
+- Use the exact section headers shown above. Do not add extra sections or merge them.
+- Total word count across all sections: approximately ${wordCount} words.
+- Write in third person (he/she/they).
+- Do not include a preamble, title, or closing statement. Output ONLY the four sections.`;
+    const userPrompt = `CHARACTER CARD:\n${cleanMemo.substring(0, 3000)}\n\nWrite the persona description for ${charName || 'this character'}.\nIMPORTANT REMINDER: The total word count across all sections MUST be approximately ${wordCount} words!`;
+    try {
+        const result = await sendStateRequest(s, systemPrompt, userPrompt);
+        return (result || '').trim() || null;
+    } catch (e) {
+        toastr['warning']('Persona bio generation failed.', 'Character Roll');
+        return null;
+    }
+}
+
+/**
+ * Shows the persona confirm overlay — Accept to create ST persona, Regenerate for a new bio.
+ */
+function showPersonaConfirmOverlay(bioText, charName, wordCount) {
+    const existing = document.getElementById('rt-persona-confirm-overlay');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'rt-persona-confirm-overlay';
+    overlay.className = 'rt-charpicker-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;';
+
+    const box = document.createElement('div');
+    box.style.cssText = 'background:var(--black80a,#1a1a2e);border:1px solid rgba(120,80,220,0.5);border-radius:8px;padding:18px;max-width:520px;width:90%;max-height:80vh;display:flex;flex-direction:column;gap:10px;overflow:hidden;';
+    box.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+            <b style="color:var(--rt-accent,#a78bfa);font-size:1em;">🎭 Persona Preview — ${escapeHtml(charName)}</b>
+            <button id="rt-pco-close" style="background:none;border:none;color:inherit;font-size:1.1em;cursor:pointer;opacity:0.6;">✕</button>
+        </div>
+        <small style="opacity:0.6;line-height:1.3;">Edit the bio below, then Accept to auto-create in SillyTavern, or copy it to paste manually.</small>
+        <textarea id="rt-pco-bio" style="flex:1;min-height:180px;max-height:300px;resize:vertical;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.15);border-radius:4px;padding:8px;color:inherit;font-size:0.88em;line-height:1.6;">${escapeHtml(bioText)}</textarea>
+        <div style="display:flex;flex-direction:column;gap:12px;">
+            <button id="rt-pco-add-pc" title="Recommended: Links this persona exclusively to the current chat as a Player Character. It will automatically load whenever you open this chat." style="width:100%;padding:12px;background:rgba(0,180,255,0.25);border:2px solid #00b4ff;border-radius:6px;color:inherit;cursor:pointer;font-weight:bold;font-size:1.1em;box-shadow:0 4px 12px rgba(0,180,255,0.15);transition:all 0.2s ease;">👤 Add as Player Character</button>
+            
+            <div style="display:flex;gap:8px;">
+                <button id="rt-pco-regen" style="flex:1;padding:8px;background:rgba(120,80,220,0.18);border:1px solid rgba(120,80,220,0.6);border-radius:4px;color:inherit;cursor:pointer;">🔄 Regenerate</button>
+                <button id="rt-pco-copy" style="flex:1;padding:8px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.2);border-radius:4px;color:inherit;cursor:pointer;">📋 Copy Bio</button>
+            </div>
+
+            <div style="text-align:center;margin-top:4px;">
+                <button id="rt-pco-accept" title="Not Recommended: Overwrites your current active global SillyTavern persona with this text. This will affect other chats using the same persona." style="background:none;border:none;color:var(--SmartThemeEmColor, rgba(255,255,255,0.5));text-decoration:underline;cursor:pointer;font-size:0.85em;padding:4px;">Inject as Current Persona (Native SillyTavern logic)</button>
+            </div>
+        </div>`;
+
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+
+    overlay.querySelector('#rt-pco-close').addEventListener('click', () => overlay.remove());
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+
+    // ── Copy Bio button ──────────────────────────────────────────────────────
+    overlay.querySelector('#rt-pco-copy').addEventListener('click', async () => {
+        const bio = /** @type {HTMLTextAreaElement} */ (overlay.querySelector('#rt-pco-bio')).value.trim();
+        try {
+            await navigator.clipboard.writeText(bio);
+            const btn = /** @type {HTMLButtonElement} */ (overlay.querySelector('#rt-pco-copy'));
+            btn.textContent = '✅ Copied!';
+            setTimeout(() => { btn.textContent = '📋 Copy Bio'; }, 1800);
+        } catch (_) {
+            toastr['info']('Could not access clipboard — please select and copy manually.', 'Character Roll');
+        }
+    });
+
+    // ── Accept button ────────────────────────────────────────────────────────
+    overlay.querySelector('#rt-pco-accept').addEventListener('click', async () => {
+        const finalBio = /** @type {HTMLTextAreaElement} */ (overlay.querySelector('#rt-pco-bio')).value.trim();
+        const ctx = SillyTavern.getContext();
+        const safeName = charName.replace(/['"\\]/g, '').trim() || 'My Character';
+        const acceptBtn = /** @type {HTMLButtonElement} */ (overlay.querySelector('#rt-pco-accept'));
+        acceptBtn.disabled = true;
+        acceptBtn.textContent = '⏳ Creating...';
+
+        let personaWritten = false;
+
+        try {
+            // Step 1: Use /persona to create or select the persona in ST.
+            // This is the authoritative way — ST shows its own "Persona Changed" toast.
+            if (typeof ctx.executeSlashCommandsWithOptions === 'function') {
+                await ctx.executeSlashCommandsWithOptions(`/persona ${safeName}`).catch(() => {});
+                // Wait for ST to process the switch and update power_user.persona
+                await new Promise(r => setTimeout(r, 700));
+            }
+
+            // Step 2: Now that /persona has run, power_user.persona points to the
+            // correct (newly created or selected) persona. Write the bio there.
+            try {
+                const pu = /** @type {any} */ (window.power_user ?? globalThis.power_user);
+                if (pu && typeof pu === 'object' && pu.personas) {
+                    const currentId = pu.persona;
+                    if (currentId !== undefined && currentId !== null && currentId !== '') {
+                        const slot = pu.personas[currentId];
+                        if (typeof slot === 'string') {
+                            // Older ST: personas[name] = descriptionString
+                            pu.personas[currentId] = finalBio;
+                        } else if (slot && typeof slot === 'object') {
+                            // Newer ST: personas[uuid] = { name, description, avatar }
+                            slot.description = finalBio;
+                        } else {
+                            // Slot doesn't exist yet — create it
+                            pu.personas[currentId] = { name: safeName, description: finalBio, avatar: 'none' };
+                        }
+                        // Also update the live persona_description field if ST uses it
+                        if ('persona_description' in pu) pu.persona_description = finalBio;
+                        personaWritten = true;
+                    }
+                }
+            } catch (_) {}
+
+            // Step 3: DOM textarea fallback (works if User Settings panel is open)
+            if (!personaWritten) {
+                try {
+                    const pdEl = /** @type {HTMLTextAreaElement|null} */ (
+                        document.querySelector('#persona_description, textarea[name="persona_description"]')
+                    );
+                    if (pdEl) {
+                        pdEl.value = finalBio;
+                        ['input', 'change', 'blur'].forEach(ev =>
+                            pdEl.dispatchEvent(new Event(ev, { bubbles: true }))
+                        );
+                        personaWritten = true;
+                    }
+                } catch (_) {}
+            }
+
+            // Step 4: Save settings so the description persists across reloads
+            try {
+                if (typeof ctx.saveSettingsDebounced === 'function') ctx.saveSettingsDebounced();
+                else if (typeof window.saveSettingsDebounced === 'function') window.saveSettingsDebounced();
+            } catch (_) {}
+
+            // Step 5: Attempt persona-lock (silently ignore if command doesn't exist)
+            try {
+                if (typeof ctx.executeSlashCommandsWithOptions === 'function') {
+                    await ctx.executeSlashCommandsWithOptions('/persona-lock').catch(() => {});
+                }
+            } catch (_) {}
+
+            if (personaWritten) {
+                toastr['success'](`Persona "${safeName}" created with bio. Check User Settings → Personas to confirm.`, 'Character Roll');
+            } else {
+                // /persona ran (persona exists in ST) but we couldn't write the description
+                try { await navigator.clipboard.writeText(finalBio); } catch (_) {}
+                toastr['warning'](
+                    `Persona "${safeName}" selected in ST but bio could not be auto-saved. Bio copied to clipboard — paste it into the persona description manually.`,
+                    'Character Roll', { timeOut: 8000 }
+                );
+            }
+        } catch (e) {
+            try { await navigator.clipboard.writeText(finalBio); } catch (_) {}
+            toastr['warning'](
+                `Could not auto-create persona. Bio copied to clipboard — go to User Settings → Personas, create "${safeName}", and paste the description.`,
+                'Character Roll', { timeOut: 8000 }
+            );
+        }
+        overlay.remove();
+    });
+
+    // ── Add as Player Character ──────────────────────────────────────────────
+    overlay.querySelector('#rt-pco-add-pc').addEventListener('click', async () => {
+        const finalBio = /** @type {HTMLTextAreaElement} */ (overlay.querySelector('#rt-pco-bio')).value.trim();
+        const safeName = charName.replace(/['"\\]/g, '').trim() || 'My Character';
+        
+        const s = getSettings();
+        if (!s.chatStates) s.chatStates = {};
+        if (_currentChatId) {
+            if (!s.chatStates[_currentChatId]) s.chatStates[_currentChatId] = {};
+            s.chatStates[_currentChatId].playerCharacter = {
+                name: safeName,
+                bio: finalBio,
+                wordCount: wordCount || 100,
+                timestamp: Date.now()
+            };
+            saveChatState(_currentChatId);
+            
+            // Force a refresh of Campaign Records so it appears immediately
+            if (typeof refreshAgentManifestNow === 'function') {
+                await refreshAgentManifestNow();
+            }
+            
+            toastr['success'](`"${safeName}" added as Player Character.`, 'Character Roll');
+        } else {
+            toastr['error']('No active chat found to link the Player Character.', 'Character Roll');
+        }
+        overlay.remove();
+    });
+
+    // ── Regenerate button ────────────────────────────────────────────────────
+    overlay.querySelector('#rt-pco-regen').addEventListener('click', async () => {
+        const regenBtn = /** @type {HTMLButtonElement} */ (overlay.querySelector('#rt-pco-regen'));
+        regenBtn.disabled = true;
+        regenBtn.textContent = '⏳ Regenerating...';
+        const newBio = await generatePersonaBio(charName, wordCount);
+        if (newBio) {
+            /** @type {HTMLTextAreaElement} */ (overlay.querySelector('#rt-pco-bio')).value = newBio;
+        } else {
+            toastr['warning']('Regeneration failed. Please try again.', 'Character Roll');
+        }
+        regenBtn.disabled = false;
+        regenBtn.textContent = '🔄 Regenerate';
+    });
+}
+
+
 /**
  * Send a direct instruction to the State Model bypassing the narrative pipeline.
  * Used for initial character setup and manual corrections.
@@ -3223,7 +3728,8 @@ function bindRenderedCardEvents(el, memo, isDetachedContext = false, onRefresh =
                 horror_occultist: '👻 Summoning...',
                 horror_survivor: '🔪 Enduring...',
                 persona: '🎭 Embodying...',
-                custom: '⚙️ Customizing...'
+                custom: '⚙️ Customizing...',
+                char_roll: '🎲 Rolling...'
             };
 
             const CHARACTER_FORMAT_HINT = `\n\nCRITICAL TAG WRAPPING RULE: Every block you output MUST be enclosed in matching opening and closing tags. You must output the closing tag for every block (e.g. [/CHARACTER], [/INVENTORY], [/ABILITIES], [/SPELLS], [/XP], [/TIME]).
@@ -3319,6 +3825,12 @@ Gear:
                 await sendDirectPrompt(personaPrompt);
                 return;
             }
+            // ── char_roll archetype: opens the inline Character Roll panel ──
+            if (archetype === 'char_roll') {
+                showCharacterRollPanel(el);
+                return;
+            }
+
 
             el.querySelectorAll('.rt-random-char-btn').forEach(b => b.disabled = true);
             btn.textContent = labels[archetype] || '🎲 Rolling...';
@@ -5541,14 +6053,11 @@ function createPanel() {
             try {
                 const s = getSettings();
                 const prefix = (s.routerCampaignPrefix || '').trim();
-                if (!prefix) {
-                    if (gen !== _manifestRenderGen) return;
-                    list.innerHTML = '<div style="text-align: center; opacity: 0.5; font-size: 0.769em; padding: 10px;">Set a Campaign Prefix to see records.</div>';
-                    return;
-                }
+                // We will check !prefix and return AFTER rendering the Player Character,
+                // so that the PC tab renders even if no lorebooks exist.
 
                 const forceFullRefresh = source === 'manual-button';
-                const manifest = await getLorebookManifest(!forceFullRefresh);
+                const manifest = prefix ? await getLorebookManifest(!forceFullRefresh) : [];
                 if (gen !== _manifestRenderGen) return;
 
                 // Group entries by lorebook
@@ -5561,12 +6070,294 @@ function createPanel() {
                 }
 
                 // Ensure NPC book is always represented so the user can add NPCs
-                const npcBookName = `${prefix}_NPCs`;
-                if (!byBook.has(npcBookName)) {
-                    byBook.set(npcBookName, []);
+                if (prefix) {
+                    const npcBookName = `${prefix}_NPCs`;
+                    if (!byBook.has(npcBookName)) {
+                        byBook.set(npcBookName, []);
+                    }
                 }
 
                 list.innerHTML = '';
+
+                // Helper: escape HTML to prevent XSS and rendering issues
+                const escapeHtml = (unsafe) => (unsafe || '').replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+
+                // Helper: parse NPC/PC content into structured sections for the detail popup
+                const parseNpcSections = (content) => {
+                    const sections = { core: {}, dynamic: [] };
+                    if (!content) return sections;
+
+                    // 1. Extract [CORE] ... [/CORE] block
+                    let coreContent = '';
+                    let dynamicContent = content;
+
+                    const coreMatch = content.match(/\[CORE\]([\s\S]*?)\[\/CORE\]/i);
+                    if (coreMatch) {
+                        coreContent = coreMatch[1];
+                        dynamicContent = content.replace(/\[CORE\][\s\S]*?\[\/CORE\]/gi, '');
+                    } else {
+                        coreContent = content;
+                        dynamicContent = '';
+                    }
+
+                    // 2. Parse core sections
+                    const sectionMarkers = /(?=(?:Appearance\/Species|Appearance|Personality|Brief Background|Background|Habits(?:\/|\s*&\s*|\s+and\s+)Behaviors|Habits|(?<!Habits\/)(?<!Habits & )(?<!Habits and )Behaviors|Relationship with\s*\{\{user\}\}|(?<!Friendship\/)(?<!Affection\/)Relationship)\s*:)/gi;
+                    const normalizedCore = coreContent.replace(sectionMarkers, '\n');
+                    const coreLines = normalizedCore.split('\n');
+                    let currentSection = 'General';
+                    const sectionPattern = /^(Appearance\/Species|Appearance|Personality|Brief Background|Background|Habits(?:\/|\s*&\s*|\s+and\s+)Behaviors|Habits|Behaviors|Relationship with\s*\{\{user\}\}|Relationship)\s*:/i;
+
+                    for (const line of coreLines) {
+                        const trimmed = line.trim();
+                        if (!trimmed || /^\[ID:/i.test(trimmed) || /^Friendship\/Rapport:/i.test(trimmed) || /^Affection\/Interest:/i.test(trimmed)) continue;
+                        const match = trimmed.match(sectionPattern);
+                        if (match) {
+                            currentSection = match[1].replace(/\s*\{\{user\}\}/, '').replace(/\s+with$/i, '').trim();
+                            
+                            // Normalize section names for consistent rendering
+                            if (/^Habits/i.test(currentSection) && /Behaviors/i.test(currentSection)) {
+                                currentSection = 'Habits/Behaviors';
+                            } else if (currentSection.toLowerCase() === 'background') {
+                                currentSection = 'Brief Background';
+                            }
+                            
+                            const afterColon = trimmed.substring(match[0].length).trim();
+                            if (afterColon) {
+                                if (!sections.core[currentSection]) sections.core[currentSection] = [];
+                                sections.core[currentSection].push(afterColon);
+                            }
+                        } else {
+                            if (!sections.core[currentSection]) sections.core[currentSection] = [];
+                            sections.core[currentSection].push(trimmed);
+                        }
+                    }
+
+                    // 3. Parse dynamic updates
+                    const dynamicLines = dynamicContent.split('\n');
+                    for (const line of dynamicLines) {
+                        const trimmed = line.trim();
+                        if (!trimmed || /^\[ID:/i.test(trimmed) || /^Friendship\/Rapport:/i.test(trimmed) || /^Affection\/Interest:/i.test(trimmed)) continue;
+                        const timestampOnlyRegex = /^\[[^\]]+\]\s*$/;
+                        if (timestampOnlyRegex.test(trimmed)) continue;
+                        sections.dynamic.push(trimmed);
+                    }
+                    return sections;
+                };
+
+                const sectionIcons = {
+                    'General': '📋', 'Appearance/Species': '👁️', 'Appearance': '👁️', 'Personality': '🧠',
+                    'Brief Background': '📜', 'Habits/Behaviors': '🔄', 'Habits': '🔄',
+                    'Behaviors': '🔄', 'Relationship': '❤️',
+                };
+
+                const renderSectionsHtml = (rawContent) => {
+                    const parsed = parseNpcSections(rawContent);
+                    let html = '';
+                    const coreEntries = Object.entries(parsed.core);
+                    if (coreEntries.length > 0) {
+                        html += `<div style="font-size:11px;font-weight:bold;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:14px;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:4px;">🛡️ Core Identity</div>`;
+                        for (const [name, lines] of coreEntries) {
+                            const icon = sectionIcons[name] || '📋';
+                            const sectionColor = (name === 'Appearance/Species' || name === 'Appearance') ? '#d4a940' :
+                                                 name === 'Personality' ? '#8b5cf6' :
+                                                 name === 'Brief Background' ? '#3b82f6' :
+                                                 name.includes('Habit') || name.includes('Behavior') ? '#10b981' :
+                                                 'var(--SmartThemeEmColor, var(--SmartThemeBodyColorTextMuted, rgba(128,128,128,0.5)))';
+                            html += `<div style="margin-bottom:18px;">
+                                <div style="font-size:14px;font-weight:bold;color:${sectionColor};text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;display:flex;align-items:center;gap:7px;">
+                                    <span style="font-size:16px;">${icon}</span> ${escapeHtml(name)}
+                                </div>
+                                <div style="font-size:15px;line-height:1.6;color:var(--SmartThemeBodyColor, inherit);border-left:3px solid ${sectionColor}44;margin-left:3px;padding:6px 0 6px 14px;">
+                                    ${lines.map(l => escapeHtml(l)).join('<br>')}
+                                </div>
+                            </div>`;
+                        }
+                    }
+                    if (parsed.dynamic.length > 0) {
+                        html += `<div style="font-size:11px;font-weight:bold;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:1.5px;margin-top:24px;margin-bottom:14px;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:4px;">📖 Campaign History &amp; Dynamic Lore</div>`;
+                        html += `<div style="font-size:14px;line-height:1.6;color:var(--SmartThemeBodyColor, inherit);padding:4px 0 4px 10px;">`;
+                        html += parsed.dynamic.map(line => {
+                            const match = line.match(/^(\[.+?\])\s*(.*)/);
+                            if (match) {
+                                return `<div style="margin-bottom:8px;"><span style="color:#d4a940;font-weight:bold;font-family:monospace;font-size:12px;background:rgba(212,169,64,0.1);padding:2px 6px;border-radius:4px;margin-right:6px;">${escapeHtml(match[1])}</span><span>${escapeHtml(match[2])}</span></div>`;
+                            }
+                            return `<div style="margin-bottom:8px;">${escapeHtml(line)}</div>`;
+                        }).join('');
+                        html += `</div>`;
+                    }
+                    return html;
+                };
+
+                // ── Player Character Rendering ──
+                if (_currentChatId && s.chatStates?.[_currentChatId]?.playerCharacter) {
+                    const pc = s.chatStates[_currentChatId].playerCharacter;
+                    
+                    let desc = '';
+                    if (pc.bio) {
+                        const cleanBio = pc.bio.replace(/\[\/?CORE\]/gi, '');
+                        desc = cleanBio.split('\n').map(l => l.trim()).filter(l => l && !/^\[ID:/i.test(l)).slice(0, 2).join(' ').substring(0, 260);
+                    }
+                    const portraitSrc = s.customPortraits?.[pc.name] || '';
+                    
+                    const pcDiv = document.createElement('div');
+                    pcDiv.className = 'rt-npc-card';
+                    pcDiv.style.borderLeft = '3px solid #c4b5fd';
+                    pcDiv.style.marginBottom = '12px';
+                    
+                    const portraitHtml = portraitSrc
+                        ? `<img src="${escapeHtml(portraitSrc)}" alt="${escapeHtml(pc.name)}">`
+                        : `<div class="rt-npc-portrait-placeholder" style="color:#c4b5fd; border-color:rgba(120,80,220,0.5);">👤</div>`;
+
+                    pcDiv.innerHTML = `
+                        <div class="rt-npc-portrait-wrap">
+                            ${portraitHtml}
+                            <div class="rt-npc-portrait-gen-overlay" title="${portraitSrc ? 'Manage portrait' : 'Generate portrait'}">${portraitSrc ? '⚙️' : '🎨'}</div>
+                        </div>
+                        <div class="rt-npc-info">
+                            <div class="rt-npc-name" style="color:#c4b5fd;">${escapeHtml(pc.name)}</div>
+                            <div class="rt-npc-desc">${escapeHtml(desc)}</div>
+                            <span class="rt-npc-status-badge active" style="background:rgba(120,80,220,0.15);color:#c4b5fd;border:1px solid rgba(120,80,220,0.5);">👤 Player Character</span>
+                            <div class="rt-npc-actions">
+                                <button class="rt-npc-action-btn rt-npc-view" title="View PC card"><i class="fa-solid fa-address-card"></i> Full PC Card</button>
+                                <button class="rt-npc-action-btn rt-npc-edit" title="Edit PC text"><i class="fa-solid fa-pen-to-square"></i></button>
+                                <button class="rt-npc-action-btn rt-npc-delete" title="Unlink Player Character"><i class="fa-solid fa-link-slash"></i></button>
+                            </div>
+                        </div>
+                    `;
+                    
+                    const portraitWrap = pcDiv.querySelector('.rt-npc-portrait-wrap');
+                    if (portraitWrap) {
+                        portraitWrap.addEventListener('click', async (e) => {
+                            e.stopPropagation();
+                            if (typeof showPortraitSettingsMenu === 'function') {
+                                await showPortraitSettingsMenu(pc.name, refreshManifest, pc.bio || '');
+                            }
+                        });
+                    }
+
+                    const openPcPopup = async (startInEditMode = false) => {
+                        const ctx = SillyTavern.getContext();
+                        if (!ctx.callGenericPopup) return;
+                        const popupPortraitSrc = s.customPortraits?.[pc.name] || '';
+                        const hidePortrait = s.npcPortraits === false;
+                        const popupPortraitEl = popupPortraitSrc
+                            ? `<img src="${escapeHtml(popupPortraitSrc)}" style="width:100%;height:auto;aspect-ratio:1;object-fit:cover;border-radius:12px;border:2px solid rgba(120,80,220,0.5);box-shadow:0 4px 20px rgba(0,0,0,0.4);" alt="${escapeHtml(pc.name)}">`
+                            : `<div style="width:100%;aspect-ratio:1;border-radius:12px;background:var(--SmartThemeBorderColor, rgba(128,128,128,0.1));border:2px solid rgba(120,80,220,0.3);display:flex;align-items:center;justify-content:center;font-size:64px;opacity:0.25;color:var(--SmartThemeBodyColor, inherit);">👤</div>`;
+                        
+                        const popupDom = document.createElement('div');
+                        popupDom.style.cssText = 'width:100%;box-sizing:border-box;padding:24px;text-align:left;font-family:var(--rt-font, system-ui, sans-serif);color:var(--SmartThemeBodyColor, inherit);max-height:85vh;overflow-y:auto;';
+                        
+                        const sectionsInitialHtml = renderSectionsHtml(pc.bio) || '<div style="font-size:14px;color:var(--SmartThemeBodyColor, inherit);opacity:0.5;font-style:italic;padding:16px 0;">No structured sections found.</div>';
+                        
+                        popupDom.innerHTML = `
+                            <div style="display:flex;gap:24px;margin-bottom:20px;align-items:flex-start;flex-wrap:wrap;">
+                                ${hidePortrait ? '' : `<div style="flex-shrink:0;width:280px;">${popupPortraitEl}</div>`}
+                                <div style="flex:1;min-width:220px;display:flex;flex-direction:column;gap:8px;">
+                                    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
+                                        <div style="font-size:24px;font-weight:bold;color:#c4b5fd;line-height:1.2;">${escapeHtml(pc.name)}</div>
+                                        <button class="rt-npc-popup-edit-btn menu_button" style="flex-shrink:0;font-size:12px;padding:4px 12px;white-space:nowrap;">✏️ Edit Text</button>
+                                    </div>
+                                    <span style="font-size:11px;padding:3px 10px;border-radius:10px;font-weight:bold;align-self:flex-start;background:rgba(120,80,220,0.15);color:#c4b5fd;border:1px solid rgba(120,80,220,0.5);">Player Character</span>
+                                </div>
+                            </div>
+                            <div style="border-top:2px solid rgba(120,80,220,0.2);padding-top:18px;">
+                                <div class="rt-npc-popup-view">
+                                    <div class="rt-npc-popup-sections">${sectionsInitialHtml}</div>
+                                </div>
+                                <div class="rt-npc-popup-edit" style="display:none;flex-direction:column;gap:10px;">
+                                    <div style="font-size:11px;font-weight:bold;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:4px;">✏️ Editing Player Character Content</div>
+                                    <textarea class="rt-npc-popup-textarea" spellcheck="false" style="width:100%;min-height:420px;box-sizing:border-box;background:var(--SmartThemeBlurTintColor, rgba(0,0,0,0.3));color:var(--SmartThemeBodyColor, inherit);border:1px solid rgba(120,80,220,0.5);border-radius:8px;padding:12px;font-family:monospace;font-size:13px;line-height:1.6;resize:vertical;"></textarea>
+                                    <div style="display:flex;gap:8px;justify-content:flex-end;">
+                                        <button class="rt-npc-popup-cancel-btn menu_button" style="font-size:12px;padding:5px 14px;">Cancel</button>
+                                        <button class="rt-npc-popup-save-btn menu_button" style="font-size:12px;padding:5px 18px;background:rgba(120,80,220,0.2);border-color:rgba(120,80,220,0.5);color:#c4b5fd;font-weight:bold;">💾 Save</button>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                        
+                        const viewPane = popupDom.querySelector('.rt-npc-popup-view');
+                        const editPane = popupDom.querySelector('.rt-npc-popup-edit');
+                        const textarea = /** @type {HTMLTextAreaElement} */ (popupDom.querySelector('.rt-npc-popup-textarea'));
+                        const editBtn = popupDom.querySelector('.rt-npc-popup-edit-btn');
+                        const cancelBtn = popupDom.querySelector('.rt-npc-popup-cancel-btn');
+                        const saveBtn = /** @type {HTMLButtonElement} */ (popupDom.querySelector('.rt-npc-popup-save-btn'));
+                        const sectionsDiv = popupDom.querySelector('.rt-npc-popup-sections');
+                        
+                        const startEdit = () => {
+                            textarea.value = pc.bio || '';
+                            viewPane.style.display = 'none';
+                            editPane.style.display = 'flex';
+                            textarea.focus();
+                        };
+                        
+                        editBtn.addEventListener('click', startEdit);
+                        
+                        cancelBtn.addEventListener('click', () => {
+                            editPane.style.display = 'none';
+                            viewPane.style.display = 'block';
+                        });
+                        
+                        saveBtn.addEventListener('click', async () => {
+                            pc.bio = textarea.value;
+                            if (typeof saveChatState === 'function') saveChatState(_currentChatId);
+                            
+                            const newHtml = renderSectionsHtml(pc.bio) || `<div style="font-size:14px;color:var(--SmartThemeBodyColor, inherit);opacity:0.5;font-style:italic;padding:16px 0;">No structured sections found.</div>`;
+                            sectionsDiv.innerHTML = newHtml;
+                            
+                            editPane.style.display = 'none';
+                            viewPane.style.display = 'block';
+                            
+                            if (typeof refreshAgentManifestNow === 'function') refreshAgentManifestNow();
+                            
+                            // @ts-ignore
+                            if (typeof toastr !== 'undefined') toastr.success('Player Character saved.', 'Campaign Records');
+                        });
+                        
+                        if (startInEditMode) startEdit();
+                        
+                        const popupOpts = { okButton: 'Close', cancelButton: false, wide: true, large: true };
+                        await ctx.callGenericPopup(popupDom, ctx.POPUP_TYPE?.TEXT ?? 1, '', popupOpts);
+                    };
+
+                    const viewBtn = pcDiv.querySelector('.rt-npc-view');
+                    if (viewBtn) {
+                        viewBtn.addEventListener('click', async (e) => {
+                            e.stopPropagation();
+                            await openPcPopup(false);
+                        });
+                    }
+
+                    const extEditBtn = pcDiv.querySelector('.rt-npc-edit');
+                    if (extEditBtn) {
+                        extEditBtn.addEventListener('click', async (e) => {
+                            e.stopPropagation();
+                            await openPcPopup(true);
+                        });
+                    }
+                    
+                    const delBtn = pcDiv.querySelector('.rt-npc-delete');
+                    if (delBtn) {
+                        delBtn.addEventListener('click', async (e) => {
+                            e.stopPropagation();
+                            if (confirm('Unlink this Player Character from the current chat?')) {
+                                delete s.chatStates[_currentChatId].playerCharacter;
+                                if (typeof saveChatState === 'function') saveChatState(_currentChatId);
+                                if (typeof refreshAgentManifestNow === 'function') await refreshAgentManifestNow();
+                            }
+                        });
+                    }
+
+                    list.appendChild(pcDiv);
+                }
+
+                if (!prefix) {
+                    if (gen !== _manifestRenderGen) return;
+                    const msg = document.createElement('div');
+                    msg.style.cssText = 'text-align: center; opacity: 0.5; font-size: 0.769em; padding: 10px;';
+                    msg.innerHTML = 'Set a Campaign Prefix to see records.';
+                    list.appendChild(msg);
+                    return;
+                }
 
                 for (const [bookName, items] of byBook) {
                     if (gen !== _manifestRenderGen) return;
@@ -5894,122 +6685,8 @@ function createPanel() {
                             return lines.slice(0, 2).join(' ').substring(0, 260);
                         };
 
-                        // Helper: parse NPC content into structured sections for the detail popup
-                        // Handles both newline-separated AND single-line content (sections on same line)
-                        const parseNpcSections = (content) => {
-                            const sections = { core: {}, dynamic: [] };
-                            if (!content) return sections;
-
-                            // 1. Extract [CORE] ... [/CORE] block
-                            let coreContent = '';
-                            let dynamicContent = content;
-
-                            const coreMatch = content.match(/\[CORE\]([\s\S]*?)\[\/CORE\]/i);
-                            if (coreMatch) {
-                                coreContent = coreMatch[1];
-                                // Remove the [CORE] block from dynamic content
-                                dynamicContent = content.replace(/\[CORE\][\s\S]*?\[\/CORE\]/gi, '');
-                            } else {
-                                // Fallback: if no [CORE] tags, treat the whole content as potentially containing core sections
-                                coreContent = content;
-                                dynamicContent = '';
-                            }
-
-                            // 2. Parse core sections
-                            const sectionMarkers = /(?=(?:Appearance\/Species|Appearance|Personality|Brief Background|Habits\/Behaviors|(?<!Habits\/)Behaviors|Relationship with\s*\{\{user\}\}|(?<!Friendship\/|Affection\/)Relationship)\s*:)/gi;
-                            const normalizedCore = coreContent.replace(sectionMarkers, '\n');
-                            const coreLines = normalizedCore.split('\n');
-                            let currentSection = 'General';
-                            const sectionPattern = /^(Appearance\/Species|Appearance|Personality|Brief Background|Habits\/Behaviors|(?<!Habits\/)Behaviors|Relationship with\s*\{\{user\}\}|(?<!Friendship\/|Affection\/)Relationship)\s*:/i;
-
-                            for (const line of coreLines) {
-                                const trimmed = line.trim();
-                                if (!trimmed || /^\[ID:/i.test(trimmed) || /^Friendship\/Rapport:/i.test(trimmed) || /^Affection\/Interest:/i.test(trimmed)) continue;
-                                const match = trimmed.match(sectionPattern);
-                                if (match) {
-                                    currentSection = match[1].replace(/\s*\{\{user\}\}/, '').replace(/\s+with$/i, '').trim();
-                                    const afterColon = trimmed.substring(match[0].length).trim();
-                                    if (afterColon) {
-                                        if (!sections.core[currentSection]) sections.core[currentSection] = [];
-                                        sections.core[currentSection].push(afterColon);
-                                    }
-                                } else {
-                                    if (!sections.core[currentSection]) sections.core[currentSection] = [];
-                                    sections.core[currentSection].push(trimmed);
-                                }
-                            }
-
-                            // 3. Parse dynamic updates (anything outside [CORE], split by lines, ignoring empty or metadata lines)
-                            const dynamicLines = dynamicContent.split('\n');
-                            for (const line of dynamicLines) {
-                                const trimmed = line.trim();
-                                if (!trimmed || /^\[ID:/i.test(trimmed) || /^Friendship\/Rapport:/i.test(trimmed) || /^Affection\/Interest:/i.test(trimmed)) continue;
-
-                                // Ignore lines that contain ONLY a timestamp and no other text (e.g. "[05:47 PM, Day 1]")
-                                const timestampOnlyRegex = /^\[[^\]]+\]\s*$/;
-                                if (timestampOnlyRegex.test(trimmed)) continue;
-
-                                sections.dynamic.push(trimmed);
-                            }
-
-                            return sections;
-                        };
-
-
-                        // Helper: section icon map
-                        const sectionIcons = {
-                            'General': '📋', 'Appearance/Species': '👁️', 'Appearance': '👁️', 'Personality': '🧠',
-                            'Brief Background': '📜', 'Habits/Behaviors': '🔄', 'Habits': '🔄',
-                            'Behaviors': '🔄', 'Relationship': '❤️',
-                        };
-
-                        // Helper: open NPC detail popup
+                        // Helper: Open the full NPC popup
                         openNpcDetailPopup = async (item, rel) => {
-                            const ctx = SillyTavern.getContext();
-                            if (!ctx.callGenericPopup) return;
-                            const normLabel = item.label.replace(/\s*\(.*?\)/g, '').trim();
-                            const portraitSrc = s.customPortraits?.[normLabel] || '';
-                            const hidePortrait = s.npcPortraits === false;
-
-                            // Helper: build formatted sections HTML from raw content string
-                            const renderSectionsHtml = (rawContent) => {
-                                const parsed = parseNpcSections(rawContent);
-                                let html = '';
-                                const coreEntries = Object.entries(parsed.core);
-                                if (coreEntries.length > 0) {
-                                    html += `<div style="font-size:11px;font-weight:bold;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:14px;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:4px;">🛡️ Core Identity</div>`;
-                                    for (const [name, lines] of coreEntries) {
-                                        const icon = sectionIcons[name] || '📋';
-                                        const sectionColor = (name === 'Appearance/Species' || name === 'Appearance') ? '#d4a940' :
-                                                             name === 'Personality' ? '#8b5cf6' :
-                                                             name === 'Brief Background' ? '#3b82f6' :
-                                                             name.includes('Habit') || name.includes('Behavior') ? '#10b981' :
-                                                             'var(--SmartThemeEmColor, var(--SmartThemeBodyColorTextMuted, rgba(128,128,128,0.5)))';
-                                        html += `<div style="margin-bottom:18px;">
-                                            <div style="font-size:14px;font-weight:bold;color:${sectionColor};text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;display:flex;align-items:center;gap:7px;">
-                                                <span style="font-size:16px;">${icon}</span> ${escapeHtml(name)}
-                                            </div>
-                                            <div style="font-size:15px;line-height:1.6;color:var(--SmartThemeBodyColor, inherit);border-left:3px solid ${sectionColor}44;margin-left:3px;padding:6px 0 6px 14px;">
-                                                ${lines.map(l => escapeHtml(l)).join('<br>')}
-                                            </div>
-                                        </div>`;
-                                    }
-                                }
-                                if (parsed.dynamic.length > 0) {
-                                    html += `<div style="font-size:11px;font-weight:bold;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:1.5px;margin-top:24px;margin-bottom:14px;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:4px;">📖 Campaign History &amp; Dynamic Lore</div>`;
-                                    html += `<div style="font-size:14px;line-height:1.6;color:var(--SmartThemeBodyColor, inherit);padding:4px 0 4px 10px;">`;
-                                    html += parsed.dynamic.map(line => {
-                                        const match = line.match(/^(\[.+?\])\s*(.*)/);
-                                        if (match) {
-                                            return `<div style="margin-bottom:8px;"><span style="color:#d4a940;font-weight:bold;font-family:monospace;font-size:12px;background:rgba(212,169,64,0.1);padding:2px 6px;border-radius:4px;margin-right:6px;">${escapeHtml(match[1])}</span><span>${escapeHtml(match[2])}</span></div>`;
-                                        }
-                                        return `<div style="margin-bottom:8px;">${escapeHtml(line)}</div>`;
-                                    }).join('');
-                                    html += `</div>`;
-                                }
-                                return html;
-                            };
-
                             // Friendship/Affection bars for popup (large version, with editable sliders)
                             const makeBigBar = (val, label, colorPos, colorNeg, icon, type) => {
                                 const relMax = getNpcRelationshipMax(s);

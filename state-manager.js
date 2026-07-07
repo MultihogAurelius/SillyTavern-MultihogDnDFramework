@@ -1546,6 +1546,9 @@ export function saveChatState(chatId) {
 
         // Preserve lorebook stack link — written by Link button and router, not by normal state saves
         campaignBooks: existing.campaignBooks || [],
+
+        // Preserve Player Character pseudo-persona which is injected into the chat state
+        playerCharacter: existing.playerCharacter,
     };
     SillyTavern.getContext().saveSettingsDebounced();
 }

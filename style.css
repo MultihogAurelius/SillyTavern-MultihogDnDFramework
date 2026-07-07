@@ -2226,6 +2226,97 @@
     cursor: wait;
 }
 
+/* ── Character Roll Trigger Button ── */
+.rt-char-roll-trigger {
+    background: rgba(120, 80, 220, 0.15) !important;
+    border-color: rgba(120, 80, 220, 0.5) !important;
+    color: #c4b5fd !important;
+    font-weight: 600;
+}
+.rt-char-roll-trigger:hover {
+    background: rgba(120, 80, 220, 0.28) !important;
+    border-color: rgba(120, 80, 220, 0.8) !important;
+    color: #ddd6fe !important;
+}
+
+/* ── Character Roll Inline Panel ── */
+#rt-char-roll-panel {
+    border: 1px solid rgba(120, 80, 220, 0.25);
+    border-radius: 6px;
+    padding: 10px;
+    background: rgba(120, 80, 220, 0.05);
+    margin-top: 2px;
+}
+
+.rt-cr-row {
+    display: flex;
+    gap: 7px;
+    width: 100%;
+}
+
+.rt-cr-field {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    flex: 1 1 0%;
+    min-width: 0;
+}
+
+.rt-cr-label {
+    font-size: 0.78em;
+    font-weight: 600;
+    opacity: 0.75;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.rt-cr-input {
+    font-size: 11px !important;
+    padding: 3px 6px !important;
+    border-radius: 4px !important;
+    background: var(--black70a) !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+textarea.rt-cr-input {
+    min-height: 48px;
+}
+
+/* ── Persona Help Icon ── */
+.rt-cr-help-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    font-size: 0.72em;
+    font-weight: bold;
+    cursor: default;
+    opacity: 0.65;
+    flex-shrink: 0;
+    line-height: 1;
+    color: var(--rt-text-muted);
+    transition: opacity 0.2s, border-color 0.2s;
+}
+.rt-cr-help-icon:hover {
+    opacity: 1;
+    border-color: rgba(255,255,255,0.6);
+}
+
+/* ── Generate Button ── */
+#rt-cr-generate-btn:hover:not(:disabled) {
+    background: rgba(120, 80, 220, 0.35) !important;
+    border-color: rgba(160, 120, 255, 0.9) !important;
+}
+#rt-cr-generate-btn:disabled {
+    opacity: 0.55;
+    cursor: wait;
+}
+
+
 .rt-rng-toggle-overlay {
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid rgba(255, 255, 255, 0.1);
