@@ -10,8 +10,10 @@ All notable changes to the **Multihog D&D Framework** will be documented in this
   - Automatically seeds the initial framework state with rich, personalized stats and background tags.
   - Added a **Create Persona** checkbox that automatically generates a rich background, appearance, habits, and personality for your SillyTavern persona! Features customizable word count targets (ranging from 100 up to 1000+ words).
 - **Player Character (PC) Integration**: The Lorebook Agent and State Tracker have been upgraded to officially track and render the Player Character.
-  - The framework now dynamically parses and displays PC-specific information such as Health, AC, stats, inventory, and abilities in real-time, just like the narrator.
-  - Seamlessly integrates PC profile cards directly into the UI, ensuring your character's active narrative state is always synced.
+  - The framework now Seamlessly integrates PC profile cards directly into the UI, ensuring your character's active narrative state is always synced and accessible.
+
+### Fixed
+- **PC & State Persistence**: Fixed a critical bug where the newly created Player Character (and the state memo) would disappear if SillyTavern was refreshed immediately after generation or after the framework automatically updated the memo via swipe/AI generation. The framework now forces a synchronous save when modifying chat state partitions, preventing SillyTavern's debounce timer from losing uncommitted data on page unload.
 
 
 ## [4.5.2] - 2026-07-06

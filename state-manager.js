@@ -1550,7 +1550,13 @@ export function saveChatState(chatId) {
         // Preserve Player Character pseudo-persona which is injected into the chat state
         playerCharacter: existing.playerCharacter,
     };
-    SillyTavern.getContext().saveSettingsDebounced();
+    
+    const ctx = SillyTavern.getContext();
+    if (typeof ctx.saveSettings === 'function') {
+        ctx.saveSettings();
+    } else if (typeof ctx.saveSettingsDebounced === 'function') {
+        ctx.saveSettingsDebounced();
+    }
 }
 
 // ── Profile I/O ───────────────────────────────────────────────────────────────
