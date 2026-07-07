@@ -1,4 +1,4 @@
-import { getSettings, getEffectiveRouterCampaignPrefix, persistWorldProgressionTimer, persistRouterLastRunWatermark, persistRouterLastRunTimestamp, getNpcRelationshipMax, clampRelationshipValue, buildRouterRelationshipInstruction, sanitizeRouterState } from './state-manager.js';
+import { getSettings, getEffectiveRouterCampaignPrefix, persistWorldProgressionTimer, persistRouterLastRunWatermark, persistRouterLastRunTimestamp, getNpcRelationshipMax, clampRelationshipValue, buildRouterRelationshipInstruction, sanitizeRouterState, adjustPromptTimestamps } from './state-manager.js';
 import { sendStateRequest, sendAgentTurn } from './llm-client.js';
 import { getRequestHeaders } from '../../../../script.js';
 import { extractCurrentTimeStr, cleanMessageContent, parseInWorldTime, formatInWorldTime, findNthUserMessageStartIdx, formatAgentChatLogFromIndex, sanitizeLorebookRecordContent } from './memo-processor.js';
@@ -443,7 +443,8 @@ export async function runRouterPass(narrativeOutput, manualPrompt = null, custom
               `Justify each deactivation.`
             : '';
 
-        const basePrompt = (settings.routerSystemPromptTemplate || 'You are the Lorebook Agent. Maintain narrative consistency and manage lorebooks.')
+        const sysTemplate = adjustPromptTimestamps(settings.routerSystemPromptTemplate || 'You are the Lorebook Agent. Maintain narrative consistency and manage lorebooks.', settings);
+        const basePrompt = sysTemplate
             .replace(/\{\{campaignRoot\}\}/g, prefix || 'World Chronicle')
             .replace(/\{\{user\}\}/g, ctx.name1 || 'User');
 
@@ -1150,12 +1151,14 @@ Include the entity name/title itself (without timestamps like "[Day 1]") as a ke
 ${Object.values(settings.routerModules || {}).filter(m => m.enabled).map(m => `- ${m.tag}: ${m.instruction}`).join('\n')}${(settings.routerCustomTags || []).length ? '\n\n### CUSTOM CATEGORIES\n' + (settings.routerCustomTags || []).map(m => `- ${m.tag.toUpperCase()}: ${m.instruction}`).join('\n') : ''}`;
 
             const commitActionSchema = settings.npcRelationshipBars
-                ? `commit({"record": [...], "update": [...], "rename": [...], "activate": [...], "deactivate": [...], "delete_ids": [...], "rel": [...], "core": [...]}) ? write all changes and finish`
-                : `commit({"record": [...], "update": [...], "rename": [...], "activate": [...], "deactivate": [...], "delete_ids": [...], "core": [...]}) ? write all changes and finish`;
+                ? `commit({"record": [...], "update": [...], "rename": [...], "activate": [...], "deactivate": [...], "delete_ids": [...], "rel": [...], "core": [...]}) — write all changes and finish`
+                : `commit({"record": [...], "update": [...], "rename": [...], "activate": [...], "deactivate": [...], "delete_ids": [...], "core": [...]}) — write all changes and finish`;
 
             const commitRelDescription = settings.npcRelationshipBars
                 ? `\ncommit rel items: {"id": "Book::UID or NPC Name", "field": "friendship"|"affection", "delta": ±N} — set INITIAL relationship values for newly recorded NPCs only (signed integer delta)`
                 : ``;
+
+            const adjustedSharedContext = adjustPromptTimestamps(sharedContext, settings);
 
             const agentSystemPrompt = usesNativeTools
                 // Clean prompt for native tool calling ? model gets schemas via the API
@@ -1165,7 +1168,7 @@ ${Object.values(settings.routerModules || {}).filter(m => m.enabled).map(m => `-
 You are a lorebook research agent. Maintain the campaign lorebook using the provided tools.
 Use grep_lore / inspect_book / read_entry to look up existing data before recording.
 When research is complete, call commit once to write all changes. Stop immediately after.
-${sharedContext}`
+${adjustedSharedContext}`
                 // Text-format prompt for profile/default ? model outputs Action:/Observation: text
                 : `${basePrompt}
 
@@ -1192,7 +1195,7 @@ commit core items: {"id": "Book::UID", "field": "Appearance/Species|Personality|
 ## EXAMPLE
 Thought: I see a new faction called Iron Syndicate. I will record it.
 Action: commit({"record": [{"label": "Iron Syndicate", "keys": ["Khelt", "faction"], "content": "The dominant industrial authority.", "category": "FAC"}]})
-${sharedContext}`;
+${adjustedSharedContext}`;
 
             const questMatchA = settings.currentMemo?.match(/\[QUESTS\]([\s\S]*?)\[\/QUESTS\]/i);
             const questBlockA = questMatchA ? `[QUESTS]${questMatchA[1].trim()}[/QUESTS]` : 'None';

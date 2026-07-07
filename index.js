@@ -1,5 +1,5 @@
 import { EXAMPLES, COLOR_EXAMPLES, DEFAULT_STOCK_PROMPTS, RT_PROMPTS, BLOCK_ICONS, BLOCK_ORDER, PAGE_SIZE, NO_PAGINATE, QUESTS_NARRATOR, buildOnboardingXpHint, resolveTimePromptKey, resolveTimePromptDisplayTag } from './constants.js';
-import { MODULE_NAME, DEFAULT_MODULES, getSettings, getBarBackground, migrateCustomFields, saveChatState, saveProfile, deleteProfile, getEffectiveRouterCampaignPrefix, sanitizeCampaignPrefixString, buildNpcInstruction, loadStockPromptsFromProfile, getNpcRelationshipMax, getNpcRelationshipMaxDefault, clampRelationshipValue, relationshipBarPct, buildRelationshipTrackingSysprompt, getFriendshipTier, getAffectionTier, getRelTierBadgeStyle, getRelTierDetailedStyle, getRelTierDetailedLabelStyle, applyRelTierBadgeElement, sanitizeRouterState } from './state-manager.js';
+import { MODULE_NAME, DEFAULT_MODULES, getSettings, getBarBackground, migrateCustomFields, saveChatState, saveProfile, deleteProfile, getEffectiveRouterCampaignPrefix, sanitizeCampaignPrefixString, buildNpcInstruction, loadStockPromptsFromProfile, getNpcRelationshipMax, getNpcRelationshipMaxDefault, clampRelationshipValue, relationshipBarPct, buildRelationshipTrackingSysprompt, getFriendshipTier, getAffectionTier, getRelTierBadgeStyle, getRelTierDetailedStyle, getRelTierDetailedLabelStyle, applyRelTierBadgeElement, sanitizeRouterState, rebuildAllModuleInstructions, adjustAllStoredTemplatesForTimeFormat } from './state-manager.js';
 import { sendStateRequest, fetchOllamaModels, fetchOpenAIModels, testOpenAIConnection, getConnectionProfiles, getCurrentCompletionPreset, setCompletionPreset, syncCombatProfile, resetCombatProfileOverride } from './llm-client.js';
 import { getDiceToolName, getDiceCommandName, getDiceCommandAliases, doDiceRoll, registerDiceFunctionTool, registerDiceSlashCommand, installInterceptor, getNarrativeBlocks, onGenerationStarted, onGenerationEnded, ensureRelTagRegex, resetRouterTick, getRouterTick, resetRouterAutoTick, makeRngQueue, buildRngBlock, RNG_QUEUE_LEN, parseAndApplyNarrativeRelTags } from './narrative-hooks.js';
 import { deduplicateMemo, mergeMemo, computeDelta, escapeHtml, escapeRegex, highlightParens, cleanToolCallMessage, cleanMessageContent, getLastUserAction, buildLorebookContext, buildModulesInstructionText, buildModuleFormatInstruction, parseQuestsFromMemo, syncQuestsFromMemo, syncQuestsToMemo, writeQuestsToMemo, getQuestMood, extractCurrentTimeStr, stripArchivedQuestsFromMemo, stripCompletedQuestsFromMemo, applyQuestSyncAndStripMemo, isArchivedQuestStatus, removeArchivedQuest, parseInWorldTime, formatInWorldTime, sanitizeLorebookRecordContent } from './memo-processor.js';
@@ -576,9 +576,11 @@ function setUseDdMmYyFormat(isDate) {
     } else if (!s.initialDate || s.initialDate === "01/01/2026" || s.initialDate === "01/01/26") {
         s.initialDate = "Day 1";
     }
-    if (s.routerModules?.npc) {
-        s.routerModules.npc.instruction = buildNpcInstruction(s.npcMajorWords, s.npcMinorWords, false);
-    }
+    rebuildAllModuleInstructions(s);
+    adjustAllStoredTemplatesForTimeFormat(s);
+    $('#rpg_tracker_router_prompt').val(s.routerSystemPromptTemplate);
+    $('#rpg_tracker_router_modular_prompt').val(s.routerModularPromptTemplate);
+    refreshOrderList();
     saveSettings();
     persistChatTimeFormatIfLinked();
     syncTimeFormatSettingsUi(s);
@@ -593,6 +595,11 @@ function setUseDdMmYyFormat(isDate) {
 function setUse24hTime(is24h) {
     const s = getSettings();
     s.use24hTime = !!is24h;
+    rebuildAllModuleInstructions(s);
+    adjustAllStoredTemplatesForTimeFormat(s);
+    $('#rpg_tracker_router_prompt').val(s.routerSystemPromptTemplate);
+    $('#rpg_tracker_router_modular_prompt').val(s.routerModularPromptTemplate);
+    refreshOrderList();
     saveSettings();
     persistChatTimeFormatIfLinked();
     syncTimeFormatSettingsUi(s);
