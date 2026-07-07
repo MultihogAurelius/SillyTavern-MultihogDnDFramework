@@ -1552,10 +1552,10 @@ export function saveChatState(chatId) {
     };
     
     const ctx = SillyTavern.getContext();
-    if (typeof ctx.saveSettings === 'function') {
-        ctx.saveSettings();
-    } else if (typeof ctx.saveSettingsDebounced === 'function') {
+    if (typeof ctx.saveSettingsDebounced === 'function') {
         ctx.saveSettingsDebounced();
+    } else if (typeof ctx.saveSettings === 'function') {
+        ctx.saveSettings();
     }
 }
 
