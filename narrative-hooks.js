@@ -12,7 +12,7 @@
  * circular import. This will be cleaned up when index.js is split.
  */
 
-import { getSettings, hydrateWorldProgressionFromChatState, persistWorldProgressionTimer, persistRouterLastRunWatermark, getNpcRelationshipMax, clampRelationshipValue, relationshipBarPct, getFriendshipTier, getAffectionTier, applyRelTierBadgeElement, saveChatState } from './state-manager.js';
+import { getSettings, hydrateWorldProgressionFromChatState, persistWorldProgressionTimer, persistRouterLastRunWatermark, getNpcRelationshipMax, clampRelationshipValue, relationshipBarPct, getFriendshipTier, getAffectionTier, applyRelTierBadgeElement } from './state-manager.js';
 import { syncCombatProfile } from './llm-client.js';
 import { parseQuestsFromMemo, extractCurrentTimeStr, cleanMessageContent, formatInWorldTime } from './memo-processor.js';
 import { runRouterPass, saveSceneToLorebook, scanAssistantOutputForKeywords, parseInWorldMinutes, runWorldProgressionPass, updateLorebookEntry, getLorebookManifest } from './router.js';
@@ -995,19 +995,11 @@ export async function parseAndApplyNarrativeRelTags() {
         if (typeof ctx.saveChatDebounced === 'function') ctx.saveChatDebounced();
         ctx.saveSettingsDebounced?.();
         refreshRelationshipBarsDOM(settings);
-        if (settings.chatLinkEnabled) {
-            const chatId = ctx.chatId || ctx.getCurrentChatId?.();
-            if (chatId) saveChatState(chatId);
-        }
     };
 
     const triggerStateOnlyUIUpdate = () => {
         if (typeof ctx.saveChatDebounced === 'function') ctx.saveChatDebounced();
         ctx.saveSettingsDebounced?.();
-        if (settings.chatLinkEnabled) {
-            const chatId = ctx.chatId || ctx.getCurrentChatId?.();
-            if (chatId) saveChatState(chatId);
-        }
     };
 
     // If Relationship Bars are disabled, we only handle State Tracker swipe updates

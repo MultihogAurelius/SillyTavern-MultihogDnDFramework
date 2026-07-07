@@ -1551,12 +1551,7 @@ export function saveChatState(chatId) {
         playerCharacter: existing.playerCharacter,
     };
     
-    const ctx = SillyTavern.getContext();
-    if (typeof ctx.saveSettingsDebounced === 'function') {
-        ctx.saveSettingsDebounced();
-    } else if (typeof ctx.saveSettings === 'function') {
-        ctx.saveSettings();
-    }
+    SillyTavern.getContext().saveSettingsDebounced();
 }
 
 // ── Profile I/O ───────────────────────────────────────────────────────────────
