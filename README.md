@@ -1,3 +1,5 @@
+# NOTE: if updating to the most recent version fails, just re-clone the repo/reinstall.
+
 # Multihog D&D Framework
 
 *A D&D-based RPG platform/simulation engine for SillyTavern.*
