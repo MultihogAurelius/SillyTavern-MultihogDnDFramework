@@ -581,6 +581,9 @@ function setUseDdMmYyFormat(isDate) {
     $('#rpg_tracker_router_prompt').val(s.routerSystemPromptTemplate);
     $('#rpg_tracker_router_modular_prompt').val(s.routerModularPromptTemplate);
     refreshOrderList();
+    if (typeof globalThis._rpgRenderAgentModules === 'function') {
+        globalThis._rpgRenderAgentModules();
+    }
     saveSettings();
     persistChatTimeFormatIfLinked();
     syncTimeFormatSettingsUi(s);
@@ -600,6 +603,9 @@ function setUse24hTime(is24h) {
     $('#rpg_tracker_router_prompt').val(s.routerSystemPromptTemplate);
     $('#rpg_tracker_router_modular_prompt').val(s.routerModularPromptTemplate);
     refreshOrderList();
+    if (typeof globalThis._rpgRenderAgentModules === 'function') {
+        globalThis._rpgRenderAgentModules();
+    }
     saveSettings();
     persistChatTimeFormatIfLinked();
     syncTimeFormatSettingsUi(s);
