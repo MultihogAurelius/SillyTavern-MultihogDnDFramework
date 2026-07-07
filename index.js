@@ -2619,7 +2619,7 @@ const _CR_CLASS_LISTS = {
 };
 const _CR_CLASS_CONSTANTS = [
     ['📝 Other — type below…','__other__'],
-    ['✨ Story-Fitting — AI decides','__story__'],
+    ['✨ AI decides','__story__'],
 ];
 
 /**
