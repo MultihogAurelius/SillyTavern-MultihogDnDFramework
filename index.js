@@ -446,15 +446,22 @@ async function syncCampaignPrefixAndWorldsForChat(newChatId, source) {
  * Centralized save helper that handles both global settings and
  * the Chat-Linked State for the active chat.
  */
+let _saveSettingsTimer = null;
 export function saveSettings() {
-    const s = getSettings();
-    const ctx = SillyTavern.getContext();
-    ctx.saveSettingsDebounced();
-    const activeChatId = _currentChatId || ctx.chatId;
-    if (s.chatLinkEnabled && activeChatId) {
-        saveChatState(activeChatId);
-    }
+    // Keep UI synchronization immediate so toggle checkboxes and forms respond instantly
     syncOnboardingUI();
+
+    if (_saveSettingsTimer) clearTimeout(_saveSettingsTimer);
+    _saveSettingsTimer = setTimeout(() => {
+        _saveSettingsTimer = null;
+        const s = getSettings();
+        const ctx = SillyTavern.getContext();
+        ctx.saveSettingsDebounced();
+        const activeChatId = _currentChatId || ctx.chatId;
+        if (s.chatLinkEnabled && activeChatId) {
+            saveChatState(activeChatId);
+        }
+    }, 150);
 }
 
 /** When NPC portraits are disabled, turn off NPC auto-generation and sync dependent UI. */
