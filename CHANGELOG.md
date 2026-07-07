@@ -2,6 +2,18 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [4.6.0] - 2026-07-07
+
+### Added
+- **Character Roll System**: Introduced a brand new `🎲 Character Roll` button in the starting screen that streamlines character creation!
+  - Features intuitive inputs for Name, Gender, Orientation, Species, Ethnicity, Genre, Level, and Class.
+  - Automatically seeds the initial framework state with rich, personalized stats and background tags.
+  - Added a **Create Persona** checkbox that automatically generates a rich background, appearance, habits, and personality for your SillyTavern persona! Features customizable word count targets (ranging from 100 up to 1000+ words).
+- **Player Character (PC) Integration**: The Lorebook Agent and State Tracker have been upgraded to officially track and render the Player Character.
+  - The framework now dynamically parses and displays PC-specific information such as Health, AC, stats, inventory, and abilities in real-time, just like the narrator.
+  - Seamlessly integrates PC profile cards directly into the UI, ensuring your character's active narrative state is always synced.
+
+
 ## [4.5.2] - 2026-07-06
 
 ### Fixed
