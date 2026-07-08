@@ -559,11 +559,19 @@ export function openCustomFieldEditor(index) {
         };
         const savedCustomFields = s.customFields;
         s.customFields = [...savedCustomFields, ghostField];
+        if (!s.modulePageSizes) s.modulePageSizes = {};
+        const savedPageSize = s.modulePageSizes[previewTag];
+        s.modulePageSizes[previewTag] = 99999;
         try {
             renderView.innerHTML = renderMemoAsCards(fakeMemo, previewTag, _sectionPages);
             bindRenderedCardEvents(renderView, fakeMemo, true, () => renderPreviewInto(targetEl));
         } finally {
             s.customFields = savedCustomFields;
+            if (savedPageSize === undefined) {
+                delete s.modulePageSizes[previewTag];
+            } else {
+                s.modulePageSizes[previewTag] = savedPageSize;
+            }
         }
     };
 
