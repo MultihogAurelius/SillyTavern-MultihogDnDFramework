@@ -9,6 +9,11 @@ import { initializeDebugViewer, toggleDebugViewer } from './debug-viewer.js';
 import { runRouterPass, rollbackRouterPass, reapplyRouterPass, getLorebookManifest, deleteLorebookEntry, updateLorebookEntry, disableManagedEntries, isRouterRunning, stopRouterPass } from './router.js';
 import { getRequestHeaders } from '../../../../script.js';
 import { fileToDataUrl, scaleImageTo512Square, applyPortraitData, generatePortraitPrompt, generateNpcPortraitPrompt, showPortraitPromptPopup, generatePortraitDirect, autoGeneratePartyPortraits, removeAllPortraits, checkAndTriggerAutoGenerations, autoGenerateEnemyPortraits, forceCheckAutoGenerations, resetAutoGenerationTracking } from './portraits.js';
+import { loadPanelGeometry, loadDeltaHeight, makeDraggable, makeResizableTR, makeResizableBR, makeResizableBL, setupResizeObserver, setupDeltaResize } from './ui-geometry.js';
+import { applyCustomTheme, openThemeWizard, refreshSavedThemesList, handleRecolor, undoThemeChange } from './theme-manager.js';
+import { showCharacterRollPanel } from './character-creator.js';
+import { handleCategorySettings, openCustomFieldEditor, openPromptEditor, refreshOrderList, exportModules, importModulesFromJson } from './ui-editors.js';
+import { applyCustomSysprompts, replaceGsSlotMarkers, openGameSystemWizard, openManageGameSystems, openUnlockSectionsMenu, openCustomSyspromptLibrary, resetSyspromptLibrary, runAiSectionBuilder, runManualSectionBuilder, syncAllNarratorTogglesForUnlockState } from './game-systems.js';
 
 export const RENDERING_TAGS_LIBRARY = [
     'Health: ((BAR)) 50/100',
@@ -46,7 +51,7 @@ export const RENDERING_TAGS_LIBRARY = [
 ];
 
 // Capture the folder name dynamically from the module URL so it works regardless of what the user names the folder
-const FOLDER_NAME = (function () {
+export const FOLDER_NAME = (function () {
     try {
         const urlObj = new URL(import.meta.url);
         const parts = urlObj.pathname.split('/');
@@ -65,7 +70,6 @@ let _prefixDeriveTimer = null; // Pending CHAT_CHANGED → prefix-derivation tim
 /** Set during init BOOTSTRAP so the immediate CHAT_CHANGED does not repeat /world scans. */
 let _sessionBootstrapChatId = null;
 let _bootstrapSyncPromise = null;
-let themeUndoStack = [];
 let _pillDeselectHandler = null;
 let _tabModeMenuDeselectHandler = null;
 let renderRouterUI = null;
@@ -126,7 +130,7 @@ function scheduleAgentManifestRefresh(force = false) {
 }
 
 /** Reload CAMPAIGN RECORDS — safe from settings UI outside createPanel(). */
-async function refreshAgentManifestNow() {
+export async function refreshAgentManifestNow() {
     if (typeof globalThis._rpgRefreshAgentManifest === 'function') {
         await globalThis._rpgRefreshAgentManifest();
     }
@@ -474,7 +478,7 @@ function applyNpcPortraitSetting(settings, enabled) {
 }
 
 /** Sync NPC portrait toggle and disable auto-generate-NPCs when portraits are off. */
-function syncNpcPortraitDependentUi(settings) {
+export function syncNpcPortraitDependentUi(settings) {
     const enabled = settings.npcPortraits !== false;
     $('#rpg_tracker_npc_portraits').prop('checked', enabled);
     const autoNpcCb = $('#rpg_tracker_portrait_auto_npcs');
@@ -491,7 +495,7 @@ function syncNpcPortraitDependentUi(settings) {
  * UI, so no surface can ever show a stale or contradicting value.
  * @param {object} s
  */
-function syncTimeFormatSettingsUi(s) {
+export function syncTimeFormatSettingsUi(s) {
     const timeDdMmyyCb = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_time_ddmmyy_toggle'));
     if (timeDdMmyyCb) timeDdMmyyCb.checked = !!s.useDdMmYyFormat;
     const time24hCb = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_time_24h_toggle'));
@@ -568,7 +572,7 @@ function applyChatTimeFormatSettings(saved) {
  * drift apart between the different places it's exposed.
  * @param {boolean} isDate
  */
-function setUseDdMmYyFormat(isDate) {
+export function setUseDdMmYyFormat(isDate) {
     const s = getSettings();
     s.useDdMmYyFormat = !!isDate;
     if (isDate) {
@@ -595,7 +599,7 @@ function setUseDdMmYyFormat(isDate) {
  * See {@link setUseDdMmYyFormat} for why every toggle must funnel through here.
  * @param {boolean} is24h
  */
-function setUse24hTime(is24h) {
+export function setUse24hTime(is24h) {
     const s = getSettings();
     s.use24hTime = !!is24h;
     rebuildAllModuleInstructions(s);
@@ -728,7 +732,7 @@ function syncSegToggle(segEl, activeValue) {
 // ── Renderer / navigation state ──
 let _historyViewIndex = -1;    // -1 = live, 0 = most recent snapshot, higher = older
 let _renderedViewActive = false;
-const _sectionPages = {};
+export const _sectionPages = {};
 
 // ── Lorebook Agent nav state ──
 /** @type {Array<{prePassSnapshot: object, postPassState: object}>} */
@@ -1017,7 +1021,7 @@ async function cloneCampaignStack() {
 
 // ── Chat-Linked State (deferred from state-manager.js — touches DOM + _historyViewIndex) ──
 
-function refreshQuestPrompt(s) {
+export function refreshQuestPrompt(s) {
     let prompt = DEFAULT_STOCK_PROMPTS.quests;
     if (!s.syspromptModules?.questsDeadlines && !s.syspromptModules?.questsFrustration) {
         prompt = prompt.replace(/  DEADLINE:.*\n/g, '');
@@ -1133,6 +1137,15 @@ function loadChatState(chatId) {
     s.worldOpenaiKey = saved.worldOpenaiKey || "";
     s.worldOpenaiModel = saved.worldOpenaiModel || "";
 
+    s.gameSystemWizardConnectionSource = saved.gameSystemWizardConnectionSource ?? "default";
+    s.gameSystemWizardConnectionProfileId = saved.gameSystemWizardConnectionProfileId || "";
+    s.gameSystemWizardCompletionPresetId = saved.gameSystemWizardCompletionPresetId || "";
+    s.gameSystemWizardOllamaUrl = saved.gameSystemWizardOllamaUrl || "http://localhost:11434";
+    s.gameSystemWizardOllamaModel = saved.gameSystemWizardOllamaModel || "";
+    s.gameSystemWizardOpenaiUrl = saved.gameSystemWizardOpenaiUrl || "";
+    s.gameSystemWizardOpenaiKey = saved.gameSystemWizardOpenaiKey || "";
+    s.gameSystemWizardOpenaiModel = saved.gameSystemWizardOpenaiModel || "";
+
     applyChatTimeFormatSettings(saved);
     applyChatNpcRelMaxSettings(saved);
 
@@ -1188,6 +1201,16 @@ function loadChatState(chatId) {
     $('#rpg_world_openai_model').val(s.worldOpenaiModel || '');
     $('#rpg_world_openai_model_manual').val(s.worldOpenaiModel || '');
 
+    $('#rpg_gs_wizard_connection_source').val(s.gameSystemWizardConnectionSource || 'default');
+    $('#rpg_gs_wizard_connection_profile').val(s.gameSystemWizardConnectionProfileId || '');
+    $('#rpg_gs_wizard_completion_preset').val(s.gameSystemWizardCompletionPresetId || '');
+    $('#rpg_gs_wizard_ollama_url').val(s.gameSystemWizardOllamaUrl || 'http://localhost:11434');
+    $('#rpg_gs_wizard_ollama_model').val(s.gameSystemWizardOllamaModel || '');
+    $('#rpg_gs_wizard_openai_url').val(s.gameSystemWizardOpenaiUrl || '');
+    $('#rpg_gs_wizard_openai_key').val(s.gameSystemWizardOpenaiKey || '');
+    $('#rpg_gs_wizard_openai_model').val(s.gameSystemWizardOpenaiModel || '');
+    $('#rpg_gs_wizard_openai_model_manual').val(s.gameSystemWizardOpenaiModel || '');
+
     // Toggle container visibilities
     $('#rpg_portrait_profile_group').toggle(s.portraitConnectionSource === 'profile');
     $('#rpg_portrait_ollama_group').toggle(s.portraitConnectionSource === 'ollama');
@@ -1195,6 +1218,9 @@ function loadChatState(chatId) {
     $('#rpg_world_profile_group').toggle(s.worldConnectionSource === 'profile');
     $('#rpg_world_ollama_group').toggle(s.worldConnectionSource === 'ollama');
     $('#rpg_world_openai_group').toggle(s.worldConnectionSource === 'openai');
+    $('#rpg_gs_wizard_profile_group').toggle(s.gameSystemWizardConnectionSource === 'profile');
+    $('#rpg_gs_wizard_ollama_group').toggle(s.gameSystemWizardConnectionSource === 'ollama');
+    $('#rpg_gs_wizard_openai_group').toggle(s.gameSystemWizardConnectionSource === 'openai');
 
     const wpPosSelect = $('#rpg_world_progression_injection_position');
     const wpPosition = s.worldProgressionInjectionPosition ?? 4;
@@ -1605,600 +1631,10 @@ function onChatChanged(newChatId) {
 }
 
 
-async function openThemeWizard(isIteration = false) {
-    const settings = getSettings();
 
-    const systemPrompt = `You are a CSS theme designer for a dark-UI RPG tracker panel.
-The user will describe a visual theme in plain language. You must output ONLY a valid JSON object with these exact keys and CSS values:
 
-{
-  "--rt-custom-bg": "<CSS background value, usually rgba()>",
-  "--rt-custom-blur": "<blur() value, e.g. blur(12px)>",
-  "--rt-custom-border": "<full CSS border, e.g. 1px solid #rrggbb>",
-  "--rt-custom-text": "<primary text color, hex or rgba>",
-  "--rt-custom-text-muted": "<secondary/dimmed text color>",
-  "--rt-custom-font": "<font-family stack>",
-  "--rt-custom-font-mono": "<monospace font-family stack>",
-  "--rt-custom-accent": "<main accent/highlight color>",
-  "--rt-custom-accent-dim": "<accent color at ~40% opacity, rgba()>",
-  "--rt-custom-accent-bg": "<accent color at ~10-15% opacity, rgba()>",
-  "--rt-custom-card-border": "<full CSS border for inner cards>",
-  "--rt-custom-shadow": "<box-shadow value>",
-  "--rt-custom-header-bg": "<header background, usually semi-transparent>",
-  "--rt-custom-card-bg": "<card body background, semi-transparent>",
-  "--rt-custom-card-header": "<card header background, semi-transparent>"
-}
 
-Rules:
-- Output ONLY the JSON object. No markdown, no code fences, no explanation.
-- All colors must be valid CSS. Prefer rgba() for backgrounds (allow transparency).
-- Make the theme visually coherent and beautiful. Lean into the user's description creatively.
-- Ensure text colors have sufficient contrast against the background for readability.`;
 
-    const statusEl = document.getElementById('rpg_tracker_theme_wizard_status');
-    const generateBtn = /** @type {HTMLButtonElement|null} */ (document.getElementById('rpg_tracker_theme_generate'));
-    const iterateBtn = /** @type {HTMLButtonElement|null} */ (document.getElementById('rpg_tracker_theme_iterate'));
-
-    const setStatus = (msg, isError = false) => {
-        if (!statusEl) return;
-        statusEl.style.display = 'block';
-        statusEl.style.color = isError ? '#ff7777' : 'inherit';
-        statusEl.textContent = msg;
-    };
-
-    const promptText = /** @type {HTMLTextAreaElement} */ (document.getElementById('rpg_tracker_theme_prompt'))?.value?.trim();
-    if (!promptText) {
-        setStatus(isIteration ? '⚠ Please describe the changes you want.' : '⚠ Please describe a theme first.', true);
-        return;
-    }
-
-    const iterationContext = (isIteration && settings.customTheme)
-        ? `\n\nCURRENT THEME STATE (JSON):\n${JSON.stringify(settings.customTheme, null, 2)}\n\nUser wants to CHANGE this theme as follows: ${promptText}`
-        : `\n\nUser description: ${promptText}`;
-
-    if (generateBtn) generateBtn.disabled = true;
-    if (iterateBtn) iterateBtn.disabled = true;
-    setStatus(isIteration ? '⚡ Refining theme.' : '⚡ Generating theme.');
-
-    let raw = '';
-    try {
-        raw = await sendStateRequest(settings, systemPrompt, iterationContext);
-    } catch (err) {
-        setStatus(`❌ Request failed: ${err.message}`, true);
-        if (generateBtn) generateBtn.disabled = false;
-        if (iterateBtn) iterateBtn.disabled = false;
-        return;
-    }
-
-    const jsonMatch = raw.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-        setStatus('❌ AI did not return valid JSON. Try a different prompt or model.', true);
-        if (generateBtn) generateBtn.disabled = false;
-        if (iterateBtn) iterateBtn.disabled = false;
-        return;
-    }
-
-    let vars;
-    try {
-        vars = JSON.parse(jsonMatch[0]);
-    } catch (e) {
-        setStatus('❌ Failed to parse AI response as JSON.', true);
-        if (generateBtn) generateBtn.disabled = false;
-        if (iterateBtn) iterateBtn.disabled = false;
-        return;
-    }
-
-    const expected = [
-        '--rt-custom-bg', '--rt-custom-blur', '--rt-custom-border',
-        '--rt-custom-text', '--rt-custom-text-muted', '--rt-custom-font',
-        '--rt-custom-font-mono', '--rt-custom-accent', '--rt-custom-accent-dim',
-        '--rt-custom-accent-bg', '--rt-custom-card-border', '--rt-custom-shadow',
-        '--rt-custom-header-bg', '--rt-custom-card-bg', '--rt-custom-card-header',
-    ];
-    const missing = expected.filter(k => !vars[k]);
-    if (missing.length > 3) {
-        setStatus(`❌ AI response is missing too many theme keys: ${missing.join(', ')}`, true);
-        if (generateBtn) generateBtn.disabled = false;
-        if (iterateBtn) iterateBtn.disabled = false;
-        return;
-    }
-
-    if (settings.customTheme) {
-        themeUndoStack.push(JSON.parse(JSON.stringify(settings.customTheme)));
-        if (themeUndoStack.length > 20) themeUndoStack.shift();
-    }
-    settings.customTheme = vars;
-    settings.trackerTheme = 'rt-theme-custom';
-    saveSettings();
-    applyCustomTheme(vars);
-
-    document.querySelectorAll('.rpg-tracker-panel').forEach(p => {
-        p.className = p.className.replace(/rt-theme-\S+/g, '').trim() + ' rt-theme-custom';
-    });
-
-    const sel = /** @type {HTMLSelectElement} */ (document.getElementById('rpg_tracker_theme_select'));
-    if (sel) sel.value = 'rt-theme-custom';
-
-    setStatus(isIteration ? '✅ Theme refined!' : '✅ Theme generated!');
-    if (generateBtn) generateBtn.disabled = false;
-    if (iterateBtn) iterateBtn.disabled = false;
-    toastr['success'](isIteration ? 'Theme refined successfully!' : 'New theme generated and applied!', 'Theme Wizard');
-    refreshSavedThemesList();
-}
-
-function refreshSavedThemesList() {
-    const settings = getSettings();
-    const container = document.getElementById('rpg_tracker_saved_themes_container');
-    const list = document.getElementById('rpg_tracker_saved_themes_list');
-    if (!container || !list) return;
-
-    const entries = Object.entries(settings.savedThemes || {});
-    if (entries.length === 0) {
-        container.style.display = 'none';
-        return;
-    }
-
-    container.style.display = 'block';
-    list.innerHTML = '';
-
-    entries.forEach(([name, vars]) => {
-        const row = document.createElement('div');
-        row.className = 'flex-container alignitemscenter gap-1';
-        row.style.background = 'rgba(255,255,255,0.05)';
-        row.style.padding = '4px 8px';
-        row.style.borderRadius = '4px';
-
-        const nameSpan = document.createElement('span');
-        nameSpan.textContent = name;
-        nameSpan.style.flex = '1';
-        nameSpan.style.fontSize = '0.85em';
-        nameSpan.style.cursor = 'pointer';
-        nameSpan.className = 'interactable';
-        nameSpan.title = 'Click to load this theme';
-        nameSpan.addEventListener('click', () => {
-            settings.customTheme = JSON.parse(JSON.stringify(vars));
-            settings.trackerTheme = 'rt-theme-custom';
-            saveSettings();
-            applyCustomTheme(settings.customTheme);
-
-            // Update UI
-            const sel = /** @type {HTMLSelectElement} */ (document.getElementById('rpg_tracker_theme_select'));
-            if (sel) sel.value = 'rt-theme-custom';
-            document.querySelectorAll('.rpg-tracker-panel').forEach(p => {
-                p.className = p.className.replace(/rt-theme-\S+/g, '').trim() + ' rt-theme-custom';
-            });
-
-            const statusEl = document.getElementById('rpg_tracker_theme_wizard_status');
-            if (statusEl) {
-                statusEl.style.display = 'block';
-                statusEl.style.color = 'inherit';
-                statusEl.textContent = `⚡ Loaded library theme: ${name}`;
-            }
-        });
-
-        const delBtn = document.createElement('i');
-        delBtn.className = 'fa-solid fa-trash-can interactable';
-        delBtn.style.fontSize = '0.8em';
-        delBtn.style.opacity = '0.5';
-        delBtn.title = 'Delete theme';
-        delBtn.addEventListener('click', () => {
-            if (confirm(`Are you sure you want to delete the theme "${name}"?`)) {
-                delete settings.savedThemes[name];
-                saveSettings();
-                refreshSavedThemesList();
-                toastr['info'](`Deleted theme: ${name}`, 'Theme Library');
-            }
-        });
-
-        row.appendChild(nameSpan);
-        row.appendChild(delBtn);
-        list.appendChild(row);
-    });
-}
-
-function handleRecolor(barId, currentBg, targetEl) {
-    if (!barId) return;
-
-    document.getElementById('rt-recolor-popup')?.remove();
-
-    const s = getSettings();
-    const initialCfg = s.barColors?.[barId] ? JSON.parse(JSON.stringify(s.barColors[barId])) : null;
-
-    let cfg = s.barColors?.[barId];
-    if (!cfg) {
-        const isHP = barId.endsWith(':HP') || barId.includes(':HPBAR') || barId.endsWith(':HP');
-        let color = "#ff0000";
-        const hexMatch = currentBg.match(/#[0-9a-fA-F]{3,8}/);
-        if (hexMatch) color = hexMatch[0];
-
-        if (isHP) {
-            cfg = { mode: 'dynamic', color: '#00ffaa', color2: '#ff5555' };
-        } else {
-            cfg = { mode: 'solid', color: color };
-        }
-    } else if (typeof cfg === 'string') {
-        cfg = { mode: 'solid', color: cfg };
-    }
-
-    const applyLive = () => {
-        const ss = getSettings();
-        if (!ss.barColors) ss.barColors = {};
-        ss.barColors[barId] = { ...cfg };
-        saveSettings();
-        refreshRenderedView();
-    };
-
-    const popup = document.createElement('div');
-    popup.id = 'rt-recolor-popup';
-    popup.style.cssText = `
-            position: fixed; z-index: 999999; background: #252535; border: 1px solid rgba(255,255,255,0.3);
-            border-radius: 12px; padding: 14px; box-shadow: 0 12px 40px rgba(0,0,0,0.75);
-            backdrop-filter: blur(16px); color: #ffffff !important; font-family: sans-serif; width: 240px;
-        `;
-
-    const renderContent = () => {
-        popup.innerHTML = `
-                <div style="display:flex; flex-direction:column; gap:12px;">
-                    <div style="font-size:0.85em; font-weight:bold; opacity:0.8; letter-spacing:0.05em; text-transform:uppercase;">Recolor Bar</div>
-                    
-                    <div style="display:flex; background:rgba(0,0,0,0.3); border-radius:6px; padding:2px;">
-                        <button class="mode-btn" data-mode="solid" style="flex:1; border:none; background:${cfg.mode === 'solid' ? 'rgba(255,255,255,0.15)' : 'transparent'}; color:white; font-size:0.75em; padding:4px; border-radius:4px; cursor:pointer;">Solid</button>
-                        <button class="mode-btn" data-mode="gradient" style="flex:1; border:none; background:${cfg.mode === 'gradient' ? 'rgba(255,255,255,0.15)' : 'transparent'}; color:white; font-size:0.75em; padding:4px; border-radius:4px; cursor:pointer;">Gradient</button>
-                        <button class="mode-btn" data-mode="dynamic" style="flex:1; border:none; background:${cfg.mode === 'dynamic' ? 'rgba(255,255,255,0.15)' : 'transparent'}; color:white; font-size:0.75em; padding:4px; border-radius:4px; cursor:pointer;">Dynamic</button>
-                    </div>
-
-                    <div id="recolor-controls" style="display:flex; align-items:center; gap:10px; min-height:40px;">
-                        ${cfg.mode === 'dynamic' ? `
-                            <span style="font-size:0.8em; opacity:0.7;">HP-based coloring active</span>
-                        ` : `
-                            <input id="color1" type="color" value="${cfg.color}" style="width:40px; height:30px; border:1px solid rgba(255,255,255,0.2); border-radius:4px; cursor:pointer; background:rgba(255,255,255,0.1);" />
-                            ${cfg.mode === 'gradient' ? `
-                                <span style="font-size:1.2em; opacity:0.5;">&rarr;</span>
-                                <input id="color2" type="color" value="${cfg.color2 || cfg.color}" style="width:40px; height:30px; border:1px solid rgba(255,255,255,0.2); border-radius:4px; cursor:pointer; background:rgba(255,255,255,0.1);" />
-                            ` : ''}
-                        `}
-                    </div>
-
-                    <div style="display:flex; gap:6px; margin-top:4px;">
-                        <button id="recolor-ok" style="flex:1.5; padding:6px; border-radius:6px; border:none; background:var(--rt-accent-bg, #00ffaa); color:#000; font-weight:bold; cursor:pointer; font-size:0.85em;">OK</button>
-                        <button id="recolor-cancel" style="flex:1; padding:6px; border-radius:6px; border:1px solid rgba(255,255,255,0.2); background:rgba(255,255,255,0.05); color:white; cursor:pointer; font-size:0.85em;">Cancel</button>
-                        <button id="recolor-reset" style="flex:1; padding:6px; border-radius:6px; border:1px solid rgba(255,255,255,0.2); background:rgba(255,255,255,0.05); color:white; cursor:pointer; font-size:0.85em;" title="Reset to defaults">Reset</button>
-                    </div>
-                </div>
-            `;
-
-        popup.querySelectorAll('.mode-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                cfg.mode = /** @type {HTMLElement} */ (btn).dataset.mode;
-                if (cfg.mode === 'gradient' && !cfg.color2) cfg.color2 = cfg.color;
-                applyLive();
-                renderContent();
-            });
-        });
-
-        const c1 = popup.querySelector('#color1');
-        const c2 = popup.querySelector('#color2');
-
-        // --- Live preview while dragging: only patch bar color in-place, no re-render ---
-        const patchBarColor = () => {
-            let bg;
-            if (cfg.mode === 'gradient' && cfg.color2) {
-                bg = `linear-gradient(90deg,${cfg.color},${cfg.color2})`;
-            } else {
-                bg = cfg.color;
-            }
-            // Patch the actual bar fill element directly — O(1), no DOM rebuild.
-            document.querySelectorAll(`.rt-hp-bar-wrap[data-recolor-id="${CSS.escape(barId)}"] .rt-hp-bar,
-                                       .rt-xp-bar-wrap[data-recolor-id="${CSS.escape(barId)}"] .rt-xp-bar`)
-                .forEach(bar => { bar.style.background = bg; });
-        };
-
-        if (c1) {
-            // `input`: fires every frame while dragging — cheap live patch only
-            c1.addEventListener('input', (e) => {
-                cfg.color = /** @type {HTMLInputElement} */ (e.target).value;
-                patchBarColor();
-            });
-            // `change`: fires once on mouse-up — now safe to save + full re-render
-            c1.addEventListener('change', () => { applyLive(); });
-        }
-        if (c2) {
-            c2.addEventListener('input', (e) => {
-                cfg.color2 = /** @type {HTMLInputElement} */ (e.target).value;
-                patchBarColor();
-            });
-            c2.addEventListener('change', () => { applyLive(); });
-        }
-
-        popup.querySelector('#recolor-ok').addEventListener('click', () => {
-            applyLive();
-            popup.remove();
-        });
-
-        popup.querySelector('#recolor-cancel').addEventListener('click', () => {
-            const ss = getSettings();
-            if (initialCfg) ss.barColors[barId] = initialCfg;
-            else delete ss.barColors[barId];
-            saveSettings();
-            refreshRenderedView();
-            popup.remove();
-        });
-
-        popup.querySelector('#recolor-reset').addEventListener('click', () => {
-            const ss = getSettings();
-            if (ss.barColors) delete ss.barColors[barId];
-            saveSettings();
-            refreshRenderedView();
-            popup.remove();
-        });
-    };
-
-    renderContent();
-    document.body.appendChild(popup);
-
-    const rect = targetEl.getBoundingClientRect();
-    let left = rect.left + rect.width / 2 - 120;
-    let top = rect.top - popup.offsetHeight - 12;
-    left = Math.max(8, Math.min(left, window.innerWidth - 248));
-    if (top < 8) top = rect.bottom + 12;
-    popup.style.left = left + 'px';
-    popup.style.top = top + 'px';
-
-    const onOutside = (e) => {
-        if (!popup.contains(e.target)) {
-            popup.remove();
-            document.removeEventListener('mousedown', onOutside);
-        }
-    };
-
-    setTimeout(() => document.addEventListener('mousedown', onOutside), 50);
-}
-
-function handleCategorySettings(tag, targetEl) {
-    const existing = document.getElementById('rt-cat-settings-popup');
-    if (existing) {
-        const oldTag = existing.getAttribute('data-tag');
-        existing.remove();
-        if (oldTag === tag) return;
-    }
-    const s = getSettings();
-    if (!s.categoryRenderOptions) s.categoryRenderOptions = {};
-    if (!s.categoryRenderOptions[tag]) {
-        const noBullets = (tag === 'TIME' || tag === 'XP' || tag === 'QUESTS' || tag === 'SPELLS' || tag === 'CHARACTER' || tag === 'PARTY' || tag === 'COMBAT' || tag === 'ABILITIES');
-        s.categoryRenderOptions[tag] = {
-            fontSize: (tag === 'TIME' || tag === 'INVENTORY') ? 12 : 13,
-            italic: false,
-            bold: false,
-            bullets: !noBullets,
-            bulletStyle: tag === 'INVENTORY' ? '▪' : '•',
-            bulletColor: 'inherit',
-            fontFamily: 'inherit',
-            textColor: 'inherit'
-        };
-    } else if (s.categoryRenderOptions[tag].bullets === undefined) {
-        // Migration for existing settings: default specific categories to no bullets
-        if (tag === 'TIME' || tag === 'XP' || tag === 'QUESTS' || tag === 'SPELLS' || tag === 'CHARACTER' || tag === 'PARTY' || tag === 'COMBAT' || tag === 'ABILITIES') {
-            s.categoryRenderOptions[tag].bullets = false;
-        } else {
-            s.categoryRenderOptions[tag].bullets = true;
-        }
-    }
-    const cfg = s.categoryRenderOptions[tag];
-    const initialCfg = JSON.stringify(cfg);
-
-    let applyTimeout = null;
-    const applyLive = () => {
-        if (applyTimeout) clearTimeout(applyTimeout);
-        applyTimeout = setTimeout(() => {
-            saveSettings();
-            refreshRenderedView();
-        }, 50);
-    };
-
-    const popup = document.createElement('div');
-    popup.id = 'rt-cat-settings-popup';
-    popup.setAttribute('data-tag', tag);
-    popup.style.cssText = `
-            position: fixed; z-index: 999999; background: #252535; border: 1px solid rgba(255,255,255,0.3);
-            border-radius: 12px; padding: 14px; box-shadow: 0 12px 40px rgba(0,0,0,0.75);
-            backdrop-filter: blur(16px); color: #ffffff !important; font-family: sans-serif; width: 280px;
-        `;
-
-    const renderContent = () => {
-        const symbols = ['•', '○', '●', '▪', '▫', '▶', '➤', '—', '*', '>', '✓', '⚡'];
-        popup.innerHTML = `
-                <div style="display:flex; flex-direction:column; gap:12px;">
-                    <div style="font-size:0.85em; font-weight:bold; opacity:0.8; letter-spacing:0.05em; text-transform:uppercase;">${tag} Settings</div>
-                    
-                    <div style="display:flex; flex-direction:column; gap:4px;">
-                        <div style="display:flex; align-items:center; justify-content:space-between;">
-                            <span style="font-size:0.85em; opacity:0.8;">Font Size</span>
-                            <span id="rt-cat-fs-val" style="font-size:0.85em; font-weight:bold; color:var(--rt-accent, #00ffaa);">${cfg.fontSize || '13'}</span>
-                        </div>
-                        <input id="rt-cat-fs" type="range" value="${cfg.fontSize || 13}" min="8" max="24" step="1" style="width:100%; cursor:pointer; accent-color:var(--rt-accent, #00ffaa);">
-                    </div>
-
-                    <div style="display:flex; gap:6px;">
-                        <button id="rt-cat-bold" style="flex:1; padding:6px; border-radius:6px; border:1px solid rgba(255,255,255,0.2); background:${cfg.bold ? 'rgba(255,255,255,0.15)' : 'transparent'}; color:white; cursor:pointer; font-weight:bold;">B</button>
-                        <button id="rt-cat-italic" style="flex:1; padding:6px; border-radius:6px; border:1px solid rgba(255,255,255,0.2); background:${cfg.italic ? 'rgba(255,255,255,0.15)' : 'transparent'}; color:white; cursor:pointer; font-style:italic;">I</button>
-                        ${(tag !== 'QUESTS' && tag !== 'SPELLS' && tag !== 'CHARACTER' && tag !== 'PARTY' && tag !== 'COMBAT' && tag !== 'ABILITIES') ? `<button id="rt-cat-bullets" style="flex:2; padding:6px; border-radius:6px; border:1px solid rgba(255,255,255,0.2); background:${cfg.bullets ? 'rgba(255,255,255,0.15)' : 'transparent'}; color:white; cursor:pointer; font-size:0.85em;">${cfg.bullets ? 'Bullets: ON' : 'Bullets: OFF'}</button>` : ''}
-                    </div>
-
-                    <div style="display:${(cfg.bullets && tag !== 'QUESTS' && tag !== 'SPELLS' && tag !== 'CHARACTER' && tag !== 'PARTY' && tag !== 'COMBAT' && tag !== 'ABILITIES') ? 'flex' : 'none'}; flex-direction:column; gap:8px;">
-                        <div style="font-size:0.75em; opacity:0.6; font-weight:bold; text-transform:uppercase;">Bullet Style</div>
-                        <div style="display:grid; grid-template-columns: repeat(6, 1fr); gap:4px;">
-                            ${symbols.map(s => `
-                                <button class="symbol-btn" data-symbol="${s}" style="aspect-ratio:1; border:1px solid ${cfg.bulletStyle === s ? 'var(--rt-accent, #00ffaa)' : 'rgba(255,255,255,0.1)'}; background:${cfg.bulletStyle === s ? 'rgba(0,255,170,0.1)' : 'rgba(0,0,0,0.2)'}; color:white; border-radius:4px; cursor:pointer; font-size:1em;">${s}</button>
-                            `).join('')}
-                        </div>
-                        <div style="display:flex; align-items:center; justify-content:space-between; margin-top:4px;">
-                            <span style="font-size:0.85em; opacity:0.8;">Bullet Color</span>
-                            <input id="rt-cat-bullet-color" type="color" value="${cfg.bulletColor === 'inherit' ? '#ffffff' : cfg.bulletColor}" style="width:40px; height:24px; border:none; border-radius:4px; cursor:pointer; background:none;">
-                        </div>
-                    </div>
-
-                    <div style="display:flex; flex-direction:column; gap:8px;">
-                        <div style="display:flex; align-items:center; justify-content:space-between;">
-                            <span style="font-size:0.85em; opacity:0.8;">Font Family</span>
-                            <select id="rt-cat-family" style="background:#151525; color:white; border:1px solid rgba(255,255,255,0.2); border-radius:4px; font-size:0.85em; padding:2px 4px;">
-                                <option value="inherit" ${cfg.fontFamily === 'inherit' ? 'selected' : ''}>Inherit</option>
-                                <option value="sans-serif" ${cfg.fontFamily === 'sans-serif' ? 'selected' : ''}>Sans</option>
-                                <option value="serif" ${cfg.fontFamily === 'serif' ? 'selected' : ''}>Serif</option>
-                                <option value="monospace" ${cfg.fontFamily === 'monospace' ? 'selected' : ''}>Mono</option>
-                            </select>
-                        </div>
-                        <div style="display:flex; align-items:center; justify-content:space-between;">
-                            <div style="display:flex; align-items:center; gap:6px;">
-                                <span style="font-size:0.85em; opacity:0.8;">Text Color</span>
-                                <button id="rt-cat-color-reset" style="font-size:0.7em; background:rgba(255,255,255,0.1); border:none; color:#aaa; border-radius:3px; padding:1px 4px; cursor:pointer;">Reset</button>
-                            </div>
-                            <input id="rt-cat-text-color" type="color" value="${cfg.textColor === 'inherit' ? '#ffffff' : cfg.textColor}" style="width:40px; height:24px; border:none; border-radius:4px; cursor:pointer; background:none;">
-                        </div>
-                    </div>
-
-                    <div style="display:flex; gap:6px; margin-top:4px;">
-                        <button id="rt-cat-ok" style="flex:1.5; padding:8px; border-radius:6px; border:none; background:var(--rt-accent-bg, #00ffaa); color:#000; font-weight:bold; cursor:pointer; font-size:0.85em;">DONE</button>
-                        <button id="rt-cat-reset" style="flex:1; padding:8px; border-radius:6px; border:1px solid rgba(255,255,255,0.2); background:rgba(255,255,255,0.05); color:white; cursor:pointer; font-size:0.85em;">RESET</button>
-                    </div>
-                </div>
-            `;
-
-        popup.querySelector('#rt-cat-fs').addEventListener('mousedown', (e) => e.stopPropagation());
-        popup.querySelector('#rt-cat-fs').addEventListener('input', (e) => {
-            const target = /** @type {HTMLInputElement} */ (e.target);
-            const val = parseInt(target.value);
-            cfg.fontSize = val;
-            const display = popup.querySelector('#rt-cat-fs-val');
-            if (display) display.textContent = val.toString() + 'px';
-            applyLive();
-        });
-
-        popup.querySelector('#rt-cat-bold').addEventListener('click', () => {
-            cfg.bold = !cfg.bold;
-            applyLive();
-            renderContent();
-        });
-
-        popup.querySelector('#rt-cat-italic').addEventListener('click', () => {
-            cfg.italic = !cfg.italic;
-            applyLive();
-            renderContent();
-        });
-
-        const bulletsBtn = popup.querySelector('#rt-cat-bullets');
-        if (bulletsBtn) {
-            bulletsBtn.addEventListener('click', () => {
-                cfg.bullets = !cfg.bullets;
-                applyLive();
-                renderContent();
-            });
-        }
-
-        popup.querySelectorAll('.symbol-btn').forEach(btn => {
-            const el = /** @type {HTMLElement} */ (btn);
-            el.addEventListener('click', () => {
-                cfg.bulletStyle = el.dataset.symbol;
-                applyLive();
-                renderContent();
-            });
-        });
-
-        const colorInp = popup.querySelector('#rt-cat-bullet-color');
-        if (colorInp) {
-            colorInp.addEventListener('mousedown', (e) => e.stopPropagation());
-            colorInp.addEventListener('input', (e) => {
-                const target = /** @type {HTMLInputElement} */ (e.target);
-                cfg.bulletColor = target.value;
-                applyLive();
-            });
-        }
-
-        popup.querySelector('#rt-cat-family').addEventListener('change', (e) => {
-            const target = /** @type {HTMLSelectElement} */ (e.target);
-            cfg.fontFamily = target.value;
-            applyLive();
-        });
-
-        const textColorInp = popup.querySelector('#rt-cat-text-color');
-        if (textColorInp) {
-            textColorInp.addEventListener('mousedown', (e) => e.stopPropagation());
-            textColorInp.addEventListener('input', (e) => {
-                const target = /** @type {HTMLInputElement} */ (e.target);
-                cfg.textColor = target.value;
-                applyLive();
-            });
-        }
-
-        popup.querySelector('#rt-cat-color-reset').addEventListener('click', () => {
-            cfg.textColor = 'inherit';
-            applyLive();
-            renderContent();
-        });
-
-        popup.querySelector('#rt-cat-ok').addEventListener('click', () => {
-            popup.remove();
-        });
-
-        popup.querySelector('#rt-cat-reset').addEventListener('click', () => {
-            const noBullets = (tag === 'TIME' || tag === 'XP' || tag === 'QUESTS' || tag === 'SPELLS' || tag === 'CHARACTER' || tag === 'PARTY' || tag === 'COMBAT' || tag === 'ABILITIES');
-            cfg.fontSize = (tag === 'TIME' || tag === 'INVENTORY') ? 12 : 13;
-            cfg.italic = false;
-            cfg.bold = false;
-            cfg.bullets = !noBullets;
-            cfg.bulletStyle = tag === 'INVENTORY' ? '▪' : '•';
-            cfg.bulletColor = 'inherit';
-            cfg.fontFamily = 'inherit';
-            cfg.textColor = 'inherit';
-            applyLive();
-            renderContent();
-        });
-    };
-
-    renderContent();
-    document.body.appendChild(popup);
-
-    const rect = targetEl.getBoundingClientRect();
-    let left = rect.left + rect.width / 2 - 140;
-    let top = rect.bottom + 10;
-    left = Math.max(8, Math.min(left, window.innerWidth - 288));
-    if (top + 300 > window.innerHeight) top = rect.top - 300;
-    popup.style.left = left + 'px';
-    popup.style.top = top + 'px';
-
-    const onOutside = (e) => {
-        if (!popup.contains(e.target) && !targetEl.contains(e.target)) {
-            popup.remove();
-            document.removeEventListener('mouseup', onOutside);
-        }
-    };
-    setTimeout(() => document.addEventListener('mouseup', onOutside), 50);
-}
-
-/**
- * Injects/updates the <style id="rt-custom-theme-style"> tag in <head>
- * to set the --rt-custom-* variables on :root.
- * @param {Record<string,string>|null} vars
- */
-function applyCustomTheme(vars) {
-    let tag = document.getElementById('rt-custom-theme-style');
-    if (!tag) {
-        tag = document.createElement('style');
-        tag.id = 'rt-custom-theme-style';
-        document.head.appendChild(tag);
-    }
-
-    if (!vars) {
-        tag.textContent = '';
-        return;
-    }
-
-    let css = ':root {\n';
-    for (const [key, val] of Object.entries(vars)) {
-        if (val) css += `  ${key}: ${val} !important;\n`;
-    }
-    css += '}';
-    tag.textContent = css;
-}
 
 /**
  * Syncs the 🔗/🔓 icon in the panel header and the settings checkbox
@@ -2570,721 +2006,13 @@ function handleLevelUp() {
     }
 }
 
-// ── Character Roll class lists ──────────────────────────────────────────────
-const _CR_CLASS_LISTS = {
-    fantasy: [
-        ['⚔️ Fighter','Fighter'],['🗡️ Rogue','Rogue'],['🧙 Wizard','Wizard'],
-        ['🔥 Sorcerer','Sorcerer'],['🌑 Warlock','Warlock'],['🙏 Paladin','Paladin'],
-        ['🏹 Ranger','Ranger'],['🐻 Druid','Druid'],['🎵 Bard','Bard'],
-        ['☯️ Monk','Monk'],['🛡️ Barbarian','Barbarian'],['🧝 Cleric','Cleric'],
-        ['🔮 Artificer','Artificer'],['🩸 Blood Hunter','Blood Hunter'],
-        ['🐉 Draconic Bloodline','Draconic Bloodline'],['🌿 Nature Shaman','Nature Shaman'],
-        ['🔱 Death Knight','Death Knight'],['🎯 Arcane Archer','Arcane Archer'],
-        ['🌟 Celestial Chosen','Celestial Chosen'],['💀 Necromancer','Necromancer'],
-    ],
-    realistic: [
-        ['💼 Detective','Detective'],['🩺 Doctor','Doctor'],['💊 Medic','Medic'],
-        ['🔬 Scientist','Scientist'],['🔫 Soldier','Soldier'],['🕵️ Agent','Agent'],
-        ['🚑 Paramedic','Paramedic'],['⚖️ Lawyer','Lawyer'],['🔧 Mechanic','Mechanic'],
-        ['💻 Hacker','Hacker'],['🎤 Journalist','Journalist'],['🏋️ Athlete','Athlete'],
-        ['👮 Officer','Officer'],['🎭 Con Artist','Con Artist'],['📦 Smuggler','Smuggler'],
-        ['🧑‍🍳 Chef','Chef'],['💰 Entrepreneur','Entrepreneur'],
-        ['📡 Tech Specialist','Tech Specialist'],['🪖 Contractor','Contractor'],
-        ['🧠 Psychologist','Psychologist'],
-    ],
-    scifi: [
-        ['🚀 Starship Pilot','Starship Pilot'],['🔫 Space Marine','Space Marine'],
-        ['🤖 Cyberneticist','Cyberneticist'],['🌌 Navigator','Navigator'],
-        ['🧬 Xenobiologist','Xenobiologist'],['💻 Netrunner','Netrunner'],
-        ['⚡ Power Armor Trooper','Power Armor Trooper'],['🛰️ Recon Scout','Recon Scout'],
-        ['☢️ Reactor Tech','Reactor Tech'],['🩺 Combat Medic','Combat Medic'],
-        ['💀 Bounty Hunter','Bounty Hunter'],['📡 Comms Officer','Comms Officer'],
-        ['🔬 Research Scientist','Research Scientist'],['🛠️ Ship Engineer','Ship Engineer'],
-        ['🌍 Terraformer','Terraformer'],['🔮 Psyker','Psyker'],
-        ['🕵️ Intel Operative','Intel Operative'],['🏴‍☠️ Space Pirate','Space Pirate'],
-        ['🧙 Biopunk Shaman','Biopunk Shaman'],['⚖️ Colonial Administrator','Colonial Administrator'],
-    ],
-    horror: [
-        ['🕵️ Paranormal Investigator','Paranormal Investigator'],['📖 Occultist','Occultist'],
-        ['🔪 Survivor','Survivor'],['🏥 Traumatized Doctor','Traumatized Doctor'],
-        ['👮 Sheriff','Sheriff'],['🎤 Journalist','Journalist'],['🧠 Psychologist','Psychologist'],
-        ['🕯️ Cult Escapee','Cult Escapee'],['🔫 Vigilante','Vigilante'],
-        ['🧛 Reluctant Monster','Reluctant Monster'],['🌙 Cursed Bloodline','Cursed Bloodline'],
-        ['📜 Forbidden Scholar','Forbidden Scholar'],['⛪ Fallen Priest','Fallen Priest'],
-        ['🎲 Desperate Gambler','Desperate Gambler'],['🔧 Doomsday Prepper','Doomsday Prepper'],
-        ['💀 Ghost Whisperer','Ghost Whisperer'],['🩹 Haunted Soldier','Haunted Soldier'],
-        ['🏚️ Urban Explorer','Urban Explorer'],['🔍 Cold Case Detective','Cold Case Detective'],
-        ['🌊 Sea-Cursed Sailor','Sea-Cursed Sailor'],
-    ],
-};
-const _CR_CLASS_CONSTANTS = [
-    ['📝 Other — type below…','__other__'],
-    ['✨ AI decides','__story__'],
-];
-
-/** @returns {Record<string, string|number|boolean>} */
-function collectCharacterCreatorDraft(panel) {
-    const classSelect = /** @type {HTMLSelectElement|null} */ (panel.querySelector('#rt-cr-class'));
-    const wordsSelect = /** @type {HTMLSelectElement|null} */ (panel.querySelector('#rt-cr-persona-words'));
-    const wordsCustom = /** @type {HTMLInputElement|null} */ (panel.querySelector('#rt-cr-persona-words-custom'));
-    return {
-        name: /** @type {HTMLInputElement} */ (panel.querySelector('#rt-cr-name'))?.value ?? '',
-        gender: /** @type {HTMLInputElement} */ (panel.querySelector('#rt-cr-gender'))?.value ?? '',
-        age: /** @type {HTMLInputElement} */ (panel.querySelector('#rt-cr-age'))?.value ?? '',
-        orientation: /** @type {HTMLInputElement} */ (panel.querySelector('#rt-cr-orientation'))?.value ?? '',
-        species: /** @type {HTMLInputElement} */ (panel.querySelector('#rt-cr-species'))?.value ?? '',
-        ethnicity: /** @type {HTMLInputElement} */ (panel.querySelector('#rt-cr-ethnicity'))?.value ?? '',
-        genre: /** @type {HTMLSelectElement} */ (panel.querySelector('#rt-cr-genre'))?.value ?? '',
-        level: /** @type {HTMLSelectElement} */ (panel.querySelector('#rt-cr-level'))?.value ?? '1',
-        class: classSelect?.value ?? '__story__',
-        classOther: /** @type {HTMLInputElement} */ (panel.querySelector('#rt-cr-class-other'))?.value ?? '',
-        traits: /** @type {HTMLTextAreaElement} */ (panel.querySelector('#rt-cr-traits'))?.value ?? '',
-        abilities: /** @type {HTMLTextAreaElement} */ (panel.querySelector('#rt-cr-abilities'))?.value ?? '',
-        background: /** @type {HTMLInputElement} */ (panel.querySelector('#rt-cr-background'))?.value ?? '',
-        appearance: /** @type {HTMLInputElement} */ (panel.querySelector('#rt-cr-appearance'))?.value ?? '',
-        additional: /** @type {HTMLTextAreaElement} */ (panel.querySelector('#rt-cr-additional'))?.value ?? '',
-        personaEnabled: !!/** @type {HTMLInputElement} */ (panel.querySelector('#rt-cr-persona-cb'))?.checked,
-        personaWords: wordsSelect?.value ?? '150',
-        personaWordsCustom: wordsCustom?.value ?? '',
-    };
-}
-
-/**
- * @param {HTMLElement} panel
- * @param {(genre: string) => void} populateClasses
- */
-function applyCharacterCreatorDraft(panel, draft, populateClasses) {
-    if (!draft) return;
-    const setVal = (sel, val) => { const el = panel.querySelector(sel); if (el) el.value = val ?? ''; };
-    setVal('#rt-cr-name', draft.name);
-    setVal('#rt-cr-gender', draft.gender);
-    setVal('#rt-cr-age', draft.age);
-    setVal('#rt-cr-orientation', draft.orientation);
-    setVal('#rt-cr-species', draft.species);
-    setVal('#rt-cr-ethnicity', draft.ethnicity);
-    setVal('#rt-cr-genre', draft.genre ?? '');
-    setVal('#rt-cr-level', String(draft.level ?? 1));
-    populateClasses(draft.genre ?? '');
-    const classSelect = /** @type {HTMLSelectElement|null} */ (panel.querySelector('#rt-cr-class'));
-    const classOther = /** @type {HTMLInputElement|null} */ (panel.querySelector('#rt-cr-class-other'));
-    if (classSelect) {
-        const classVal = draft.class ?? '__story__';
-        if ([...classSelect.options].some(o => o.value === classVal)) {
-            classSelect.value = classVal;
-        } else {
-            classSelect.value = '__story__';
-        }
-    }
-    if (classOther) {
-        classOther.value = draft.classOther ?? '';
-        classOther.style.display = classSelect?.value === '__other__' ? 'block' : 'none';
-    }
-    setVal('#rt-cr-traits', draft.traits);
-    setVal('#rt-cr-abilities', draft.abilities);
-    setVal('#rt-cr-background', draft.background);
-    setVal('#rt-cr-appearance', draft.appearance);
-    setVal('#rt-cr-additional', draft.additional);
-    const personaCb = /** @type {HTMLInputElement|null} */ (panel.querySelector('#rt-cr-persona-cb'));
-    if (personaCb) personaCb.checked = !!draft.personaEnabled;
-    const wordsSelect = /** @type {HTMLSelectElement|null} */ (panel.querySelector('#rt-cr-persona-words'));
-    const wordsCustom = /** @type {HTMLInputElement|null} */ (panel.querySelector('#rt-cr-persona-words-custom'));
-    if (wordsSelect) wordsSelect.value = draft.personaWords ?? '150';
-    if (wordsCustom) {
-        wordsCustom.value = draft.personaWordsCustom ?? '';
-        wordsCustom.style.display = wordsSelect?.value === 'other' ? 'inline-block' : 'none';
-    }
-}
-
-/** @param {HTMLElement} panel */
-function saveCharacterCreatorDraft(panel) {
-    getSettings().characterCreatorDraft = collectCharacterCreatorDraft(panel);
-    saveSettings();
-}
-
-/**
- * @param {HTMLElement} panel
- * @param {(genre: string) => void} populateClasses
- */
-function resetCharacterCreatorFields(panel, populateClasses) {
-    const s = getSettings();
-    getSettings().characterCreatorDraft = null;
-    const setVal = (sel, val) => { const el = panel.querySelector(sel); if (el) el.value = val; };
-    setVal('#rt-cr-name', '');
-    setVal('#rt-cr-gender', '');
-    setVal('#rt-cr-age', '');
-    setVal('#rt-cr-orientation', '');
-    setVal('#rt-cr-species', '');
-    setVal('#rt-cr-ethnicity', '');
-    setVal('#rt-cr-genre', '');
-    setVal('#rt-cr-level', String(s.onboardingLevel || 1));
-    populateClasses('');
-    const classSelect = /** @type {HTMLSelectElement|null} */ (panel.querySelector('#rt-cr-class'));
-    if (classSelect) classSelect.value = '__story__';
-    const classOther = /** @type {HTMLInputElement|null} */ (panel.querySelector('#rt-cr-class-other'));
-    if (classOther) { classOther.value = ''; classOther.style.display = 'none'; }
-    setVal('#rt-cr-traits', '');
-    setVal('#rt-cr-abilities', '');
-    setVal('#rt-cr-background', '');
-    setVal('#rt-cr-appearance', '');
-    setVal('#rt-cr-additional', '');
-    const personaCb = /** @type {HTMLInputElement|null} */ (panel.querySelector('#rt-cr-persona-cb'));
-    if (personaCb) personaCb.checked = false;
-    const wordsSelect = /** @type {HTMLSelectElement|null} */ (panel.querySelector('#rt-cr-persona-words'));
-    const wordsCustom = /** @type {HTMLInputElement|null} */ (panel.querySelector('#rt-cr-persona-words-custom'));
-    if (wordsSelect) wordsSelect.value = '150';
-    if (wordsCustom) { wordsCustom.value = ''; wordsCustom.style.display = 'none'; }
-    saveSettings();
-}
-
-/**
- * Shows the inline Character Roll panel inside the .rt-empty onboarding area.
- * @param {HTMLElement} el - the .rt-empty element
- */
-function showCharacterRollPanel(el) {
-    const panel = /** @type {HTMLElement|null} */ (el.querySelector('#rt-char-roll-panel'));
-    if (!panel) return;
-    const configWrap = /** @type {HTMLElement|null} */ (el.querySelector('.rt-onboarding-config-row')?.parentElement);
-    const allBtnGroups = /** @type {NodeListOf<HTMLElement>} */ (el.querySelectorAll('.rt-onboarding-buttons'));
-
-    // Hide config + button groups, show panel
-    if (configWrap) configWrap.style.display = 'none';
-    allBtnGroups.forEach(g => { g.style.display = 'none'; });
-    panel.style.display = 'flex';
-
-    const s = getSettings();
-    const genreSelect = /** @type {HTMLSelectElement|null} */ (panel.querySelector('#rt-cr-genre'));
-    const levelSelect = /** @type {HTMLSelectElement|null} */ (panel.querySelector('#rt-cr-level'));
-    const classSelect = /** @type {HTMLSelectElement|null} */ (panel.querySelector('#rt-cr-class'));
-    const classOther  = /** @type {HTMLInputElement|null}  */ (panel.querySelector('#rt-cr-class-other'));
-
-    function populateClasses(genre) {
-        if (!classSelect) return;
-        // Empty genre (None) = only show Story-Fitting + Other; AI decides
-        const genreList = genre ? (_CR_CLASS_LISTS[genre] || _CR_CLASS_LISTS.fantasy) : [];
-        const list = [...genreList, ..._CR_CLASS_CONSTANTS];
-        classSelect.innerHTML = list.map(([label, val]) =>
-            `<option value="${escapeHtml(val)}">${escapeHtml(label)}</option>`
-        ).join('');
-        // Always default to Story-Fitting
-        classSelect.value = '__story__';
-    }
-    populateClasses('');
-
-    const draft = s.characterCreatorDraft;
-    if (draft) {
-        applyCharacterCreatorDraft(panel, draft, populateClasses);
-    } else {
-        // Default genre to '' (None — AI decides); do NOT carry over onboardingGenre here
-        if (genreSelect) genreSelect.value = '';
-        if (levelSelect) levelSelect.value = String(s.onboardingLevel || 1);
-    }
-
-    const nameInput = /** @type {HTMLInputElement|null} */ (panel.querySelector('#rt-cr-name'));
-    const randomNameBtn = panel.querySelector('#rt-cr-random-name');
-    if (randomNameBtn && nameInput && !randomNameBtn._bound) {
-        randomNameBtn._bound = true;
-        randomNameBtn.addEventListener('click', () => {
-            const firsts = [
-                "Aethelgard", "Elysande", "Ilaria", "Lyari", "Mirelia", "Nesta", "Seraphina", "Thalia", "Valerith", "Zephira",
-                "Aelrin", "Calandil", "Elessar", "Faelan", "Galdor", "Ithilior", "Lorien", "Sylas", "Thandor", "Zoran",
-                "Astrid", "Bregna", "Dagmar", "Freja", "Gunnora", "Hilda", "Kira", "Morgath", "Sigrid", "Yrsa",
-                "Bram", "Cormac", "Drogo", "Fenrir", "Garrick", "Haldor", "Kaelen", "Ragnar", "Thorgar", "Wulfric",
-                "Belial", "Carmilla", "Drusilla", "Lilith", "Malakor", "Morrigan", "Nox", "Sariel", "Vespera", "Xanthia",
-                "Alastor", "Caspian", "Darius", "Kaelen", "Malakai", "Nekros", "Soren", "Valerius", "Vane", "Zarek",
-                "Astraea", "Celestia", "Elora", "Isra", "Lunaria", "Nova", "Selene", "Solana", "Talia", "Vega",
-                "Aero", "Caelum", "Hyperion", "Orion", "Phobos", "Rigel", "Sirius", "Titan", "Zephyr", "Zion"
-            ];
-            const lasts = [
-                "Blackwood", "Crownguard", "Ironclad", "Kingsley", "Silverglade", "Stormborn", "Thorne", "Valerius", "Winterborne", "Zephyr",
-                "Barker", "Clay", "Fletcher", "Miller", "Potter", "Smith", "Tanner", "Weaver", "Wood", "Wright"
-            ];
-            const first = firsts[Math.floor(Math.random() * firsts.length)];
-            const last = lasts[Math.floor(Math.random() * lasts.length)];
-            nameInput.value = `${first} ${last}`;
-            nameInput.dispatchEvent(new Event('input', { bubbles: true }));
-        });
-    }
-
-    if (genreSelect && !genreSelect._crBound) {
-        genreSelect._crBound = true;
-        genreSelect.addEventListener('change', () => {
-            populateClasses(genreSelect.value);
-            if (classOther) classOther.style.display = 'none';
-        });
-    }
-    if (classSelect && !classSelect._crBound) {
-        classSelect._crBound = true;
-        classSelect.addEventListener('change', () => {
-            if (classOther) classOther.style.display = classSelect.value === '__other__' ? 'block' : 'none';
-        });
-    }
-
-    const wordsSelect = /** @type {HTMLSelectElement|null} */ (panel.querySelector('#rt-cr-persona-words'));
-    const wordsCustom = /** @type {HTMLInputElement|null} */ (panel.querySelector('#rt-cr-persona-words-custom'));
-    if (wordsSelect && !wordsSelect._crBound) {
-        wordsSelect._crBound = true;
-        wordsSelect.addEventListener('change', () => {
-            if (wordsCustom) wordsCustom.style.display = wordsSelect.value === 'other' ? 'inline-block' : 'none';
-        });
-    }
-
-    const backBtn = panel.querySelector('#rt-char-roll-back');
-    if (backBtn && !backBtn._crBound) {
-        backBtn._crBound = true;
-        backBtn.addEventListener('click', () => {
-            panel.style.display = 'none';
-            if (configWrap) configWrap.style.display = '';
-            const genre = getSettings().onboardingGenre || 'fantasy';
-            allBtnGroups.forEach(g => {
-                g.style.display = g.classList.contains(`rt-${genre}-buttons`) ? 'flex' : 'none';
-            });
-        });
-    }
-
-    const resetBtn = panel.querySelector('#rt-cr-reset-btn');
-    if (resetBtn && !resetBtn._crBound) {
-        resetBtn._crBound = true;
-        resetBtn.addEventListener('click', () => resetCharacterCreatorFields(panel, populateClasses));
-    }
-
-    const genBtn = panel.querySelector('#rt-cr-generate-btn');
-    if (genBtn && !genBtn._crBound) {
-        genBtn._crBound = true;
-        genBtn.addEventListener('click', () => { void handleCharRollGenerate(el, panel); });
-    }
-}
-
-/**
- * Extracts the character's name from the current state memo.
- * Handles both "Name (Class): HP" and "Name: value" formats.
- * @param {string} memo
- * @returns {string}
- */
-function extractCharNameFromMemo(memo) {
-    if (!memo) return '';
-    // Strategy 1: first line of [CHARACTER] block — "Kael Veyne (Fighter): 24/24 HP"
-    const charBlock = memo.match(/\[CHARACTER\]([\s\S]*?)\[\/CHARACTER\]/i);
-    if (charBlock) {
-        const firstLine = charBlock[1].replace(/<[^>]+>/g, '').trim().split('\n')[0].trim();
-        // Extract name before the first "(" or ":"
-        const m = firstLine.match(/^([^(:\[\n]{2,50}?)(?:\s*\(|\s*:)/);
-        if (m) {
-            const candidate = m[1].trim();
-            // Reject generic fallbacks
-            if (candidate && !/^(character|unknown|user|name)$/i.test(candidate)) return candidate;
-        }
-    }
-    // Strategy 2: explicit "Name: value" field anywhere in memo
-    const nameField = memo.match(/(?:^|\n)\s*(?:Name|Character Name)\s*[:\|]\s*([^\n\|\[<]{2,60})/im);
-    if (nameField) {
-        const candidate = nameField[1].replace(/<[^>]+>/g, '').trim();
-        if (candidate && !/^(character|unknown|user)$/i.test(candidate)) return candidate;
-    }
-    return '';
-}
-
-/**
- * Reads the Character Roll form, builds the prompt, calls sendDirectPrompt,
- * and optionally triggers persona creation.
- */
-async function handleCharRollGenerate(el, panel) {
-
-    saveCharacterCreatorDraft(panel);
-
-    const s = getSettings();
-    const nameVal        = /** @type {HTMLInputElement}   */ (panel.querySelector('#rt-cr-name'))?.value.trim()        || '';
-    const genderVal      = /** @type {HTMLInputElement}   */ (panel.querySelector('#rt-cr-gender'))?.value.trim()      || '';
-    const ageVal         = /** @type {HTMLInputElement}   */ (panel.querySelector('#rt-cr-age'))?.value.trim()         || '';
-    const orientationVal = /** @type {HTMLInputElement}   */ (panel.querySelector('#rt-cr-orientation'))?.value.trim() || '';
-    const speciesVal     = /** @type {HTMLInputElement}   */ (panel.querySelector('#rt-cr-species'))?.value.trim()     || '';
-    const ethnicityVal   = /** @type {HTMLInputElement}   */ (panel.querySelector('#rt-cr-ethnicity'))?.value.trim()   || '';
-    const genre          = /** @type {HTMLSelectElement}  */ (panel.querySelector('#rt-cr-genre'))?.value              || s.onboardingGenre || 'fantasy';
-    const level          = parseInt(/** @type {HTMLSelectElement} */ (panel.querySelector('#rt-cr-level'))?.value      || String(s.onboardingLevel || 1), 10) || 1;
-    const classSelect    = /** @type {HTMLSelectElement|null} */ (panel.querySelector('#rt-cr-class'));
-    let   classRaw       = classSelect?.value || '__story__';
-    let   classOtherVal  = /** @type {HTMLInputElement} */ (panel.querySelector('#rt-cr-class-other'))?.value.trim()   || '';
-    const traitsVal      = /** @type {HTMLTextAreaElement}*/ (panel.querySelector('#rt-cr-traits'))?.value.trim()       || '';
-    const abilitiesVal   = /** @type {HTMLTextAreaElement}*/ (panel.querySelector('#rt-cr-abilities'))?.value.trim()    || '';
-    const backgroundVal  = /** @type {HTMLInputElement}   */ (panel.querySelector('#rt-cr-background'))?.value.trim()  || '';
-    const appearanceVal  = /** @type {HTMLInputElement}   */ (panel.querySelector('#rt-cr-appearance'))?.value.trim()  || '';
-    const additionalVal  = /** @type {HTMLTextAreaElement}*/ (panel.querySelector('#rt-cr-additional'))?.value.trim()   || '';
-    const personaCb      = /** @type {HTMLInputElement}   */ (panel.querySelector('#rt-cr-persona-cb'));
-    const wantPersona    = !!personaCb?.checked;
-    const wordsSelectEl  = /** @type {HTMLSelectElement} */ (panel.querySelector('#rt-cr-persona-words'));
-    const wordsCustomEl  = /** @type {HTMLInputElement} */ (panel.querySelector('#rt-cr-persona-words-custom'));
-    const wordsRaw       = wordsSelectEl?.value === 'other' ? wordsCustomEl?.value : wordsSelectEl?.value;
-    const wordCount      = parseInt(wordsRaw || '150', 10) || 150;
-
-    const isStoryFitting = classRaw === '__story__';
-    const isOther        = classRaw === '__other__';
-    // Extract Character Card Info globally
-    const ctx2 = SillyTavern.getContext();
-    const charId = ctx2.characterId;
-    const card = charId !== undefined ? ctx2.characters?.[charId] : null;
-    const cardSnippet = card ? `\nActive Card: ${(card.name || '')} — ${(card.description || '')}` : '';
-
-    let classLine = '';
-    if (isStoryFitting) {
-        classLine = `Class: (choose a class that fits the current story, setting, and card naturally — be creative)`;
-    } else if (isOther && classOtherVal) {
-        classLine = `Class: ${classOtherVal}`;
-    } else if (!isOther && !isStoryFitting && classRaw) {
-        classLine = `Class: ${classRaw}`;
-    } else {
-        classLine = `Class: (invent a class fitting the setting and era — do NOT use fantasy D&D class names in non-fantasy contexts)`;
-    }
-
-    let extraHints = '';
-    if (nameVal || genderVal || ageVal || orientationVal || speciesVal || ethnicityVal || traitsVal || backgroundVal || appearanceVal || additionalVal) {
-        extraHints = `\n\n--- PLAYER PREFERENCES & HINTS ---\n` +
-                     (nameVal ? `Name: ${nameVal}\n` : '') +
-                     (genderVal ? `Gender: ${genderVal}\n` : '') +
-                     (ageVal ? `Age: ${ageVal}\n` : '') +
-                     (orientationVal ? `Orientation: ${orientationVal}\n` : '') +
-                     (speciesVal ? `Species: ${speciesVal}\n` : '') +
-                     (ethnicityVal ? `Ethnicity: ${ethnicityVal}\n` : '') +
-                     (traitsVal ? `Traits: ${traitsVal}\n` : '') +
-                     (appearanceVal ? `Appearance Hints: ${appearanceVal}\n` : '') +
-                     (backgroundVal ? `Background Hints: ${backgroundVal}\n` : '') +
-                     (additionalVal ? `Additional: ${additionalVal}\n` : '');
-    }
-    const isCalendar = !!s.useDdMmYyFormat;
-    const startDateVal = isCalendar
-        ? (s.initialDate && s.initialDate !== 'Day 1' ? s.initialDate : '01/01/2026')
-        : 'Day 1';
-    const initRestVal = isCalendar ? startDateVal : 'Day 0';
-    const levelPrefix = `STARTING LEVEL: ${level} (mandatory — the character MUST be exactly Level ${level}).`;
-    const xpHint = buildOnboardingXpHint(level);
-    const CHARACTER_FORMAT_HINT = `\n\nCRITICAL TAG WRAPPING RULE: Every block you output MUST be enclosed in matching opening and closing tags (e.g. [/CHARACTER], [/INVENTORY], [/ABILITIES], [/SPELLS], [/XP], [/TIME]).`;
-    const TIME_FORMAT_HINT = `\n\n[TIME]\nLast Rest: 12:00 AM, ${initRestVal}\nCurrent Time: 08:00 AM, ${startDateVal}\n[/TIME]`;
-
-    const SETTING_HINTS = {
-        realistic: `\n\nCRITICAL REALISM RULE: This is a realistic/non-fantasy setting. Do NOT output a [SPELLS] block. Avoid fantasy classes and races. Use realistic currency (e.g. $, USD, GBP). Gear and weapons must be realistic.`,
-        scifi: `\n\nCRITICAL SCI-FI RULE: Science-fiction setting. No [SPELLS] block. No fantasy classes or races. Use Credits or equivalent currency. Gear should be futuristic.`,
-        horror: `\n\nCRITICAL HORROR RULE: Horror setting. No [SPELLS] block — occult abilities go in [ABILITIES]. No fantasy classes or races. Use realistic currency. Characters are grounded and vulnerable.`,
-        fantasy: '',
-    };
-    const settingHint = SETTING_HINTS[genre] || '';
-
-    const f = (val, fallback) => val || fallback;
-    const prompt = `${levelPrefix}
-
-Design a complete player character that fits naturally into the current scenario, card, and recent chat history. Be authentic to the setting, era, and tone.
-
---- PLAYER PREFERENCES ---
-Name:         ${f(nameVal, '(invent a creative, setting-appropriate name — NEVER use "User", "Unknown", or any placeholder)')}
-Gender:       ${f(genderVal, '(your choice)')}
-Age:          ${f(ageVal, '(your choice)')}
-Orientation:  ${f(orientationVal, '(your choice)')}
-Species:      ${f(speciesVal, '(your choice)')}
-Ethnicity:    ${f(ethnicityVal, '(your choice)')}
-${classLine}
-Traits:       ${f(traitsVal, '(invent 2–3 distinctive traits)')}
-Level:        ${level}
-Abilities:    ${f(abilitiesVal, '(generate fitting, creative abilities)')}
-Background:   ${f(backgroundVal, '(invent a brief origin)')}
-Appearance:   ${f(appearanceVal, '(invent a memorable appearance)')}
-${additionalVal ? `Additional:   ${additionalVal}` : ''}
-${cardSnippet ? `\n--- CHARACTER CARD CONTEXT ---${cardSnippet}` : ''}
-
---- REQUIREMENTS ---
-• Fill every blank field above with creative, setting-appropriate content. No field may be empty, "Unknown", "N/A", or a placeholder.
-• The name must be original and fitting. NEVER write "User" or any variation.
-• Output every currently active state-memo field (custom and default). Only include [SPELLS] if the class genuinely uses magic.
-• ${isOther || isStoryFitting ? 'Invent the most fitting class for the setting and context.' : `Use the chosen class "${classRaw}" exactly as given — do not rename or substitute it.`}
-• If the setting is non-fantasy and no class was specified, create a class that feels natural to the world — not a fantasy D&D class name.
-• All stats, gear, saves, and XP must be consistent with Level ${level}.
-${CHARACTER_FORMAT_HINT}${xpHint}${TIME_FORMAT_HINT}${settingHint}`;
-
-    el.querySelectorAll('.rt-random-char-btn').forEach(b => { /** @type {HTMLButtonElement} */ (b).disabled = true; });
-    const genBtn = /** @type {HTMLButtonElement|null} */ (panel.querySelector('#rt-cr-generate-btn'));
-    if (genBtn) { genBtn.disabled = true; genBtn.textContent = '🎲 Generating...'; }
-
-    await sendDirectPrompt(prompt);
-
-    if (genBtn) { genBtn.disabled = false; genBtn.textContent = '🎲 Generate Character'; }
-    el.querySelectorAll('.rt-random-char-btn').forEach(b => { /** @type {HTMLButtonElement} */ (b).disabled = false; });
-
-    if (wantPersona) {
-        // Pull the name the AI actually generated from the memo — much better than
-        // falling back to the (possibly blank) form field value.
-        const s2 = getSettings();
-        const extractedName = extractCharNameFromMemo(s2.currentMemo);
-        const charName = extractedName || nameVal || 'My Character';
-        const finalExtraHints = extraHints + (cardSnippet ? `\n\n--- CHARACTER CARD CONTEXT ---${cardSnippet}` : '');
-        const bio = await generatePersonaBio(charName, wordCount, finalExtraHints);
-        if (bio) showPersonaConfirmOverlay(bio, charName, wordCount, extraHints);
-    }
-}
-
-/**
- * Sends a focused request to generate a SillyTavern persona bio from the current memo.
- */
-async function generatePersonaBio(charName, wordCount, extraHints = '') {
-    const s = getSettings();
-    const rawMemo = s.currentMemo || '';
-    const cleanMemo = rawMemo.replace(/<\/?memo>/gi, '').replace(/<[^>]+>/g, ' ').trim();
-
-    const systemPrompt = `You are a persona writer for a roleplay system. Based on the character state card provided, write a persona description for ${charName || 'this character'} in third person.${extraHints}
-
-You MUST use this exact section format — each section on its own line with the label followed by a colon:
-
-Appearance/Species:
-[Describe physical features and species: body type, height, hair, eyes, skin tone, distinguishing marks, scars, and natural body language. You MUST explicitly state their Species, Ethnicity, and Gender based on the character card and Player Preferences. You MUST explicitly incorporate any appearance notes provided in the card/preferences. Do NOT describe clothing, armor, or worn gear — those are handled dynamically elsewhere and will change.]
-
-Personality:
-[Describe temperament, how they act around others, and emotional tendencies. You MUST incorporate any traits provided.]
-
-Background:
-[Provide backstory context grounded in the character card. You MUST incorporate any background hints provided. Brief but meaningful.]
-
-Habits & Behaviors:
-[Describe recurring mannerisms, habits, quirks, or behavioral patterns.]
-
-Rules:
-- Use the exact section headers shown above. Do not add extra sections or merge them.
-- Total word count across all sections: approximately ${wordCount} words.
-- Write in third person (he/she/they).
-- Keep the prose grounded and natural. Avoid purple prose, excessive em-dashes, or clichés (e.g. "deliberate step", "breath hitched").
-- Do not include a preamble, title, or closing statement. Output ONLY the four sections.
-- CRITICAL: You MUST faithfully and explicitly incorporate ALL provided traits, background hints, species, gender, and appearance hints from the character card and the PLAYER PREFERENCES. Do not ignore user-provided details.`;
-
-    const { chat } = SillyTavern.getContext();
-    let chatLog = '';
-    if (chat && chat.length > 0) {
-        const numMsgs = s.directPromptContext > 0 ? s.directPromptContext : 15;
-        const recentChat = chat.slice(-numMsgs);
-        chatLog = `## NARRATIVE HISTORY (Last ${recentChat.length} messages)\n` +
-            recentChat.map(m => {
-                const name = m.is_user ? 'Player' : (m.name || 'Narrator');
-                return `${name}: ${m.mes || m.content || ''}`;
-            }).join('\n\n');
-    }
-
-    const userPrompt = `CHARACTER CARD:\n${cleanMemo}\n\n${chatLog}\n\nWrite the persona description for ${charName || 'this character'}.\nIMPORTANT REMINDER: The total word count across all sections MUST be approximately ${wordCount} words!`;
-    try {
-        const result = await sendStateRequest(s, systemPrompt, userPrompt);
-        return (result || '').trim() || null;
-    } catch (e) {
-        toastr['warning']('Persona bio generation failed.', 'Character Creator');
-        return null;
-    }
-}
-
-/**
- * Uploads a default avatar image for a newly created persona.
- * @param {string} url
- * @param {string} avatarId
- * @param {() => Promise<void>} refreshAvatars
- */
-async function uploadDefaultPersonaAvatar(url, avatarId, refreshAvatars) {
-    const fetchResult = await fetch(url);
-    const blob = await fetchResult.blob();
-    const file = new File([blob], 'avatar.png', { type: 'image/png' });
-    const formData = new FormData();
-    formData.append('avatar', file);
-    formData.append('overwrite_name', avatarId);
-
-    const response = await fetch('/api/avatars/upload', {
-        method: 'POST',
-        headers: getRequestHeaders({ omitContentType: true }),
-        cache: 'no-cache',
-        body: formData,
-    });
-    if (!response.ok) {
-        throw new Error(`Failed to upload persona avatar: ${response.statusText}`);
-    }
-    const data = await response.json();
-    await refreshAvatars(true, data?.path || avatarId);
-}
-
-/**
- * Creates or updates a real SillyTavern persona and selects it.
- * Core ST modules are imported dynamically so extension startup is not blocked by circular deps.
- * @param {string} name
- * @param {string} description
- * @returns {Promise<string>} avatar id
- */
-async function injectAsSillyTavernPersona(name, description) {
-    const [
-        { initPersona, setUserAvatar, getUserAvatars, setPersonaDescription, user_avatar, persona_description_positions },
-        { findPersona },
-        { power_user },
-        { default_user_avatar },
-    ] = await Promise.all([
-        import('../../../personas.js'),
-        import('../../../utils.js'),
-        import('../../../power-user.js'),
-        import('../../../../script.js'),
-    ]);
-
-    const trimmedName = name.trim() || 'My Character';
-    const existing = findPersona({ name: trimmedName, preferCurrentPersona: false, quiet: true });
-
-    let avatarId;
-    if (existing) {
-        avatarId = existing.avatar;
-        if (!power_user.persona_descriptions[avatarId]) {
-            power_user.persona_descriptions[avatarId] = {
-                description: '',
-                position: persona_description_positions.IN_PROMPT,
-                depth: 4,
-                role: 0,
-                lorebook: '',
-                connections: [],
-                title: '',
-            };
-        }
-        power_user.persona_descriptions[avatarId].description = description;
-        if (user_avatar === avatarId) {
-            power_user.persona_description = description;
-        }
-    } else {
-        avatarId = `${Date.now()}-${trimmedName.replace(/[^a-zA-Z0-9]/g, '')}.png`;
-        await initPersona(avatarId, trimmedName, description, '');
-        await uploadDefaultPersonaAvatar(default_user_avatar, avatarId, getUserAvatars);
-    }
-
-    await setUserAvatar(avatarId);
-    setPersonaDescription();
-    SillyTavern.getContext().saveSettingsDebounced();
-    await getUserAvatars(true, avatarId);
-    return avatarId;
-}
-
-/**
- * Shows the persona confirm overlay — Accept to create ST persona, Regenerate for a new bio.
- */
-function showPersonaConfirmOverlay(bioText, charName, wordCount, extraHints = '') {
-    const existing = document.getElementById('rt-persona-confirm-overlay');
-    if (existing) existing.remove();
-
-    const overlay = document.createElement('div');
-    overlay.id = 'rt-persona-confirm-overlay';
-    overlay.className = 'rt-charpicker-overlay';
-    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;';
-
-    const box = document.createElement('div');
-    box.style.cssText = 'background:var(--black80a,#1a1a2e);border:1px solid rgba(120,80,220,0.5);border-radius:8px;padding:18px;max-width:520px;width:90%;max-height:80vh;display:flex;flex-direction:column;gap:10px;overflow:hidden;';
-    box.innerHTML = `
-        <div style="display:flex;justify-content:space-between;align-items:center;">
-            <b style="color:var(--rt-accent,#a78bfa);font-size:1em;">🎭 Persona Preview — ${escapeHtml(charName)}</b>
-            <button id="rt-pco-close" style="background:none;border:none;color:inherit;font-size:1.1em;cursor:pointer;opacity:0.6;">✕</button>
-        </div>
-        <small style="opacity:0.6;line-height:1.3;">Edit the bio below, then Accept to auto-create in SillyTavern, or copy it to paste manually.</small>
-        <textarea id="rt-pco-bio" style="flex:1;min-height:180px;max-height:300px;resize:vertical;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.15);border-radius:4px;padding:8px;color:inherit;font-size:0.88em;line-height:1.6;">${escapeHtml(bioText)}</textarea>
-        <div style="display:flex;flex-direction:column;gap:12px;">
-            <button id="rt-pco-add-pc" title="Recommended: Adds this character as the Player entry in the Lorebook Agent for this chat. It will automatically load whenever you open this chat." style="width:100%;padding:12px;background:rgba(0,180,255,0.25);border:2px solid #00b4ff;border-radius:6px;color:inherit;cursor:pointer;font-weight:bold;font-size:1.1em;box-shadow:0 4px 12px rgba(0,180,255,0.15);transition:all 0.2s ease;">👤 Add as Player into Lorebook Agent</button>
-            
-            <div style="display:flex;gap:8px;">
-                <button id="rt-pco-regen" style="flex:1;padding:8px;background:rgba(120,80,220,0.18);border:1px solid rgba(120,80,220,0.6);border-radius:4px;color:inherit;cursor:pointer;">🔄 Regenerate</button>
-                <button id="rt-pco-copy" style="flex:1;padding:8px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.2);border-radius:4px;color:inherit;cursor:pointer;">📋 Copy Bio</button>
-            </div>
-
-            <div style="text-align:center;margin-top:4px;">
-                <button id="rt-pco-accept" title="Creates a new SillyTavern persona (or updates an existing one with the same name), selects it, and optionally locks it to this chat." style="background:none;border:none;color:var(--SmartThemeEmColor, rgba(255,255,255,0.5));text-decoration:underline;cursor:pointer;font-size:0.85em;padding:4px;">Inject as Current Persona (Native SillyTavern logic)</button>
-            </div>
-        </div>`;
-
-    overlay.appendChild(box);
-    document.body.appendChild(overlay);
-
-    overlay.querySelector('#rt-pco-close').addEventListener('click', () => overlay.remove());
-    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
-
-    // ── Copy Bio button ──────────────────────────────────────────────────────
-    overlay.querySelector('#rt-pco-copy').addEventListener('click', async () => {
-        const bio = /** @type {HTMLTextAreaElement} */ (overlay.querySelector('#rt-pco-bio')).value.trim();
-        try {
-            await navigator.clipboard.writeText(bio);
-            const btn = /** @type {HTMLButtonElement} */ (overlay.querySelector('#rt-pco-copy'));
-            btn.textContent = '✅ Copied!';
-            setTimeout(() => { btn.textContent = '📋 Copy Bio'; }, 1800);
-        } catch (_) {
-            toastr['info']('Could not access clipboard — please select and copy manually.', 'Character Creator');
-        }
-    });
-
-    // ── Accept button ────────────────────────────────────────────────────────
-    overlay.querySelector('#rt-pco-accept').addEventListener('click', async () => {
-        const finalBio = /** @type {HTMLTextAreaElement} */ (overlay.querySelector('#rt-pco-bio')).value.trim();
-        const ctx = SillyTavern.getContext();
-        const safeName = charName.replace(/['"\\]/g, '').trim() || 'My Character';
-        const acceptBtn = /** @type {HTMLButtonElement} */ (overlay.querySelector('#rt-pco-accept'));
-        acceptBtn.disabled = true;
-        acceptBtn.textContent = '⏳ Creating...';
-
-        try {
-            await injectAsSillyTavernPersona(safeName, finalBio);
-
-            try {
-                if (typeof ctx.executeSlashCommandsWithOptions === 'function') {
-                    await ctx.executeSlashCommandsWithOptions('/persona-lock').catch(() => {});
-                }
-            } catch (_) {}
-
-            toastr['success'](`Persona "${safeName}" saved and selected. Check User Settings → Personas to confirm.`, 'Character Creator');
-        } catch (e) {
-            try { await navigator.clipboard.writeText(finalBio); } catch (_) {}
-            toastr['warning'](
-                `Could not auto-create persona. Bio copied to clipboard — go to User Settings → Personas, create "${safeName}", and paste the description.`,
-                'Character Creator', { timeOut: 8000 }
-            );
-        }
-        overlay.remove();
-     });
- 
-     // ── Add as Player into Lorebook Agent ────────────────────────────────────
-     overlay.querySelector('#rt-pco-add-pc').addEventListener('click', async () => {
-         const finalBio = /** @type {HTMLTextAreaElement} */ (overlay.querySelector('#rt-pco-bio')).value.trim();
-         const safeName = charName.replace(/['"\\]/g, '').trim() || 'My Character';
-         
-         const s = getSettings();
-         if (!s.chatStates) s.chatStates = {};
-         if (_currentChatId) {
-             if (!s.chatStates[_currentChatId]) s.chatStates[_currentChatId] = {};
-             s.chatStates[_currentChatId].playerCharacter = {
-                 name: safeName,
-                 bio: finalBio,
-                 wordCount: wordCount || 100,
-                 timestamp: Date.now()
-             };
-             saveChatState(_currentChatId);
-             
-             // Force a refresh of Campaign Records so it appears immediately
-             if (typeof refreshAgentManifestNow === 'function') {
-                 await refreshAgentManifestNow();
-             }
-             
-             toastr['success'](`"${safeName}" added as Player in Lorebook Agent.`, 'Character Creator');
-         } else {
-             toastr['error']('No active chat found to link the Player Character.', 'Character Creator');
-         }
-         overlay.remove();
-     });
- 
-     // ── Regenerate button ────────────────────────────────────────────────────
-     overlay.querySelector('#rt-pco-regen').addEventListener('click', async () => {
-         const regenBtn = /** @type {HTMLButtonElement} */ (overlay.querySelector('#rt-pco-regen'));
-         regenBtn.disabled = true;
-         regenBtn.textContent = '⏳ Regenerating...';
-         const newBio = await generatePersonaBio(charName, wordCount, extraHints);
-         if (newBio) {
-             /** @type {HTMLTextAreaElement} */ (overlay.querySelector('#rt-pco-bio')).value = newBio;
-         } else {
-             toastr['warning']('Regeneration failed. Please try again.', 'Character Creator');
-         }
-         regenBtn.disabled = false;
-         regenBtn.textContent = '🔄 Regenerate';
-     });
-}
 
 
 /**
  * Send a direct instruction to the State Model bypassing the narrative pipeline.
  * Used for initial character setup and manual corrections.
  */
-async function sendDirectPrompt(message) {
+export async function sendDirectPrompt(message) {
     if (_stateModelRunning) {
         toastr['info']('State Model is already running. Please wait.', 'RPG Tracker');
         return;
@@ -3409,63 +2137,6 @@ async function sendDirectPrompt(message) {
 
 
 
-/**
- * Panel geometry persistence
- */
-const GEOMETRY_KEY = 'rpg_tracker_geometry';
-
-/**
- * @param {HTMLElement} panel
- */
-function savePanelGeometry(panel) {
-    if (!panel || panel.style.display === 'none') return;
-    const rect = panel.getBoundingClientRect();
-    if (rect.width === 0 && rect.height === 0) return;
-    const isCollapsed = panel.classList.contains('rt-panel-collapsed');
-    let savedGeo = {};
-    try {
-        const savedStr = localStorage.getItem(GEOMETRY_KEY);
-        if (savedStr) savedGeo = JSON.parse(savedStr) || {};
-    } catch { }
-
-    localStorage.setItem(GEOMETRY_KEY, JSON.stringify({
-        left: rect.left, top: rect.top,
-        width: isCollapsed ? (savedGeo.width || rect.width) : rect.width,
-        height: isCollapsed ? (savedGeo.height || rect.height) : rect.height
-    }));
-}
-
-/**
- * @param {HTMLElement} panel
- */
-function loadPanelGeometry(panel) {
-    try {
-        const saved = JSON.parse(localStorage.getItem(GEOMETRY_KEY));
-        if (!saved) return;
-
-        // Sanitize coordinates to prevent "bricking" off-screen
-        const left = saved.left !== undefined ? Math.max(0, Math.min(window.innerWidth - 50, saved.left)) : undefined;
-        const top = saved.top !== undefined ? Math.max(0, Math.min(window.innerHeight - 50, saved.top)) : undefined;
-
-        if (left !== undefined) { panel.style.left = left + 'px'; panel.style.right = 'auto'; }
-        if (top !== undefined) { panel.style.top = top + 'px'; panel.style.bottom = 'auto'; }
-        if (saved.width) panel.style.width = saved.width + 'px';
-        // Guard: ignore saved heights that are smaller than a reasonable minimum (e.g. a stale
-        // header-only save from before the collapse feature existed). 80px ≈ header + tiny content.
-        if (saved.height && saved.height > 80) panel.style.height = saved.height + 'px';
-    } catch { /* ignore */ }
-}
-
-const DELTA_HEIGHT_KEY = 'rpg_tracker_delta_height';
-
-function saveDeltaHeight(height) {
-    localStorage.setItem(DELTA_HEIGHT_KEY, String(height));
-}
-
-function loadDeltaHeight() {
-    const v = parseInt(localStorage.getItem(DELTA_HEIGHT_KEY) || '');
-    return isNaN(v) ? 120 : Math.max(40, v);
-}
 
 /** Profile system — load a named profile into live settings. */
 function loadProfile(name) {
@@ -3530,6 +2201,15 @@ function loadProfile(name) {
     s.worldOpenaiKey = p.worldOpenaiKey || "";
     s.worldOpenaiModel = p.worldOpenaiModel || "";
 
+    s.gameSystemWizardConnectionSource = p.gameSystemWizardConnectionSource ?? "default";
+    s.gameSystemWizardConnectionProfileId = p.gameSystemWizardConnectionProfileId || "";
+    s.gameSystemWizardCompletionPresetId = p.gameSystemWizardCompletionPresetId || "";
+    s.gameSystemWizardOllamaUrl = p.gameSystemWizardOllamaUrl || "http://localhost:11434";
+    s.gameSystemWizardOllamaModel = p.gameSystemWizardOllamaModel || "";
+    s.gameSystemWizardOpenaiUrl = p.gameSystemWizardOpenaiUrl || "";
+    s.gameSystemWizardOpenaiKey = p.gameSystemWizardOpenaiKey || "";
+    s.gameSystemWizardOpenaiModel = p.gameSystemWizardOpenaiModel || "";
+
     // Update settings UI inputs if rendered
     $('#rpg_world_progression_randomize_npcs').prop('checked', !!s.worldProgressionRandomizeNPCs);
     $('#rpg_world_progression_random_skeleton_npc_count').val(s.worldProgressionRandomSkeletonNPCCount ?? 2);
@@ -3577,6 +2257,16 @@ function loadProfile(name) {
     $('#rpg_world_openai_model').val(s.worldOpenaiModel || '');
     $('#rpg_world_openai_model_manual').val(s.worldOpenaiModel || '');
 
+    $('#rpg_gs_wizard_connection_source').val(s.gameSystemWizardConnectionSource || 'default');
+    $('#rpg_gs_wizard_connection_profile').val(s.gameSystemWizardConnectionProfileId || '');
+    $('#rpg_gs_wizard_completion_preset').val(s.gameSystemWizardCompletionPresetId || '');
+    $('#rpg_gs_wizard_ollama_url').val(s.gameSystemWizardOllamaUrl || 'http://localhost:11434');
+    $('#rpg_gs_wizard_ollama_model').val(s.gameSystemWizardOllamaModel || '');
+    $('#rpg_gs_wizard_openai_url').val(s.gameSystemWizardOpenaiUrl || '');
+    $('#rpg_gs_wizard_openai_key').val(s.gameSystemWizardOpenaiKey || '');
+    $('#rpg_gs_wizard_openai_model').val(s.gameSystemWizardOpenaiModel || '');
+    $('#rpg_gs_wizard_openai_model_manual').val(s.gameSystemWizardOpenaiModel || '');
+
     // Toggle container visibilities
     $('#rpg_portrait_profile_group').toggle(s.portraitConnectionSource === 'profile');
     $('#rpg_portrait_ollama_group').toggle(s.portraitConnectionSource === 'ollama');
@@ -3584,6 +2274,9 @@ function loadProfile(name) {
     $('#rpg_world_profile_group').toggle(s.worldConnectionSource === 'profile');
     $('#rpg_world_ollama_group').toggle(s.worldConnectionSource === 'ollama');
     $('#rpg_world_openai_group').toggle(s.worldConnectionSource === 'openai');
+    $('#rpg_gs_wizard_profile_group').toggle(s.gameSystemWizardConnectionSource === 'profile');
+    $('#rpg_gs_wizard_ollama_group').toggle(s.gameSystemWizardConnectionSource === 'ollama');
+    $('#rpg_gs_wizard_openai_group').toggle(s.gameSystemWizardConnectionSource === 'openai');
 
     // Toggle container visibilities
     if (s.worldProgressionRandomizeNPCs) $('#rpg_world_progression_random_npc_count_container').show();
@@ -3863,7 +2556,7 @@ async function showPortraitSettingsMenu(entityName, onRefresh, npcContent = null
     }
 }
 
-function bindRenderedCardEvents(el, memo, isDetachedContext = false, onRefresh = null) {
+export function bindRenderedCardEvents(el, memo, isDetachedContext = false, onRefresh = null) {
     const refresh = onRefresh || refreshRenderedView;
 
     // Genre tab toggle listener & persistent preference save
@@ -4577,7 +3270,7 @@ function getDisplayQuests(memoText) {
     return activeFromMemo;
 }
 
-function refreshRenderedView() {
+export function refreshRenderedView() {
     if (!_renderedViewActive) return;
     const s = getSettings();
     const memo = _historyViewIndex === -1
@@ -10048,7 +8741,7 @@ function navigateSnapshot(direction) {
     syncMemoView();
 }
 
-function syncMemoView() {
+export function syncMemoView() {
     const s = getSettings();
     const textarea = /** @type {HTMLTextAreaElement|null} */ (document.getElementById('rpg-tracker-memo'));
     const navLabel = document.getElementById('rpg-tracker-nav-label');
@@ -10126,283 +8819,6 @@ function syncMemoView() {
     refreshRenderedView();
 }
 
-/**
- * @param {HTMLElement} panel
- * @param {HTMLElement} handle
- */
-function makeDraggable(panel, handle, customKey = null) {
-    let isDragging = false;
-    let startX, startY, startLeft, startTop;
-
-    const onPointerDown = (e) => {
-        if (e.button !== 0) return;
-        // Ignore clicks on buttons inside the header
-        if (e.target instanceof Element && e.target.closest('button, input, select, textarea')) return;
-        isDragging = true;
-        handle.setPointerCapture(e.pointerId);
-        const rect = panel.getBoundingClientRect();
-        startX = e.clientX; startY = e.clientY;
-        startLeft = rect.left; startTop = rect.top;
-        panel.style.left = startLeft + 'px';
-        panel.style.top = startTop + 'px';
-        panel.style.right = 'auto';
-        panel.style.bottom = 'auto';
-        e.preventDefault();
-    };
-
-    const onPointerMove = (e) => {
-        if (!isDragging) return;
-        const left = startLeft + (e.clientX - startX);
-        const top = startTop + (e.clientY - startY);
-
-        // Constrain to viewport (ensure header stays reachable)
-        const boundedLeft = Math.max(0, Math.min(window.innerWidth - 100, left));
-        const boundedTop = Math.max(0, Math.min(window.innerHeight - 50, top));
-
-        panel.style.left = boundedLeft + 'px';
-        panel.style.top = boundedTop + 'px';
-    };
-
-    const onPointerUp = (e) => {
-        if (isDragging) {
-            isDragging = false;
-            try { handle.releasePointerCapture(e.pointerId); } catch(err){}
-            if (customKey) {
-                const rect = panel.getBoundingClientRect();
-                const isCollapsed = panel.classList.contains('rt-panel-collapsed');
-                let savedGeo = {};
-                try {
-                    const savedStr = localStorage.getItem(customKey);
-                    if (savedStr) savedGeo = JSON.parse(savedStr) || {};
-                } catch { }
-
-                localStorage.setItem(customKey, JSON.stringify({
-                    left: rect.left, top: rect.top,
-                    width: isCollapsed ? (savedGeo.width || rect.width) : rect.width,
-                    height: isCollapsed ? (savedGeo.height || rect.height) : rect.height
-                }));
-            } else {
-                savePanelGeometry(panel);
-            }
-        }
-    };
-
-    handle.addEventListener('pointerdown', onPointerDown);
-    handle.addEventListener('pointermove', onPointerMove);
-    handle.addEventListener('pointerup', onPointerUp);
-    handle.addEventListener('pointercancel', (e) => {
-        isDragging = false;
-        try { handle.releasePointerCapture(e.pointerId); } catch(err){}
-    });
-
-    return () => {
-        isDragging = false;
-        handle.removeEventListener('pointerdown', onPointerDown);
-        handle.removeEventListener('pointermove', onPointerMove);
-        handle.removeEventListener('pointerup', onPointerUp);
-    };
-}
-
-/**
- * Top-Right corner resizer logic
- * @param {HTMLElement} panel 
- * @param {HTMLElement} handle 
- */
-function makeResizableTR(panel, handle) {
-    let startX, startY, startWidth, startHeight, startTop, startLeft;
-
-    handle.addEventListener('pointerdown', (e) => {
-        if (e.button !== 0) return;
-        handle.setPointerCapture(e.pointerId);
-        const rect = panel.getBoundingClientRect();
-        startX = e.clientX;
-        startY = e.clientY;
-        startWidth = rect.width;
-        startHeight = rect.height;
-        startTop = rect.top;
-        startLeft = rect.left;
-
-        panel.style.left = startLeft + 'px';
-        panel.style.top = startTop + 'px';
-        panel.style.right = 'auto';
-        panel.style.bottom = 'auto';
-
-        e.preventDefault();
-        e.stopPropagation();
-    });
-
-    handle.addEventListener('pointermove', (e) => {
-        if (!handle.hasPointerCapture(e.pointerId)) return;
-        const dx = e.clientX - startX;
-        const dy = e.clientY - startY;
-
-        const newWidth = Math.max(220, startWidth + dx);
-        const newHeight = Math.max(200, startHeight - dy);
-        const newTop = startTop + dy;
-
-        panel.style.width = newWidth + 'px';
-        if (newHeight > 200) {
-            panel.style.height = newHeight + 'px';
-            panel.style.top = newTop + 'px';
-        }
-    });
-
-    handle.addEventListener('pointerup', (e) => {
-        try { handle.releasePointerCapture(e.pointerId); } catch(err){}
-        savePanelGeometry(panel);
-    });
-
-    handle.addEventListener('pointercancel', (e) => {
-        try { handle.releasePointerCapture(e.pointerId); } catch(err){}
-    });
-}
-
-/**
- * Bottom-Right corner resizer logic.
- * Same pointer-capture pattern as makeResizableTR.
- * @param {HTMLElement} panel
- * @param {HTMLElement} handle
- */
-function makeResizableBR(panel, handle) {
-    let startX, startY, startWidth, startHeight, startTop, startLeft;
-
-    handle.addEventListener('pointerdown', (e) => {
-        if (e.button !== 0) return;
-        handle.setPointerCapture(e.pointerId);
-        const rect = panel.getBoundingClientRect();
-        startX = e.clientX;
-        startY = e.clientY;
-        startWidth = rect.width;
-        startHeight = rect.height;
-        startTop = rect.top;
-        startLeft = rect.left;
-
-        panel.style.left = startLeft + 'px';
-        panel.style.top = startTop + 'px';
-        panel.style.right = 'auto';
-        panel.style.bottom = 'auto';
-        panel.style.maxHeight = 'none';
-
-        e.preventDefault();
-        e.stopPropagation();
-    });
-
-    handle.addEventListener('pointermove', (e) => {
-        if (!handle.hasPointerCapture(e.pointerId)) return;
-        const dx = e.clientX - startX;
-        const dy = e.clientY - startY;
-
-        panel.style.width = Math.max(220, startWidth + dx) + 'px';
-        panel.style.height = Math.max(200, startHeight + dy) + 'px';
-    });
-
-    handle.addEventListener('pointerup', (e) => {
-        try { handle.releasePointerCapture(e.pointerId); } catch(err){}
-        savePanelGeometry(panel);
-    });
-
-    handle.addEventListener('pointercancel', (e) => {
-        try { handle.releasePointerCapture(e.pointerId); } catch(err){}
-    });
-}
-
-/**
- * Bottom-Left corner resizer logic.
- * Same pointer-capture pattern as makeResizableTR.
- * @param {HTMLElement} panel
- * @param {HTMLElement} handle
- */
-function makeResizableBL(panel, handle) {
-    let startX, startY, startWidth, startHeight, startTop, startLeft;
-
-    handle.addEventListener('pointerdown', (e) => {
-        if (e.button !== 0) return;
-        handle.setPointerCapture(e.pointerId);
-        const rect = panel.getBoundingClientRect();
-        startX = e.clientX;
-        startY = e.clientY;
-        startWidth = rect.width;
-        startHeight = rect.height;
-        startTop = rect.top;
-        startLeft = rect.left;
-
-        panel.style.left = startLeft + 'px';
-        panel.style.top = startTop + 'px';
-        panel.style.right = 'auto';
-        panel.style.bottom = 'auto';
-        panel.style.maxHeight = 'none';
-
-        e.preventDefault();
-        e.stopPropagation();
-    });
-
-    handle.addEventListener('pointermove', (e) => {
-        if (!handle.hasPointerCapture(e.pointerId)) return;
-        const dx = e.clientX - startX;
-        const dy = e.clientY - startY;
-
-        const newWidth = Math.max(220, startWidth - dx);
-        const newLeft = startLeft + dx;
-
-        if (newWidth > 220) {
-            panel.style.width = newWidth + 'px';
-            panel.style.left = newLeft + 'px';
-        }
-        panel.style.height = Math.max(200, startHeight + dy) + 'px';
-    });
-
-    handle.addEventListener('pointerup', (e) => {
-        try { handle.releasePointerCapture(e.pointerId); } catch(err){}
-        savePanelGeometry(panel);
-    });
-
-    handle.addEventListener('pointercancel', (e) => {
-        try { handle.releasePointerCapture(e.pointerId); } catch(err){}
-    });
-}
-
-function setupResizeObserver(panel) {
-    // Debounced save on resize.
-    // Skip the very first callback — it fires immediately on observe() before
-    // the panel's restored geometry (from loadPanelGeometry) has been painted,
-    // which would cause it to overwrite the saved position with the CSS default.
-    let _resizeTimer;
-    let _initialFired = false;
-    const ro = new ResizeObserver(() => {
-        if (!_initialFired) { _initialFired = true; return; }
-        clearTimeout(_resizeTimer);
-        _resizeTimer = setTimeout(() => savePanelGeometry(panel), 300);
-    });
-    ro.observe(panel);
-}
-
-function setupDeltaResize(panel) {
-    const handle = /** @type {HTMLElement} */ (panel.querySelector('#rpg-tracker-delta-handle'));
-    const deltaEl = /** @type {HTMLElement} */ (panel.querySelector('#rpg-tracker-delta'));
-    let startY, startH;
-
-    handle.addEventListener('pointerdown', (e) => {
-        startY = e.clientY;
-        startH = deltaEl.offsetHeight;
-        handle.setPointerCapture(e.pointerId);
-        e.preventDefault();
-    });
-
-    handle.addEventListener('pointermove', (e) => {
-        if (!handle.hasPointerCapture(e.pointerId)) return;
-        const newH = Math.max(40, startH - (e.clientY - startY));
-        deltaEl.style.height = newH + 'px';
-    });
-
-    handle.addEventListener('pointerup', (e) => {
-        if (handle.hasPointerCapture(e.pointerId)) {
-            saveDeltaHeight(deltaEl.offsetHeight);
-        }
-    });
-
-    handle.addEventListener('pointercancel', () => { });
-}
-
 function updateUIMemo(text) {
     if (_historyViewIndex !== -1) return; // don't clobber snapshot view
     const textarea = /** @type {HTMLTextAreaElement|null} */ (document.getElementById('rpg-tracker-memo'));
@@ -10418,7 +8834,7 @@ function updateAgentStatusIndicator(running) {
     if (playBtn) playBtn.style.opacity = running ? '0.3' : '';
 }
 
-function updateStatusIndicator(state) {
+export function updateStatusIndicator(state) {
     const indicator = document.getElementById('rpg-tracker-status');
     const stopBtn = /** @type {HTMLElement} */ (document.getElementById('rpg-tracker-stop-btn'));
     if (!indicator) return;
@@ -10468,1133 +8884,6 @@ const ROW_TYPE_OPTIONS = [
     ['text', 'Plain Text'],
 ];
 
-function buildExistingFieldsContextForAi(settings) {
-    let existingFieldsContext = '';
-    BLOCK_ORDER.forEach(tag => {
-        if (tag === 'QUESTS' && settings.syspromptModules?.quests === false) return;
-        if (!settings.modules || settings.modules[tag] !== false) {
-            const modLower = tag === 'TIME' ? resolveTimePromptKey(settings) : tag.toLowerCase();
-            const promptContent = (settings.stockPrompts && settings.stockPrompts[modLower])
-                ? settings.stockPrompts[modLower]
-                : DEFAULT_STOCK_PROMPTS[modLower] || '';
-            existingFieldsContext += `[${tag}] (Stock Module)\nPrompt: ${promptContent}\n\n`;
-        }
-    });
-    (settings.customFields || []).forEach(f => {
-        if (!settings.modules || settings.modules[f.tag.toUpperCase()] !== false) {
-            existingFieldsContext += `[${f.tag}] (Custom Field: ${f.label})\nPrompt: ${f.prompt}\nTemplate: ${f.template}\n\n`;
-        }
-    });
-    return existingFieldsContext.trim();
-}
-
-function parseAiJsonResponse(result) {
-    let jsonStr = result.trim();
-    const fenceMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (fenceMatch) jsonStr = fenceMatch[1].trim();
-    return JSON.parse(jsonStr);
-}
-
-async function showAiCustomModulePreviewPopup(parsed, settings) {
-    const { Popup } = SillyTavern.getContext();
-    const previewContent = `
-            <div style="display:flex; flex-direction:column; gap:10px; width:100%; box-sizing:border-box; max-height:80vh;">
-                <div style="font-size:13px; font-weight:bold;">🪄 AI Generated Custom Field</div>
-                <div style="border: 1px solid rgba(255,255,255,0.15); border-radius:8px; padding:12px; background:rgba(255,255,255,0.03); overflow-y:auto;">
-                    <div><b>Tag:</b> [${escapeHtml(parsed.tag)}]</div>
-                    <div><b>Label:</b> ${escapeHtml(parsed.icon)} ${escapeHtml(parsed.label)}</div>
-                    <div style="margin-top:6px;"><b>AI Prompt:</b></div>
-                    <div style="font-size:11px; opacity:0.8; white-space:pre-wrap; padding:6px 8px; background:rgba(0,0,0,0.2); border-radius:4px; margin-top:2px;">${escapeHtml(parsed.prompt)}</div>
-                    <div style="margin-top:6px;"><b>Example Template:</b></div>
-                    <div style="font-size:11px; opacity:0.8; white-space:pre-wrap; padding:6px 8px; background:rgba(0,0,0,0.2); border-radius:4px; margin-top:2px; font-family:monospace;">${escapeHtml(parsed.template)}</div>
-                    <div style="margin-top:12px; font-weight:bold; font-size:12px;">Live Preview:</div>
-                    <div id="rt_ai_cfe_preview_view" class="rpg-tracker-render-view" style="margin-top:4px; border:1px solid rgba(255,255,255,0.1); border-radius:6px; background:rgba(0,0,0,0.2); padding:4px;"></div>
-                </div>
-            </div>
-        `;
-
-    setTimeout(() => {
-        const renderView = document.getElementById('rt_ai_cfe_preview_view');
-        if (!renderView) return;
-
-        const previewTag = parsed.tag;
-        const fakeMemo = `[${previewTag}]\n${parsed.template}\n[/${previewTag}]`;
-        const ghostField = {
-            tag: previewTag,
-            label: parsed.label,
-            icon: parsed.icon,
-            template: parsed.template,
-            prompt: '',
-            enabled: true
-        };
-        const savedCustomFields = settings.customFields;
-        settings.customFields = [...(savedCustomFields || []), ghostField];
-        try {
-            renderView.innerHTML = renderMemoAsCards(fakeMemo, previewTag, {});
-            bindRenderedCardEvents(renderView, fakeMemo, true, null);
-        } finally {
-            settings.customFields = savedCustomFields;
-        }
-    }, 150);
-
-    return Popup.show.confirm('Accept Changes?', previewContent);
-}
-
-async function promptForAiModuleEditDescription(moduleLabel) {
-    const { Popup } = SillyTavern.getContext();
-    const inputContent = `
-            <div style="display:flex; flex-direction:column; gap:10px; width:100%; box-sizing:border-box;">
-                <div style="font-size:13px; opacity:0.9; font-weight:bold;">🪄 AI Module Editor</div>
-                <div style="font-size:11px; opacity:0.7; line-height:1.4;">
-                    Describe how you want to change <b>${escapeHtml(moduleLabel)}</b>. The AI will revise the module while preserving anything you do not ask to change.
-                </div>
-                <textarea id="rt_ai_edit_desc" rows="4" class="text_pole"
-                    style="font-size:12px; resize:vertical; width:100%;"
-                    placeholder="Example: Add a section for tracking attunement slots. Show attuned items as pills and list unused slots."></textarea>
-            </div>
-        `;
-
-    let description = '';
-    setTimeout(() => {
-        const textarea = document.getElementById('rt_ai_edit_desc');
-        if (textarea) {
-            textarea.addEventListener('input', () => { description = textarea.value.trim(); });
-        }
-    }, 100);
-
-    const inputResult = await Popup.show.confirm(`Edit ${moduleLabel} with AI`, inputContent, { okButton: 'Generate', cancelButton: 'Cancel' });
-    if (!inputResult) return null;
-    if (!description) {
-        toastr['warning']('Please describe the changes you want.', 'AI Module Editor');
-        return null;
-    }
-    return description;
-}
-
-async function showAiStockPromptPreviewPopup(displayTag, promptText) {
-    const { Popup } = SillyTavern.getContext();
-    const previewContent = `
-            <div style="display:flex; flex-direction:column; gap:10px; width:100%; box-sizing:border-box; max-height:80vh;">
-                <div style="font-size:13px; font-weight:bold;">🪄 AI Revised Prompt — [${escapeHtml(displayTag)}]</div>
-                <div style="font-size:11px; opacity:0.8; white-space:pre-wrap; padding:10px 12px; background:rgba(0,0,0,0.2); border-radius:6px; border:1px solid rgba(255,255,255,0.1); overflow-y:auto; max-height:60vh;">${escapeHtml(promptText)}</div>
-            </div>
-        `;
-    return Popup.show.confirm('Accept Changes?', previewContent);
-}
-
-function buildAiCustomModuleRules(existingTags, editingTag = null) {
-    const tagRule = editingTag
-        ? `- 'tag' must stay "${editingTag}" unless the user explicitly asks to rename the field`
-        : `- 'tag' (the field ID) must NOT conflict with any of the field tags listed in <existing_fields>`;
-    return `RULES:
-- 'tag' (the field ID) must be UPPERCASE, no spaces, use underscores
-${tagRule}
-- NEVER use asterisks (*) anywhere. Do not use them in the tag, prompt, template, or anywhere else. The * symbol is completely BANNED as it breaks rendering. Use ((HIGHLIGHT)) instead if you need emphasis.
-- You are ENCOURAGED to use any of the available rendering tags, even if they are used by other fields
-- icon must be a single emoji
-- prompt should start with 1-3 sentences of clear and specific instructions
-- prompt MUST include a newline, then 'FORMAT:', then the required layout with rendering markers
-- prompt MUST include a newline, then 'EXAMPLE:', then a realistic made up example of how it should look
-- The AI during gameplay only sees 'prompt', it does NOT see 'template'
-- template MUST use rendering tags — this is just the UI preview for the user. It should match the EXAMPLE you provided in the prompt.
-- Return ONLY the JSON. No explanation, no markdown fences.`;
-}
-
-async function runAiEditCustomModule(settings, field, description) {
-    const existingTags = BLOCK_ORDER.concat((settings.customFields || []).map(f => f.tag.toUpperCase()));
-    const existingFieldsContext = buildExistingFieldsContextForAi(settings);
-    const aiPrompt = `You are a configuration editor for a game state tracker extension.
-
-The user's current system prompt is provided below for reference:
-<current_prompt>
-${document.getElementById('main_prompt_quick_edit_textarea')?.value || settings.systemPromptTemplate || ''}
-</current_prompt>
-
-Here are ALL the user's currently enabled tracking fields (both stock and custom), including their exact instructions and formatting. Use these for inspiration on depth and style. Ensure your revised field complements them without duplicating functionality:
-<existing_fields>
-${existingFieldsContext}
-</existing_fields>
-
-You are EDITING an existing custom tracking field. Preserve anything the user did not ask to change.
-
-Current field configuration:
-{
-  "tag": "${field.tag}",
-  "label": "${field.label}",
-  "icon": "${field.icon}",
-  "prompt": ${JSON.stringify(field.prompt || '')},
-  "template": ${JSON.stringify(field.template || '')}
-}
-
-The user's requested changes:
-"${description}"
-
-Available rendering tags (MUST use at least one in the template). Tags can be placed inline (e.g., 'Health: ((BAR)) 50/100'). Pill tags optionally support parenthesis text for descriptions (e.g. 'Status: ((PILLS)) Sleeping (Unconscious)'):
-${RENDERING_TAGS_LIBRARY.map(t => '- ' + t).join('\n')}
-
-Return ONLY a valid JSON object with these fields:
-{
-  "tag": "UPPERCASE_FIELD_ID",
-  "label": "Human Readable Label",
-  "icon": "single emoji",
-  "prompt": "Instruction text telling the AI model what to track and exactly how to format it. MUST include a newline, then a literal 'FORMAT:' section, then a newline, then an 'EXAMPLE:' section.",
-  "template": "Example output showing rendering markers. MUST use at least one ((MARKER)) tag. Show realistic example data."
-}
-
-${buildAiCustomModuleRules(existingTags, field.tag.toUpperCase())}`;
-
-    toastr['info']('Revising custom module with AI...', 'AI Module Editor', { timeOut: 3000 });
-    const result = await sendStateRequest(settings, 'You are a JSON configuration generator. Return ONLY valid JSON.', aiPrompt);
-    if (!result) throw new Error('No response from AI');
-
-    const parsed = parseAiJsonResponse(result);
-    if (!parsed.tag || !parsed.label || !parsed.icon || !parsed.prompt || !parsed.template) {
-        throw new Error('AI returned incomplete field config');
-    }
-
-    const normalTag = parsed.tag.toUpperCase().replace(/[^A-Z0-9_]/g, '_');
-    const reservedConflict = BLOCK_ORDER.includes(normalTag);
-    const otherCustomConflict = (settings.customFields || []).some(f =>
-        f.tag.toUpperCase() === normalTag && f.tag.toUpperCase() !== field.tag.toUpperCase()
-    );
-    if (reservedConflict || otherCustomConflict) {
-        parsed.tag = field.tag.toUpperCase();
-    } else {
-        parsed.tag = normalTag;
-    }
-
-    const approved = await showAiCustomModulePreviewPopup(parsed, settings);
-    if (!approved) {
-        toastr['info']('Module edit cancelled.', 'AI Module Editor');
-        return null;
-    }
-    return parsed;
-}
-
-async function runAiEditStockModulePrompt(settings, modKey, blockTag, displayTag, currentPrompt, description) {
-    const existingFieldsContext = buildExistingFieldsContextForAi(settings);
-    const aiPrompt = `You are an instruction editor for a game state tracker extension.
-
-The user's current system prompt is provided below for reference:
-<current_prompt>
-${document.getElementById('main_prompt_quick_edit_textarea')?.value || settings.systemPromptTemplate || ''}
-</current_prompt>
-
-Here are ALL the user's currently enabled tracking fields (both stock and custom), including their exact instructions and formatting. Use these for inspiration on depth and style:
-<existing_fields>
-${existingFieldsContext}
-</existing_fields>
-
-You are EDITING the stock module prompt for [${blockTag}]. Preserve anything the user did not ask to change.
-
-Current prompt for [${blockTag}]:
-${currentPrompt}
-
-The user's requested changes:
-"${description}"
-
-Return ONLY a valid JSON object:
-{
-  "prompt": "The full revised instruction text for this stock module."
-}
-
-RULES:
-- Preserve structure and formatting conventions unless the user asks to change them
-- NEVER use asterisks (*) anywhere in the prompt. Use ((HIGHLIGHT)) instead if you need emphasis
-- Return ONLY the JSON. No explanation, no markdown fences.`;
-
-    toastr['info']('Revising module prompt with AI...', 'AI Module Editor', { timeOut: 3000 });
-    const result = await sendStateRequest(settings, 'You are a JSON configuration generator. Return ONLY valid JSON.', aiPrompt);
-    if (!result) throw new Error('No response from AI');
-
-    const parsed = parseAiJsonResponse(result);
-    if (!parsed.prompt || typeof parsed.prompt !== 'string') {
-        throw new Error('AI returned incomplete prompt');
-    }
-
-    const approved = await showAiStockPromptPreviewPopup(displayTag, parsed.prompt);
-    if (!approved) {
-        toastr['info']('Module edit cancelled.', 'AI Module Editor');
-        return null;
-    }
-    return parsed;
-}
-
-function buildRowTypeSelect(selectedVal) {
-    const sel = document.createElement('select');
-    sel.className = 'text_pole';
-    sel.style.cssText = 'flex:2; min-width:110px; height:28px; padding:2px 4px; font-size:12px;';
-    ROW_TYPE_OPTIONS.forEach(([val, label]) => {
-        const opt = document.createElement('option');
-        opt.value = val; opt.textContent = label;
-        if (val === selectedVal) opt.selected = true;
-        sel.appendChild(opt);
-    });
-    return sel;
-}
-
-function openCustomFieldEditor(index) {
-    const isSmallScreen = window.innerWidth <= 700;
-    const s = getSettings();
-    const field = s.customFields[index];
-    const overlay = document.createElement('div');
-    overlay.id = 'rt_cfe_overlay';
-    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.7);backdrop-filter:blur(2px);z-index:10000000;display:none;align-items:center;justify-content:center;overflow-y:auto;';
-
-    overlay.innerHTML = `
-            <div id="rt_cfe_modal" class="popup shadowBase" style="
-                width: min(540px, 94vw);
-                height: ${isSmallScreen ? '85vh' : 'auto'};
-                max-height: ${isSmallScreen ? '90vh' : '850px'};
-                margin: auto;
-                display: flex;
-                flex-direction: column;
-                padding: 0;
-                overflow: hidden;
-            ">
-                <div class="popup-header">
-                    <h3 class="margin0" style="font-size:14px; flex:1;">Custom Module Editor</h3>
-                    <div id="rt_cfe_close" class="popup-close interactable" title="Close"><i class="fa-solid fa-times"></i></div>
-                </div>
-                <div class="popup-body flex-container flexFlowColumn gap-1" style="padding:10px 14px; overflow-y:auto; flex:1;">
-                    <!-- Identity row -->
-                    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
-                        <input type="text" id="rt_cfe_icon" class="text_pole" style="width:44px;text-align:center;" title="Icon (emoji)">
-                        <input type="text" id="rt_cfe_tag"  class="text_pole" style="width:100px;font-family:monospace;" placeholder="TAG">
-                        <input type="text" id="rt_cfe_label" class="text_pole" style="flex:1;min-width:80px;" placeholder="Display label">
-                    </div>
-
-                    <!-- Layout Options -->
-                    <div style="display:flex; align-items:center; gap:10px; margin-top:4px; padding:2px 4px;">
-                        <div style="display:flex; align-items:center; gap:6px;">
-                            <span style="font-size:12px; font-weight:bold; opacity:0.8;">Pagination Threshold:</span>
-                            <input type="text" inputmode="numeric" pattern="[0-9]*" id="rt_cfe_pagesize" class="text_pole" style="width:50px; height:24px; text-align:center;" min="1" max="99" title="How many items to show before adding page buttons">
-                            <span style="font-size:11px; opacity:0.6;">entries</span>
-                        </div>
-                    </div>
-
-                    <!-- AI Instructions -->
-                    <div style="margin-top:12px; padding:10px; background:rgba(0,0,0,0.2); border-radius:8px; border:1px solid rgba(255,255,255,0.05);">
-                        <div style="display:flex; align-items:center; gap:6px; margin-bottom:6px;">
-                            <i class="fa-solid fa-robot" style="opacity:0.7;"></i>
-                            <b style="font-size:12px;">AI Instructions</b>
-                        </div>
-                        <textarea id="rt_cfe_prompt" class="text_pole" rows="10" style="resize:vertical; width:100%;" placeholder="What should the AI track and in what format? Define the instructions. You can use the box below with the live preview (desktop only for now!) to create and paste a formatting instructions template here.&#10;&#10;Example: Track the Limit Break charge level of the protagonist. Increment Times Used on use; increase level by 1 on each use.&#10;&#10;Format:&#10;[LIMIT BREAK]&#10;((XPBAR)) Limit Break: 10/100 Level 4&#10;Times Used: 3&#10;[/LIMIT BREAK]"></textarea>
-                    </div>
-
-                    <!-- Testing Sandbox -->
-                    <div style="margin-top:15px;">
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                             <b style="font-size:13px;">Testing Sandbox (desktop only) <i class="fa-solid fa-circle-question" style="opacity:0.5; cursor:help; font-size:11px;" title="This box is ONLY for testing how the UI renders your formatting. Nothing from this box is sent to the AI. You must manually include any formatting examples in the 'AI Instructions' box above."></i></b>
-                        </div>
-                        <textarea id="rt_cfe_template" class="text_pole" rows="8" style="resize:vertical; width:100%; font-family:monospace; font-size:12px;" placeholder="Example:\n((PILLS)) Skills: Stealth, Deception\nHP: 10/100"></textarea>
-                    </div>
-                </div>
-                <!-- Footer -->
-                <div class="popup-footer flex-container gap-1 justifycontentend" style="padding:8px 14px; border-top:1px solid rgba(255,255,255,0.08); flex-shrink:0;">
-                    <button id="rt_cfe_delete" class="menu_button interactable" style="color:#ff5555;font-size:12px;"><i class="fa-solid fa-trash"></i> Delete</button>
-                    <button id="rt_cfe_export" class="menu_button interactable" style="font-size:12px;margin-right:auto;" title="Export this module as a shareable code"><i class="fa-solid fa-file-export"></i> Export</button>
-                    <button id="rt_cfe_edit_ai" class="menu_button interactable" style="font-size:12px; background:rgba(180,100,255,0.15); border-color:rgba(180,100,255,0.4);" title="Describe changes and let AI revise this module"><i class="fa-solid fa-wand-magic-sparkles"></i> Edit with AI</button>
-                    <button id="rt_cfe_cancel" class="menu_button interactable" style="font-size:12px;">Cancel</button>
-                    <button id="rt_cfe_save" class="menu_button interactable" style="font-size:12px;">Save Changes</button>
-                </div>
-            </div>
-            <!-- Floating preview -->
-            <div id="rt_cfe_preview" class="rpg-tracker-panel" style="margin:0;display:none;flex-direction:column;cursor:default;height:auto;min-height:44px;width:300px;position:fixed;">
-                <div id="rt_cfe_preview_header" class="rpg-tracker-header" style="cursor:move;user-select:none;font-size:0.75em;opacity:0.7;padding:5px 10px;"><i class="fa-solid fa-grip-lines" style="margin-right:6px;"></i>UI Live Preview</div>
-                <div id="rt_cfe_preview_view" class="rpg-tracker-render-view"></div>
-            </div>
-        `;
-    document.body.appendChild(overlay);
-    overlay.addEventListener('mousedown', e => e.stopPropagation());
-    overlay.addEventListener('click', e => e.stopPropagation());
-
-    const iconEl = /** @type {HTMLInputElement}    */ (document.getElementById('rt_cfe_icon'));
-    const tagEl = /** @type {HTMLInputElement}    */ (document.getElementById('rt_cfe_tag'));
-    const labelEl = /** @type {HTMLInputElement}    */ (document.getElementById('rt_cfe_label'));
-    const templateEl = /** @type {HTMLTextAreaElement} */ (document.getElementById('rt_cfe_template'));
-    const promptEl = /** @type {HTMLTextAreaElement} */ (document.getElementById('rt_cfe_prompt'));
-    const previewEl = document.getElementById('rt_cfe_preview');
-    const pageSizeEl = /** @type {HTMLInputElement}    */ (document.getElementById('rt_cfe_pagesize'));
-
-    iconEl.value = field.icon || '📄';
-    tagEl.value = field.tag || '';
-    labelEl.value = field.label || '';
-    templateEl.value = field.template || '';
-    // Legacy cleanup: clear the old placeholder text if it's stored as a value
-    if (field.prompt === 'What should the AI track for this new field? Describe it here.') {
-        field.prompt = '';
-    }
-    promptEl.value = field.prompt || '';
-    pageSizeEl.value = String(s.modulePageSizes?.[field.tag.toUpperCase()] ?? (field.tag.toUpperCase() === 'SPELLS' ? 5 : PAGE_SIZE));
-
-    // ── Live Preview ──
-    let _previewDebounce = null;
-    let _bgRefreshDebounce = null;
-    const schedulePreview = () => {
-        clearTimeout(_previewDebounce);
-        _previewDebounce = setTimeout(updatePreview, 180);
-        clearTimeout(_bgRefreshDebounce);
-        _bgRefreshDebounce = setTimeout(refreshRenderedView, 300);
-    };
-
-    const renderPreviewInto = (targetEl) => {
-        const renderView = targetEl || document.getElementById('rt_cfe_preview_view');
-        if (!renderView) return;
-
-        const testContent = templateEl.value || 'Nothing in testing sandbox';
-        const previewTag = '__PREVIEW__';
-        const fakeMemo = `[${previewTag}]\n${testContent}\n[/${previewTag}]`;
-
-        const ghostField = {
-            tag: previewTag,
-            label: labelEl.value || tagEl.value || 'Preview',
-            icon: iconEl.value || '📄',
-            template: templateEl.value,
-            prompt: '',
-            enabled: true
-        };
-        const savedCustomFields = s.customFields;
-        s.customFields = [...savedCustomFields, ghostField];
-        try {
-            renderView.innerHTML = renderMemoAsCards(fakeMemo, previewTag, _sectionPages);
-            bindRenderedCardEvents(renderView, fakeMemo, true, () => renderPreviewInto(targetEl));
-        } finally {
-            s.customFields = savedCustomFields;
-        }
-    };
-
-    const updatePreview = () => renderPreviewInto(null);
-
-    iconEl.addEventListener('input', schedulePreview);
-    tagEl.addEventListener('input', schedulePreview);
-    labelEl.addEventListener('input', schedulePreview);
-    templateEl.addEventListener('input', schedulePreview);
-    pageSizeEl.addEventListener('input', () => {
-        if (!s.modulePageSizes) s.modulePageSizes = {};
-        const val = parseInt(String(pageSizeEl.value), 10);
-        if (!isNaN(val) && val >= 1) {
-            s.modulePageSizes[tagEl.value.toUpperCase()] = val;
-            saveSettings();
-            schedulePreview();
-        }
-    });
-
-    updatePreview();
-    overlay.style.display = 'flex';
-
-    const modal = document.getElementById('rt_cfe_modal');
-    const previewHeader = (document.getElementById('rt_cfe_preview_header'));
-
-    if (modal && previewEl && previewHeader) {
-        const rect = modal.getBoundingClientRect();
-        const spaceOnRight = window.innerWidth - rect.right;
-        if (spaceOnRight >= 320 && !isSmallScreen) {
-            previewEl.style.display = 'flex';
-            previewEl.style.left = (rect.right + 20) + 'px';
-            previewEl.style.top = rect.top + 'px';
-            // @ts-ignore
-            makeDraggable(previewEl, previewHeader);
-        }
-    }
-
-    const save = () => {
-        field.icon = iconEl.value;
-        const newTag = tagEl.value.replace(/[^a-zA-Z0-9_]/g, '').toUpperCase();
-        if (!newTag) { toastr['error']('Tag cannot be empty.', 'RPG Tracker'); return; }
-
-        // Save page size
-        if (!s.modulePageSizes) s.modulePageSizes = {};
-        const ps = parseInt(pageSizeEl.value, 10);
-        if (!isNaN(ps) && ps >= 1) {
-            s.modulePageSizes[newTag] = ps;
-        }
-        if (!newTag) { toastr['error']('Tag cannot be empty.', 'RPG Tracker'); return; }
-        if (BLOCK_ORDER.includes(newTag)) { toastr['error'](`[${newTag}] is a reserved stock module name.`, 'RPG Tracker'); return; }
-        const dup = s.customFields.find((f, i) => i !== index && f.tag.toUpperCase() === newTag);
-        if (dup) { toastr['error'](`Tag [${newTag}] is already in use.`, 'RPG Tracker'); return; }
-
-        field.tag = newTag;
-        field.label = labelEl.value;
-        field.template = templateEl.value;
-        field.prompt = promptEl.value;
-        delete field.rows;
-        delete field.renderType;
-
-        overlay.remove();
-        saveSettings();
-        refreshOrderList();
-        refreshRenderedView();
-    };
-
-    const del = () => {
-        const tagToDelete = field.tag.toUpperCase();
-        if (confirm(`Delete custom module [${tagToDelete}]? This will also remove its data from the current tracker.`)) {
-            s.customFields.splice(index, 1);
-            if (s.blockOrder) s.blockOrder = s.blockOrder.filter(t => t !== tagToDelete);
-            const memoBlocks = parseMemoBlocks(s.currentMemo || '');
-            if (memoBlocks[tagToDelete] !== undefined) {
-                delete memoBlocks[tagToDelete];
-                s.currentMemo = Object.entries(memoBlocks).map(([k, v]) => `[${k}]\n${v}\n[/${k}]`).join('\n\n');
-                updateUIMemo(s.currentMemo);
-            }
-            overlay.remove();
-            saveSettings();
-            refreshOrderList();
-            refreshRenderedView();
-        }
-    };
-
-    const close = () => overlay.remove();
-    document.getElementById('rt_cfe_save').onclick = save;
-    document.getElementById('rt_cfe_delete').onclick = del;
-    document.getElementById('rt_cfe_cancel').onclick = close;
-    document.getElementById('rt_cfe_close').onclick = close;
-    document.getElementById('rpg-tracker-debug-btn').onclick = () => toggleDebugViewer();
-    document.getElementById('rt_cfe_export').onclick = () => exportModules([field]);
-    document.getElementById('rt_cfe_edit_ai').onclick = async () => {
-        const description = await promptForAiModuleEditDescription(`[${field.tag}] ${field.label || field.tag}`);
-        if (!description) return;
-        try {
-            const parsed = await runAiEditCustomModule(s, field, description);
-            if (!parsed) return;
-            iconEl.value = parsed.icon;
-            tagEl.value = parsed.tag;
-            labelEl.value = parsed.label;
-            promptEl.value = parsed.prompt;
-            templateEl.value = parsed.template;
-            schedulePreview();
-            toastr['success'](`Module "${parsed.label}" revised. Review and click Save Changes.`, 'AI Module Editor');
-        } catch (err) {
-            console.error('[RPG Tracker] AI Module Editor error:', err);
-            toastr['error'](`Failed to edit module: ${err.message}`, 'AI Module Editor');
-        }
-    };
-}
-function openPromptEditor(blockTag, title, currentText, defaultText, onSave, promptModKey) {
-    let overlay = document.getElementById('rt_pe_overlay');
-
-    if (!overlay) {
-        overlay = document.createElement('div');
-        overlay.id = 'rt_pe_overlay';
-        overlay.style.position = 'fixed';
-        overlay.style.top = '0';
-        overlay.style.left = '0';
-        overlay.style.width = '100vw';
-        overlay.style.height = '100vh';
-        overlay.style.backgroundColor = 'rgba(0,0,0,0.7)';
-        overlay.style.zIndex = '10000000';
-        overlay.style.display = 'flex';
-        overlay.style.alignItems = 'center';
-        overlay.style.justifyContent = 'center';
-        overlay.innerHTML = `
-                <div class="popup shadowBase" style="min-width: 400px; max-width: 600px;">
-                    <div class="popup-header">
-                        <h3 class="margin0" id="rt_pe_title">Edit Prompt</h3>
-                        <div id="rt_pe_close" class="popup-close interactable" title="Close"><i class="fa-solid fa-times"></i></div>
-                    </div>
-                    <div class="popup-body flex-container flexFlowColumn gap-1" style="padding: 10px;">
-                        <!-- Layout Options -->
-                        <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px; padding:0 4px;">
-                            <div style="display:flex; align-items:center; gap:6px;">
-                                <span style="font-size:12px; font-weight:bold; opacity:0.8;">Pagination Threshold:</span>
-                                <input type="text" inputmode="numeric" pattern="[0-9]*" id="rt_pe_pagesize" class="text_pole" style="width:50px; height:24px; text-align:center;" min="1" max="99" title="How many items to show before adding page buttons">
-                                <span style="font-size:11px; opacity:0.6;">entries</span>
-                            </div>
-                        </div>
-                        <textarea id="rt_pe_text" class="text_pole" rows="10" style="width: 100%; resize: vertical;"></textarea>
-                        <div class="flex-container gap-1 justifycontentend">
-                            <button id="rt_pe_edit_ai" class="menu_button interactable" style="background:rgba(180,100,255,0.15); border-color:rgba(180,100,255,0.4);"><i class="fa-solid fa-wand-magic-sparkles"></i> Edit with AI</button>
-                            <button id="rt_pe_reset" class="menu_button interactable" style="margin-right: auto;"><i class="fa-solid fa-arrow-rotate-left"></i> Reset</button>
-                            <button id="rt_pe_cancel" class="menu_button interactable">Cancel</button>
-                            <button id="rt_pe_save" class="menu_button interactable">Save Changes</button>
-                        </div>
-                    </div>
-                </div>
-            `;
-        document.body.appendChild(overlay);
-    }
-
-    const titleEl = document.getElementById('rt_pe_title');
-    const textEl = /** @type {HTMLTextAreaElement} */ (document.getElementById('rt_pe_text'));
-    const pageSizeEl = /** @type {HTMLInputElement} */ (document.getElementById('rt_pe_pagesize'));
-    const saveBtn = document.getElementById('rt_pe_save');
-    const resetBtn = document.getElementById('rt_pe_reset');
-    const closeBtn = document.getElementById('rt_pe_close');
-    const cancelBtn = document.getElementById('rt_pe_cancel');
-
-    const modKey = promptModKey || blockTag.toLowerCase();
-    const s = getSettings();
-    pageSizeEl.value = String(s.modulePageSizes?.[blockTag.toUpperCase()] ?? (blockTag.toUpperCase() === 'SPELLS' ? 5 : PAGE_SIZE));
-    pageSizeEl.oninput = () => {
-        if (!s.modulePageSizes) s.modulePageSizes = {};
-        const val = parseInt(String(pageSizeEl.value), 10);
-        if (!isNaN(val) && val >= 1) {
-            s.modulePageSizes[blockTag.toUpperCase()] = val;
-            saveSettings();
-            refreshRenderedView();
-        }
-    };
-
-    const close = () => { overlay.style.display = 'none'; };
-
-    titleEl.textContent = title;
-    textEl.value = currentText;
-    overlay.style.display = 'flex';
-
-    const saveHandler = () => {
-        if (!s.modulePageSizes) s.modulePageSizes = {};
-        const ps = parseInt(String(pageSizeEl.value), 10);
-        if (!isNaN(ps) && ps >= 1) {
-            s.modulePageSizes[blockTag.toUpperCase()] = ps;
-        }
-        saveSettings();
-        onSave(textEl.value);
-        close();
-    };
-
-    const resetHandler = () => {
-        if (confirm("Reset this prompt to the factory default?")) {
-            textEl.value = defaultText;
-        }
-    };
-
-    const editAiHandler = async () => {
-        const displayTag = blockTag === 'TIME' ? resolveTimePromptDisplayTag(modKey) : blockTag;
-        const description = await promptForAiModuleEditDescription(`[${displayTag}]`);
-        if (!description) return;
-        try {
-            const parsed = await runAiEditStockModulePrompt(s, modKey, blockTag, displayTag, textEl.value, description);
-            if (!parsed) return;
-            textEl.value = parsed.prompt;
-            toastr['success'](`[${displayTag}] prompt revised. Review and click Save Changes.`, 'AI Module Editor');
-        } catch (err) {
-            console.error('[RPG Tracker] AI Module Editor error:', err);
-            toastr['error'](`Failed to edit prompt: ${err.message}`, 'AI Module Editor');
-        }
-    };
-
-    saveBtn.onclick = saveHandler;
-    resetBtn.onclick = resetHandler;
-    document.getElementById('rt_pe_edit_ai').onclick = editAiHandler;
-    document.getElementById('rt_pe_close').onclick = close;
-    document.getElementById('rt_pe_cancel').onclick = close;
-}
-
-
-// ── Module Export / Import ──────────────────────────────────────────────────
-
-/**
- * Builds the shareable JSON envelope for the given custom field objects
- * and opens the share modal.
- * @param {Array<{icon:string, tag:string, label:string, prompt:string}>} fields
- */
-function exportModules(fields) {
-    const payload = {
-        format: 'multihog-custom-module',
-        version: 1,
-        exportedAt: new Date().toISOString(),
-        modules: fields.map(f => ({
-            icon: f.icon || '📄',
-            tag: f.tag,
-            label: f.label || f.tag,
-            prompt: f.prompt || '',
-        })),
-    };
-    openShareModal(JSON.stringify(payload, null, 2));
-}
-
-/**
- * Opens a read-only copy-to-clipboard modal with the export JSON.
- * Uses the Termux-safe execCommand fallback (same as sysprompt copy).
- * @param {string} jsonString
- */
-function openShareModal(jsonString) {
-    const { Popup } = SillyTavern.getContext();
-    const escaped = jsonString
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;');
-    const content = `
-            <div style="display:flex; flex-direction:column; gap:8px; min-width:360px;">
-                <p style="margin:0; font-size:12px; opacity:0.7;">
-                    Copy this code and share it anywhere. Others can paste it using the <b>Import</b> button.
-                </p>
-                <textarea id="rt_share_blob" readonly rows="12" class="text_pole"
-                    style="font-family:monospace; font-size:11px; resize:vertical; width:100%;"
-                >${escaped}</textarea>
-                <div style="display:flex; gap:8px;">
-                    <button id="rt_share_copy" class="menu_button interactable" style="flex:1;">
-                        <i class="fa-solid fa-copy"></i> Copy to Clipboard
-                    </button>
-                    <button id="rt_share_download" class="menu_button interactable" style="flex:1;">
-                        <i class="fa-solid fa-file-download"></i> Export .json
-                    </button>
-                </div>
-            </div>
-        `;
-    Popup.show.confirm('📤 Share Custom Module', content, {
-        okButton: 'Done',
-        cancelButton: false,
-    });
-    // Wire buttons after the popup DOM renders (next tick)
-    setTimeout(() => {
-        const copyBtn = document.getElementById('rt_share_copy');
-        if (copyBtn) {
-            copyBtn.addEventListener('click', async () => {
-                try {
-                    // Use modern Clipboard API if available and in secure context
-                    if (navigator.clipboard && window.isSecureContext) {
-                        await navigator.clipboard.writeText(jsonString);
-                        toastr['success']('Module code copied to clipboard!', 'Multihog Framework');
-                        return;
-                    }
-
-                    // Fallback for non-secure contexts (HTTP) or older browsers
-                    const ta = document.createElement('textarea');
-                    ta.value = jsonString;
-                    ta.style.position = 'fixed';
-                    ta.style.left = '-9999px';
-                    ta.style.top = '0';
-                    ta.style.opacity = '0';
-                    document.body.appendChild(ta);
-                    ta.focus();
-                    ta.select();
-                    ta.setSelectionRange(0, 99999); // Important for mobile
-
-                    const success = document.execCommand('copy');
-                    document.body.removeChild(ta);
-
-                    if (success) {
-                        toastr['success']('Module code copied to clipboard!', 'Multihog Framework');
-                    } else {
-                        throw new Error('execCommand returned false');
-                    }
-                } catch (err) {
-                    console.error('[Multihog Framework] clipboard copy failed:', err);
-                    toastr['error']('Could not copy automatically. Please select the text manually.', 'Multihog Framework');
-                }
-            });
-        }
-
-        const downloadBtn = document.getElementById('rt_share_download');
-        if (downloadBtn) {
-            downloadBtn.addEventListener('click', () => {
-                const blob = new Blob([jsonString], { type: 'application/json' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `multihog_module_${new Date().getTime()}.json`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-            });
-        }
-    }, 50);
-}
-
-/**
- * Validates and imports custom modules from a pasted JSON export string.
- * Collects all tag conflicts first, then resolves them with a single prompt.
- * @param {string} jsonString
- */
-async function importModulesFromJson(jsonString) {
-    // Stock module tags — derived from the settings default so they stay in sync
-    const STOCK_TAGS = new Set(['COMBAT', 'CHARACTER', 'PARTY', 'INVENTORY', 'ABILITIES', 'SPELLS', 'XP', 'TIME']);
-
-    let parsed;
-    try {
-        parsed = JSON.parse(jsonString.trim());
-    } catch {
-        toastr['error']('Invalid JSON. Please paste a valid module export.', 'Multihog Framework');
-        return;
-    }
-
-    if (parsed?.format !== 'multihog-custom-module' && parsed?.format !== 'fatbody-custom-module' || !Array.isArray(parsed?.modules)) {
-        toastr['error']("This doesn't look like a Multihog module export.", 'Multihog Framework');
-        return;
-    }
-
-    // Normalize and filter out malformed entries
-    const incoming = parsed.modules.filter(m => {
-        if (!m.tag || typeof m.tag !== 'string') return false;
-        m.tag = m.tag.replace(/[^a-zA-Z0-9_]/g, '').toUpperCase();
-        return m.tag.length > 0;
-    });
-
-    if (incoming.length === 0) {
-        toastr['warning']('No valid modules found in the export.', 'Multihog Framework');
-        return;
-    }
-
-    const s = getSettings();
-    const existingTags = new Set((s.customFields || []).map(f => f.tag.toUpperCase()));
-
-    // Hard-block stock tag conflicts
-    const stockConflicts = incoming.filter(m => STOCK_TAGS.has(m.tag));
-    if (stockConflicts.length > 0) {
-        toastr['error'](
-            `Cannot import: [${stockConflicts.map(m => m.tag).join('], [')}] clash with built-in stock modules.`,
-            'Multihog Framework'
-        );
-        return;
-    }
-
-    // Collect soft (custom) conflicts and resolve with a single popup
-    const softConflicts = incoming.filter(m => existingTags.has(m.tag));
-    let overwriteConflicts = false;
-
-    if (softConflicts.length > 0) {
-        const { Popup } = SillyTavern.getContext();
-        const tagList = softConflicts.map(m => `<b>[${m.tag}]</b>`).join(', ');
-        const choice = await Popup.show.confirm(
-            '⚠️ Import Conflicts',
-            `<p>${softConflicts.length} module(s) already exist: ${tagList}</p><p>What would you like to do?</p>`,
-            { okButton: 'Overwrite Existing', cancelButton: 'Skip Conflicts' }
-        );
-        if (choice === null || choice === undefined) return; // user dismissed
-        overwriteConflicts = (choice === 1);
-    }
-
-    if (!s.blockOrder) s.blockOrder = ['COMBAT', 'CHARACTER', 'PARTY', 'INVENTORY', 'ABILITIES', 'SPELLS', 'XP', 'TIME'];
-
-    let importedCount = 0;
-    for (const m of incoming) {
-        const isConflict = existingTags.has(m.tag);
-        if (isConflict && !overwriteConflicts) continue;
-
-        const newField = {
-            icon: m.icon || '📄',
-            tag: m.tag,
-            label: m.label || m.tag,
-            prompt: m.prompt || '',
-            template: '',   // sandbox always starts blank
-            enabled: true, // imported modules are active immediately
-        };
-
-        if (isConflict) {
-            const idx = s.customFields.findIndex(f => f.tag.toUpperCase() === m.tag);
-            if (idx !== -1) s.customFields[idx] = newField;
-        } else {
-            s.customFields.push(newField);
-            if (!s.blockOrder.includes(m.tag)) s.blockOrder.push(m.tag);
-        }
-        importedCount++;
-    }
-
-    if (importedCount === 0) {
-        toastr['info']('No modules were imported (all conflicts were skipped).', 'Multihog Framework');
-        return;
-    }
-
-    saveSettings();
-    refreshOrderList();
-    syncMemoView();
-    toastr['success'](`Imported ${importedCount} custom module(s).`, 'Multihog Framework');
-}
-/**
- * Helper to update a setting, save it, and sync the UIs.
- * This avoids the 'ghost click' problem where onboarding UI tries to
- * trigger changes on non-existent settings panel elements.
- */
-export function syncSettingsAndUI(updateFn) {
-    const fresh = getSettings();
-    updateFn(fresh);
-
-    // Sync the main settings panel if it exists
-    const rngHybrid = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_rng_hybrid'));
-    const rngLegacy = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_rng_legacy'));
-    const rngNone = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_rng_none'));
-    const questsCb = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_sysprompt_mod_quests'));
-    const deadlinesCb = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_quests_deadlines'));
-    const frustrationCb = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_quests_frustration'));
-
-    if (rngHybrid && rngLegacy && rngNone) {
-        rngHybrid.checked = fresh.rngEnabled && !!fresh.diceFunctionTool;
-        rngLegacy.checked = fresh.rngEnabled && !fresh.diceFunctionTool;
-        rngNone.checked = !fresh.rngEnabled;
-    }
-    if (questsCb) questsCb.checked = fresh.syspromptModules?.quests !== false;
-    if (deadlinesCb) deadlinesCb.checked = !!fresh.syspromptModules?.questsDeadlines;
-    if (frustrationCb) frustrationCb.checked = !!fresh.syspromptModules?.questsFrustration;
-    const frustrationWrapEl = /** @type {HTMLElement|null} */ (document.getElementById('rpg_quests_frustration_wrap'));
-    if (frustrationWrapEl) frustrationWrapEl.style.display = !!fresh.syspromptModules?.questsDeadlines ? '' : 'none';
-    const difficultyCb = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_quests_difficulty'));
-    if (difficultyCb) difficultyCb.checked = !!fresh.syspromptModules?.questsDifficulty;
-    const showArchiveCb = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_quests_show_archive'));
-    if (showArchiveCb) showArchiveCb.checked = fresh.syspromptModules?.questsShowArchive !== false;
-
-    // Optional components
-    const mods = { 'loot': '#rpg_sysprompt_mod_loot', 'random_events': '#rpg_sysprompt_mod_random_events', 'resting': '#rpg_sysprompt_mod_resting' };
-    for (const [key, id] of Object.entries(mods)) {
-        const cb = /** @type {HTMLInputElement|null} */ (document.getElementById(id.replace('#', '')));
-        if (cb) cb.checked = !!fresh.syspromptModules?.[key];
-    }
-
-    // Relationship system sync
-    const relBarsCb = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_tracker_npc_rel_bars'));
-    if (relBarsCb) relBarsCb.checked = !!fresh.npcRelationshipBars;
-    const syspromptRelBarsCb = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_sysprompt_mod_npc_rel_bars'));
-    if (syspromptRelBarsCb) syspromptRelBarsCb.checked = !!fresh.npcRelationshipBars;
-    const onboardingRelBarsCb = /** @type {HTMLInputElement|null} */ (document.getElementById('rt_onboarding_mod_npc_rel_bars'));
-    if (onboardingRelBarsCb) onboardingRelBarsCb.checked = !!fresh.npcRelationshipBars;
-    const relToastUICb = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_tracker_npc_rel_toast'));
-    if (relToastUICb) relToastUICb.checked = fresh.npcRelationshipToast !== false;
-    const relMaxDefaultUICb = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_tracker_npc_rel_max_default'));
-    if (relMaxDefaultUICb) relMaxDefaultUICb.value = String(getNpcRelationshipMaxDefault(fresh));
-    const npcPortraitsCb = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_tracker_npc_portraits'));
-    if (npcPortraitsCb) npcPortraitsCb.checked = fresh.npcPortraits !== false;
-    syncNpcPortraitDependentUi(fresh);
-    const stateSwipeRollbackUICb = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_tracker_state_swipe_rollback'));
-    if (stateSwipeRollbackUICb) stateSwipeRollbackUICb.checked = fresh.stateTrackerSwipeRollback !== false;
-
-    // Custom Sysprompt
-    const customSyspromptEl = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_tracker_custom_sysprompt'));
-    if (customSyspromptEl) customSyspromptEl.checked = !!fresh.customSysprompt;
-    syncTimeFormatSettingsUi(fresh);
-    const narratorBlockEl = document.getElementById('rpg_narrator_config_block');
-    if (narratorBlockEl) narratorBlockEl.style.display = !!fresh.customSysprompt ? 'none' : '';
-
-    // Save and sync the onboarding view
-    saveSettings();
-
-    refreshQuestPrompt(fresh);
-    refreshOrderList();
-    saveSettings();
-    if (!document.querySelector('.rt-empty')) {
-        refreshRenderedView();
-    }
-}
-
-// ───────────────────────────────────────────────────────────────────────────
-
-function refreshOrderList() {
-    const s = getSettings();
-    const list = document.getElementById('rpg_tracker_order_list');
-    if (!list) return;
-
-    list.innerHTML = '';
-
-    const getIcon = (tag) => {
-        if (BLOCK_ICONS[tag]) return BLOCK_ICONS[tag];
-        const custom = (s.customFields || []).find(f => f.tag.toUpperCase() === tag);
-        return custom?.icon || '📄';
-    };
-
-    if (!s.blockOrder) s.blockOrder = [...BLOCK_ORDER];
-
-    // --- Sanitization Pass: Ensure unique tags and no stock conflicts ---
-    const seenTags = new Set(BLOCK_ORDER);
-    (s.customFields || []).forEach(f => {
-        let baseTag = f.tag.toUpperCase().replace(/[^A-Z0-9_]/g, '');
-        if (!baseTag) baseTag = 'CUSTOM';
-        let finalTag = baseTag;
-        let counter = 1;
-        while (seenTags.has(finalTag)) {
-            finalTag = `${baseTag}_${counter++}`;
-        }
-        if (f.tag !== finalTag) {
-            console.log(`[RPG Tracker] Sanitized tag: ${f.tag} -> ${finalTag}`);
-            f.tag = finalTag;
-        }
-        seenTags.add(finalTag);
-    });
-
-    // Add any missing tags to blockOrder
-    const allCustomTags = (s.customFields || []).map(f => f.tag.toUpperCase());
-    [...BLOCK_ORDER, ...allCustomTags].forEach(tag => {
-        if (!s.blockOrder.includes(tag)) s.blockOrder.push(tag);
-    });
-
-    // Current order, filtered for validity and optional module toggles
-    const validCustomTags = new Set(allCustomTags);
-    const order = s.blockOrder.filter(tag => {
-        const isStock = BLOCK_ORDER.includes(tag);
-        if (!isStock && !validCustomTags.has(tag)) return false;
-
-        // Hide QUESTS if disabled in Narrator Config
-        if (tag === 'QUESTS' && s.syspromptModules?.quests === false) return false;
-
-        return true;
-    });
-    s.blockOrder = order;
-
-    order.forEach((tag, index) => {
-        const isStock = BLOCK_ORDER.includes(tag);
-        const customIndex = s.customFields.findIndex(f => f.tag.toUpperCase() === tag);
-        const field = isStock ? null : s.customFields[customIndex];
-
-        const isEnabled = isStock ? (s.modules[tag.toLowerCase()] ?? false) : (field?.enabled ?? false);
-
-        const item = document.createElement('div');
-        item.className = 'flex-container gap-1 alignitemscenter rt-order-item';
-        item.style.padding = '5px';
-        item.style.background = isEnabled ? 'var(--black30a)' : 'transparent';
-        item.style.opacity = isEnabled ? '1' : '0.6';
-        item.style.borderRadius = '4px';
-        item.style.border = '1px solid var(--smartThemeBorderColor)';
-
-        // 1. Checkbox
-        const cb = document.createElement('input');
-        cb.type = 'checkbox';
-        cb.checked = isEnabled;
-        cb.style.margin = '0 5px';
-        cb.onchange = () => {
-            if (isStock) {
-                s.modules[tag.toLowerCase()] = cb.checked;
-            } else {
-                field.enabled = cb.checked;
-            }
-            saveSettings();
-            refreshOrderList();
-            refreshRenderedView();
-        };
-
-        // 2. Label
-        const label = document.createElement('span');
-        label.style.flex = '1';
-        label.style.fontSize = '12px';
-        label.style.cursor = 'default';
-        label.textContent = `${getIcon(tag)} ${tag}`;
-
-        // 3. Button Group
-        const btnGroup = document.createElement('div');
-        btnGroup.className = 'flex-container gap-1';
-
-        // Edit Button
-        const editBtn = document.createElement('button');
-        editBtn.className = 'menu_button interactable rt-order-btn';
-        editBtn.style.padding = '2px 6px';
-        editBtn.title = isStock ? 'Edit Prompt' : 'Edit Custom Field';
-        editBtn.innerHTML = '<i class="fa-solid fa-pen-to-square"></i>';
-        editBtn.onclick = () => {
-            if (isStock) {
-                let mod = tag.toLowerCase();
-                let displayTag = tag;
-                if (tag === 'TIME') {
-                    mod = resolveTimePromptKey(s);
-                    displayTag = resolveTimePromptDisplayTag(mod);
-                }
-
-                if (!s.stockPrompts) s.stockPrompts = { ...DEFAULT_STOCK_PROMPTS };
-                openPromptEditor(
-                    tag,
-                    `Edit Default [${displayTag}] Prompt`,
-                    s.stockPrompts[mod] || DEFAULT_STOCK_PROMPTS[mod],
-                    DEFAULT_STOCK_PROMPTS[mod],
-                    (newVal) => {
-                        s.stockPrompts[mod] = newVal;
-                        saveSettings();
-                        toastr['success'](`[${displayTag}] prompt updated.`, 'RPG Tracker');
-                    },
-                    mod
-                );
-            } else {
-                openCustomFieldEditor(customIndex);
-            }
-        };
-
-        // Reset Button (Stock only)
-        let resetBtn = null;
-        if (isStock) {
-            resetBtn = document.createElement('button');
-            resetBtn.className = 'menu_button interactable rt-order-btn';
-            resetBtn.style.padding = '2px 6px';
-            resetBtn.title = 'Reset Prompt to Default';
-            resetBtn.innerHTML = '<i class="fa-solid fa-rotate-left"></i>';
-            resetBtn.onclick = () => {
-                let mod = tag.toLowerCase();
-                if (tag === 'TIME') mod = resolveTimePromptKey(s);
-
-                if (confirm(`Reset [${tag}] prompt to default? This will lose any custom changes.`)) {
-                    if (!s.stockPrompts) s.stockPrompts = { ...DEFAULT_STOCK_PROMPTS };
-                    s.stockPrompts[mod] = DEFAULT_STOCK_PROMPTS[mod];
-                    saveSettings();
-                    toastr['success'](`[${tag}] prompt reset.`, 'RPG Tracker');
-                }
-            };
-        }
-
-        // Up/Down Arrows
-        const upBtn = document.createElement('button');
-        upBtn.className = 'menu_button interactable rt-order-btn';
-        upBtn.style.padding = '2px 6px';
-        upBtn.innerHTML = '<i class="fa-solid fa-arrow-up"></i>';
-        upBtn.disabled = index === 0;
-        upBtn.onclick = () => {
-            const newOrder = [...order];
-            [newOrder[index - 1], newOrder[index]] = [newOrder[index], newOrder[index - 1]];
-            s.blockOrder = newOrder;
-            saveSettings();
-            refreshOrderList();
-            refreshRenderedView();
-        };
-
-        const downBtn = document.createElement('button');
-        downBtn.className = 'menu_button interactable rt-order-btn';
-        downBtn.style.padding = '2px 6px';
-        downBtn.innerHTML = '<i class="fa-solid fa-arrow-down"></i>';
-        downBtn.disabled = index === order.length - 1;
-        downBtn.onclick = () => {
-            const newOrder = [...order];
-            [newOrder[index + 1], newOrder[index]] = [newOrder[index], newOrder[index + 1]];
-            s.blockOrder = newOrder;
-            saveSettings();
-            refreshOrderList();
-            refreshRenderedView();
-        };
-
-        item.appendChild(cb);
-        item.appendChild(label);
-
-        // TIME-specific: inline 24h clock toggle and DD/MM/YY format toggle
-        if (tag === 'TIME' && isStock) {
-            const pill = document.createElement('label');
-            pill.title = 'Toggle between 12-hour (AM/PM) and 24-hour time format for the [TIME] module prompt and all time displays.';
-            pill.style.cssText = 'display:inline-flex; align-items:center; gap:4px; font-size:10px; opacity:0.8; cursor:pointer; user-select:none; margin-right:4px; white-space:nowrap;';
-
-            const cb24h = document.createElement('input');
-            cb24h.id = 'rpg_time_24h_toggle';
-            cb24h.type = 'checkbox';
-            cb24h.checked = !!s.use24hTime;
-            cb24h.style.cssText = 'margin:0; cursor:pointer;';
-            cb24h.onchange = () => setUse24hTime(cb24h.checked);
-
-            const lbl24h = document.createElement('span');
-            lbl24h.textContent = '24h';
-
-            pill.appendChild(cb24h);
-            pill.appendChild(lbl24h);
-            item.appendChild(pill);
-
-            const pillDate = document.createElement('label');
-            pillDate.title = 'Toggle between [Day X] and [DD/MM/YYYY] date format for the time displays and prompts.';
-            pillDate.style.cssText = 'display:inline-flex; align-items:center; gap:4px; font-size:10px; opacity:0.8; cursor:pointer; user-select:none; margin-right:4px; white-space:nowrap;';
-
-            const cbDate = document.createElement('input');
-            cbDate.id = 'rpg_time_ddmmyy_toggle';
-            cbDate.type = 'checkbox';
-            cbDate.checked = !!s.useDdMmYyFormat;
-            cbDate.style.cssText = 'margin:0; cursor:pointer;';
-            cbDate.onchange = () => setUseDdMmYyFormat(cbDate.checked);
-
-            const lblDate = document.createElement('span');
-            lblDate.textContent = 'DD/MM/YYYY';
-
-            pillDate.appendChild(cbDate);
-            pillDate.appendChild(lblDate);
-            item.appendChild(pillDate);
-        }
-
-        btnGroup.appendChild(editBtn);
-        if (resetBtn) btnGroup.appendChild(resetBtn);
-        btnGroup.appendChild(upBtn);
-        btnGroup.appendChild(downBtn);
-        item.appendChild(btnGroup);
-        list.appendChild(item);
-    });
-}
 
 /**
  * Rebuilds the system prompt by stripping out XML blocks that are
@@ -11602,11 +8891,15 @@ function refreshOrderList() {
  * @param {string} rawText
  * @returns {string}
  */
-let _autoApplyTimer = null;
-async function autoApplySysprompt(force = false) {
-    const s = getSettings();
-    if (!force && (!s.enabled || s.customSysprompt)) return;
-
+/**
+ * Fetches the raw (unprocessed) base sysprompt text — either sysprompt.txt or
+ * sysprompt_legacy.txt depending on settings — falling back to the bundled
+ * RT_PROMPTS copy if the live file can't be fetched.
+ * @param {Record<string, any>} [settingsOverride]
+ * @returns {Promise<string>}
+ */
+export async function fetchBaseSyspromptRaw(settingsOverride = null) {
+    const s = settingsOverride || getSettings();
     const fileName = s.diceFunctionTool ? 'sysprompt.txt' : 'sysprompt_legacy.txt';
     let content;
     try {
@@ -11617,17 +8910,29 @@ async function autoApplySysprompt(force = false) {
             throw new Error(`Server returned ${response.status}`);
         }
     } catch (err) {
-        console.warn(`[Multihog Framework] autoApplySysprompt: could not fetch ${fileName}, using fallback:`, err);
+        console.warn(`[Multihog Framework] fetchBaseSyspromptRaw: could not fetch ${fileName}, using fallback:`, err);
         content = RT_PROMPTS[fileName];
     }
+    return content || '';
+}
+
+let _autoApplyTimer = null;
+export async function autoApplySysprompt(force = false) {
+    const s = getSettings();
+    if (!force && (!s.enabled || s.customSysprompt)) return;
+
+    const content = await fetchBaseSyspromptRaw(s);
     if (!content) return;
 
-    content = buildSysprompt(content);
+    const built = buildSysprompt(content);
     const mainTextarea = /** @type {HTMLTextAreaElement|null} */ (document.getElementById('main_prompt_quick_edit_textarea'));
     if (mainTextarea) {
-        mainTextarea.value = content;
+        mainTextarea.value = built;
         mainTextarea.dispatchEvent(new Event('blur', { bubbles: true }));
     }
+    // Re-layer any custom/unlocked Game Systems sections so they always survive a full rebuild
+    // triggered by an unrelated settings change (e.g. toggling 24h time).
+    await applyCustomSysprompts();
 }
 
 function scheduleAutoApply() {
@@ -11637,15 +8942,25 @@ function scheduleAutoApply() {
     _autoApplyTimer = setTimeout(() => { _autoApplyTimer = null; autoApplySysprompt(); }, 400);
 }
 
-function buildSysprompt(rawText) {
+export function buildSysprompt(rawText) {
     if (!rawText) return "";
     const s = getSettings();
     const mods = s.syspromptModules || {};
+    const unlockedBaseTags = new Set(
+        (s.customSyspromptLibrary || [])
+            .filter(p => p.origin === 'unlocked_base' && p.baseTag)
+            .map(p => p.baseTag)
+    );
 
     // 1. Tag-based module stripping and Quest mode swap
     let content = rawText
         .replace(/<(\w[\w_-]*)>([\s\S]*?)<\/\1>/g, (match, tag) => {
-            if (mods[tag] === false) return '';
+            if (mods[tag] === false) {
+                // If this tag has been "unlocked" for full customization in Game Systems,
+                // leave a slot marker so applyCustomSysprompts() can reinsert the user's
+                // override at this exact position instead of losing it or appending it elsewhere.
+                return unlockedBaseTags.has(tag) ? `<!--GS_SLOT:${tag}-->` : '';
+            }
             if (tag === 'relationship_tracking') {
                 if (!s.npcRelationshipBars) return '';
                 return `<relationship_tracking>\n${buildRelationshipTrackingSysprompt(getNpcRelationshipMax(s))}\n</relationship_tracking>`;
@@ -12845,6 +10160,126 @@ function tryBindConnectionProfileDropdown(selector, initialProfileId, onProfileI
             saveSettings();
         });
 
+        // ── Game System Wizard Connection Settings UI Bindings ──
+        const gsWizardSourceSelect = $('#rpg_gs_wizard_connection_source');
+        const gsWizardProfileGroup = $('#rpg_gs_wizard_profile_group');
+        const gsWizardProfileSelect = $('#rpg_gs_wizard_connection_profile');
+        const gsWizardOllamaGroup = $('#rpg_gs_wizard_ollama_group');
+        const gsWizardOpenaiGroup = $('#rpg_gs_wizard_openai_group');
+
+        function updateGsWizardConnectionPanels() {
+            const source = gsWizardSourceSelect.val();
+            gsWizardProfileGroup.toggle(source === 'profile');
+            gsWizardOllamaGroup.toggle(source === 'ollama');
+            gsWizardOpenaiGroup.toggle(source === 'openai');
+        }
+
+        gsWizardSourceSelect.val(settings.gameSystemWizardConnectionSource || 'default').on('change', function () {
+            settings.gameSystemWizardConnectionSource = $(this).val();
+            updateGsWizardConnectionPanels();
+            saveSettings();
+        });
+        updateGsWizardConnectionPanels();
+
+        $('#rpg_gs_wizard_ollama_url').val(settings.gameSystemWizardOllamaUrl || 'http://localhost:11434').on('input', function () {
+            settings.gameSystemWizardOllamaUrl = $(this).val();
+            saveSettings();
+        });
+        const gsWizardOllamaModelSelect = $('#rpg_gs_wizard_ollama_model');
+        gsWizardOllamaModelSelect.val(settings.gameSystemWizardOllamaModel).on('change', function () {
+            settings.gameSystemWizardOllamaModel = $(this).val();
+            saveSettings();
+        });
+        $('#rpg_gs_wizard_ollama_refresh').on('click', async function () {
+            const url = $('#rpg_gs_wizard_ollama_url').val();
+            if (!url) return toastr['info']("Please enter an Ollama URL first.");
+            try {
+                toastr['info']("Fetching Ollama models...");
+                const models = await fetchOllamaModels(url);
+                gsWizardOllamaModelSelect.empty().append('<option value="">-- Select Model --</option>');
+                models.forEach(m => {
+                    gsWizardOllamaModelSelect.append($('<option></option>').val(m.name).text(m.name));
+                });
+                gsWizardOllamaModelSelect.val(settings.gameSystemWizardOllamaModel);
+                toastr['success']("Ollama models updated.");
+            } catch (e) {
+                toastr['error']("Failed to fetch Ollama models.");
+            }
+        });
+
+        $('#rpg_gs_wizard_openai_url').val(settings.gameSystemWizardOpenaiUrl).on('input', function () {
+            settings.gameSystemWizardOpenaiUrl = $(this).val();
+            saveSettings();
+        });
+        $('#rpg_gs_wizard_openai_key').val(settings.gameSystemWizardOpenaiKey).on('input', function () {
+            settings.gameSystemWizardOpenaiKey = $(this).val();
+            saveSettings();
+        });
+        const gsWizardOpenaiModelSelect = $('#rpg_gs_wizard_openai_model');
+        const gsWizardOpenaiModelManual = $('#rpg_gs_wizard_openai_model_manual');
+        gsWizardOpenaiModelManual.val(settings.gameSystemWizardOpenaiModel || '');
+        gsWizardOpenaiModelSelect.on('change', function () {
+            const val = $(this).val();
+            if (val) {
+                gsWizardOpenaiModelManual.val('');
+                settings.gameSystemWizardOpenaiModel = String(val);
+            } else {
+                settings.gameSystemWizardOpenaiModel = String(gsWizardOpenaiModelManual.val() || '').trim() || '';
+            }
+            saveSettings();
+        });
+        gsWizardOpenaiModelManual.on('input', function () {
+            const manual = String($(this).val() || '').trim();
+            if (manual) gsWizardOpenaiModelSelect.val('');
+            settings.gameSystemWizardOpenaiModel = manual || String(gsWizardOpenaiModelSelect.val() || '') || '';
+            saveSettings();
+        });
+        $('#rpg_gs_wizard_openai_refresh').on('click', async function () {
+            const url = $('#rpg_gs_wizard_openai_url').val();
+            const key = $('#rpg_gs_wizard_openai_key').val();
+            if (!url) return toastr['info']("Please enter an Endpoint URL first.");
+            try {
+                toastr['info']("Fetching models...");
+                const models = await fetchOpenAIModels(url, key);
+                gsWizardOpenaiModelSelect.empty().append('<option value="">-- Select Model --</option>');
+                models.forEach(m => {
+                    const id = typeof m === 'string' ? m : (m.id || m.name);
+                    if (id) gsWizardOpenaiModelSelect.append($('<option></option>').val(id).text(id));
+                });
+                gsWizardOpenaiModelSelect.val(settings.gameSystemWizardOpenaiModel);
+                toastr['success']("Models updated.");
+            } catch (e) {
+                toastr['warning']("Cannot auto-detect models. Type manually.");
+            }
+        });
+
+        const gsWizardPresetSelect = $('#rpg_gs_wizard_completion_preset');
+        if (!tryBindConnectionProfileDropdown('#rpg_gs_wizard_connection_profile', settings.gameSystemWizardConnectionProfileId, (id) => {
+            settings.gameSystemWizardConnectionProfileId = id;
+            saveSettings();
+        })) {
+            getConnectionProfiles().then(profiles => {
+                gsWizardProfileSelect.empty().append('<option value="">-- No Profile Selected --</option>');
+                profiles.forEach(p => gsWizardProfileSelect.append($('<option></option>').val(p).text(p)));
+                gsWizardProfileSelect.val(settings.gameSystemWizardConnectionProfileId || "");
+            });
+            gsWizardProfileSelect.on('change', function () {
+                settings.gameSystemWizardConnectionProfileId = $(this).val();
+                saveSettings();
+            });
+        }
+
+        if (pm && typeof pm.getAllPresets === 'function') {
+            const presets = pm.getAllPresets();
+            gsWizardPresetSelect.empty().append('<option value="">-- Use Current Settings --</option>');
+            presets.forEach(p => gsWizardPresetSelect.append($('<option></option>').val(p).text(p)));
+            gsWizardPresetSelect.val(settings.gameSystemWizardCompletionPresetId || '');
+        }
+        gsWizardPresetSelect.on('change', function () {
+            settings.gameSystemWizardCompletionPresetId = String($(this).val() || '');
+            saveSettings();
+        });
+
         // Advanced Options
         const sinceLastUserChk = $('#rpg_tracker_lookback_since_last_user');
         const lookbackNumericRow = $('#rpg_tracker_lookback_numeric_row');
@@ -13060,20 +10495,7 @@ function tryBindConnectionProfileDropdown(selector, initialProfileId, onProfileI
             }
         });
         document.getElementById('rpg_tracker_theme_wizard_undo')?.addEventListener('click', () => {
-            if (themeUndoStack.length === 0) {
-                toastr['info']('No steps to undo.', 'Theme Wizard');
-                return;
-            }
-            const prev = themeUndoStack.pop();
-            settings.customTheme = prev;
-            saveSettings();
-            applyCustomTheme(prev);
-            const statusEl = document.getElementById('rpg_tracker_theme_wizard_status');
-            if (statusEl) {
-                statusEl.style.display = 'block';
-                statusEl.style.color = 'inherit';
-                statusEl.textContent = `Undone last change. (${themeUndoStack.length} steps remaining)`;
-            }
+            undoThemeChange(settings);
         });
 
         refreshSavedThemesList();
@@ -13558,503 +10980,15 @@ RULES:
         });
 
 
-        // ── Custom Sysprompt Library ──
-        async function applyCustomSysprompts() {
-            const settings = getSettings();
-            const mainTextarea = /** @type {HTMLTextAreaElement} */ (document.getElementById('main_prompt_quick_edit_textarea'));
-            if (!mainTextarea) {
-                toastr['warning']('Quick-edit textarea not found. Open the ST prompt editor first.', 'RPG Tracker');
-                return false;
-            }
-
-            const enabledPrompts = (settings.customSyspromptLibrary || []).filter(p => {
-                if (!p.enabled || !p.content) return false;
-                const trimmed = p.content.trim();
-                if (!trimmed) return false;
-                // Skip if content is just empty XML tags (e.g. <custom_section>\n\n</custom_section>)
-                const emptyTagMatch = trimmed.match(/^<(\w+[\w_-]*)>\s*<\/\1>$/);
-                if (emptyTagMatch) return false;
-                return true;
-            });
-
-            const newInjection = enabledPrompts.length > 0
-                ? enabledPrompts.map(p => p.content).join('\n\n')
-                : '';
-
-            let currentContent = mainTextarea.value;
-
-            // Remove the previously-injected block by exact string match (no markers in textarea).
-            // Also clean up any legacy injections that used the old HTML-comment sentinel format.
-            const legacyBlockRegex = /<!-- RT_CUSTOM_LIBRARY_START -->[\s\S]*?<!-- RT_CUSTOM_LIBRARY_END -->\n*/g;
-            currentContent = currentContent.replace(legacyBlockRegex, '');
-
-            const lastInjection = settings._customLibraryLastInjection || '';
-            if (lastInjection) {
-                // Escape for use in a RegExp to do an exact literal removal
-                const escaped = lastInjection.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                currentContent = currentContent.replace(new RegExp(`\\n{0,2}${escaped}\\n{0,2}`, 'g'), '\n\n');
-            }
-
-            if (newInjection) {
-                // Insert raw sections (no markers) — the AI sees clean XML only.
-                if (currentContent.includes('<constraints>')) {
-                    currentContent = currentContent.replace('<constraints>', `${newInjection}\n\n<constraints>`);
-                } else {
-                    currentContent = currentContent.trim() + '\n\n' + newInjection;
-                }
-            }
-
-            // Remember what we injected so next apply can remove it precisely.
-            settings._customLibraryLastInjection = newInjection;
-            saveSettings();
-
-            mainTextarea.value = currentContent.replace(/\n{3,}/g, '\n\n').trim();
-            mainTextarea.dispatchEvent(new Event('blur', { bubbles: true }));
-            return true;
-        }
-
-        // ── Unified Section Editor ──────────────────────────────────────────────
-        /**
-         * Show a unified popup for creating or editing a custom sysprompt section.
-         * @param {object} opts
-         * @param {'ai'|'manual'|'edit'} opts.mode
-         * @param {string} [opts.tag]          - Pre-filled tag name (without angle brackets)
-         * @param {string} [opts.description]  - Pre-filled label/description text
-         * @param {string} [opts.content]      - Pre-filled XML content
-         * @param {function} [opts.onRegenerate] - Async fn(desc) -> string; present in 'ai' mode
-         * @returns {Promise<{tag:string, description:string, content:string, saveMode:string}|null>}
-         */
-        async function showSectionEditor({ mode = 'manual', tag = '', description = '', content = '', onRegenerate = null } = {}) {
-            const { Popup } = SillyTavern.getContext();
-
-            const titleMap = {
-                ai: '✨ Review Generated Section',
-                manual: '📝 Add Section Manually',
-                edit: '✏️ Edit Section',
-            };
-
-            const showSaveOptions = mode !== 'edit';
-            const showRegenerate = mode === 'ai';
-
-            const editorHtml = `
-                <div id="rt-section-editor" style="display:flex; flex-direction:column; gap:10px; width:100%; box-sizing:border-box;">
-                    <div style="display:flex; gap:8px;">
-                        <div style="flex:1;">
-                            <div style="font-size:11px; opacity:0.7; margin-bottom:4px;">Tag Name (snake_case)</div>
-                            <input id="rt-se-tag" type="text" class="text_pole" value="${escapeHtml(tag)}"
-                                placeholder="e.g. reputation_system"
-                                style="width:100%; font-size:12px; font-family:monospace;">
-                        </div>
-                        <div style="flex:2;">
-                            <div style="font-size:11px; opacity:0.7; margin-bottom:4px;">Label / Description</div>
-                            <input id="rt-se-desc" type="text" class="text_pole" value="${escapeHtml(description)}"
-                                placeholder="Brief description of this section"
-                                style="width:100%; font-size:12px;">
-                        </div>
-                    </div>
-                    <div>
-                        <div style="font-size:11px; opacity:0.7; margin-bottom:4px;">XML Content — paste or edit freely (outer XML tag is managed automatically)</div>
-                        <textarea id="rt-se-content" class="text_pole" rows="12"
-                            style="width:100%; font-size:11px; font-family:monospace; resize:vertical; white-space:pre;"
-                            placeholder="  Rules go here...\n  - Rule 1\n  - Rule 2"
-                            >${escapeHtml(content)}</textarea>
-                    </div>
-                    ${showRegenerate ? `<button id="rt-se-regen" class="menu_button interactable" style="background:rgba(180,100,255,0.15); border-color:rgba(180,100,255,0.4); width:100%;"><i class="fa-solid fa-rotate"></i> Regenerate with AI</button>` : ''}
-                    ${showSaveOptions ? `
-                    <div style="padding:10px; border:1px solid rgba(255,255,255,0.1); border-radius:6px; background:rgba(0,0,0,0.2);">
-                        <div style="font-size:11px; font-weight:bold; margin-bottom:6px;">Save Options:</div>
-                        <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin-bottom:4px;">
-                            <input type="radio" name="rt_se_save_mode" id="rt-se-mode-apply" value="apply" checked style="margin:0;">
-                            <span style="font-size:12px;">Save to Library &amp; Apply to Sysprompt</span>
-                        </label>
-                        <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
-                            <input type="radio" name="rt_se_save_mode" id="rt-se-mode-library" value="library" style="margin:0;">
-                            <span style="font-size:12px;">Save to Library Only</span>
-                        </label>
-                    </div>` : ''}
-                </div>
-            `;
-
-            let currentTag = tag;
-            let currentDesc = description;
-            let currentContent = content;
-            let currentSaveMode = 'apply';
-
-            // Attach event listeners after DOM is ready
-            setTimeout(() => {
-                const tagEl = document.getElementById('rt-se-tag');
-                const descEl = document.getElementById('rt-se-desc');
-                const contentEl = document.getElementById('rt-se-content');
-
-                if (tagEl) {
-                    tagEl.addEventListener('input', () => { currentTag = tagEl.value; });
-                }
-                if (descEl) {
-                    descEl.addEventListener('input', () => { currentDesc = descEl.value; });
-                }
-                if (contentEl) {
-                    contentEl.addEventListener('input', () => { currentContent = contentEl.value; });
-                }
-
-                // Handle save mode radio buttons
-                const saveModeEls = document.querySelectorAll('input[name="rt_se_save_mode"]');
-                saveModeEls.forEach(el => {
-                    el.addEventListener('change', () => {
-                        const checked = document.querySelector('input[name="rt_se_save_mode"]:checked');
-                        if (checked) currentSaveMode = checked.value;
-                    });
-                });
-
-                // Attach regen handler
-                if (showRegenerate && onRegenerate) {
-                    const regenBtn = document.getElementById('rt-se-regen');
-                    if (regenBtn) {
-                        regenBtn.addEventListener('click', async () => {
-                            const currentDescVal = descEl ? descEl.value.trim() : description;
-                            regenBtn.disabled = true;
-                            regenBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Regenerating...';
-                            try {
-                                const newContent = await onRegenerate(currentDescVal);
-                                if (contentEl) {
-                                    contentEl.value = newContent;
-                                    currentContent = newContent;
-                                }
-                                const extractedTag = newContent.match(/^<(\w+[\w_-]*)/)?.[1];
-                                if (extractedTag && tagEl) {
-                                    if (!tagEl.value.trim()) {
-                                        tagEl.value = extractedTag;
-                                        currentTag = extractedTag;
-                                    }
-                                }
-                                toastr['success']('Section regenerated!', 'AI Section Builder');
-                            } catch (err) {
-                                toastr['error'](`Regeneration failed: ${err.message}`, 'AI Section Builder');
-                            } finally {
-                                regenBtn.disabled = false;
-                                regenBtn.innerHTML = '<i class="fa-solid fa-rotate"></i> Regenerate with AI';
-                            }
-                        });
-                    }
-                }
-            }, 100);
-
-            const confirmed = await Popup.show.confirm(
-                titleMap[mode] || '📝 Section Editor',
-                editorHtml,
-                { okButton: mode === 'edit' ? 'Save Changes' : 'Save Section', cancelButton: 'Cancel' }
-            );
-            if (!confirmed) return null;
-
-            let finalContent = currentContent.trim();
-            if (!finalContent) {
-                toastr['warning']('Section content cannot be empty.', 'Section Builder');
-                return null;
-            }
-            let finalTag = currentTag.trim().replace(/[^\w_-]/g, '');
-
-            // Robust check to see if content is already wrapped in a root XML tag
-            const outerTagRegex = /^<(\w+[\w_-]*)(?:\s+[^>]*)*>([\s\S]*)<\/\1>$/;
-            const tagMatch = finalContent.match(outerTagRegex);
-
-            if (tagMatch) {
-                const contentTag = tagMatch[1];
-                const innerContent = tagMatch[2].trim();
-                
-                // If Tag Name field was empty, adopt the tag from the XML content
-                if (!finalTag) {
-                    finalTag = contentTag;
-                }
-                
-                // Always wrap with finalTag to ensure consistency and prevent mismatch/double-tagging
-                finalContent = `<${finalTag}>\n${innerContent}\n</${finalTag}>`;
-            } else {
-                // Content is not wrapped in XML tags, or has mismatched/multiple sibling tags
-                if (!finalTag) {
-                    finalTag = 'custom_section';
-                }
-                finalContent = `<${finalTag}>\n${finalContent}\n</${finalTag}>`;
-            }
-
-            return {
-                tag: finalTag,
-                description: currentDesc.trim(),
-                content: finalContent,
-                saveMode: currentSaveMode,
-            };
-        }
-
-        // ── Custom Sysprompt Library ──
-        $('#rpg_tracker_btn_sysprompt_library').on('click', async function () {
-            const { Popup } = SillyTavern.getContext();
-            const settings = getSettings();
-
-            if (!settings.customSyspromptLibrary) {
-                settings.customSyspromptLibrary = [];
-            }
-
-            // Function to generate the HTML for the library list
-            const generateListHtml = () => {
-                if (settings.customSyspromptLibrary.length === 0) {
-                    return `<div style="text-align:center; padding:30px; opacity:0.5; font-style:italic;">Library is empty. Use AI Builder or Add Manually to create sections.</div>`;
-                }
-
-                let listHtml = '<div style="display:flex; flex-direction:column; gap:8px;">';
-                settings.customSyspromptLibrary.forEach((item, index) => {
-                    listHtml += `
-                        <div class="rt-library-item" data-index="${index}" style="display:flex; flex-direction:column; border:1px solid rgba(255,255,255,0.1); border-radius:6px; background:rgba(0,0,0,0.2); padding:10px; transition:border-color 0.2s;">
-                            <div style="display:flex; align-items:center; gap:10px;">
-                                <div style="font-size:16px; width:24px; text-align:center; color:var(--rt-accent, #5588ff);"><i class="fa-solid ${item.icon || 'fa-puzzle-piece'}"></i></div>
-                                <div style="flex:1; min-width:0;">
-                                    <div style="font-weight:bold; font-size:13px; color:#ffdd88;">&lt;${escapeHtml(item.tag)}&gt;</div>
-                                    <div style="font-size:11px; opacity:0.7; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(item.description || 'Custom Section')}</div>
-                                </div>
-                                <div style="display:flex; align-items:center; gap:6px;">
-                                    <label class="checkbox_label" style="margin:0; font-size:11px;">
-                                        <input type="checkbox" class="rt-lib-toggle" data-index="${index}" ${item.enabled ? 'checked' : ''}>
-                                        <span>Enable</span>
-                                    </label>
-                                    <button class="rt-lib-edit" data-index="${index}" style="background:none; border:none; color:#88bbff; cursor:pointer; padding:4px;" title="Edit Section"><i class="fa-solid fa-pen-to-square"></i></button>
-                                    <button class="rt-lib-delete" data-index="${index}" style="background:none; border:none; color:#ff5555; cursor:pointer; padding:4px;" title="Delete Section"><i class="fa-solid fa-trash-can"></i></button>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                });
-                listHtml += '</div>';
-                return listHtml;
-            };
-
-            let html = `
-                <div id="rt-library-container" style="display:flex; flex-direction:column; gap:12px; width:100%; box-sizing:border-box; max-height:70vh;">
-                    <div style="display:flex; align-items:center; justify-content:space-between;">
-                        <div style="font-size:11px; opacity:0.8; line-height:1.4;">Manage your custom system prompt sections. Enabling a section injects it into your main prompt when you click Apply.</div>
-                        <button id="rt_lib_btn_add_manual" class="menu_button interactable" style="white-space:nowrap; margin-left:10px; background:rgba(80,180,120,0.15); border-color:rgba(80,180,120,0.4); font-size:11px; padding:4px 8px;">
-                            <i class="fa-solid fa-plus"></i> Add Manually
-                        </button>
-                    </div>
-                    <div id="rt-library-list-wrap" style="overflow-y:auto; padding-right:10px; flex:1;">
-                        ${generateListHtml()}
-                    </div>
-                </div>
-            `;
-
-            // Wait for DOM to attach
-            setTimeout(() => {
-                const container = document.getElementById('rt-library-container');
-                if (!container) return;
-
-                const bindEvents = () => {
-                    const wrap = document.getElementById('rt-library-list-wrap');
-                    if (!wrap) return;
-
-                    // Toggle Checkbox
-                    wrap.querySelectorAll('.rt-lib-toggle').forEach(el => {
-                        el.addEventListener('change', (e) => {
-                            const idx = parseInt(e.target.dataset.index);
-                            settings.customSyspromptLibrary[idx].enabled = e.target.checked;
-                            saveSettings();
-                        });
-                    });
-
-                    // Edit Button
-                    wrap.querySelectorAll('.rt-lib-edit').forEach(el => {
-                        el.addEventListener('click', async (e) => {
-                            const idx = parseInt(e.currentTarget.dataset.index);
-                            const item = settings.customSyspromptLibrary[idx];
-                            const result = await showSectionEditor({
-                                mode: 'edit',
-                                tag: item.tag,
-                                description: item.description || '',
-                                content: item.content,
-                            });
-                            if (!result) return;
-                            settings.customSyspromptLibrary[idx].tag = result.tag;
-                            settings.customSyspromptLibrary[idx].description = result.description;
-                            settings.customSyspromptLibrary[idx].content = result.content;
-                            saveSettings();
-                            wrap.innerHTML = generateListHtml();
-                            bindEvents();
-                        });
-                    });
-
-                    // Delete Button
-                    wrap.querySelectorAll('.rt-lib-delete').forEach(el => {
-                        el.addEventListener('click', async (e) => {
-                            if (!confirm('Delete this custom section permanently?')) return;
-                            const idx = parseInt(e.currentTarget.dataset.index);
-                            settings.customSyspromptLibrary.splice(idx, 1);
-                            saveSettings();
-                            wrap.innerHTML = generateListHtml();
-                            bindEvents();
-                        });
-                    });
-                };
-                bindEvents();
-
-                // Add Manually button inside library
-                const addManualBtn = document.getElementById('rt_lib_btn_add_manual');
-                if (addManualBtn) {
-                    addManualBtn.addEventListener('click', async () => {
-                        const result = await showSectionEditor({ mode: 'manual' });
-                        if (!result) return;
-                        const newItem = {
-                            id: Date.now().toString(),
-                            tag: result.tag,
-                            content: result.content,
-                            enabled: result.saveMode === 'apply',
-                            icon: 'fa-pen-to-square',
-                            description: result.description || 'Custom Section',
-                        };
-                        settings.customSyspromptLibrary.push(newItem);
-                        saveSettings();
-                        const wrap = document.getElementById('rt-library-list-wrap');
-                        if (wrap) { wrap.innerHTML = generateListHtml(); bindEvents(); }
-                        if (result.saveMode === 'apply') {
-                            await applyCustomSysprompts();
-                            toastr['success']('Saved to Library & Applied to Sysprompt! ✅', 'Section Builder');
-                        } else {
-                            toastr['success']('Saved to Library! ✅', 'Section Builder');
-                        }
-                    });
-                }
-            }, 100);
-
-            const approved = await Popup.show.confirm('📚 Custom Sysprompt Library', html, { okButton: 'Apply Enabled Prompts', cancelButton: 'Close' });
-            if (approved) {
-                const success = await applyCustomSysprompts();
-                if (success) {
-                    toastr['success']('Library prompts applied to Sysprompt! \u2705', 'Sysprompt Library');
-                }
-            }
-        });
-
-        $('#rpg_tracker_btn_reset_sysprompt_library').on('click', async function () {
-            if (!confirm('This will disable all custom sections in your Sysprompt Library and restore the D&D system prompt to its clean defaults. Proceed?')) return;
-            const settings = getSettings();
-            if (settings.customSyspromptLibrary) {
-                settings.customSyspromptLibrary.forEach(p => p.enabled = false);
-            }
-            settings._customLibraryLastInjection = '';
-            saveSettings();
-            await autoApplySysprompt();
-            toastr['success']('All library sections disabled & Sysprompt reset to defaults! 🔄', 'Sysprompt Editor');
-        });
-
-        // ── AI Section Builder ──
-        $('#rpg_tracker_btn_ai_add_section').on('click', async function () {
-            const settings = getSettings();
-
-            const buildAiPrompt = (desc) =>
-                `You are a D&D system prompt architect. The user wants a new section added to their existing system prompt.\n\nTheir description: "${desc}"\n\nThe user's current system prompt is provided below for reference so you can seamlessly integrate the new mechanic without duplicating existing rules:\n<current_prompt>\n${document.getElementById('main_prompt_quick_edit_textarea')?.value || settings.systemPromptTemplate || ''}\n</current_prompt>\n\nCreate a new XML-tagged section. Your response MUST:\n1. Start with <tag_name> and end with </tag_name>\n2. Use a unique, descriptive tag name in snake_case (e.g. <reputation_system>, <corruption>, <weather_mechanics>)\n3. Be written as clear DM instructions — telling the AI what rules to follow\n4. Be comprehensive but concise (10-30 lines)\n5. Include specific mechanical rules, not just flavor text\n6. Reference {{user}} for the player character\n\nReturn ONLY the XML section. No explanation, no other text.`;
-
-            const generateSection = async (desc) => {
-                const result = await sendStateRequest(settings, 'You are a D&D system prompt section generator. Return ONLY the XML section.', buildAiPrompt(desc));
-                if (!result) throw new Error('No response from AI');
-                let section = result.trim();
-                const fenceMatch = section.match(/```(?:xml)?\s*([\s\S]*?)```/);
-                if (fenceMatch) section = fenceMatch[1].trim();
-                if (!section.match(/^<\w+[\w_-]*>/)) throw new Error('AI did not return a valid XML section');
-                return section;
-            };
-
-            // Step 1: get description
-            const { Popup } = SillyTavern.getContext();
-            const inputContent = `
-                <div style="display:flex; flex-direction:column; gap:10px; width:100%; box-sizing:border-box;">
-                    <div style="font-size:13px; opacity:0.9; font-weight:bold;">✨ AI Section Builder</div>
-                    <div style="font-size:11px; opacity:0.7; line-height:1.4;">
-                        Describe a new system, mechanic, or rule you want added to your D&amp;D system prompt. The AI will generate a properly formatted XML section ready to be appended.
-                    </div>
-                    <textarea id="rt_ai_section_desc" rows="4" class="text_pole"
-                        style="font-size:12px; resize:vertical; width:100%;"
-                        placeholder="Example: A reputation system where NPCs in different factions track the player's standing."></textarea>
-                </div>
-            `;
-
-            let description = '';
-            setTimeout(() => {
-                const ta = document.getElementById('rt_ai_section_desc');
-                if (ta) ta.addEventListener('input', () => { description = ta.value.trim(); });
-            }, 100);
-
-            const inputResult = await Popup.show.confirm('✨ AI Section Builder', inputContent, { okButton: 'Generate', cancelButton: 'Cancel' });
-            if (!inputResult) return;
-
-            if (!description) {
-                toastr['warning']('Please describe the mechanic/system you want.', 'AI Section Builder');
-                return;
-            }
-
-            // Step 2: generate
-            toastr['info']('Generating section with AI...', 'AI Section Builder', { timeOut: 3000 });
-            try {
-                const section = await generateSection(description);
-                const extractedTag = section.match(/^<(\w+[\w_-]*)/)?.[1] || '';
-
-                // Step 3: show unified editor (ai mode)
-                const result = await showSectionEditor({
-                    mode: 'ai',
-                    tag: extractedTag,
-                    description,
-                    content: section,
-                    onRegenerate: generateSection,
-                });
-                if (!result) {
-                    toastr['info']('Section builder cancelled.', 'AI Section Builder');
-                    return;
-                }
-
-                const newItem = {
-                    id: Date.now().toString(),
-                    tag: result.tag,
-                    content: result.content,
-                    enabled: result.saveMode === 'apply',
-                    icon: 'fa-wand-magic-sparkles',
-                    description: result.description || description,
-                };
-
-                settings.customSyspromptLibrary = settings.customSyspromptLibrary || [];
-                settings.customSyspromptLibrary.push(newItem);
-                saveSettings();
-
-                if (result.saveMode === 'apply') {
-                    const success = await applyCustomSysprompts();
-                    if (success) toastr['success']('Saved to Library & Applied to Sysprompt! \u2705', 'AI Section Builder');
-                } else {
-                    toastr['success']('Saved to Library! \u2705', 'AI Section Builder');
-                }
-            } catch (err) {
-                console.error('[RPG Tracker] AI Section Builder error:', err);
-                toastr['error'](`Failed to generate section: ${err.message}`, 'AI Section Builder');
-            }
-        });
-
-        // ── Manual Section Builder ──
-        $('#rpg_tracker_btn_manual_add_section').on('click', async function () {
-            const settings = getSettings();
-            const result = await showSectionEditor({ mode: 'manual' });
-            if (!result) return;
-
-            const newItem = {
-                id: Date.now().toString(),
-                tag: result.tag,
-                content: result.content,
-                enabled: result.saveMode === 'apply',
-                icon: 'fa-pen-to-square',
-                description: result.description || 'Custom Section',
-            };
-
-            settings.customSyspromptLibrary = settings.customSyspromptLibrary || [];
-            settings.customSyspromptLibrary.push(newItem);
-            saveSettings();
-
-            if (result.saveMode === 'apply') {
-                const success = await applyCustomSysprompts();
-                if (success) toastr['success']('Saved to Library & Applied to Sysprompt! \u2705', 'Section Builder');
-            } else {
-                toastr['success']('Saved to Library! \u2705', 'Section Builder');
-            }
-        });
+        // ── Game Systems (Wizard / Manage / Unlock / Advanced library tools) ──
+        // Heavy logic lives in game-systems.js; these are thin bindings only.
+        $('#rpg_tracker_btn_game_system_wizard').on('click', () => openGameSystemWizard());
+        $('#rpg_tracker_btn_manage_game_systems').on('click', () => openManageGameSystems());
+        $('#rpg_tracker_btn_unlock_sections').on('click', () => openUnlockSectionsMenu());
+        $('#rpg_tracker_btn_sysprompt_library').on('click', () => openCustomSyspromptLibrary());
+        $('#rpg_tracker_btn_reset_sysprompt_library').on('click', () => resetSyspromptLibrary());
+        $('#rpg_tracker_btn_ai_add_section').on('click', () => runAiSectionBuilder());
+        $('#rpg_tracker_btn_manual_add_section').on('click', () => runManualSectionBuilder());
 
         $('#rpg_tracker_btn_reset_and_apply_sysprompt').on('click', async function () {
             if (!confirm('This will:\n\n1. Reset the Core State Model prompt to built-in default\n2. Reset all Stock Module prompts, Active Modules, and Module Order to factory defaults\n3. Reset all Lorebook Agent prompts and World Progression prompts to factory defaults\n4. Fetch the latest sysprompt.txt and write it directly into your Quick Prompt "Main" box\n5. Automatically re-enable any custom sysprompt sections that were already enabled\n\nYour custom modules will NOT be affected. Proceed?')) return;
@@ -14143,7 +11077,11 @@ RULES:
                 toastr['success']('All prompts reset & Main sysprompt applied! \u2705', 'RPG Tracker');
             } else {
                 // 5. Automatically re-apply any custom sysprompt library sections that were already enabled
+                // (unlocked-base overrides are reinserted at their original GS_SLOT position first).
+                content = replaceGsSlotMarkers(content, finalSettings);
+
                 const enabledPrompts = (finalSettings.customSyspromptLibrary || []).filter(p => {
+                    if (p.origin === 'unlocked_base') return false;
                     if (!p.enabled || !p.content) return false;
                     const trimmed = p.content.trim();
                     if (!trimmed) return false;
@@ -14216,6 +11154,8 @@ RULES:
                 $('#rpg_quests_options').toggle(val);
             }
         });
+        // Disable any toggle whose section is currently unlocked for Game Systems customization.
+        syncAllNarratorTogglesForUnlockState();
 
         // Deadlines Toggle
         const deadlinesCb = /** @type {HTMLInputElement} */ (document.getElementById('rpg_quests_deadlines'));

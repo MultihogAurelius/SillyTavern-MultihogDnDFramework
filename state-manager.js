@@ -548,6 +548,24 @@ You may be asked to use Markers: ((PLS)), ((B)), ((XB)), ((BDG)), ((HGT)). These
         stockPrompts: { ...DEFAULT_STOCK_PROMPTS },
         customFields: [],
         customSyspromptLibrary: [],
+        /**
+         * Game System Wizard bundles — link a customSyspromptLibrary entry and/or a
+         * customFields entry as a single manageable unit.
+         * Shape: { id, name, icon, enabled, needsTracker,
+         *          driverTime: boolean (value auto-ticks each turn from elapsed [TIME]
+         *              minutes — a rate x minutes-elapsed formula, e.g. hunger/thirst/fatigue),
+         *          driverGmAnnotation: boolean (value changes via GM-declared inline delta
+         *              annotations requiring cross-turn narrative judgment, e.g. faction
+         *              reputation, trust, sanity),
+         *          driverStatedFact: boolean (tracker reads an objective number already
+         *              plainly stated in the narrative output each turn, e.g. a stated
+         *              damage amount — no judgment or annotation needed),
+         *          (one or more drivers may be true at once; at least one must be true
+         *              whenever needsTracker is true — see normalizeDrivers() in game-systems.js),
+         *          effectOwner: 'tracker'|'gm' (who narrates a crossed threshold),
+         *          syspromptLibraryId, customFieldTag, description, createdAt }
+         */
+        gameSystems: [],
         profiles: {},
         activeProfile: "",
         fullViewSections: [],
@@ -821,6 +839,14 @@ Example: [[FAC: Iron Syndicate | ...]]  NOT  [[FAC: Khelt :: Iron Syndicate | ..
         worldOpenaiUrl: "",
         worldOpenaiKey: "",
         worldOpenaiModel: "",
+        gameSystemWizardConnectionSource: "default",
+        gameSystemWizardConnectionProfileId: "",
+        gameSystemWizardCompletionPresetId: "",
+        gameSystemWizardOllamaUrl: "http://localhost:11434",
+        gameSystemWizardOllamaModel: "",
+        gameSystemWizardOpenaiUrl: "",
+        gameSystemWizardOpenaiKey: "",
+        gameSystemWizardOpenaiModel: "",
         lastResetVersion: "",
         autoResetPromptsOnUpdate: false,
         userPromptSuffix: '## OUTPUT ONLY CHANGED SECTIONS:',
@@ -1539,6 +1565,14 @@ export function saveChatState(chatId) {
         worldOpenaiUrl: s.worldOpenaiUrl || "",
         worldOpenaiKey: s.worldOpenaiKey || "",
         worldOpenaiModel: s.worldOpenaiModel || "",
+        gameSystemWizardConnectionSource: s.gameSystemWizardConnectionSource ?? "default",
+        gameSystemWizardConnectionProfileId: s.gameSystemWizardConnectionProfileId || "",
+        gameSystemWizardCompletionPresetId: s.gameSystemWizardCompletionPresetId || "",
+        gameSystemWizardOllamaUrl: s.gameSystemWizardOllamaUrl || "http://localhost:11434",
+        gameSystemWizardOllamaModel: s.gameSystemWizardOllamaModel || "",
+        gameSystemWizardOpenaiUrl: s.gameSystemWizardOpenaiUrl || "",
+        gameSystemWizardOpenaiKey: s.gameSystemWizardOpenaiKey || "",
+        gameSystemWizardOpenaiModel: s.gameSystemWizardOpenaiModel || "",
 
         // Per-chat time/date formatting (24h clock, DD/MM/YYYY vs Day N, initial anchor)
         use24hTime: !!s.use24hTime,
@@ -1682,6 +1716,14 @@ export function saveProfile(name) {
         worldOpenaiUrl: s.worldOpenaiUrl || "",
         worldOpenaiKey: s.worldOpenaiKey || "",
         worldOpenaiModel: s.worldOpenaiModel || "",
+        gameSystemWizardConnectionSource: s.gameSystemWizardConnectionSource ?? "default",
+        gameSystemWizardConnectionProfileId: s.gameSystemWizardConnectionProfileId || "",
+        gameSystemWizardCompletionPresetId: s.gameSystemWizardCompletionPresetId || "",
+        gameSystemWizardOllamaUrl: s.gameSystemWizardOllamaUrl || "http://localhost:11434",
+        gameSystemWizardOllamaModel: s.gameSystemWizardOllamaModel || "",
+        gameSystemWizardOpenaiUrl: s.gameSystemWizardOpenaiUrl || "",
+        gameSystemWizardOpenaiKey: s.gameSystemWizardOpenaiKey || "",
+        gameSystemWizardOpenaiModel: s.gameSystemWizardOpenaiModel || "",
     };
     s.activeProfile = name;
     SillyTavern.getContext().saveSettingsDebounced();
