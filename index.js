@@ -3,7 +3,7 @@ import { MODULE_NAME, DEFAULT_MODULES, getSettings, getBarBackground, migrateCus
 import { sendStateRequest, fetchOllamaModels, fetchOpenAIModels, testOpenAIConnection, getConnectionProfiles, getCurrentCompletionPreset, setCompletionPreset, syncCombatProfile, resetCombatProfileOverride } from './llm-client.js';
 import { getDiceToolName, getDiceCommandName, getDiceCommandAliases, doDiceRoll, registerDiceFunctionTool, registerDiceSlashCommand, installInterceptor, getNarrativeBlocks, onGenerationStarted, onGenerationEnded, ensureRelTagRegex, resetRouterTick, getRouterTick, resetRouterAutoTick, makeRngQueue, buildRngBlock, RNG_QUEUE_LEN, parseAndApplyNarrativeRelTags } from './narrative-hooks.js';
 import { deduplicateMemo, mergeMemo, computeDelta, escapeHtml, escapeRegex, highlightParens, cleanToolCallMessage, cleanMessageContent, getLastUserAction, buildLorebookContext, buildModulesInstructionText, buildModuleFormatInstruction, parseQuestsFromMemo, syncQuestsFromMemo, syncQuestsToMemo, writeQuestsToMemo, getQuestMood, extractCurrentTimeStr, stripArchivedQuestsFromMemo, stripCompletedQuestsFromMemo, applyQuestSyncAndStripMemo, isArchivedQuestStatus, removeArchivedQuest, parseInWorldTime, formatInWorldTime, sanitizeLorebookRecordContent } from './memo-processor.js';
-import { renderSubFieldByRule, tryRenderMarker, renderCustomBlockLine, stripMemoHtml, escapeHtmlWithColor, parseMemoBlocks, getPageSize, loadCollapsed, saveCollapsed, loadDetached, saveDetached, blockToItems, renderMemoAsCards, renderTabModeView, renderQuestLog, renderLorebookTerminal, loadActiveTab, saveActiveTab, getTimeOfDayInfo } from './renderer.js';
+import { renderSubFieldByRule, tryRenderMarker, renderCustomBlockLine, stripMemoHtml, escapeHtmlWithColor, parseMemoBlocks, getPageSize, loadCollapsed, saveCollapsed, loadDetached, saveDetached, blockToItems, renderMemoAsCards, renderTabModeView, renderQuestLog, renderLorebookTerminal, loadActiveTab, saveActiveTab, getTimeOfDayInfo, MARKER_TYPE_MAP } from './renderer.js';
 import { unregisterLogQuestTool, checkQuestDeadlines, renderQuestsAsPlainText } from './quests.js';
 import { initializeDebugViewer, toggleDebugViewer } from './debug-viewer.js';
 import { runRouterPass, rollbackRouterPass, reapplyRouterPass, getLorebookManifest, deleteLorebookEntry, updateLorebookEntry, disableManagedEntries, isRouterRunning, stopRouterPass } from './router.js';
@@ -16,40 +16,7 @@ import { handleCategorySettings, openCustomFieldEditor, openPromptEditor, refres
 import { openGameSystemWizard, openManageGameSystems, openSystemPromptControlRoom, syncAllNarratorTogglesForUnlockState, extractTopLevelSections, normalizeSectionOrder, getSectionRowDescriptor, transformBaseSectionContent, isBlankSectionContent } from './game-systems.js';
 import { openManageGameCartridges } from './game-cartridges.js';
 
-export const RENDERING_TAGS_LIBRARY = [
-    'Health: ((BAR)) 50/100',
-    '((BARRED)) Blood 40/100',
-    'Mana: ((BARBLUE)) 80/100',
-    '((BARGREEN)) Stamina 20/100',
-    '((BARYELLOW)) Energy 60/100',
-    'Void: ((BARPURPLE)) 90/100',
-    '((BARORANGE)) Heat 30/100',
-    'Exp: ((XPBAR)) 450/1000 Level 3',
-    'Status: ((PILLS)) Active, Focused (Concentrating)',
-    'Debuffs: ((PILLRED)) Bleeding (1d4 dmg), Poisoned',
-    '((PILLGREEN)) Buffs (Blessed)',
-    'Magic: ((PILLBLUE)) Shielded (Absorbs 10 dmg)',
-    'Standing: ((BADGE)) Neutral',
-    'Alert: ((WARNING)) Caution',
-    '((DANGER)) Hostile',
-    '((SUCCESS)) Friendly',
-    'Role: ((INFO)) Quest NPC',
-    'Wallet: ((GOLD)) 150',
-    '((SILVER)) 45',
-    'Pocket: ((BRONZE)) 12',
-    'Stash: ((DOLLAR)) 500',
-    'Kills: ((SKULL)) 12',
-    'Lives: ((HEART)) 3',
-    'Souls: ((SOUL)) 42',
-    'Main Quest: ((OBJ)) ○ Find the artifact',
-    'Side Quest: ((OBJ)) ✓ Defeat the bandit leader',
-    '((OBJ)) ✗ Save the hostage',
-    'Bounty: ((REWARD)) 500 XP',
-    'Challenge: ((DIFFICULTY)) Hard',
-    'Items: ((PROGRESS)) 3/5 collected',
-    'Attack: ((ROLL)) 1d20+5 = 18',
-    'Note: ((HIGHLIGHT)) Emphasized text'
-];
+export const RENDERING_TAGS_LIBRARY = Object.keys(MARKER_TYPE_MAP).map(k => `((${k})) ${MARKER_TYPE_MAP[k].example}`);
 
 // Capture the folder name dynamically from the module URL so it works regardless of what the user names the folder
 export const FOLDER_NAME = (function () {
@@ -2780,7 +2747,7 @@ Gear:
         });
     });
 
-    el.querySelectorAll('.rt-hp-bar-wrap[data-recolor-id], .rt-xp-bar-wrap[data-recolor-id]').forEach(wrap => {
+    el.querySelectorAll('[data-recolor-id]').forEach(wrap => {
         wrap.addEventListener('click', (e) => {
             e.stopPropagation();
             handleRecolor(wrap.dataset.recolorId, wrap.dataset.recolorCurrent, wrap);
