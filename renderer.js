@@ -1,4 +1,4 @@
-import { getSettings, getBarBackground } from './state-manager.js';
+import { getSettings, getBarBackground, getBarShowAsPercentage } from './state-manager.js';
 import { escapeHtml, highlightParens, highlightNumbers, parseInWorldTime, formatTimeDiff, isArchivedQuestStatus } from './memo-processor.js';
 import { BLOCK_ICONS, BLOCK_ORDER, PAGE_SIZE, NO_PAGINATE } from './constants.js';
 
@@ -104,12 +104,16 @@ export function getTimeOfDayInfo(str) {
 
                     const recolorData = barId ? ` data-recolor-id="${escapeHtml(barId)}" data-recolor-current="${escapeHtml(barBg)}" title="Click to recolor"` : '';
 
+                    const showAsPct = getBarShowAsPercentage(barId);
+                    const dispCur = showAsPct ? Math.round(pct) : cur;
+                    const dispMax = showAsPct ? 100 : max;
+
                     return `<div class="rt-entity-sub-line" style="gap:6px;">
                         ${labelHtml}
                         <div class="rt-hp-bar-wrap"${recolorData} style="flex:1; position:relative; height:14px; border-radius:4px; overflow:hidden; background:rgba(255,255,255,0.1);">
                             <div class="rt-hp-bar" style="width:${pct.toFixed(1)}%; height:100%; border-radius:4px; background:${barBg}; transition:width 0.3s;"></div>
                         </div>
-                        <span style="font-size:0.82em; opacity:0.85; white-space:nowrap;">${cur}/${max}${extra ? ' ' + escapeHtml(extra) : ''}</span>
+                        <span style="font-size:0.82em; opacity:0.85; white-space:nowrap;">${dispCur}/${dispMax}${extra ? ' ' + escapeHtml(extra) : ''}</span>
                     </div>`;
                 }
                 // Fallback: plain text
@@ -129,12 +133,16 @@ export function getTimeOfDayInfo(str) {
 
                     const recolorData = barId ? ` data-recolor-id="${escapeHtml(barId)}" data-recolor-current="${escapeHtml(barBg)}" title="Click to recolor"` : '';
 
+                    const showAsPct = getBarShowAsPercentage(barId);
+                    const dispCur = showAsPct ? Math.round(pct) : xm[1];
+                    const dispMax = showAsPct ? 100 : xm[2];
+
                     return `<div class="rt-entity-sub-line" style="gap:6px;">
                         ${labelHtml}
                         <div class="rt-xp-bar-wrap"${recolorData} style="flex:1; height:12px;">
                             <div class="rt-xp-bar" style="width:${pct.toFixed(1)}%; background:${barBg};"></div>
                         </div>
-                        <span style="font-size:0.82em; opacity:0.85; white-space:nowrap;">${levelStr}${xm[1]}/${xm[2]}</span>
+                        <span style="font-size:0.82em; opacity:0.85; white-space:nowrap;">${levelStr}${dispCur}/${dispMax}</span>
                     </div>`;
                 }
                 return `<div class="rt-entity-sub-line">${labelHtml} ${escapeHtmlWithColor(value)}</div>`;
@@ -832,7 +840,11 @@ function formatValueToCurrency(totalCp, detectedCurrency) {
                             ? inlineBarRule.color
                             : (!hasMax ? DEFAULT_HP_COLOR : pct > 60 ? DEFAULT_HP_COLOR : pct > 30 ? '#ffaa00' : '#ff5555');
                         const status = (rest || '').trim().replace(/^\|\s*/, '');
-                        const label = hasMax ? `${curRaw}/${maxRaw}` : `${curRaw}`;
+                        
+                        const showAsPct = getBarShowAsPercentage(`${tag}:${name}:HP`);
+                        const dispCur = showAsPct ? Math.round(pct) : curRaw;
+                        const dispMax = showAsPct ? 100 : maxRaw;
+                        const label = hasMax ? `${dispCur}/${dispMax}` : `${curRaw}`;
 
                         currentEntity = name;
                         const barId = `${tag}:${currentEntity}:HP`;
@@ -982,8 +994,12 @@ function formatValueToCurrency(totalCp, detectedCurrency) {
                         const barId = 'XP::XP';
                         const barBg = getBarBackground(barId, 'linear-gradient(90deg, #f39c12, #e67e22)', pct);
 
+                        const showAsPct = getBarShowAsPercentage(barId);
+                        const dispCur = showAsPct ? Math.round(pct) : curRaw;
+                        const dispMax = showAsPct ? 100 : maxRaw;
+
                         return `<div class="rt-xp-row">
-                            <div class="rt-xp-label"><span>Level ${level}</span><span>XP: ${curRaw} / ${maxRaw}</span></div>
+                            <div class="rt-xp-label"><span>Level ${level}</span><span>XP: ${dispCur} / ${dispMax}</span></div>
                             <div class="rt-xp-bar-wrap" title="Click to recolor XP" data-recolor-id="${escapeHtml(barId)}" data-recolor-current="${escapeHtml(barBg)}">
                                 <div class="rt-xp-bar" style="width:${pct.toFixed(1)}%; background:${barBg};"></div>
                             </div>
@@ -1001,8 +1017,12 @@ function formatValueToCurrency(totalCp, detectedCurrency) {
                         const barId = 'XP::XP';
                         const barBg = getBarBackground(barId, 'linear-gradient(90deg, #f39c12, #e67e22)', pct);
 
+                        const showAsPct = getBarShowAsPercentage(barId);
+                        const dispCur = showAsPct ? Math.round(pct) : curRaw;
+                        const dispMax = showAsPct ? 100 : maxRaw;
+
                         return `<div class="rt-xp-row">
-                            <div class="rt-xp-label">${levelHtml}<span>XP: ${curRaw} / ${maxRaw}</span></div>
+                            <div class="rt-xp-label">${levelHtml}<span>XP: ${dispCur} / ${dispMax}</span></div>
                             <div class="rt-xp-bar-wrap" title="Click to recolor XP" data-recolor-id="${escapeHtml(barId)}" data-recolor-current="${escapeHtml(barBg)}">
                                 <div class="rt-xp-bar" style="width:${pct.toFixed(1)}%; background:${barBg};"></div>
                             </div>
@@ -1713,8 +1733,11 @@ function renderPartyVitalsStrip(blocks) {
 
     const items = members.map(m => {
         const barId = `PARTY:${m.name}:HP`;
+        const showAsPct = getBarShowAsPercentage(barId);
+        const dispCur = showAsPct ? Math.round(m.pct) : m.cur;
+        const dispMax = showAsPct ? 100 : m.max;
         const ringColor = getBarBackground(barId, DEFAULT_HP_COLOR, m.pct);
-        return `<button class="rt-vitals-member" data-jump-tag="PARTY" title="${escapeHtml(m.name)}: ${m.cur}/${m.max} HP">
+        return `<button class="rt-vitals-member" data-jump-tag="PARTY" title="${escapeHtml(m.name)}: ${dispCur}/${dispMax} HP">
             <span class="rt-vitals-portrait-wrap" style="--rt-vitals-ring: ${ringColor}; --rt-vitals-pct: ${m.pct}%;">
                 ${renderPortraitHtml(m.name)}
             </span>

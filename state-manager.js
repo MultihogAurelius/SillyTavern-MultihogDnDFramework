@@ -1355,6 +1355,21 @@ export function getBarBackground(barId, defaultBackground, pct = null) {
 }
 
 /**
+ * Checks if a specific bar is configured to be rendered as a percentage.
+ * @param {string} barId
+ * @returns {boolean}
+ */
+export function getBarShowAsPercentage(barId) {
+    if (!barId) return false;
+    const s = getSettings();
+    const cfg = s.barColors?.[barId];
+    if (cfg && typeof cfg === 'object') {
+        return !!cfg.showAsPercentage;
+    }
+    return false;
+}
+
+/**
  * Sanitizes a string into a lorebook-safe campaign prefix (same rules as chat-id derive).
  * @param {string} raw
  * @returns {string}

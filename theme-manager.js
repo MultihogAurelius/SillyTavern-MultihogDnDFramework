@@ -284,6 +284,11 @@ export function handleRecolor(barId, currentBg, targetEl) {
                         `}
                     </div>
 
+                    <label style="display:flex; align-items:center; gap:8px; font-size:0.8em; opacity:0.85; cursor:pointer; user-select:none; margin-top:-4px; margin-bottom:4px;">
+                        <input id="show-as-percentage" type="checkbox" ${cfg.showAsPercentage ? 'checked' : ''} style="margin:0; cursor:pointer;" />
+                        <span>Show as Percentage</span>
+                    </label>
+
                     <div style="display:flex; gap:6px; margin-top:4px;">
                         <button id="recolor-ok" style="flex:1.5; padding:6px; border-radius:6px; border:none; background:var(--rt-accent-bg, #00ffaa); color:#000; font-weight:bold; cursor:pointer; font-size:0.85em;">OK</button>
                         <button id="recolor-cancel" style="flex:1; padding:6px; border-radius:6px; border:1px solid rgba(255,255,255,0.2); background:rgba(255,255,255,0.05); color:white; cursor:pointer; font-size:0.85em;">Cancel</button>
@@ -303,6 +308,14 @@ export function handleRecolor(barId, currentBg, targetEl) {
 
         const c1 = popup.querySelector('#color1');
         const c2 = popup.querySelector('#color2');
+        const pctCheckbox = popup.querySelector('#show-as-percentage');
+
+        if (pctCheckbox) {
+            pctCheckbox.addEventListener('change', (e) => {
+                cfg.showAsPercentage = /** @type {HTMLInputElement} */ (e.target).checked;
+                applyLive();
+            });
+        }
 
         // --- Live preview while dragging: only patch bar color in-place, no re-render ---
         const patchBarColor = () => {
