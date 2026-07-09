@@ -1614,6 +1614,10 @@ export async function openGameSystemWizard(existingSystem = null) {
         description = nextDescription;
 
         toastr['info']('Designing your game system with AI...', 'Game System Wizard', { timeOut: 3000 });
+        const $btn = $('#rpg_tracker_btn_game_system_wizard');
+        const oldHtml = $btn.html();
+        $btn.prop('disabled', true).addClass('loading').html('<i class="fa-solid fa-spinner fa-spin"></i> Generating...');
+
         let parsed;
         try {
             parsed = await generateGameSystemDraft(settings, description);
@@ -1621,6 +1625,8 @@ export async function openGameSystemWizard(existingSystem = null) {
             console.error('[RPG Tracker] Game System Wizard error:', err);
             toastr['error'](`Failed to generate game system: ${err.message}`, 'Game System Wizard');
             continue;
+        } finally {
+            $btn.prop('disabled', false).removeClass('loading').html(oldHtml);
         }
 
         while (true) {
