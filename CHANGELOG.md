@@ -2,6 +2,21 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [4.7.0] - 2026-07-09
+
+### Added
+- **Game System Wizard Upgrades**: Improved the prompt generation wizard to support compound meters, scaled magnitudes, and natural-language inline delta annotations (e.g., `*(Food eaten: Chocolate Bar. +75 Hunger)*`).
+- **UI Feedback for Wizard**: The Game System Wizard button now disables and displays a loading spinner (`Generating...`) while the LLM is generating drafts.
+- **Bar Percentage Mode**: Added a "Show as Percentage" option to HP/XP and custom status bars in the recolor popup. When enabled, it displays the value scaled out of 100 (e.g., `50/100`), keeping the backend math identical for AI parsing.
+- **Native Portrait Generator Default**: Swapped the default portrait generator from Pollinations.ai to the SillyTavern native Image Generation Extension to bypass the new Pollinations PAYG paywall, and added an informative configuration tooltip.
+
+### Changed
+- **Modular Code Architecture**: Refactored the codebase by splitting the monolithic `index.js` into dedicated modules (`character-creator.js`, `game-systems.js`, `theme-manager.js`, `ui-editors.js`, `ui-geometry.js`) to improve maintenance and load times.
+
+### Fixed
+- **State Save Performance**: Solved the UI lag/freeze during typing by debouncing live setting saves by 2000ms, and implemented smart flushing that instantly commits edits before switching views or switching chats.
+- **State Leakage**: Fixed cross-chat state leakage in `saveChatState` by using the authoritative `getActiveChatId()` rather than potentially stale event sources.
+
 ## [4.6.2] - 2026-07-07
 
 ### Fixed
