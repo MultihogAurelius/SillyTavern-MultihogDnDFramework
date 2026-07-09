@@ -1587,7 +1587,16 @@ export function saveChatState(chatId) {
         playerCharacter: existing.playerCharacter,
     };
     
-    SillyTavern.getContext().saveSettingsDebounced();
+    // Use a synchronous save so data is not lost if the page is closed before
+    // a debounced timer fires (the root cause of the PC/state/relationship loss bug).
+    // saveChatState is always called with an explicit chatId so there is no
+    // cross-chat leakage risk from this call itself.
+    const ctx = SillyTavern.getContext();
+    if (typeof ctx.saveSettings === 'function') {
+        ctx.saveSettings();
+    } else if (typeof ctx.saveSettingsDebounced === 'function') {
+        ctx.saveSettingsDebounced();
+    }
 }
 
 // ── Profile I/O ───────────────────────────────────────────────────────────────
