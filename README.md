@@ -53,7 +53,8 @@ Together they solve the four core problems of LLM tabletop RP: the AI forgetting
 - **Automatic Long-Context Tracking** via the Lorebook Agent with World Engine simulation.
 - **AI Portrait Generation** via Pollinations.ai — free, non-profit image generation with full lorebook agent context awareness for accurate character portraits.
 - **Inventory Currency Auto-Rendering** — items with a worth value automatically display a styled coin badge (gold, silver, bronze, or dollar) based on the currency type.
-- **Character card importing** - import any existing character into the story as an NPC; AI will automatically adapt it to the story, regardless of setting/theme.
+- **Character card importing** — import any existing character into the story as an NPC; AI will automatically adapt it to the story, regardless of setting/theme.
+- **AI-powered Game Systems Wizard** — Simply describe any mechanic to the wizard in natural language (e.g. "reputation system), and the AI will build the system for you according to the structure of the extension (sysprompt + module.) Iterate, regenerate, or manually edit any block directly within the forge before saving. 
   
 ---
 
