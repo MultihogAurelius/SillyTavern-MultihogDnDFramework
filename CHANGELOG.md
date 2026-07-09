@@ -2,6 +2,16 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [4.8.5] - 2026-07-09
+
+### Added
+- **Player NPC Safeguard**: Implemented detailed prompting rules to check chat log dialog and prevent creating duplicate NPC entries for the player's persona or in-character name/alias (e.g. "Dave Davidson").
+- **Faction [CORE] Tags**: Standardized Faction (FAC) entries to wrap permanent description text inside `[CORE] ... [/CORE]` tags, matching Location formats.
+
+### Fixed
+- **Settings UI Cartridge Sync**: Modified settings UI loading code to immediately re-sync toggles (including RNG settings) when loading a game cartridge or closing the cartridge menu, resolving the need for manual browser refreshes (F5).
+- **CORE Tag Auto-Stripping**: Corrected a regular expression filter in the content sanitization function that was accidentally stripping out `[CORE]` and `[/CORE]` tag lines from committed lorebook entries.
+
 ## [4.8.0] - 2026-07-09
 
 ### Added

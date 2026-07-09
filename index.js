@@ -14,6 +14,7 @@ import { applyCustomTheme, openThemeWizard, refreshSavedThemesList, handleRecolo
 import { showCharacterRollPanel } from './character-creator.js';
 import { handleCategorySettings, openCustomFieldEditor, openPromptEditor, refreshOrderList, exportModules, importModulesFromJson } from './ui-editors.js';
 import { openGameSystemWizard, openManageGameSystems, openSystemPromptControlRoom, syncAllNarratorTogglesForUnlockState, extractTopLevelSections, normalizeSectionOrder, getSectionRowDescriptor, transformBaseSectionContent, isBlankSectionContent } from './game-systems.js';
+import { openManageGameCartridges } from './game-cartridges.js';
 
 export const RENDERING_TAGS_LIBRARY = [
     'Health: ((BAR)) 50/100',
@@ -9083,7 +9084,7 @@ function tryBindConnectionProfileDropdown(selector, initialProfileId, onProfileI
 
         // --- Version Upgrade Prompt Reset Dialog ---
         {
-            let currentVersion = '4.8.0'; // Fallback
+            let currentVersion = '4.8.5'; // Fallback
             try {
                 const manifestUrl = new URL('./manifest.json', import.meta.url);
                 const response = await fetch(manifestUrl);
@@ -10951,6 +10952,10 @@ RULES:
         $('#rpg_tracker_btn_manage_game_systems').on('click', () => openManageGameSystems());
         $('#rpg_tracker_btn_control_room').on('click', () => openSystemPromptControlRoom());
 
+        // ── Game Cartridges (save/load/export/import full configuration) ──
+        // Heavy logic lives in game-cartridges.js; this is a thin binding only.
+        $('#rpg_tracker_btn_manage_cartridges').on('click', () => openManageGameCartridges());
+
         $('#rpg_tracker_btn_reset_and_apply_sysprompt').on('click', async function () {
             if (!confirm('This will:\n\n1. Reset the Core State Model prompt to built-in default\n2. Reset all Stock Module prompts, Active Modules, and Module Order to factory defaults\n3. Reset all Lorebook Agent prompts and World Progression prompts to factory defaults\n4. Fetch the latest sysprompt.txt and write it directly into your Quick Prompt "Main" box\n5. Automatically re-enable any custom sysprompt sections that were already enabled\n\nYour custom modules will NOT be affected. Proceed?')) return;
 
@@ -12511,6 +12516,85 @@ RULES:
             refreshProfileDropdown();
             toastr['success'](`Profile "${name}" deleted.`, 'RPG Tracker');
         });
+
+        function syncSettingsUi() {
+            const s = getSettings();
+            
+            // RNG toggles
+            let currentRngMode = 'hybrid';
+            if (!s.rngEnabled) {
+                currentRngMode = 'none';
+            } else if (s.diceFunctionTool === false) {
+                currentRngMode = 'legacy';
+            }
+            $(`input[name="rpg_sysprompt_rng_mode"][value="${currentRngMode}"]`).prop('checked', true);
+
+            // General toggles
+            $('#rpg_tracker_enabled').prop('checked', !!s.enabled);
+            $('#rpg_tracker_debug').prop('checked', !!s.debugMode);
+            $('#rpg_tracker_auto_reset_prompts').prop('checked', !!s.autoResetPromptsOnUpdate);
+            $('#rpg_tracker_enable_portraits').prop('checked', s.enablePortraits !== false);
+            $('#rpg_portrait_generator_source').val(s.portraitGeneratorSource || 'native');
+            $('#rpg_tracker_pollinations_group').toggle((s.portraitGeneratorSource || 'native') === 'pollinations');
+            $('#rpg_tracker_portrait_skip_prompt').prop('checked', !!s.portraitSkipPromptDialog);
+            $('#rpg_tracker_portrait_auto_party').prop('checked', !!s.portraitAutoGenerateParty);
+            $('#rpg_tracker_portrait_auto_enemies').prop('checked', !!s.portraitAutoGenerateEnemies);
+            $('#rpg_tracker_portrait_auto_npcs').prop('checked', !!s.portraitAutoGenerateNpcs);
+            $('#rpg_tracker_pollinations_key').val(s.pollinationsApiKey || '');
+
+            // Inventory/Core Prompt
+            $('#rpg_tracker_inventory_worth_mode').val(s.inventoryWorthMode || 'hover');
+            $('#rpg_tracker_show_total_value').prop('checked', s.showTotalInventoryValue !== false);
+            $('#rpg_tracker_core_prompt').val(s.systemPromptTemplate || '');
+            $('#rpg_tracker_user_prompt_suffix').val(s.userPromptSuffix || '');
+
+            // Router Agent
+            $('#rpg_tracker_router_enabled').prop('checked', !!s.routerEnabled);
+            const inPanelCheck = (document.getElementById('rt-agent-router-enable'));
+            if (inPanelCheck) inPanelCheck.checked = !!s.routerEnabled;
+            const ap = document.getElementById('rpg-tracker-agent');
+            if (ap) {
+                if (s.routerEnabled) ap.classList.remove('is-agent-disabled');
+                else ap.classList.add('is-agent-disabled');
+            }
+            $('#rpg_tracker_router_basic_mode').prop('checked', !!s.routerBasicMode);
+            $('#rt-agent-router-basic').prop('checked', !!s.routerBasicMode);
+            $('#rpg_tracker_router_native_keyword_activation').prop('checked', !!s.routerNativeKeywordActivation);
+            $('#rt-agent-router-native-kw').prop('checked', !!s.routerNativeKeywordActivation);
+            $('#rpg_tracker_router_include_hidden').prop('checked', !!s.routerIncludeHidden);
+            $('#rt-agent-router-include-hidden').prop('checked', !!s.routerIncludeHidden);
+
+            $('#rpg_tracker_router_source').val(s.routerConnectionSource || 'default');
+            updateRouterConnectionPanels();
+            updateSettingsLorePrefixReadout();
+            $('#rpg_tracker_router_prefix_override').val(s.routerCampaignPrefixOverride || '');
+            $('#rpg_tracker_router_connection_profile').val(s.routerConnectionProfileId || '');
+            $('#rpg_tracker_router_completion_preset').val(s.routerCompletionPresetId || '');
+
+            // NPC Relationship & Time Settings
+            $('#rpg_tracker_npc_portraits').prop('checked', s.npcPortraits !== false);
+            $('#rpg_tracker_npc_rel_bars').prop('checked', !!s.npcRelationshipBars);
+            $('#rpg_sysprompt_mod_npc_rel_bars').prop('checked', !!s.npcRelationshipBars);
+            $('#rpg_sysprompt_mod_time_ddmmyy').prop('checked', !!s.useDdMmYyFormat);
+            $('#rpg_tracker_npc_card_import').prop('checked', !!s.experimentalNpcImport);
+            $('#rpg_tracker_ignore_npc_limits').prop('checked', !!s.ignoreNpcImportLimits);
+
+            // World Progression
+            $('#rpg_world_progression_enabled').prop('checked', !!s.worldProgressionEnabled);
+            $('#rpg_world_progression_randomize_npcs').prop('checked', !!s.worldProgressionRandomizeNPCs);
+            $('#rpg_world_progression_randomize_locations').prop('checked', !!s.worldProgressionRandomizeLocations);
+            $('#rpg_world_progression_randomize_factions').prop('checked', !!s.worldProgressionRandomizeFactions);
+            $('#rpg_world_progression_skeleton_use_existing').prop('checked', !!s.worldProgressionSkeletonUseExisting);
+            $('#rpg_world_progression_auto_exclude_party').prop('checked', !!s.worldProgressionAutoExcludeParty);
+            $('#rpg_world_progression_consolidate_enabled').prop('checked', !!s.worldProgressionConsolidateEnabled);
+
+            // Textareas (Agent prompt templates)
+            $('#rpg_tracker_router_prompt').val(s.routerSystemPromptTemplate || '');
+            $('#rpg_tracker_router_modular_prompt').val(s.routerModularPromptTemplate || '');
+            $('#rpg_world_progression_system_prompt').val(s.worldProgressionSystemPrompt || '');
+            $('#rpg_world_progression_skeleton_system_prompt').val(s.worldProgressionSkeletonSystemPrompt || '');
+        }
+        globalThis._rpgSyncSettingsUi = syncSettingsUi;
 
     } catch (e) {
         console.error("[RPG Tracker] Failed to build settings UI", e);

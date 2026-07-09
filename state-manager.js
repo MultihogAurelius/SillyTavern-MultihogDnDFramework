@@ -322,7 +322,11 @@ export function buildNpcInstruction(majorWords = 25, minorWords = 15, ignoreLimi
         useDdMmYy = !!getSettings().useDdMmYyFormat;
     } catch (_) {}
 
-    let instruction = `Significant named characters the party interacts with (do NOT record every random enemy or nameless bartender, only characters who are somehow significant). Do NOT create an entry for {{user}}. Mention {{user}} in EVENT or QUEST entries as needed. Always use the exact macro string \`{{user}}\` when referring to the player; do NOT write the plain word "user" or "player".
+    let instruction = `Significant named characters the party interacts with (do NOT record every random enemy or nameless bartender, only characters who are somehow significant).
+Do NOT create an NPC entry for the player character (controlled by the user) under any circumstances.
+In the chat history, the player character is the speaker labeled "Player" (and prompt replacement "{{user}}"). Analyze the dialogue to identify what in-character roleplay name(s) or alias(es) other characters use when addressing or referring to the "Player" (for example, if they call the Player "Dave Davidson" or "Dave", then "Dave Davidson" is the player character).
+Under no circumstances should you create an NPC entry for the player character, regardless of whether they are referred to as "Player", "{{user}}", or by their actual in-character name/alias (like "Dave Davidson").
+Always use the exact macro string \`{{user}}\` when referring to the player character in EVENT, QUEST, or NPC relationship descriptions; do NOT write the plain word "user" or "player" or their actual character name in entry contents.
 
 <CORE_FORMAT — NPC only>
 IMPORTANT: The Description field inside the [[ ]] tags MUST start directly with the [CORE] tag. Do NOT prepend any timestamps, dates, or other text before the [CORE] tag under any circumstances (e.g. do NOT write "[4:47 PM, ${useDdMmYy ? '01/01/2026' : 'Day 1'}] [CORE]" or "[${useDdMmYy ? 'DD/MM/YYYY' : 'Day X'}, HH:MM] [CORE]"). The very first character of the Description MUST be the "[" of the "[CORE]" tag. Wrap the identity sections (Appearance/Species, Personality, Brief Background, Habits/Behaviors) inside a single \`[CORE]\` and \`[/CORE]\` tag block.
@@ -362,7 +366,7 @@ Major NPCs (recurring, plot-important): target AT LEAST ${majorWords} words per 
 Minor NPCs (shopkeepers, guards, one-off encounters): target AT LEAST ${minorWords} words per each section of [CORE].
 
 Expand/extrapolate thematically if you can't otherwise meet the specified length targets.
-</CORE LENGTH TARGETS>`;
+</CORE_LENGTH TARGETS>`;
     }
 
     instruction += `\n\n<COMBAT_GRANULARITY>
@@ -402,12 +406,37 @@ After \`[/CORE]\`, append timestamped deltas when the place changes ([${useDdMmY
 </CORE_FORMAT>`;
 }
 
+/**
+ * Builds the FAC module instruction string (plain [CORE] for factions — no NPC field headers).
+ * @returns {string}
+ */
+export function buildFacInstruction() {
+    let useDdMmYy = false;
+    try {
+        useDdMmYy = !!getSettings().useDdMmYyFormat;
+    } catch (_) {}
+
+    return `Named factions, guilds, organisations. **Status**: short current-state line (standing with the party, active conflicts, what changed recently). **Description**: permanent history, ideology, schemes, and notable members.
+
+<CORE_FORMAT — FAC only>
+When FIRST recording a faction, wrap the permanent description (history, ideology, schemes, and notable members) inside a plain \`[CORE]\` … \`[/CORE]\` block. Do NOT use NPC field headers (Appearance/Species, Personality, Brief Background, Habits/Behaviors) — those structured sections are NPC-only.
+
+Correct:
+[CORE]
+A consulting group based out of Lower Manhattan, operating professional, climate-controlled server environments and dealing with highly sensitive data.
+[/CORE]
+
+The Description MUST start directly with \`[CORE]\`. Do NOT prepend timestamps before the opening tag (e.g. do NOT write "[${useDdMmYy ? '01/01/2026' : 'Day 1'}, 08:00] [CORE]").
+After \`[/CORE]\`, append timestamped chronicle updates/developments ([${useDdMmYy ? 'DD/MM/YYYY' : 'Day X'}, HH:MM] ...).
+</CORE_FORMAT>`;
+}
+
 
 // ── Default module definitions (single source of truth for reset logic) ─────────
 export const DEFAULT_MODULES = {
     npc:   { enabled: true, tag: 'NPC',   format: 'Name | Description | Keywords',                    instruction: buildNpcInstruction() },
     loc:   { enabled: true, tag: 'LOC',   format: 'Name | Description | Keywords',                    instruction: buildLocInstruction() },
-    fac:   { enabled: true, tag: 'FAC',   format: 'Name | Status | Description | Keywords',           instruction: 'Named factions, guilds, organisations. **Status**: short current-state line (standing with the party, active conflicts, what changed recently). **Description**: longer narrative (history, ideology, schemes, notable members). **Keywords**: comma-separated terms for discovery.' },
+    fac:   { enabled: true, tag: 'FAC',   format: 'Name | Status | Description | Keywords',           instruction: buildFacInstruction() },
     quest: { enabled: true, tag: 'QUEST', format: 'Name | Location | Description | Keywords',         instruction: 'ONLY record a quest if the tag [QUEST ACCEPTED] is outputted in the narrative. A quest being mentioned or offered is NOT enough.' },
     event: { enabled: true, tag: 'EVENT', format: 'Name | Details | Keywords',                        instruction: 'Significant narrative events. The Name is a SHORT, STABLE identifier (e.g. "Siege of Ashford") — no timestamps in the name, no "Final"/"Update" suffixes. Put timestamps in the Details field. Reuse the exact same Name when adding new information — entries are chronicles that accumulate automatically. COMBAT GRANULARITY: Do NOT record turn-by-turn status, round-by-round HP changes, or granular actions. For long combats, limit updates to the initiation (e.g., when they became hostile and attacked {{user}}), a high-level progress update every ~5 rounds to capture major shifts, and the final resolution.' },
     world: { enabled: false, tag: 'WORLD', format: 'Name | Details | Keywords',                       instruction: 'World Progression reports tracking off-screen NPC actions and events. Name must be the time period (e.g. "Day 1", "Week 1 (Days 1-7)").' }
@@ -420,9 +449,13 @@ export const DEFAULT_MODULES = {
  * missing keys. All reads and writes to persistent state go through this.
  * @returns {Record<string, any>}
  */
-export function getSettings() {
-    const { extensionSettings } = SillyTavern.getContext();
-    const defaults = {
+/**
+ * Builds a fresh copy of every settings default. Extracted from getSettings()
+ * so it can be reused by getFactoryCartridgePayload() (the "Stock" Game
+ * Cartridge) without duplicating this large literal.
+ */
+function buildDefaultSettings() {
+    return {
         currentMemo: "",
         prevMemo1: "",
         prevMemo2: "",
@@ -576,6 +609,15 @@ You may be asked to use Markers: ((PLS)), ((B)), ((XB)), ((BDG)), ((HGT)). These
          *          syspromptLibraryId, customFieldTag, description, createdAt }
          */
         gameSystems: [],
+        /**
+         * Game Cartridges — named, exportable/importable snapshots of the entire
+         * "configuration surface" (system prompt sections/order/toggles, Game
+         * Systems, tracker modules, block order, stock prompts, extractor prompt,
+         * RNG/format flags). See game-cartridges.js. Shape: { id, name,
+         * description, icon, createdAt, updatedAt, format:'multihog-game-cartridge',
+         * version:1, payload: <see getFactoryCartridgePayload()> }.
+         */
+        gameCartridges: [],
         profiles: {},
         activeProfile: "",
         fullViewSections: [],
@@ -755,8 +797,16 @@ Your goal is to keep the Active Context saturated. Think of it as a stage: it is
 
 If you briefly exceed the budget due to newly activated entries, deactivate the lowest-priority items in the same turn to return within range. It is better to rotate aggressively than to leave the Narrator without context.
 
-BUDGET VIOLATION notices mean you exceeded the limit. When you see one, immediately identify and deactivate the least relevant entries (Exit Contexts first) until you are within budget. List those IDs in the \`deactivate\` field of the same commit call.
+Budget violation notices mean you exceeded the limit. When you see one, immediately identify and deactivate the least relevant entries (Exit Contexts first) until you are within budget. List those IDs in the \`deactivate\` field of the same commit call.
 </context_maximization>
+
+<player_character_safeguard>
+The player character (the user) is the protagonist.
+- Do NOT create a lorebook entry (NPC, Location, Faction, etc.) for the player character under any circumstances.
+- The player character is the speaker labeled "Player" (and prompt replacement "{{user}}"). In the chat logs, pay close attention to what name(s) or alias(es) the other characters use when addressing or referring to the "Player" (e.g., if they address the Player as "Dave Davidson" or "Dave", then "Dave Davidson" is the player character).
+- Under no circumstances should you create an NPC entry for these names/aliases, because they refer to the player.
+- Always use the exact macro string \`{{user}}\` when referring to the player. Do NOT write the plain word "user", "player", "Player", or the player's roleplay character name (like "Dave Davidson") in plain text in any entry updates or descriptions.
+</player_character_safeguard>
 
 <formatting>
 When recording a new entry, keep the lorebook category separate from the entity label.
@@ -828,7 +878,8 @@ Also include each ancestor name (Khelt, Rust-Lantern District) as a plain keywor
 NPC / FAC / QUEST / EVENT labels: Name only — NO " :: " hierarchy, NO tag prefix.
 Example: [[FAC: Iron Syndicate | ...]]  NOT  [[FAC: Khelt :: Iron Syndicate | ...]]  and  NOT  [[FAC: FAC: Iron Syndicate | ...]]
 
-**FAC** uses four fields: \`Name | Status | Description | Keywords\`. Put a concise current-state line in **Status** (standing, conflicts, recent changes); put history, ideology, schemes, and members in **Description**.`,
+**FAC [CORE]:** Wrap history, ideology, schemes, and members inside a plain \`[CORE] … [/CORE]\` block in the **Description** field.
+**FAC** uses four fields: \`Name | Status | Description | Keywords\`. Put a concise current-state line in **Status** (standing, conflicts, recent changes); put history, ideology, schemes, and members in **Description** (wrapped in \`[CORE] ... [/CORE]\`).`,
         categoryRenderOptions: {},
         combatProfileAutoSwitch: false,
         combatConnectionProfileId: "",
@@ -861,6 +912,51 @@ Example: [[FAC: Iron Syndicate | ...]]  NOT  [[FAC: Khelt :: Iron Syndicate | ..
         autoResetPromptsOnUpdate: false,
         userPromptSuffix: '## OUTPUT ONLY CHANGED SECTIONS:',
     };
+}
+
+/**
+ * The list of settings fields that make up a Game Cartridge's "payload" —
+ * everything that defines how the framework behaves as a game/system, minus
+ * connection settings, UI/display prefs, and per-campaign save state
+ * (profiles/chatStates/memo). See game-cartridges.js for the save/load/
+ * export/import logic that operates on this shape.
+ */
+const CARTRIDGE_PAYLOAD_KEYS = [
+    'customSyspromptLibrary',
+    'syspromptSectionOrder',
+    'syspromptModules',
+    'npcRelationshipBars',
+    'rngEnabled',
+    'diceFunctionTool',
+    'use24hTime',
+    'useDdMmYyFormat',
+    'gameSystems',
+    'customFields',
+    'blockOrder',
+    'modules',
+    'stockPrompts',
+    'systemPromptTemplate',
+];
+
+/**
+ * Returns a fresh deep clone of the factory-default value for every
+ * Game-Cartridge payload field. Used both to build the virtual "Stock"
+ * cartridge and to backfill any field missing from an older/partial
+ * imported cartridge.
+ * @returns {object}
+ */
+export function getFactoryCartridgePayload() {
+    const defaults = buildDefaultSettings();
+    const payload = {};
+    for (const key of CARTRIDGE_PAYLOAD_KEYS) {
+        payload[key] = JSON.parse(JSON.stringify(defaults[key]));
+    }
+    return payload;
+}
+
+export function getSettings() {
+    const { extensionSettings } = SillyTavern.getContext();
+    const defaults = buildDefaultSettings();
 
     if (!extensionSettings[MODULE_NAME]) {
         extensionSettings[MODULE_NAME] = {};
@@ -1208,6 +1304,22 @@ Example: [[FAC: Iron Syndicate | ...]]  NOT  [[FAC: Khelt :: Iron Syndicate | ..
             s.npcRelationshipMax = s.npcRelationshipMaxDefault;
         }
         s.settingsVersion = '4.4.0';
+    }
+
+    // Hardened player safeguard prompts & Faction [CORE] tags (v4.5.0)
+    if (!s.settingsVersion || s.settingsVersion < '4.5.0') {
+        if (s.routerModules?.npc) {
+            s.routerModules.npc.instruction = buildNpcInstruction(s.npcMajorWords, s.npcMinorWords, false);
+        }
+        if (s.routerModules?.loc) {
+            s.routerModules.loc.instruction = buildLocInstruction();
+        }
+        if (s.routerModules?.fac) {
+            s.routerModules.fac.instruction = buildFacInstruction();
+        }
+        s.routerSystemPromptTemplate = defaults.routerSystemPromptTemplate;
+        s.routerModularPromptTemplate = defaults.routerModularPromptTemplate;
+        s.settingsVersion = '4.5.0';
     }
 
     // ── MIGRATION: Update system prompts with keywords instructions (v3.2.3+) ──────
@@ -1935,5 +2047,8 @@ export function rebuildAllModuleInstructions(settings) {
     }
     if (settings.routerModules.loc) {
         settings.routerModules.loc.instruction = buildLocInstruction();
+    }
+    if (settings.routerModules.fac) {
+        settings.routerModules.fac.instruction = buildFacInstruction();
     }
 }

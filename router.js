@@ -880,9 +880,16 @@ ${modularPrompt}
 5. **LIMIT**: You are limited to **${settings.routerMaxActivations || 8} active entries**. Nothing is archived automatically. If you exceed this limit you will see a **BUDGET VIOLATION** line and you MUST use [[DEACTIVATE: Name]] on the least relevant active entries to return within budget before this pass ends.
 ${relSection}
 ## [CORE] BY CATEGORY
-- **NPC** only: structured \`[CORE]\` with Appearance/Species, Personality, Brief Background, Habits/Behaviors (see NPC field instructions below).
+- **NPC**: structured \`[CORE]\` with Appearance/Species, Personality, Brief Background, Habits/Behaviors (see NPC field instructions below).
 - **LOC**: plain \`[CORE]\` with 1–2 sentences describing the place. No field headers.
-- **FAC, QUEST, EVENT**: do NOT use \`[CORE]\`. Use timestamped chronicle lines only.
+- **FAC**: plain \`[CORE]\` wrapping permanent history, ideology, schemes, and members. No field headers.
+- **QUEST, EVENT**: do NOT use \`[CORE]\`. Use timestamped chronicle lines only.
+
+## PLAYER CHARACTER SAFEGUARD
+- Do NOT create a lorebook entry (NPC, Location, Faction, etc.) for the player character under any circumstances.
+- The player character is the speaker labeled "Player" (and prompt replacement "{{user}}"). In the chat logs, pay close attention to what name(s) or alias(es) the other characters use when addressing or referring to the "Player" (e.g., if they call the Player "Dave Davidson" or "Dave", then "Dave Davidson" is the player character).
+- Under no circumstances should you create an NPC entry for these names/aliases, because they refer to the player.
+- Always use the exact macro string \`{{user}}\` when referring to the player. Do NOT write the plain word "user", "player", "Player", or the player's roleplay character name (like "Dave Davidson") in plain text in any entry updates or descriptions.
 
 ## NPC CORE UPDATES (NPC only)
 If any field inside the permanent [CORE] block changes, is updated, or new information is revealed (Appearance/Species, Personality, Brief Background, Habits/Behaviors), output:
@@ -894,7 +901,8 @@ Use the exact FieldName (e.g. Personality, Brief Background, Appearance/Species,
 2. Use ACTIVATE to bring an existing entry into the current scene context.
 3. Use DEACTIVATE to remove an entry that is no longer relevant to the scene.
 4. Use DELETE to permanently remove duplicate or redundant entries.
-5. Output your thoughts first, then the tags.
+5. Do NOT create any entry for the player character (e.g. "Player" or "Dave Davidson").
+6. Output your thoughts first, then the tags.
 
 Example:
 Thought: I see a new NPC named Barnaby in Khelt's Rust-Lantern District. I will record him and the tavern.
@@ -907,7 +915,7 @@ Habits/Behaviors: Wipes his brow with a greasy rag.
 [[LOC: Khelt :: Rust-Lantern District :: Barnaby's Forge | [CORE]
 A squat iron building managing mining contracts; soot-stained walls and a clanging workshop floor.
 [/CORE] | Barnaby's Forge, forge, Khelt, Rust-Lantern]]
-[[FAC: Iron Syndicate | Wary of outsiders after the forge raid; still dominant in the industrial quarter. | Founded by ex-mercenaries forty years ago; controls scrap tariffs and smuggling. Lieutenant Marna Voss handles street enforcement. | Iron Syndicate, Khelt, faction, smuggling]]`;
+[[FAC: Iron Syndicate | Wary of outsiders after the forge raid; still dominant in the industrial quarter. | [CORE]Founded by ex-mercenaries forty years ago; controls scrap tariffs and smuggling. Lieutenant Marna Voss handles street enforcement.[/CORE] | Iron Syndicate, Khelt, faction, smuggling]]`;
 
             const finalBasicSystemPrompt = basicSystemPrompt;
 
@@ -954,9 +962,9 @@ A squat iron building managing mining contracts; soot-stained walls and a clangi
                     items: {
                         type: 'object',
                         properties: {
-                            label: { type: 'string', description: 'Entity name only. NO tag prefix (e.g. "Iron Syndicate", NOT "FAC: Iron Syndicate").' },
+                            label: { type: 'string', description: 'Entity name only. NO tag prefix (e.g. "Iron Syndicate", NOT "FAC: Iron Syndicate"). Do NOT record the player character under any name (including "Player" or their roleplay character name/alias like "Dave Davidson").' },
                             keys:  { type: 'array', items: { type: 'string' }, description: 'Search keywords. Include the entity name/title itself (without timestamps like "[Day 1]") as a keyword, plus any ancestor location names.' },
-                            content:  { type: 'string', description: 'Full entry body. NPC: structured [CORE] with Appearance/Species, Personality, Brief Background, Habits/Behaviors. LOC: plain [CORE] with 1–2 sentences (no field headers). FAC/QUEST/EVENT: no [CORE]; use chronicle format.' },
+                            content:  { type: 'string', description: 'Full entry body. NPC: structured [CORE] with Appearance/Species, Personality, Brief Background, Habits/Behaviors. LOC: plain [CORE] with 1–2 sentences (no field headers). FAC: plain [CORE] wrapping permanent history, ideology, schemes. QUEST/EVENT: no [CORE]; use chronicle format.' },
                             category: { type: 'string', enum: categoryEnum, description: 'Determines which lorebook the entry goes into.' }
                         },
                         required: ['label', 'keys', 'content', 'category']
@@ -1145,7 +1153,7 @@ Include the entity name/title itself (without timestamps like "[Day 1]") as a ke
 - Each time-stamped event must start on its own line. Do NOT chain multiple '[Day X, ...]' entries on the same line.
 - Correct: '[Day 2, 10:42] Corruption manifests.\n[Day 2, 10:44] Sentry targets Rozach.'
 - Wrong:   '[Day 2, 10:42] Corruption manifests. [Day 2, 10:44] Sentry targets Rozach.'
-- **[CORE] by category:** NPC = structured fields inside [CORE] (see NPC instructions). LOC = plain [CORE], 1–2 sentences, no field headers. FAC/QUEST/EVENT = no [CORE].
+- **[CORE] by category:** NPC = structured fields inside [CORE] (see NPC instructions). LOC = plain [CORE], 1–2 sentences, no field headers. FAC = plain [CORE] wrapping permanent history/ideology, no field headers. QUEST/EVENT = no [CORE].
 
 ## FIELD INSTRUCTIONS
 ${Object.values(settings.routerModules || {}).filter(m => m.enabled).map(m => `- ${m.tag}: ${m.instruction}`).join('\n')}${(settings.routerCustomTags || []).length ? '\n\n### CUSTOM CATEGORIES\n' + (settings.routerCustomTags || []).map(m => `- ${m.tag.toUpperCase()}: ${m.instruction}`).join('\n') : ''}`;

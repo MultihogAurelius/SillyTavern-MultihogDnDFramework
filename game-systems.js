@@ -19,6 +19,7 @@ import { refreshOrderList } from './ui-editors.js';
 import { QUESTS_NARRATOR, DEFAULT_STOCK_PROMPTS, resolveTimePromptKey } from './constants.js';
 import { getSortableDelay } from '../../../utils.js';
 import { POPUP_RESULT } from '../../../popup.js';
+import { openManageGameCartridges } from './game-cartridges.js';
 import {
     RENDERING_TAGS_LIBRARY,
     saveSettings,
@@ -410,13 +411,14 @@ export function getSectionRowDescriptor(key, settings, baseSectionMap) {
     if (!item) return null;
     if (item.origin === 'wizard') {
         const gs = (settings.gameSystems || []).find(g => g.syspromptLibraryId === id);
+        const wizardSubtext = buildWizardControlRoomSubtext(gs, settings);
         return {
             key, kind: 'wizard', tag: item.tag,
             libId: item.id,
             gameSystemId: gs?.id || null,
             icon: item.icon,
             label: `<${item.tag}>`,
-            description: item.description || '',
+            description: wizardSubtext || item.description || '',
             enabled: !!item.enabled,
             content: item.content,
         };
@@ -2048,6 +2050,22 @@ export async function editUnlockedSection(tag, options = {}) {
 // folded in as toolbar actions.
 // ─────────────────────────────────────────────────────────────────────────
 
+function buildWizardControlRoomSubtext(gs, settings) {
+    if (!gs) return '';
+    const field = gs.customFieldTag
+        ? (settings.customFields || []).find(f => f.tag.toUpperCase() === gs.customFieldTag.toUpperCase())
+        : null;
+    if (!field) {
+        return gs.name ? `Game System: ${gs.name}` : '';
+    }
+    const trackerName = (field.label || field.tag || gs.name || '').trim();
+    let text = `Game System: ${gs.name || trackerName}`;
+    if (trackerName && trackerName !== gs.name) {
+        text += ` · Tracker: ${trackerName}`;
+    }
+    return text;
+}
+
 function controlRoomRowIcon(row) {
     if (row.kind === 'base') return `<i class="fa-solid fa-lock" style="width:20px; text-align:center; opacity:0.5;"></i>`;
     if (row.kind === 'unlocked') return `<i class="fa-solid fa-lock-open" style="width:20px; text-align:center; color:#ffb43c;"></i>`;
@@ -2091,7 +2109,7 @@ function renderControlRoomRow(row) {
             ${controlRoomRowIcon(row)}
             <div style="flex:1; min-width:0;">
                 <div style="font-family:monospace; font-size:12px; font-weight:bold;">${escapeHtml(row.label)}${controlRoomRowBadge(row)}</div>
-                ${row.description ? `<div style="font-size:10px; opacity:0.65; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(row.description)}</div>` : ''}
+                ${row.description ? `<div style="font-size:10px; opacity:0.65; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${escapeHtml(row.description)}">${escapeHtml(row.description)}</div>` : ''}
             </div>
             <label class="checkbox_label" style="margin:0; font-size:11px; white-space:nowrap;">
                 <input type="checkbox" class="rt-cr-enable" data-key="${escapeHtml(row.key)}" ${row.enabled ? 'checked' : ''}>
@@ -2105,7 +2123,7 @@ function renderControlRoomRow(row) {
 export async function openSystemPromptControlRoom() {
     const { Popup } = SillyTavern.getContext();
     const settings = getSettings();
-    const initialSnapshot = snapshotControlRoomSettings(settings);
+    let initialSnapshot = snapshotControlRoomSettings(settings);
     const deferOpts = { deferPersistence: true };
     const isDirty = () => JSON.stringify(snapshotControlRoomSettings(settings)) !== JSON.stringify(initialSnapshot);
 
@@ -2147,6 +2165,9 @@ export async function openSystemPromptControlRoom() {
                 </button>
                 <button id="rt_cr_btn_reset" class="menu_button interactable" style="width:auto; padding:4px 12px; background:rgba(255,100,100,0.15); border-color:rgba(255,100,100,0.4); font-size:11px;" title="Remove all AI/manually-added sections and reset the order to defaults">
                     <i class="fa-solid fa-rotate-left"></i>
+                </button>
+                <button id="rt_cr_btn_cartridges" class="menu_button interactable" style="width:auto; padding:4px 12px; background:rgba(100,220,150,0.15); border-color:rgba(100,220,150,0.4); font-size:11px;" title="Save, load, export, or import your entire configuration as a Game Cartridge">
+                    <i class="fa-solid fa-compact-disc"></i>
                 </button>
             </div>
             <div id="rt-cr-list-wrap" style="overflow-y:auto; padding-right:10px; flex:1;">
@@ -2306,6 +2327,21 @@ export async function openSystemPromptControlRoom() {
 
         const resetBtn = document.getElementById('rt_cr_btn_reset');
         if (resetBtn) resetBtn.addEventListener('click', async () => { await resetSyspromptLibrary(deferOpts); refresh(); });
+
+        const cartridgesBtn = document.getElementById('rt_cr_btn_cartridges');
+        if (cartridgesBtn) {
+            cartridgesBtn.addEventListener('click', async () => {
+                if (isDirty()) {
+                    toastr['warning']('Save or Cancel your current changes before opening Game Cartridges.', 'System Prompt Control Room');
+                    return;
+                }
+                await openManageGameCartridges();
+                // A cartridge Load fully replaces settings outside this popup's normal
+                // Save/Cancel deferral — re-baseline so Cancel doesn't revert it.
+                initialSnapshot = snapshotControlRoomSettings(settings);
+                refresh();
+            });
+        }
     }, 100);
 
     const result = await Popup.show.confirm('🎛️ System Prompt Control Room', html, {

@@ -99,7 +99,11 @@ export function sanitizeLorebookRecordContent(content) {
     let s = content.trim();
     s = s.replace(/^\s*\[[^\]]+\]\s*(?=\[CORE\])/i, '');
     s = s.split('\n')
-        .filter(line => !/^\[[^\]]+\]\s*$/.test(line.trim()))
+        .filter(line => {
+            const trimmed = line.trim();
+            if (/^\[\/?core\]$/i.test(trimmed)) return true;
+            return !/^\[[^\]]+\]\s*$/.test(trimmed);
+        })
         .join('\n')
         .replace(/\n{3,}/g, '\n\n')
         .trim();
