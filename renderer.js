@@ -173,9 +173,10 @@ export function getTimeOfDayInfo(str) {
                     const cur = parseInt(pm[1], 10), max = parseInt(pm[2], 10);
                     const pct = max > 0 ? Math.min(100, (cur / max) * 100) : 0;
                     const extra = value.replace(pm[0], '').trim();
+                    const bgStyle = rule.color ? `background:${rule.color};` : '';
                     return `<div class="rt-entity-sub-line rt-progress-row">${labelHtml}
                         <div class="rt-progress-bar-wrap">
-                            <div class="rt-progress-bar" style="width:${pct.toFixed(1)}%;"></div>
+                            <div class="rt-progress-bar" style="width:${pct.toFixed(1)}%;${bgStyle}"></div>
                         </div>
                         <span class="rt-progress-label">${cur}/${max}${extra ? ' ' + escapeHtml(extra) : ''}</span>
                     </div>`;
@@ -256,43 +257,50 @@ export function getTimeOfDayInfo(str) {
 
 
     // Shared marker type map used by tokenizeMarkers and tryRenderMarker.
-    const MARKER_TYPE_MAP = {
-        PILLS:{ renderType: 'pills' }, PLS:{ renderType: 'pills' },
-        BAR:{ renderType: 'hp_bar' }, B:{ renderType: 'hp_bar' }, HPBAR:{ renderType: 'hp_bar' }, HPB:{ renderType: 'hp_bar' }, HP: { renderType: 'hp_bar' },
-        BARRED:{ renderType: 'hp_bar', color: 'linear-gradient(90deg,#e74c3c,#c0392b)' },
-        BARBLUE:{ renderType: 'hp_bar', color: 'linear-gradient(90deg,#3498db,#2980b9)' },
-        BARGREEN:{ renderType: 'hp_bar', color: 'linear-gradient(90deg,#2ecc71,#27ae60)' },
-        BARYELLOW:{ renderType: 'hp_bar', color: 'linear-gradient(90deg,#f1c40f,#f39c12)' },
-        BARPURPLE:{ renderType: 'hp_bar', color: 'linear-gradient(90deg,#9b59b6,#8e44ad)' },
-        BARORANGE:{ renderType: 'hp_bar', color: 'linear-gradient(90deg,#e67e22,#d35400)' },
-        XPBAR:{ renderType: 'xp_bar' }, XB:{ renderType: 'xp_bar' },
-        TEXT:{ renderType: 'text' },
-        BADGE:{ renderType: 'badge' }, BDG:{ renderType: 'badge' },
-        HIGHLIGHT:{ renderType: 'highlight' }, HGT:{ renderType: 'highlight' },
-        OBJ:{ renderType: 'objective' },
-        REWARD:{ renderType: 'reward' },
-        DIFFICULTY:{ renderType: 'difficulty' },
-        PROGRESS:{ renderType: 'progress' },
-        PILLRED:{ renderType: 'pill_colored', pillClass: 'rt-pill-debuff' },
-        PILLGREEN:{ renderType: 'pill_colored', pillClass: 'rt-pill-buff' },
-        PILLBLUE:{ renderType: 'pill_colored', pillClass: 'rt-pill-magic' },
-        WARNING:{ renderType: 'badge_colored', color: '#f1c40f' },
-        DANGER:{ renderType: 'badge_colored', color: '#e74c3c' },
-        SUCCESS:{ renderType: 'badge_colored', color: '#2ecc71' },
-        INFO:{ renderType: 'badge_colored', color: '#3498db' },
-        GOLD:{ renderType: 'coin', color: '#ffd700', icon: '💰' },
-        SILVER:{ renderType: 'coin', color: '#c0c0c0', icon: '🪙' },
-        BRONZE:{ renderType: 'coin', color: '#cd7f32', icon: '🪙' },
-        DOLLAR:{ renderType: 'coin', color: '#85bb65', icon: '💵' },
-        HEART:{ renderType: 'coin', color: '#ff4466', icon: '❤️' },
-        SKULL:{ renderType: 'coin', color: '#aaaaaa', icon: '💀' },
-        SOUL:{ renderType: 'coin', color: '#aa88ff', icon: '👻' },
-        ROLL:{ renderType: 'dice_roll' }
+    export const MARKER_TYPE_MAP = {
+        PILLS:{ renderType: 'pills', example: 'A, B (Gray pills)' }, PLS:{ renderType: 'pills', example: 'A, B (Gray pills)' },
+        BAR:{ renderType: 'hp_bar', example: '50/100 (Red HP/Standing)' }, B:{ renderType: 'hp_bar', example: '50/100 (Red HP/Standing)' }, HPBAR:{ renderType: 'hp_bar', example: '50/100 (Red HP/Standing)' }, HPB:{ renderType: 'hp_bar', example: '50/100 (Red HP/Standing)' }, HP: { renderType: 'hp_bar', example: '50/100 (Red HP/Standing)' },
+        BARRED:{ renderType: 'hp_bar', color: 'linear-gradient(90deg,#e74c3c,#c0392b)', example: '50/100 (Crimson Blood)' },
+        BARBLUE:{ renderType: 'hp_bar', color: 'linear-gradient(90deg,#3498db,#2980b9)', example: '50/100 (Blue Mana/Mana)' },
+        BARGREEN:{ renderType: 'hp_bar', color: 'linear-gradient(90deg,#2ecc71,#27ae60)', example: '50/100 (Green Stamina)' },
+        BARYELLOW:{ renderType: 'hp_bar', color: 'linear-gradient(90deg,#f1c40f,#f39c12)', example: '50/100 (Yellow Energy)' },
+        BARPURPLE:{ renderType: 'hp_bar', color: 'linear-gradient(90deg,#9b59b6,#8e44ad)', example: '50/100 (Purple Void)' },
+        BARORANGE:{ renderType: 'hp_bar', color: 'linear-gradient(90deg,#e67e22,#d35400)', example: '50/100 (Orange Heat)' },
+        XPBAR:{ renderType: 'xp_bar', example: '450/1000 Level 3 (XP/Progress)' }, XB:{ renderType: 'xp_bar', example: '450/1000 Level 3 (XP/Progress)' },
+        TEXT:{ renderType: 'text', example: 'Some text (Plain)' },
+        BADGE:{ renderType: 'badge', example: 'Neutral (Reputation badge)' }, BDG:{ renderType: 'badge', example: 'Neutral (Reputation badge)' },
+        HIGHLIGHT:{ renderType: 'highlight', example: 'Emphasis (Bright highlight text)' }, HGT:{ renderType: 'highlight', example: 'Emphasis (Bright highlight text)' },
+        OBJ:{ renderType: 'objective', example: '✓ Done (Checked quest bullet)' },
+        REWARD:{ renderType: 'reward', example: '500 XP (Loot reward badge)' },
+        DIFFICULTY:{ renderType: 'difficulty', example: 'Hard (Difficulty star badge)' },
+        PROGRESS:{ renderType: 'progress', example: '3/5 (Fraction progress)' },
+        PROGRESSRED:{ renderType: 'progress', color: '#e74c3c', example: '3/5 (Red fraction progress)' },
+        PROGRESSBLUE:{ renderType: 'progress', color: '#3498db', example: '3/5 (Blue fraction progress)' },
+        PROGRESSGREEN:{ renderType: 'progress', color: '#2ecc71', example: '3/5 (Green fraction progress)' },
+        PROGRESSYELLOW:{ renderType: 'progress', color: '#f1c40f', example: '3/5 (Yellow fraction progress)' },
+        PROGRESSPURPLE:{ renderType: 'progress', color: '#9b59b6', example: '3/5 (Purple fraction progress)' },
+        PROGRESSORANGE:{ renderType: 'progress', color: '#e67e22', example: '3/5 (Orange fraction progress)' },
+        PROGRESSCYAN:{ renderType: 'progress', color: '#00ffff', example: '3/5 (Cyan fraction progress)' },
+        PILLRED:{ renderType: 'pill_colored', pillClass: 'rt-pill-debuff', example: 'Debuffs, Stunned' },
+        PILLGREEN:{ renderType: 'pill_colored', pillClass: 'rt-pill-buff', example: 'Buffs, Blessed' },
+        PILLBLUE:{ renderType: 'pill_colored', pillClass: 'rt-pill-magic', example: 'Wards, Shielded' },
+        WARNING:{ renderType: 'badge_colored', color: '#f1c40f', example: 'Caution (Amber badge)' },
+        DANGER:{ renderType: 'badge_colored', color: '#e74c3c', example: 'Hostile (Red badge)' },
+        SUCCESS:{ renderType: 'badge_colored', color: '#2ecc71', example: 'Active (Green badge)' },
+        INFO:{ renderType: 'badge_colored', color: '#3498db', example: 'Role (Blue badge)' },
+        GOLD:{ renderType: 'coin', color: '#ffd700', icon: '💰', example: '150 (Gold coins)' },
+        SILVER:{ renderType: 'coin', color: '#c0c0c0', icon: '🪙', example: '45 (Silver coins)' },
+        BRONZE:{ renderType: 'coin', color: '#cd7f32', icon: '🪙', example: '12 (Bronze coins)' },
+        DOLLAR:{ renderType: 'coin', color: '#85bb65', icon: '💵', example: '500 (Paper cash)' },
+        HEART:{ renderType: 'coin', color: '#ff4466', icon: '❤️', example: '3 (Lives/Hearts)' },
+        SKULL:{ renderType: 'coin', color: '#aaaaaa', icon: '💀', example: '12 (Kills/Deaths)' },
+        SOUL:{ renderType: 'coin', color: '#aa88ff', icon: '👻', example: '42 (Souls)' },
+        ROLL:{ renderType: 'dice_roll', example: '1d20+5 = 18 (Dice roll badge)' }
     };
 
     // Regex that matches the NEXT ((MARKER)) token anywhere in a string.
     // Used iteratively by tokenizeMarkers.
-    const MARKER_TOKEN_RE = /\(\((PILLS|BAR|HPBAR|XPBAR|TEXT|BADGE|HIGHLIGHT|PLS|B|HPB|XB|HGT|BDG|HP|OBJ|REWARD|DIFFICULTY|PROGRESS|BARRED|BARBLUE|BARGREEN|BARYELLOW|BARPURPLE|BARORANGE|PILLRED|PILLGREEN|PILLBLUE|WARNING|DANGER|SUCCESS|INFO|GOLD|SILVER|BRONZE|DOLLAR|HEART|SKULL|SOUL|ROLL)\)\)/i;
+    export const MARKER_TOKEN_RE = new RegExp(`\\(\\((${Object.keys(MARKER_TYPE_MAP).join('|')})\\)\\)`, 'i');
 
     /**
      * Splits `line` into an ordered array of segments wherever a ((MARKER))
