@@ -2,6 +2,13 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [4.8.6] - 2026-07-10
+
+### Added
+- **Colored Progress Variants**: Added a full suite of color-coded variants for the `((PROGRESS))` marker (e.g. `((PROGRESSRED))`, `((PROGRESSBLUE))`, `((PROGRESSGREEN))`) to expand dynamic visual tracking options in the library.
+- **Dynamic AI Tag Engine**: The Game Wizard AI now automatically synchronizes with the core renderer library, meaning it instantly understands the visual formatting and contextual meaning of all existing and future progress tag variants when generating new custom tracking modules.
+- **Progress Bar Recoloring**: All `((PROGRESS))` markers in the state tracker are now natively clickable. They utilize the same intuitive color-wheel picker as standard bars, allowing players to dynamically override their fill colors on the fly.
+
 ## [4.8.5] - 2026-07-09
 
 ### Added
