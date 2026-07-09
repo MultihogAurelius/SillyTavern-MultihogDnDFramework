@@ -12,7 +12,7 @@
  * circular import. This will be cleaned up when index.js is split.
  */
 
-import { getSettings, hydrateWorldProgressionFromChatState, persistWorldProgressionTimer, persistRouterLastRunWatermark, getNpcRelationshipMax, clampRelationshipValue, relationshipBarPct, getFriendshipTier, getAffectionTier, applyRelTierBadgeElement } from './state-manager.js';
+import { getSettings, hydrateWorldProgressionFromChatState, persistWorldProgressionTimer, persistRouterLastRunWatermark, getNpcRelationshipMax, clampRelationshipValue, relationshipBarPct, getFriendshipTier, getAffectionTier, applyRelTierBadgeElement, saveChatState, getActiveChatId } from './state-manager.js';
 import { syncCombatProfile } from './llm-client.js';
 import { parseQuestsFromMemo, extractCurrentTimeStr, cleanMessageContent, formatInWorldTime } from './memo-processor.js';
 import { runRouterPass, saveSceneToLorebook, scanAssistantOutputForKeywords, parseInWorldMinutes, runWorldProgressionPass, updateLorebookEntry, getLorebookManifest } from './router.js';
@@ -995,11 +995,24 @@ export async function parseAndApplyNarrativeRelTags() {
         if (typeof ctx.saveChatDebounced === 'function') ctx.saveChatDebounced();
         ctx.saveSettingsDebounced?.();
         refreshRelationshipBarsDOM(settings);
+        // Force a synchronous chat-state snapshot so relationship deltas and memo
+        // changes are not lost if the user closes the page before the debounce fires.
+        // Use getActiveChatId() (which defers to _rpgCurrentChatId) — never ctx.chatId
+        // directly, which can be stale during MESSAGE_SWIPED/EDITED events and would
+        // snapshot the wrong chat's state (the original cross-chat leakage bug).
+        if (settings.chatLinkEnabled) {
+            const chatId = getActiveChatId();
+            if (chatId) saveChatState(chatId);
+        }
     };
 
     const triggerStateOnlyUIUpdate = () => {
         if (typeof ctx.saveChatDebounced === 'function') ctx.saveChatDebounced();
         ctx.saveSettingsDebounced?.();
+        if (settings.chatLinkEnabled) {
+            const chatId = getActiveChatId();
+            if (chatId) saveChatState(chatId);
+        }
     };
 
     // If Relationship Bars are disabled, we only handle State Tracker swipe updates
