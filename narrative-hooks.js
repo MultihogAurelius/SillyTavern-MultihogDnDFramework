@@ -69,61 +69,108 @@ export function buildRngBlock(queue) {
 
 // ── Dice rolling ───────────────────────────────────────────────────────────────
 
-function parseAndRoll(formula) {
-    const cleanFormula = formula.replace(/\s+/g, '');
-    // Regex matches e.g. "2d20k1+5+2", "1d20+7", "d20-1", "2d20kh1", "2d20dl1"
+/**
+ * Rolls a single die-group term (e.g. "2d6kh1", "d20", "3d8dl1") and returns
+ * the sum of the kept dice, plus an array of all individual raw rolls.
+ * Returns null if the token isn't a valid die-group.
+ */
+function rollSingleGroup(token) {
+    // Matches: optional count, dSides, optional keep/drop op, optional trailing int modifiers
     const regex = /^([1-9]\d*)?d([1-9]\d*)(?:([kd][hl]?)([1-9]\d*))?((?:[+-]\d+)*)$/i;
-    const match = cleanFormula.match(regex);
+    const match = token.match(regex);
     if (!match) return null;
 
     const numDice = match[1] ? parseInt(match[1], 10) : 1;
     const numSides = parseInt(match[2], 10);
-    const opType = match[3] ? match[3].toLowerCase() : null;
-    const opCount = match[4] ? parseInt(match[4], 10) : 0;
+    const opType   = match[3] ? match[3].toLowerCase() : null;
+    const opCount  = match[4] ? parseInt(match[4], 10) : 0;
     const modifierStr = match[5] || '';
 
-    // Safety limit to prevent locking the execution thread
     if (numDice > 100) return null;
 
     const rolls = [];
-    for (let i = 0; i < numDice; i++) {
-        rolls.push(rollDie(numSides));
-    }
+    for (let i = 0; i < numDice; i++) rolls.push(rollDie(numSides));
 
     let keptRolls = [...rolls];
     if (opType && opCount > 0) {
         keptRolls.sort((a, b) => a - b);
         if (opType.startsWith('k')) {
-            if (opType === 'kl') {
-                keptRolls = keptRolls.slice(0, opCount);
-            } else {
-                keptRolls = keptRolls.slice(-opCount);
-            }
+            keptRolls = opType === 'kl'
+                ? keptRolls.slice(0, opCount)
+                : keptRolls.slice(-opCount);
         } else if (opType.startsWith('d')) {
-            if (opType === 'dh') {
-                keptRolls = keptRolls.slice(0, Math.max(0, numDice - opCount));
-            } else {
-                keptRolls = keptRolls.slice(opCount);
-            }
+            keptRolls = opType === 'dh'
+                ? keptRolls.slice(0, Math.max(0, numDice - opCount))
+                : keptRolls.slice(opCount);
         }
     }
 
     let modifier = 0;
-    if (modifierStr) {
-        const modMatches = modifierStr.match(/[+-]\d+/g);
-        if (modMatches) {
-            for (const m of modMatches) {
-                modifier += parseInt(m, 10);
-            }
+    const modMatches = modifierStr.match(/[+-]\d+/g);
+    if (modMatches) {
+        for (const m of modMatches) modifier += parseInt(m, 10);
+    }
+
+    return {
+        kept: keptRolls.reduce((s, v) => s + v, 0) + modifier,
+        rolls,
+    };
+}
+
+/**
+ * Parses and rolls a (possibly compound) dice formula such as:
+ *   "1d20+1d4+10"  →  rolls 1d20, rolls 1d4, adds flat 10
+ *   "2d6kh1-1"     →  keep-highest-1 of 2d6, subtract 1
+ *   "d20+7"        →  simple 1d20 + 7
+ *
+ * Returns { total: string, rolls: string[] } or null if the formula is invalid.
+ * The `rolls` array contains every individual raw die value across all groups,
+ * in left-to-right order.
+ */
+function parseAndRoll(formula) {
+    const cleanFormula = formula.replace(/\s+/g, '');
+
+    // Tokenise into signed terms: split on + or - that is NOT inside a die-group's
+    // trailing modifier (we re-attach the sign to each token for signed integers).
+    // Strategy: split on any + or - that is preceded by a digit (end of a term).
+    const tokenRegex = /([+-]?(?:[1-9]\d*)?d[1-9]\d*(?:[kd][hl]?[1-9]\d*)?(?:[+-]\d+)*|[+-]?\d+)/gi;
+    const tokens = cleanFormula.match(tokenRegex);
+
+    // Must have at least one token and the whole formula must be covered
+    if (!tokens || tokens.join('').replace(/\+/g, '').length !== cleanFormula.replace(/\+/g, '').length) {
+        // Fallback: try legacy single-group path for full backwards compat
+        return rollSingleGroup(cleanFormula);
+    }
+
+    // Need at least one die-group for this to be meaningful
+    const hasDie = tokens.some(t => /d/i.test(t));
+    if (!hasDie) return null;
+
+    let total = 0;
+    const allRolls = [];
+
+    for (const rawToken of tokens) {
+        // Determine sign prefix
+        const sign   = rawToken.startsWith('-') ? -1 : 1;
+        const token  = rawToken.replace(/^[+-]/, '');
+
+        if (/d/i.test(token)) {
+            // Die group
+            const result = rollSingleGroup(token);
+            if (!result) return null;           // malformed — abort entirely
+            total += sign * result.kept;
+            for (const r of result.rolls) allRolls.push(String(sign < 0 ? -r : r));
+        } else {
+            // Plain integer
+            const n = parseInt(token, 10);
+            if (isNaN(n)) return null;
+            total += sign * n;
         }
     }
 
-    const diceSum = keptRolls.reduce((sum, val) => sum + val, 0);
-    const total = diceSum + modifier;
-
     return {
         total: String(total),
-        rolls: rolls.map(String)
+        rolls: allRolls,
     };
 }
 
