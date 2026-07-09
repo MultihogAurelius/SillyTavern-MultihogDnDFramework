@@ -1178,49 +1178,14 @@
                             </button>
                         </div>
 
-                        <div style="font-weight: bold; font-size: 0.85em; opacity: 0.8; margin-top: 10px; margin-bottom: 4px;">Unlock Base Sections</div>
+                        <div style="font-weight: bold; font-size: 0.85em; opacity: 0.8; margin-top: 10px; margin-bottom: 4px;">System Prompt Control Room</div>
                         <div style="font-size: 0.78em; opacity: 0.6; line-height: 1.4; margin-bottom: 6px;">
-                            Fully override a built-in sysprompt section (e.g. &lt;combat&gt;) while the rest of the auto-derived prompt stays governed by Narrator Configuration.
+                            Reorder, enable/disable, unlock, or add any top-level system prompt section — built-in or custom — from one drag-and-drop list.
                         </div>
-                        <button id="rpg_tracker_btn_unlock_sections" class="menu_button interactable"
-                            style="width: 100%; background: rgba(255, 180, 60, 0.15); border-color: rgba(255, 180, 60, 0.4);" title="Unlock a built-in sysprompt section for full customization">
-                            <i class="fa-solid fa-lock-open"></i> Unlock Base Sections
+                        <button id="rpg_tracker_btn_control_room" class="menu_button interactable"
+                            style="width: 100%; background: rgba(255, 180, 60, 0.15); border-color: rgba(255, 180, 60, 0.4);" title="Reorder, toggle, unlock, and add system prompt sections">
+                            <i class="fa-solid fa-sliders"></i> System Prompt Control Room
                         </button>
-
-                        <div class="inline-drawer" style="margin-top: 12px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 6px;">
-                            <div class="inline-drawer-toggle inline-drawer-header" style="font-size: 0.85em; opacity: 0.8;">
-                                <i class="fa-solid fa-screwdriver-wrench" style="margin-right: 8px; opacity: 0.7;"></i>
-                                <b>Advanced: Manual Sysprompt Sections</b>
-                                <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
-                            </div>
-                            <div class="inline-drawer-content">
-                                <div class="flex-container flexFlowColumn gap-1">
-                                    <div style="font-size: 0.78em; opacity: 0.6; line-height: 1.4; margin-bottom: 6px;">
-                                        For a GM-only section with no linked tracker module and no bundle management — the same tools the Wizard is built on.
-                                    </div>
-                                    <div style="display: flex; gap: 6px;">
-                                        <button id="rpg_tracker_btn_ai_add_section" class="menu_button interactable"
-                                            style="flex: 1; background: rgba(180, 100, 255, 0.15); border-color: rgba(180, 100, 255, 0.4);" title="Generate a new section using AI">
-                                            <i class="fa-solid fa-wand-magic-sparkles"></i> AI Builder
-                                        </button>
-                                        <button id="rpg_tracker_btn_manual_add_section" class="menu_button interactable"
-                                            style="flex: 1; background: rgba(80, 180, 120, 0.15); border-color: rgba(80, 180, 120, 0.4);" title="Paste or write a section manually">
-                                            <i class="fa-solid fa-pen-to-square"></i> Add Manually
-                                        </button>
-                                    </div>
-                                    <div class="flex-container gap-1" style="margin-top: 4px; width: 100%;">
-                                        <button id="rpg_tracker_btn_sysprompt_library" class="menu_button interactable"
-                                            style="flex: 1; background: rgba(50, 150, 255, 0.15); border-color: rgba(50, 150, 255, 0.4);" title="Manage saved custom sysprompt sections">
-                                            <i class="fa-solid fa-book-open"></i> Custom Sysprompt Library
-                                        </button>
-                                        <button id="rpg_tracker_btn_reset_sysprompt_library" class="menu_button interactable"
-                                            style="width: auto; padding: 0 12px; background: rgba(255, 100, 100, 0.15); border-color: rgba(255, 100, 100, 0.4);" title="Disable all custom sysprompt sections and reset the system prompt to defaults">
-                                            <i class="fa-solid fa-rotate-left"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
 
                     </div>
                 </div>

@@ -2,6 +2,13 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [4.8.0] - 2026-07-09
+
+### Added
+- **Full Module Context for Wizard**: The Game System Wizard now receives the complete prompting instructions, templates, and active states of all enabled stock modules, custom fields, and custom GM sections. This enables the AI generator to be fully influenced by existing formatting and rules in the workspace.
+- **Complete Tags Library Exposure**: Expanded the wizard's rendering library hints to expose all 30+ available tags, resolving a bug where the AI was unaware of advanced tags like `((PROGRESS))` due to a hardcoded 12-item slice limit.
+- **Pill Hygiene Instructions**: Added explicit guidelines to the Game System Wizard and AI Custom Field Creator prompts to prevent the AI from prefixing every item in a list with the `((PILLS))` tag, avoiding visual rendering issues.
+
 ## [4.7.0] - 2026-07-09
 
 ### Added

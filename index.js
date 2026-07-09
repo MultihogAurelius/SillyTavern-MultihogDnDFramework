@@ -1,5 +1,5 @@
-import { EXAMPLES, COLOR_EXAMPLES, DEFAULT_STOCK_PROMPTS, RT_PROMPTS, BLOCK_ICONS, BLOCK_ORDER, PAGE_SIZE, NO_PAGINATE, QUESTS_NARRATOR, buildOnboardingXpHint, resolveTimePromptKey, resolveTimePromptDisplayTag } from './constants.js';
-import { MODULE_NAME, DEFAULT_MODULES, getSettings, getBarBackground, migrateCustomFields, saveChatState, saveProfile, deleteProfile, getEffectiveRouterCampaignPrefix, sanitizeCampaignPrefixString, buildNpcInstruction, loadStockPromptsFromProfile, getNpcRelationshipMax, getNpcRelationshipMaxDefault, clampRelationshipValue, relationshipBarPct, buildRelationshipTrackingSysprompt, getFriendshipTier, getAffectionTier, getRelTierBadgeStyle, getRelTierDetailedStyle, getRelTierDetailedLabelStyle, applyRelTierBadgeElement, sanitizeRouterState, rebuildAllModuleInstructions, adjustAllStoredTemplatesForTimeFormat } from './state-manager.js';
+import { EXAMPLES, COLOR_EXAMPLES, DEFAULT_STOCK_PROMPTS, RT_PROMPTS, BLOCK_ICONS, BLOCK_ORDER, PAGE_SIZE, NO_PAGINATE, buildOnboardingXpHint, resolveTimePromptKey, resolveTimePromptDisplayTag } from './constants.js';
+import { MODULE_NAME, DEFAULT_MODULES, getSettings, getBarBackground, migrateCustomFields, saveChatState, saveProfile, deleteProfile, getEffectiveRouterCampaignPrefix, sanitizeCampaignPrefixString, buildNpcInstruction, loadStockPromptsFromProfile, getNpcRelationshipMax, getNpcRelationshipMaxDefault, clampRelationshipValue, relationshipBarPct, getFriendshipTier, getAffectionTier, getRelTierBadgeStyle, getRelTierDetailedStyle, getRelTierDetailedLabelStyle, applyRelTierBadgeElement, sanitizeRouterState, rebuildAllModuleInstructions, adjustAllStoredTemplatesForTimeFormat } from './state-manager.js';
 import { sendStateRequest, fetchOllamaModels, fetchOpenAIModels, testOpenAIConnection, getConnectionProfiles, getCurrentCompletionPreset, setCompletionPreset, syncCombatProfile, resetCombatProfileOverride } from './llm-client.js';
 import { getDiceToolName, getDiceCommandName, getDiceCommandAliases, doDiceRoll, registerDiceFunctionTool, registerDiceSlashCommand, installInterceptor, getNarrativeBlocks, onGenerationStarted, onGenerationEnded, ensureRelTagRegex, resetRouterTick, getRouterTick, resetRouterAutoTick, makeRngQueue, buildRngBlock, RNG_QUEUE_LEN, parseAndApplyNarrativeRelTags } from './narrative-hooks.js';
 import { deduplicateMemo, mergeMemo, computeDelta, escapeHtml, escapeRegex, highlightParens, cleanToolCallMessage, cleanMessageContent, getLastUserAction, buildLorebookContext, buildModulesInstructionText, buildModuleFormatInstruction, parseQuestsFromMemo, syncQuestsFromMemo, syncQuestsToMemo, writeQuestsToMemo, getQuestMood, extractCurrentTimeStr, stripArchivedQuestsFromMemo, stripCompletedQuestsFromMemo, applyQuestSyncAndStripMemo, isArchivedQuestStatus, removeArchivedQuest, parseInWorldTime, formatInWorldTime, sanitizeLorebookRecordContent } from './memo-processor.js';
@@ -13,7 +13,7 @@ import { loadPanelGeometry, loadDeltaHeight, makeDraggable, makeResizableTR, mak
 import { applyCustomTheme, openThemeWizard, refreshSavedThemesList, handleRecolor, undoThemeChange } from './theme-manager.js';
 import { showCharacterRollPanel } from './character-creator.js';
 import { handleCategorySettings, openCustomFieldEditor, openPromptEditor, refreshOrderList, exportModules, importModulesFromJson } from './ui-editors.js';
-import { applyCustomSysprompts, replaceGsSlotMarkers, openGameSystemWizard, openManageGameSystems, openUnlockSectionsMenu, openCustomSyspromptLibrary, resetSyspromptLibrary, runAiSectionBuilder, runManualSectionBuilder, syncAllNarratorTogglesForUnlockState } from './game-systems.js';
+import { openGameSystemWizard, openManageGameSystems, openSystemPromptControlRoom, syncAllNarratorTogglesForUnlockState, extractTopLevelSections, normalizeSectionOrder, getSectionRowDescriptor, transformBaseSectionContent, isBlankSectionContent } from './game-systems.js';
 
 export const RENDERING_TAGS_LIBRARY = [
     'Health: ((BAR)) 50/100',
@@ -8959,9 +8959,6 @@ export async function autoApplySysprompt(force = false) {
         mainTextarea.value = built;
         mainTextarea.dispatchEvent(new Event('blur', { bubbles: true }));
     }
-    // Re-layer any custom/unlocked Game Systems sections so they always survive a full rebuild
-    // triggered by an unrelated settings change (e.g. toggling 24h time).
-    await applyCustomSysprompts();
 }
 
 function scheduleAutoApply() {
@@ -8971,99 +8968,37 @@ function scheduleAutoApply() {
     _autoApplyTimer = setTimeout(() => { _autoApplyTimer = null; autoApplySysprompt(); }, 400);
 }
 
+/**
+ * Assembles the complete final sysprompt in one deterministic pass: extracts the
+ * built-in tags from `rawText`, reconciles them with the System Prompt Control
+ * Room's row order (built-in + custom/unlocked/wizard library entries), then
+ * resolves and joins every enabled row's content in that order. See
+ * normalizeSectionOrder()/getSectionRowDescriptor()/transformBaseSectionContent()
+ * in game-systems.js for the row-level logic this builds on.
+ */
 export function buildSysprompt(rawText) {
     if (!rawText) return "";
     const s = getSettings();
-    const mods = s.syspromptModules || {};
-    const unlockedBaseTags = new Set(
-        (s.customSyspromptLibrary || [])
-            .filter(p => p.origin === 'unlocked_base' && p.baseTag)
-            .map(p => p.baseTag)
-    );
+    const baseSections = extractTopLevelSections(rawText);
+    const baseSectionMap = new Map(baseSections.map(sec => [sec.tag, sec.content]));
+    const order = normalizeSectionOrder(s, baseSections);
 
-    // 1. Tag-based module stripping and Quest mode swap
-    let content = rawText
-        .replace(/<(\w[\w_-]*)>([\s\S]*?)<\/\1>/g, (match, tag) => {
-            if (mods[tag] === false) {
-                // If this tag has been "unlocked" for full customization in Game Systems,
-                // leave a slot marker so applyCustomSysprompts() can reinsert the user's
-                // override at this exact position instead of losing it or appending it elsewhere.
-                return unlockedBaseTags.has(tag) ? `<!--GS_SLOT:${tag}-->` : '';
-            }
-            if (tag === 'relationship_tracking') {
-                if (!s.npcRelationshipBars) return '';
-                return `<relationship_tracking>\n${buildRelationshipTrackingSysprompt(getNpcRelationshipMax(s))}\n</relationship_tracking>`;
-            }
-            if (tag === 'rng_system' && !s.rngEnabled) {
-                const contentOnly = match.replace(/<\/?rng_system>/g, '');
-                let fallbackText = "To resolve actions, simulate a fair d20 roll internally and maintain all ROLL FORMAT rules.\n\n";
-                let matchedFormat = false;
-                if (contentOnly.includes('[ROLL FORMAT]')) {
-                    const rollFormatMatch = contentOnly.match(/(\[ROLL FORMAT\][\s\S]*?)(?=\n\n\[FALLBACK\]|$)/i);
-                    if (rollFormatMatch) {
-                        fallbackText += rollFormatMatch[1].trim();
-                        matchedFormat = true;
-                    }
-                } else {
-                    const l4 = contentOnly.match(/4\.\s*(Output[\s\S]*?)(?=\n\n\[FALLBACK\]|$)/i);
-                    if (l4) {
-                        fallbackText += l4[1].replace(/5\.\s*/g, '').trim();
-                        matchedFormat = true;
-                    }
-                }
-                if (!matchedFormat) {
-                    fallbackText += "Output rolls as `[ROLL: 1d20+Mod vs DC X (Result: Y) -> Outcome]` or `[ROLL: 1d20+Mod (Result: Y) -> Outcome]`.";
-                }
-                return `<rng_system>\n${fallbackText.trim()}\n</rng_system>`;
-            }
-            // Inject correct instructions for quests based on legacy mode
-            if (tag === 'quests') {
-                let instruction = QUESTS_NARRATOR;
-                // Strip Mood guidance if Frustration is off
-                if (!mods.questsFrustration) {
-                    instruction = instruction.replace(/Use the MOOD field.*?\./g, '');
-                }
-                // Strip Difficulty guidance if Difficulty is off
-                if (!mods.questsDifficulty) {
-                    instruction = instruction.replace(/the difficulty \(Very Easy to Very Hard\), /g, '');
-                    instruction = instruction.replace(/Assign an appropriate difficulty \(Very Easy to Very Hard\) based on the narrative stakes\. /g, '');
-                }
-                return `<quests>\n${instruction.trim()}\n</quests>`;
-            }
-            if (tag === 'end_of_output_footer') {
-                let footerContent = match;
-                if (s.use24hTime) {
-                    footerContent = footerContent.replace(/\[HH:MM AM\/PM\]/g, '[HH:MM] (24-hour clock, NO AM/PM)');
-                }
-                if (s.useDdMmYyFormat) {
-                    footerContent = footerContent.replace(/Day\s+\[X\]/g, '[DD/MM/YYYY]');
-                }
-                return footerContent;
-            }
-            return match;
-        });
+    const pieces = order.map(key => {
+        const row = getSectionRowDescriptor(key, s, baseSectionMap);
+        if (!row || !row.enabled) return '';
+        if (row.kind === 'base') {
+            return transformBaseSectionContent(row.tag, row.content, s);
+        }
+        // unlocked / custom / wizard rows already carry their full <tag>...</tag> content.
+        return isBlankSectionContent(row.content) ? '' : row.content;
+    }).filter(Boolean);
 
-    // 2. Inject current module instructions
+    let content = pieces.join('\n\n');
+
+    // Legacy placeholder substitution — kept for backward compatibility with any
+    // custom prompt still using it; current sysprompt.txt no longer contains it.
     const modulesText = buildModulesInstructionText(s);
     content = content.replace("{{modulesText}}", modulesText);
-
-    // 3. Handle Quests Hardcore rules stripping (Narrator guidance)
-    if (!mods.questsDeadlines) {
-        // Strip deadline assignment rule and auto_fail guidance
-        content = content.replace(/- Assign an in-world Deadline.*\n/g, '');
-        content = content.replace(/- Set auto_fail to true for quests.*\n/g, '');
-        content = content.replace(/- If a duration is given.* Day N.*\n/g, '');
-    }
-    if (!mods.questsFrustration) {
-        // Strip frustration coefficient and mood rules
-        content = content.replace(/- Set a frustration_coefficient.*\n/g, '');
-        content = content.replace(/ {2}· 0\.4 = Very patient.*\n/g, '');
-        content = content.replace(/ {2}· 1\.0 = Normal.*\n/g, '');
-        content = content.replace(/ {2}· 3\.0 = Volatile.*\n/g, '');
-        content = content.replace(/- The NPC Mood evolves continuously.*\n/g, '');
-        // Also strip the 'past deadline' override rule — only applies when Frustration is active
-        content = content.replace(/- If a quest is time-sensitive and the deadline passes.*\n/g, '');
-    }
 
     if (!s.rngEnabled) {
         content = content
@@ -9148,7 +9083,7 @@ function tryBindConnectionProfileDropdown(selector, initialProfileId, onProfileI
 
         // --- Version Upgrade Prompt Reset Dialog ---
         {
-            let currentVersion = '3.8.5'; // Fallback
+            let currentVersion = '4.8.0'; // Fallback
             try {
                 const manifestUrl = new URL('./manifest.json', import.meta.url);
                 const response = await fetch(manifestUrl);
@@ -10708,6 +10643,7 @@ RULES:
 - 'tag' (the field ID) must be UPPERCASE, no spaces, use underscores
 - 'tag' (the field ID) must NOT conflict with any of the field tags listed in <existing_fields>
 - NEVER use asterisks (*) anywhere. Do not use them in the tag, prompt, template, or anywhere else. The * symbol is completely BANNED as it breaks rendering. Use ((HIGHLIGHT)) instead if you need emphasis.
+- For comma-separated lists of pills (like ((PILLS)) or ((PILLRED))), place the tag ONLY at the very beginning of the list/line (e.g., 'Status: ((PILLS)) Sleeping, Poisoned'). NEVER repeat the tag on every item in the list (e.g., NEVER write '((PILLS)) Sleeping, ((PILLS)) Poisoned').
 - You are ENCOURAGED to use any of the available rendering tags, even if they are used by other fields
 - icon must be a single emoji
 - prompt should start with 1-3 sentences of clear and specific instructions
@@ -11009,15 +10945,11 @@ RULES:
         });
 
 
-        // ── Game Systems (Wizard / Manage / Unlock / Advanced library tools) ──
+        // ── Game Systems (Wizard / Manage / System Prompt Control Room) ──
         // Heavy logic lives in game-systems.js; these are thin bindings only.
         $('#rpg_tracker_btn_game_system_wizard').on('click', () => openGameSystemWizard());
         $('#rpg_tracker_btn_manage_game_systems').on('click', () => openManageGameSystems());
-        $('#rpg_tracker_btn_unlock_sections').on('click', () => openUnlockSectionsMenu());
-        $('#rpg_tracker_btn_sysprompt_library').on('click', () => openCustomSyspromptLibrary());
-        $('#rpg_tracker_btn_reset_sysprompt_library').on('click', () => resetSyspromptLibrary());
-        $('#rpg_tracker_btn_ai_add_section').on('click', () => runAiSectionBuilder());
-        $('#rpg_tracker_btn_manual_add_section').on('click', () => runManualSectionBuilder());
+        $('#rpg_tracker_btn_control_room').on('click', () => openSystemPromptControlRoom());
 
         $('#rpg_tracker_btn_reset_and_apply_sysprompt').on('click', async function () {
             if (!confirm('This will:\n\n1. Reset the Core State Model prompt to built-in default\n2. Reset all Stock Module prompts, Active Modules, and Module Order to factory defaults\n3. Reset all Lorebook Agent prompts and World Progression prompts to factory defaults\n4. Fetch the latest sysprompt.txt and write it directly into your Quick Prompt "Main" box\n5. Automatically re-enable any custom sysprompt sections that were already enabled\n\nYour custom modules will NOT be affected. Proceed?')) return;
@@ -11092,6 +11024,8 @@ RULES:
                 return;
             }
 
+            // buildSysprompt() already assembles the complete final prompt — base sections
+            // plus every enabled custom/unlocked/wizard section, in Control Room order.
             content = buildSysprompt(content);
 
             const mainTextarea = /** @type {HTMLTextAreaElement} */ (document.getElementById('main_prompt_quick_edit_textarea'));
@@ -11100,41 +11034,8 @@ RULES:
                 // Fire blur to trigger ST's handleQuickEditSave listener
                 mainTextarea.dispatchEvent(new Event('blur', { bubbles: true }));
 
-                // 5. Automatically re-apply any custom sysprompt library sections that were already enabled
-                await applyCustomSysprompts();
-
                 toastr['success']('All prompts reset & Main sysprompt applied! \u2705', 'RPG Tracker');
             } else {
-                // 5. Automatically re-apply any custom sysprompt library sections that were already enabled
-                // (unlocked-base overrides are reinserted at their original GS_SLOT position first).
-                content = replaceGsSlotMarkers(content, finalSettings);
-
-                const enabledPrompts = (finalSettings.customSyspromptLibrary || []).filter(p => {
-                    if (p.origin === 'unlocked_base') return false;
-                    if (!p.enabled || !p.content) return false;
-                    const trimmed = p.content.trim();
-                    if (!trimmed) return false;
-                    const emptyTagMatch = trimmed.match(/^<(\w+[\w_-]*)>\s*<\/\1>$/);
-                    if (emptyTagMatch) return false;
-                    return true;
-                });
-
-                const newInjection = enabledPrompts.length > 0
-                    ? enabledPrompts.map(p => p.content).join('\n\n')
-                    : '';
-
-                if (newInjection) {
-                    if (content.includes('<constraints>')) {
-                        content = content.replace('<constraints>', `${newInjection}\n\n<constraints>`);
-                    } else {
-                        content = content.trim() + '\n\n' + newInjection;
-                    }
-                    content = content.replace(/\n{3,}/g, '\n\n').trim();
-
-                    finalSettings._customLibraryLastInjection = newInjection;
-                    saveSettings();
-                }
-
                 // Fallback: ST might not be in OpenAI mode, so the quick-edit textarea may not exist.
                 // Copy to clipboard as a graceful fallback.
                 const ta = document.createElement('textarea');

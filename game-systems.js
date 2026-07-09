@@ -12,18 +12,50 @@
 //                              intact.
 // ─────────────────────────────────────────────────────────────────────────
 
-import { getSettings } from './state-manager.js';
+import { getSettings, getNpcRelationshipMax, buildRelationshipTrackingSysprompt } from './state-manager.js';
 import { sendStateRequest } from './llm-client.js';
 import { escapeHtml } from './memo-processor.js';
 import { refreshOrderList } from './ui-editors.js';
+import { QUESTS_NARRATOR, DEFAULT_STOCK_PROMPTS, resolveTimePromptKey } from './constants.js';
+import { getSortableDelay } from '../../../utils.js';
+import { POPUP_RESULT } from '../../../popup.js';
 import {
     RENDERING_TAGS_LIBRARY,
     saveSettings,
     refreshRenderedView,
-    buildSysprompt,
     autoApplySysprompt,
     fetchBaseSyspromptRaw,
 } from './index.js';
+
+/** @typedef {{ deferPersistence?: boolean }} SyspromptPersistOptions */
+
+async function persistSyspromptChanges(deferPersistence) {
+    if (deferPersistence) return;
+    saveSettings();
+    await autoApplySysprompt(true);
+}
+
+function snapshotControlRoomSettings(settings) {
+    return {
+        syspromptSectionOrder: JSON.parse(JSON.stringify(settings.syspromptSectionOrder || [])),
+        syspromptModules: JSON.parse(JSON.stringify(settings.syspromptModules || {})),
+        npcRelationshipBars: settings.npcRelationshipBars,
+        customSyspromptLibrary: JSON.parse(JSON.stringify(settings.customSyspromptLibrary || [])),
+        gameSystems: JSON.parse(JSON.stringify(settings.gameSystems || [])),
+        customFields: JSON.parse(JSON.stringify(settings.customFields || [])),
+        blockOrder: JSON.parse(JSON.stringify(settings.blockOrder || [])),
+    };
+}
+
+function restoreControlRoomSettings(settings, snapshot) {
+    settings.syspromptSectionOrder = snapshot.syspromptSectionOrder;
+    settings.syspromptModules = snapshot.syspromptModules;
+    settings.npcRelationshipBars = snapshot.npcRelationshipBars;
+    settings.customSyspromptLibrary = snapshot.customSyspromptLibrary;
+    settings.gameSystems = snapshot.gameSystems;
+    settings.customFields = snapshot.customFields;
+    settings.blockOrder = snapshot.blockOrder;
+}
 
 /** Popup sizing for content-heavy Game Systems dialogs (90% screen, scrollable). */
 const GS_POPUP_LARGE = { wide: true, large: true, allowVerticalScrolling: true };
@@ -110,126 +142,295 @@ export function extractTopLevelSections(rawText) {
     const re = /<(\w[\w_-]*)>([\s\S]*?)<\/\1>/g;
     let m;
     while ((m = re.exec(rawText || ''))) {
-        sections.push({ tag: m[1], content: m[2] });
+        sections.push({ tag: m[1], content: m[2].trim() });
     }
     return sections;
 }
 
 function buildExistingTagsContext(settings) {
-    const gmTags = (settings.customSyspromptLibrary || []).map(p => `<${p.tag}>`).join(', ') || '(none)';
-    const trackerTags = (settings.customFields || []).map(f => `[${f.tag.toUpperCase()}]`).join(', ') || '(none)';
-    return `Existing GM section tags: ${gmTags}\nExisting tracker module tags: ${trackerTags}`;
-}
+    let context = "=== ACTIVE / ENABLED SYSTEMS & TRACKING FIELDS ===\n\n";
 
-// ─────────────────────────────────────────────────────────────────────────
-// Custom Sysprompt Library — apply-to-prompt pipeline (moved from index.js)
-// ─────────────────────────────────────────────────────────────────────────
-
-function isUsableLibraryItem(p) {
-    if (!p.enabled || !p.content) return false;
-    const trimmed = p.content.trim();
-    if (!trimmed) return false;
-    // Skip if content is just empty XML tags (e.g. <custom_section>\n\n</custom_section>)
-    const emptyTagMatch = trimmed.match(/^<(\w+[\w_-]*)>\s*<\/\1>$/);
-    if (emptyTagMatch) return false;
-    return true;
-}
-
-/**
- * One-shot replacement of <!--GS_SLOT:tag--> markers in a content string with
- * their matching enabled "unlocked_base" override (or '' if none/disabled).
- * Used both by applyCustomSysprompts() below and by index.js's clipboard-copy
- * fallback path (when the ST quick-edit textarea isn't available).
- */
-export function replaceGsSlotMarkers(content, settings) {
-    const library = settings.customSyspromptLibrary || [];
-    return (content || '').replace(/<!--GS_SLOT:([\w-]+)-->/g, (_match, tag) => {
-        const override = library.find(p => p.origin === 'unlocked_base' && p.baseTag === tag && isUsableLibraryItem(p));
-        return override ? override.content : '';
+    // 1. Stock Modules
+    const BLOCK_ORDER = ['CHARACTER', 'PARTY', 'COMBAT', 'INVENTORY', 'ABILITIES', 'SPELLS', 'XP', 'TIME', 'QUESTS'];
+    BLOCK_ORDER.forEach(tag => {
+        if (tag === 'QUESTS' && settings.syspromptModules?.quests === false) return;
+        if (!settings.modules || settings.modules[tag] !== false) {
+            const modLower = tag === 'TIME' ? resolveTimePromptKey(settings) : tag.toLowerCase();
+            const promptContent = (settings.stockPrompts && settings.stockPrompts[modLower]) 
+                ? settings.stockPrompts[modLower] 
+                : DEFAULT_STOCK_PROMPTS[modLower] || '';
+            context += `[${tag}] (Stock Module)\nPrompt:\n${promptContent}\n\n`;
+        }
     });
-}
 
-/**
- * Layers all enabled Custom Sysprompt Library content into the ST main prompt
- * quick-edit textarea. Two kinds of entries are handled differently:
- *  - `origin: 'unlocked_base'` overrides are reinserted at their original
- *    position via the <!--GS_SLOT:tag--> marker left by buildSysprompt().
- *  - Everything else (manual/AI/wizard additions with brand-new tags) is
- *    appended as a block right before <constraints>, as before.
- */
-export async function applyCustomSysprompts() {
-    const settings = getSettings();
-    const mainTextarea = /** @type {HTMLTextAreaElement} */ (document.getElementById('main_prompt_quick_edit_textarea'));
-    if (!mainTextarea) {
-        toastr['warning']('Quick-edit textarea not found. Open the ST prompt editor first.', 'RPG Tracker');
-        return false;
-    }
-
-    const library = settings.customSyspromptLibrary || [];
-    const slotOverrides = library.filter(p => p.origin === 'unlocked_base' && isUsableLibraryItem(p));
-    const newSections = library.filter(p => p.origin !== 'unlocked_base' && isUsableLibraryItem(p));
-
-    const newInjection = newSections.length > 0
-        ? newSections.map(p => p.content).join('\n\n')
-        : '';
-
-    let currentContent = mainTextarea.value;
-
-    // ── 1. Reinsert unlocked-base overrides at their original position ──
-    const gsSlotLast = settings._gsSlotLastInjections || {};
-    const gsSlotNext = {};
-    const trackedBaseTags = new Set([
-        ...library.filter(p => p.origin === 'unlocked_base').map(p => p.baseTag),
-        ...Object.keys(gsSlotLast),
-    ]);
-    trackedBaseTags.forEach(tag => {
-        const override = slotOverrides.find(p => p.baseTag === tag);
-        const desired = override ? override.content : '';
-        const marker = `<!--GS_SLOT:${tag}-->`;
-        if (currentContent.includes(marker)) {
-            // Fresh rebuild (e.g. from autoApplySysprompt) — marker is present, fill it directly.
-            currentContent = currentContent.replace(marker, desired);
-        } else {
-            const prevInjected = gsSlotLast[tag] || '';
-            if (prevInjected) {
-                // Marker already replaced previously — swap the old injected text for the new one.
-                const escaped = prevInjected.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                currentContent = currentContent.replace(new RegExp(escaped), desired);
+    // 2. Custom Fields / Tracker Modules
+    if (settings.customFields && settings.customFields.length > 0) {
+        settings.customFields.forEach(f => {
+            if (!settings.modules || settings.modules[f.tag.toUpperCase()] !== false) {
+                context += `[${f.tag.toUpperCase()}] (Custom Tracker Module: ${f.label})\nPrompt:\n${f.prompt}\nTemplate:\n${f.template}\n\n`;
             }
-        }
-        if (desired) gsSlotNext[tag] = desired;
-    });
-    settings._gsSlotLastInjections = gsSlotNext;
-
-    // ── 2. Append brand-new sections before <constraints> (existing behavior) ──
-    // Remove the previously-injected block by exact string match (no markers in textarea).
-    // Also clean up any legacy injections that used the old HTML-comment sentinel format.
-    const legacyBlockRegex = /<!-- RT_CUSTOM_LIBRARY_START -->[\s\S]*?<!-- RT_CUSTOM_LIBRARY_END -->\n*/g;
-    currentContent = currentContent.replace(legacyBlockRegex, '');
-
-    const lastInjection = settings._customLibraryLastInjection || '';
-    if (lastInjection) {
-        // Escape for use in a RegExp to do an exact literal removal
-        const escaped = lastInjection.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        currentContent = currentContent.replace(new RegExp(`\\n{0,2}${escaped}\\n{0,2}`, 'g'), '\n\n');
+        });
     }
 
-    if (newInjection) {
-        // Insert raw sections (no markers) — the AI sees clean XML only.
-        if (currentContent.includes('<constraints>')) {
-            currentContent = currentContent.replace('<constraints>', `${newInjection}\n\n<constraints>`);
+    // 3. Custom GM Sections
+    if (settings.customSyspromptLibrary && settings.customSyspromptLibrary.length > 0) {
+        settings.customSyspromptLibrary.forEach(p => {
+            if (!isBlankSectionContent(p.content)) {
+                context += `<${p.tag}> (Custom GM/Narrator Section)\nInstructions:\n${p.content}\n\n`;
+            }
+        });
+    }
+
+    return context.trim();
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// System Prompt Control Room — ordering + row-resolution helpers.
+//
+// Every top-level sysprompt section (built-in or custom) is addressed by a
+// stable string key: "base:<tag>" for one of the fixed sysprompt.txt tags,
+// or "lib:<id>" for a customSyspromptLibrary entry. settings.syspromptSectionOrder
+// holds the canonical render order of these keys; index.js's buildSysprompt()
+// walks that order and resolves each key via getSectionRowDescriptor() below
+// to assemble the final prompt in one deterministic pass.
+// ─────────────────────────────────────────────────────────────────────────
+
+/** True if `content` is empty or just an empty XML wrapper (e.g. <tag>\n\n</tag>). */
+export function isBlankSectionContent(content) {
+    const trimmed = (content || '').trim();
+    if (!trimmed) return true;
+    return /^<(\w+[\w_-]*)>\s*<\/\1>$/.test(trimmed);
+}
+
+/** Narrator Configuration tags whose enabled-state doubles as a base sysprompt toggle. */
+const KNOWN_TOGGLE_DEFAULTS = { loot: true, random_events: true, resting: true, quests: true };
+
+/** Checkbox ids from the Narrator Configuration panel, keyed by base sysprompt tag. */
+const NARRATOR_TOGGLE_IDS = {
+    loot: 'rpg_sysprompt_mod_loot',
+    random_events: 'rpg_sysprompt_mod_random_events',
+    resting: 'rpg_sysprompt_mod_resting',
+    quests: 'rpg_sysprompt_mod_quests',
+    relationship_tracking: 'rpg_sysprompt_mod_npc_rel_bars',
+};
+
+export function isSectionUnlocked(settings, tag) {
+    return (settings.customSyspromptLibrary || []).some(p => p.origin === 'unlocked_base' && p.baseTag === tag);
+}
+
+/** Whether a built-in (non-unlocked) base section is currently enabled. */
+export function isBaseSectionEnabled(tag, settings) {
+    if (tag === 'relationship_tracking') return !!settings.npcRelationshipBars;
+    const mods = settings.syspromptModules || {};
+    return mods[tag] !== false;
+}
+
+/** Enables/disables a built-in base section and keeps the Narrator Configuration UI in sync. */
+export function setBaseSectionEnabled(tag, enabled, settings) {
+    if (tag === 'relationship_tracking') {
+        settings.npcRelationshipBars = enabled;
+    } else {
+        if (!settings.syspromptModules) settings.syspromptModules = {};
+        settings.syspromptModules[tag] = enabled;
+    }
+    syncNarratorToggleUi(tag, settings);
+}
+
+/** Pushes current enabled + unlocked/disabled state into a Narrator Configuration checkbox, if one exists for this tag. */
+function syncNarratorToggleUi(tag, settings) {
+    const id = NARRATOR_TOGGLE_IDS[tag];
+    if (!id) return;
+    const el = /** @type {HTMLInputElement} */ (document.getElementById(id));
+    if (!el) return;
+    const unlocked = isSectionUnlocked(settings, tag);
+    el.checked = isBaseSectionEnabled(tag, settings);
+    el.disabled = unlocked;
+    const label = el.closest('label');
+    if (label) label.title = unlocked ? 'Managed in Game Systems (unlocked) — edit it there instead.' : '';
+}
+
+/**
+ * Syncs every Narrator Configuration checkbox against current settings — disabling
+ * ones whose section is unlocked, and reflecting current enabled state for the rest.
+ * Call once on settings init, and after any Control Room enable/unlock/re-lock change.
+ */
+export function syncAllNarratorTogglesForUnlockState() {
+    const settings = getSettings();
+    Object.keys(NARRATOR_TOGGLE_IDS).forEach(tag => syncNarratorToggleUi(tag, settings));
+}
+
+/**
+ * Applies the built-in per-tag content transform (relationship_tracking swap,
+ * rng_system disabled-fallback text, quests instruction/hardcore-mode stripping,
+ * footer time-format) to one base section in isolation. Returns the full
+ * `<tag>...</tag>` block, or '' if the transform determines it should be omitted.
+ */
+export function transformBaseSectionContent(tag, innerContent, settings) {
+    const mods = settings.syspromptModules || {};
+
+    if (tag === 'relationship_tracking') {
+        if (!settings.npcRelationshipBars) return '';
+        return `<relationship_tracking>\n${buildRelationshipTrackingSysprompt(getNpcRelationshipMax(settings))}\n</relationship_tracking>`;
+    }
+
+    if (tag === 'rng_system' && !settings.rngEnabled) {
+        let fallbackText = "To resolve actions, simulate a fair d20 roll internally and maintain all ROLL FORMAT rules.\n\n";
+        let matchedFormat = false;
+        if (innerContent.includes('[ROLL FORMAT]')) {
+            const rollFormatMatch = innerContent.match(/(\[ROLL FORMAT\][\s\S]*?)(?=\n\n\[FALLBACK\]|$)/i);
+            if (rollFormatMatch) { fallbackText += rollFormatMatch[1].trim(); matchedFormat = true; }
         } else {
-            currentContent = currentContent.trim() + '\n\n' + newInjection;
+            const l4 = innerContent.match(/4\.\s*(Output[\s\S]*?)(?=\n\n\[FALLBACK\]|$)/i);
+            if (l4) { fallbackText += l4[1].replace(/5\.\s*/g, '').trim(); matchedFormat = true; }
+        }
+        if (!matchedFormat) {
+            fallbackText += "Output rolls as `[ROLL: 1d20+Mod vs DC X (Result: Y) -> Outcome]` or `[ROLL: 1d20+Mod (Result: Y) -> Outcome]`.";
+        }
+        return `<rng_system>\n${fallbackText.trim()}\n</rng_system>`;
+    }
+
+    if (tag === 'quests') {
+        let instruction = QUESTS_NARRATOR;
+        if (!mods.questsFrustration) {
+            instruction = instruction.replace(/Use the MOOD field.*?\./g, '');
+        }
+        if (!mods.questsDifficulty) {
+            instruction = instruction.replace(/the difficulty \(Very Easy to Very Hard\), /g, '');
+            instruction = instruction.replace(/Assign an appropriate difficulty \(Very Easy to Very Hard\) based on the narrative stakes\. /g, '');
+        }
+        let result = `<quests>\n${instruction.trim()}\n</quests>`;
+        if (!mods.questsDeadlines) {
+            result = result.replace(/- Assign an in-world Deadline.*\n/g, '');
+            result = result.replace(/- Set auto_fail to true for quests.*\n/g, '');
+            result = result.replace(/- If a duration is given.* Day N.*\n/g, '');
+        }
+        if (!mods.questsFrustration) {
+            result = result.replace(/- Set a frustration_coefficient.*\n/g, '');
+            result = result.replace(/ {2}· 0\.4 = Very patient.*\n/g, '');
+            result = result.replace(/ {2}· 1\.0 = Normal.*\n/g, '');
+            result = result.replace(/ {2}· 3\.0 = Volatile.*\n/g, '');
+            result = result.replace(/- The NPC Mood evolves continuously.*\n/g, '');
+            result = result.replace(/- If a quest is time-sensitive and the deadline passes.*\n/g, '');
+        }
+        return result;
+    }
+
+    if (tag === 'end_of_output_footer') {
+        let footerContent = `<end_of_output_footer>\n${innerContent.trim()}\n</end_of_output_footer>`;
+        if (settings.use24hTime) {
+            footerContent = footerContent.replace(/\[HH:MM AM\/PM\]/g, '[HH:MM] (24-hour clock, NO AM/PM)');
+        }
+        if (settings.useDdMmYyFormat) {
+            footerContent = footerContent.replace(/Day\s+\[X\]/g, '[DD/MM/YYYY]');
+        }
+        return footerContent;
+    }
+
+    return `<${tag}>\n${innerContent.trim()}\n</${tag}>`;
+}
+
+/**
+ * Reconciles settings.syspromptSectionOrder against the live set of base tags and
+ * orderable library entries (everything except unlocked_base overrides, which ride
+ * along on their base:<tag> slot instead of getting their own order entry). Drops
+ * stale keys, appends missing base tags defensively, and inserts any new library
+ * entries right before base:constraints (matching the legacy "append before
+ * <constraints>" behavior) or at the end if there's no constraints row.
+ * Mutates + returns settings.syspromptSectionOrder.
+ * @param {object} settings
+ * @param {{tag:string, content:string}[]} baseSections - from extractTopLevelSections()
+ * @returns {string[]}
+ */
+export function normalizeSectionOrder(settings, baseSections) {
+    if (!Array.isArray(settings.syspromptSectionOrder)) settings.syspromptSectionOrder = [];
+    const library = settings.customSyspromptLibrary || [];
+    const orderableLibKeys = new Set(library.filter(p => p.origin !== 'unlocked_base').map(p => `lib:${p.id}`));
+    const baseKeys = baseSections.map(s => `base:${s.tag}`);
+    const baseKeySet = new Set(baseKeys);
+
+    let order = settings.syspromptSectionOrder.filter(key => {
+        if (key.startsWith('base:')) return baseKeySet.has(key);
+        if (key.startsWith('lib:')) return orderableLibKeys.has(key);
+        return false;
+    });
+
+    baseKeys.forEach(key => { if (!order.includes(key)) order.push(key); });
+
+    const newLibKeys = [...orderableLibKeys].filter(key => !order.includes(key));
+    if (newLibKeys.length) {
+        const constraintsIdx = order.indexOf('base:constraints');
+        if (constraintsIdx === -1) {
+            order.push(...newLibKeys);
+        } else {
+            order.splice(constraintsIdx, 0, ...newLibKeys);
         }
     }
 
-    // Remember what we injected so next apply can remove it precisely.
-    settings._customLibraryLastInjection = newInjection;
-    saveSettings();
+    settings.syspromptSectionOrder = order;
+    return order;
+}
 
-    mainTextarea.value = currentContent.replace(/\n{3,}/g, '\n\n').trim();
-    mainTextarea.dispatchEvent(new Event('blur', { bubbles: true }));
-    return true;
+/**
+ * Resolves one order key into a display/action descriptor used by both the
+ * Control Room UI and buildSysprompt()'s final assembly.
+ * @param {string} key - "base:<tag>" or "lib:<id>"
+ * @param {object} settings
+ * @param {Map<string,string>} baseSectionMap - tag -> raw inner content, from extractTopLevelSections()
+ * @returns {null|{key:string, kind:'base'|'unlocked'|'custom'|'wizard', tag:string, libId:(string|null), gameSystemId:(string|null), label:string, description:string, enabled:boolean, content:string}}
+ */
+export function getSectionRowDescriptor(key, settings, baseSectionMap) {
+    const library = settings.customSyspromptLibrary || [];
+    if (key.startsWith('base:')) {
+        const tag = key.slice(5);
+        const override = library.find(p => p.origin === 'unlocked_base' && p.baseTag === tag);
+        if (override) {
+            return {
+                key, kind: 'unlocked', tag,
+                libId: override.id,
+                gameSystemId: null,
+                label: `<${tag}>`,
+                description: override.description || `Unlocked override of <${tag}>`,
+                enabled: !!override.enabled,
+                content: override.content,
+            };
+        }
+        return {
+            key, kind: 'base', tag,
+            libId: null,
+            gameSystemId: null,
+            label: `<${tag}>`,
+            description: '',
+            enabled: isBaseSectionEnabled(tag, settings),
+            content: baseSectionMap.get(tag) ?? '',
+        };
+    }
+
+    const id = key.slice(4);
+    const item = library.find(p => p.id === id);
+    if (!item) return null;
+    if (item.origin === 'wizard') {
+        const gs = (settings.gameSystems || []).find(g => g.syspromptLibraryId === id);
+        return {
+            key, kind: 'wizard', tag: item.tag,
+            libId: item.id,
+            gameSystemId: gs?.id || null,
+            icon: item.icon,
+            label: `<${item.tag}>`,
+            description: item.description || '',
+            enabled: !!item.enabled,
+            content: item.content,
+        };
+    }
+    return {
+        key, kind: 'custom', tag: item.tag,
+        libId: item.id,
+        gameSystemId: null,
+        icon: item.icon,
+        label: `<${item.tag}>`,
+        description: item.description || 'Custom Section',
+        enabled: !!item.enabled,
+        content: item.content,
+    };
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -407,171 +608,30 @@ export async function showSectionEditor({ mode = 'manual', tag = '', description
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// Advanced tools (moved from index.js): raw Custom Sysprompt Library,
-// AI/Manual single-section builders — kept for power users who want a
-// GM-only section with no bundle/tracker.
+// Advanced tools (moved from index.js): AI/Manual single-section builders,
+// used by the System Prompt Control Room toolbar. Their raw library-list
+// popup was absorbed into the Control Room itself.
 // ─────────────────────────────────────────────────────────────────────────
 
-export async function openCustomSyspromptLibrary() {
-    const { Popup } = SillyTavern.getContext();
+/**
+ * Removes all plain AI/manually-added custom sections (leaving Game System
+ * Wizard bundles and Unlocked Base Sections untouched) and resets the
+ * section order so it re-seeds from scratch on next build.
+ */
+export async function resetSyspromptLibrary(options = {}) {
+    const { deferPersistence = false } = options;
+    if (!confirm('This will remove all AI-generated / manually-added custom sections (Game Systems and Unlocked Sections are left untouched) and restore the default section order. Proceed?')) return;
     const settings = getSettings();
-
-    if (!settings.customSyspromptLibrary) {
-        settings.customSyspromptLibrary = [];
-    }
-
-    // Function to generate the HTML for the library list
-    const generateListHtml = () => {
-        if (settings.customSyspromptLibrary.length === 0) {
-            return `<div style="text-align:center; padding:30px; opacity:0.5; font-style:italic;">Library is empty. Use AI Builder or Add Manually to create sections.</div>`;
-        }
-
-        let listHtml = '<div style="display:flex; flex-direction:column; gap:8px;">';
-        settings.customSyspromptLibrary.forEach((item, index) => {
-            const originBadge = item.origin === 'unlocked_base'
-                ? `<span style="font-size:9px; padding:1px 5px; border-radius:3px; background:rgba(255,180,60,0.2); color:#ffb43c; margin-left:6px;" title="Override of a built-in sysprompt section">UNLOCKED</span>`
-                : (item.origin === 'wizard' ? `<span style="font-size:9px; padding:1px 5px; border-radius:3px; background:rgba(180,100,255,0.2); color:#c9a0ff; margin-left:6px;" title="Created via Game System Wizard">WIZARD</span>` : '');
-            listHtml += `
-                <div class="rt-library-item" data-index="${index}" style="display:flex; flex-direction:column; border:1px solid rgba(255,255,255,0.1); border-radius:6px; background:rgba(0,0,0,0.2); padding:10px; transition:border-color 0.2s;">
-                    <div style="display:flex; align-items:center; gap:10px;">
-                        <div style="font-size:16px; width:24px; text-align:center; color:var(--rt-accent, #5588ff);"><i class="fa-solid ${item.icon || 'fa-puzzle-piece'}"></i></div>
-                        <div style="flex:1; min-width:0;">
-                            <div style="font-weight:bold; font-size:13px; color:#ffdd88;">&lt;${escapeHtml(item.tag)}&gt;${originBadge}</div>
-                            <div style="font-size:11px; opacity:0.7; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(item.description || 'Custom Section')}</div>
-                        </div>
-                        <div style="display:flex; align-items:center; gap:6px;">
-                            <label class="checkbox_label" style="margin:0; font-size:11px;">
-                                <input type="checkbox" class="rt-lib-toggle" data-index="${index}" ${item.enabled ? 'checked' : ''}>
-                                <span>Enable</span>
-                            </label>
-                            <button class="rt-lib-edit" data-index="${index}" style="background:none; border:none; color:#88bbff; cursor:pointer; padding:4px;" title="Edit Section"><i class="fa-solid fa-pen-to-square"></i></button>
-                            <button class="rt-lib-delete" data-index="${index}" style="background:none; border:none; color:#ff5555; cursor:pointer; padding:4px;" title="Delete Section"><i class="fa-solid fa-trash-can"></i></button>
-                        </div>
-                    </div>
-                </div>
-            `;
-        });
-        listHtml += '</div>';
-        return listHtml;
-    };
-
-    let html = `
-        <div id="rt-library-container" style="display:flex; flex-direction:column; gap:12px; width:100%; box-sizing:border-box; max-height:85vh;">
-            <div style="display:flex; align-items:center; justify-content:space-between;">
-                <div style="font-size:11px; opacity:0.8; line-height:1.4;">Manage your custom system prompt sections. Enabling a section injects it into your main prompt when you click Apply. Sections created by the Game System Wizard or Unlock Base Sections are best managed from their own menus.</div>
-                <button id="rt_lib_btn_add_manual" class="menu_button interactable" style="white-space:nowrap; margin-left:10px; background:rgba(80,180,120,0.15); border-color:rgba(80,180,120,0.4); font-size:11px; padding:4px 8px;">
-                    <i class="fa-solid fa-plus"></i> Add Manually
-                </button>
-            </div>
-            <div id="rt-library-list-wrap" style="overflow-y:auto; padding-right:10px; flex:1;">
-                ${generateListHtml()}
-            </div>
-        </div>
-    `;
-
-    // Wait for DOM to attach
-    setTimeout(() => {
-        const container = document.getElementById('rt-library-container');
-        if (!container) return;
-
-        const bindEvents = () => {
-            const wrap = document.getElementById('rt-library-list-wrap');
-            if (!wrap) return;
-
-            // Toggle Checkbox
-            wrap.querySelectorAll('.rt-lib-toggle').forEach(el => {
-                el.addEventListener('change', (e) => {
-                    const idx = parseInt(e.target.dataset.index);
-                    settings.customSyspromptLibrary[idx].enabled = e.target.checked;
-                    saveSettings();
-                });
-            });
-
-            // Edit Button
-            wrap.querySelectorAll('.rt-lib-edit').forEach(el => {
-                el.addEventListener('click', async (e) => {
-                    const idx = parseInt(e.currentTarget.dataset.index);
-                    const item = settings.customSyspromptLibrary[idx];
-                    const result = await showSectionEditor({
-                        mode: 'edit',
-                        tag: item.tag,
-                        description: item.description || '',
-                        content: item.content,
-                    });
-                    if (!result) return;
-                    settings.customSyspromptLibrary[idx].tag = result.tag;
-                    settings.customSyspromptLibrary[idx].description = result.description;
-                    settings.customSyspromptLibrary[idx].content = result.content;
-                    saveSettings();
-                    wrap.innerHTML = generateListHtml();
-                    bindEvents();
-                });
-            });
-
-            // Delete Button
-            wrap.querySelectorAll('.rt-lib-delete').forEach(el => {
-                el.addEventListener('click', async (e) => {
-                    if (!confirm('Delete this custom section permanently?')) return;
-                    const idx = parseInt(e.currentTarget.dataset.index);
-                    settings.customSyspromptLibrary.splice(idx, 1);
-                    saveSettings();
-                    wrap.innerHTML = generateListHtml();
-                    bindEvents();
-                });
-            });
-        };
-        bindEvents();
-
-        // Add Manually button inside library
-        const addManualBtn = document.getElementById('rt_lib_btn_add_manual');
-        if (addManualBtn) {
-            addManualBtn.addEventListener('click', async () => {
-                const result = await showSectionEditor({ mode: 'manual' });
-                if (!result) return;
-                const newItem = {
-                    id: Date.now().toString(),
-                    tag: result.tag,
-                    content: result.content,
-                    enabled: result.saveMode === 'apply',
-                    icon: 'fa-pen-to-square',
-                    description: result.description || 'Custom Section',
-                };
-                settings.customSyspromptLibrary.push(newItem);
-                saveSettings();
-                const wrap = document.getElementById('rt-library-list-wrap');
-                if (wrap) { wrap.innerHTML = generateListHtml(); bindEvents(); }
-                if (result.saveMode === 'apply') {
-                    await applyCustomSysprompts();
-                    toastr['success']('Saved to Library & Applied to Sysprompt! ✅', 'Section Builder');
-                } else {
-                    toastr['success']('Saved to Library! ✅', 'Section Builder');
-                }
-            });
-        }
-    }, 100);
-
-    const approved = await Popup.show.confirm('📚 Custom Sysprompt Library', html, { okButton: 'Apply Enabled Prompts', cancelButton: 'Close', ...GS_POPUP_LARGE });
-    if (approved) {
-        const success = await applyCustomSysprompts();
-        if (success) {
-            toastr['success']('Library prompts applied to Sysprompt! \u2705', 'Sysprompt Library');
-        }
+    settings.customSyspromptLibrary = (settings.customSyspromptLibrary || []).filter(p => p.origin === 'unlocked_base' || p.origin === 'wizard');
+    settings.syspromptSectionOrder = [];
+    await persistSyspromptChanges(deferPersistence);
+    if (!deferPersistence) {
+        toastr['success']('Custom sections cleared & section order reset to defaults! 🔄', 'System Prompt Control Room');
     }
 }
 
-export async function resetSyspromptLibrary() {
-    if (!confirm('This will disable all custom sections in your Sysprompt Library and restore the D&D system prompt to its clean defaults. Proceed?')) return;
-    const settings = getSettings();
-    if (settings.customSyspromptLibrary) {
-        settings.customSyspromptLibrary.forEach(p => p.enabled = false);
-    }
-    settings._customLibraryLastInjection = '';
-    saveSettings();
-    await autoApplySysprompt();
-    toastr['success']('All library sections disabled & Sysprompt reset to defaults! 🔄', 'Sysprompt Editor');
-}
-
-export async function runAiSectionBuilder() {
+export async function runAiSectionBuilder(options = {}) {
+    const { deferPersistence = false } = options;
     const settings = getSettings();
 
     const buildAiPrompt = (desc) =>
@@ -645,13 +705,14 @@ export async function runAiSectionBuilder() {
 
         settings.customSyspromptLibrary = settings.customSyspromptLibrary || [];
         settings.customSyspromptLibrary.push(newItem);
-        saveSettings();
+        await persistSyspromptChanges(deferPersistence);
 
-        if (result.saveMode === 'apply') {
-            const success = await applyCustomSysprompts();
-            if (success) toastr['success']('Saved to Library & Applied to Sysprompt! \u2705', 'AI Section Builder');
-        } else {
-            toastr['success']('Saved to Library! \u2705', 'AI Section Builder');
+        if (!deferPersistence) {
+            if (result.saveMode === 'apply') {
+                toastr['success']('Saved to Library & Applied to Sysprompt! \u2705', 'AI Section Builder');
+            } else {
+                toastr['success']('Saved to Library! \u2705', 'AI Section Builder');
+            }
         }
     } catch (err) {
         console.error('[RPG Tracker] AI Section Builder error:', err);
@@ -659,7 +720,8 @@ export async function runAiSectionBuilder() {
     }
 }
 
-export async function runManualSectionBuilder() {
+export async function runManualSectionBuilder(options = {}) {
+    const { deferPersistence = false } = options;
     const settings = getSettings();
     const result = await showSectionEditor({ mode: 'manual' });
     if (!result) return;
@@ -675,13 +737,14 @@ export async function runManualSectionBuilder() {
 
     settings.customSyspromptLibrary = settings.customSyspromptLibrary || [];
     settings.customSyspromptLibrary.push(newItem);
-    saveSettings();
+    await persistSyspromptChanges(deferPersistence);
 
-    if (result.saveMode === 'apply') {
-        const success = await applyCustomSysprompts();
-        if (success) toastr['success']('Saved to Library & Applied to Sysprompt! \u2705', 'Section Builder');
-    } else {
-        toastr['success']('Saved to Library! \u2705', 'Section Builder');
+    if (!deferPersistence) {
+        if (result.saveMode === 'apply') {
+            toastr['success']('Saved to Library & Applied to Sysprompt! \u2705', 'Section Builder');
+        } else {
+            toastr['success']('Saved to Library! \u2705', 'Section Builder');
+        }
     }
 }
 
@@ -690,7 +753,7 @@ export async function runManualSectionBuilder() {
 // ─────────────────────────────────────────────────────────────────────────
 
 function buildWizardSystemPrompt() {
-    const renderingHints = RENDERING_TAGS_LIBRARY.slice(0, 12).join('\n  - ');
+    const renderingHints = RENDERING_TAGS_LIBRARY.join('\n  - ');
     return `You are a game-system architect for a D&D-style tabletop RPG framework. The user will describe ONE mechanic/system in plain language (e.g. "radiation zones", "a faction reputation system", "hunger and thirst"). You must design BOTH halves of it and return ONLY the tags below — no explanation, no markdown fences, no other text.
 
 ═══════════════════════════════════════════════════════════════════════════
@@ -713,6 +776,11 @@ When defining how items, actions, or events affect a meter (either via passive t
   - Moderate (e.g. +150 to +250): Light meals, a full drink from a waterskin, completing a standard task.
   - Major (e.g. +300 to +500): A hot feast, a full day's water supply, a major heroic achievement.
 - Provide at least 3 distinct examples with different values in the gm_section magnitude guide and tracker_module, so the Narrator/GM knows exactly how to scale the numbers and isn't tempted to default to a single hardcoded number.
+
+═══════════════════════════════════════════════════════════════════════════
+PILLS HYGIENE
+═══════════════════════════════════════════════════════════════════════════
+For comma-separated lists of pills (like ((PILLS)) or ((PILLRED))), place the tag ONLY at the very beginning of the list/line (e.g., 'Status: ((PILLS)) Sleeping, Poisoned'). NEVER repeat the tag on every item in the list (e.g., NEVER write '((PILLS)) Sleeping, ((PILLS)) Poisoned').
 
 ═══════════════════════════════════════════════════════════════════════════
 DRIVERS — how the tracked value actually changes each turn
@@ -923,7 +991,8 @@ function buildDriverGuidance(drivers, gmTag, trackerTag, effectOwner = 'tracker'
     const outputHygiene = `TRACKER SAMPLE OUTPUT HYGIENE: a threshold/tier table is reference material for the tracker to look up a status label from — it is instructional prose, NOT literal output. Never paste the full table inside the sample [${sanitizeUpperTag(trackerTag)}] ... [/${sanitizeUpperTag(trackerTag)}] block; that block must show only what really appears each turn (a bar/value line + ONE resolved status line), and that status label must be the tier that actually matches the sample value shown — never a placeholder word that isn't one of the defined tiers, and never a static/disconnected label.`;
     const compoundRules = `COMPOUND METERS: If the mechanic contains distinct/orthogonal sub-concepts (like hunger AND thirst, or shields AND armor), do NOT merge them into one muddy meter. Track them as separate fields/bars inside the single <tracker_module> output block. Give each its own decay, recovery, and thresholds, and show both bars/statuses in the sample block. Instruct the GM to use natural-language delta annotations rather than ugly variable strings (e.g., *(Food eaten: Chocolate Bar. +75 Hunger)* instead of *(YOUR_TAG_HUNGER: +75)*).`;
     const magnitudeRules = `SCALED MAGNITUDES: When defining how items/actions affect the value(s), do NOT use a single flat number (like +300) for everything. Establish a scaled hierarchy (e.g. Minor: +50 to +100 for snacks/sips, Moderate: +150 to +250 for standard meals/waterskins, Major: +300 to +500 for feasts/full canteens) and provide at least 3 distinct examples with different values in the magnitude guide.`;
-    return `${voiceRules}\n${accountingRules}\n${outputHygiene}\n${compoundRules}\n${magnitudeRules}\n${describeDrivers(drivers, trackerTag)}\n${describeEffectOwner(effectOwner, trackerTag)}`;
+    const pillRules = `PILLS HYGIENE: For comma-separated lists of pills (like ((PILLS)) or ((PILLRED))), place the tag ONLY at the very beginning of the list/line (e.g., 'Status: ((PILLS)) Sleeping, Poisoned'). NEVER repeat the tag on every item in the list (e.g., NEVER write '((PILLS)) Sleeping, ((PILLS)) Poisoned').`;
+    return `${voiceRules}\n${accountingRules}\n${outputHygiene}\n${compoundRules}\n${magnitudeRules}\n${pillRules}\n${describeDrivers(drivers, trackerTag)}\n${describeEffectOwner(effectOwner, trackerTag)}`;
 }
 
 
@@ -940,7 +1009,7 @@ async function regenerateGmSection(settings, description, gmTag, drivers, tracke
 
 /** Focused regeneration of just the tracker half. */
 async function regenerateTrackerModule(settings, description, trackerTag, drivers, effectOwner = 'tracker') {
-    const renderingHints = RENDERING_TAGS_LIBRARY.slice(0, 12).join('\n  - ');
+    const renderingHints = RENDERING_TAGS_LIBRARY.join('\n  - ');
     const systemPrompt = `You are a game-system architect for a D&D-style tabletop RPG framework. Rewrite ONLY the tracker module instructions for the mechanic described below. Return ONLY:\n<tracker_module tag="${trackerTag}" label="Display Label" icon="emoji">\n...instructions, including a sample [${trackerTag}] ... [/${trackerTag}] format block using rendering markers like:\n  - ${renderingHints}\n</tracker_module>\nNo explanation, no markdown fences, no other text.\n\nCRITICAL: Inner content must be SECOND PERSON (you/your) — direct instructions to the State Tracker. Never write "The tracker maintains…", "The State Tracker must…", or any third-person reference to the tracker as an external entity.\n\nCRITICAL: This module EXCLUSIVELY owns running totals, bars, threshold tables, and tier labels — the gm_section must never duplicate this. When scanning for inline annotations, say "narrative output" / "the latest narrative output" — NEVER "GM's output" or "GM's narration".\n\n${buildDriverGuidance(drivers, '', trackerTag, effectOwner)}`;
     const userPrompt = `${buildExistingTagsContext(settings)}\n\nMechanic description:\n${description}`;
     const raw = await sendStateRequest(getGameSystemWizardConnectionSettings(settings), systemPrompt, userPrompt);
@@ -958,7 +1027,7 @@ async function regenerateTrackerModule(settings, description, trackerTag, driver
  * mismatched state (e.g. one half still written for the old effect owner).
  */
 async function regenerateBothHalves(settings, description, gmTag, trackerTag, drivers, effectOwner = 'tracker') {
-    const renderingHints = RENDERING_TAGS_LIBRARY.slice(0, 12).join('\n  - ');
+    const renderingHints = RENDERING_TAGS_LIBRARY.join('\n  - ');
     const systemPrompt = `You are a game-system architect for a D&D-style tabletop RPG framework. Rewrite BOTH halves of the mechanic described below so they are fully coherent with each other. Return ONLY:\n<gm_section tag="${gmTag}">\n...instructions...\n</gm_section>\n<tracker_module tag="${trackerTag}" label="Display Label" icon="emoji">\n...instructions, including a sample [${trackerTag}] ... [/${trackerTag}] format block using rendering markers like:\n  - ${renderingHints}\n</tracker_module>\nNo explanation, no markdown fences, no other text. Reference {{user}} for the player. Be comprehensive but concise (10-30 lines each).\n\nCRITICAL: gm_section inner content must be SECOND PERSON (you/your) — never "The GM must". CRITICAL: tracker_module inner content must ALSO be SECOND PERSON (you/your) addressing the State Tracker directly — never "The tracker maintains…". CRITICAL: gm_section must NEVER track totals, restate current scores, or duplicate tracker accounting — the tracker_module EXCLUSIVELY owns totals, bars, thresholds, and tier labels.\n\n${buildDriverGuidance(drivers, gmTag, trackerTag, effectOwner)}\n\nSince both halves are generated together in this one call, any numbers shared between them (e.g. an items/actions magnitude guide required by the "time" driver, or a threshold table required by effect_owner="gm") MUST be identical in both halves — word for word.`;
     const userPrompt = `${buildExistingTagsContext(settings)}\n\nMechanic description:\n${description}`;
     const raw = await sendStateRequest(getGameSystemWizardConnectionSettings(settings), systemPrompt, userPrompt);
@@ -990,7 +1059,7 @@ async function iterateGameSystemDraft(settings, {
     drivers,
     effectOwner = 'tracker',
 }) {
-    const renderingHints = RENDERING_TAGS_LIBRARY.slice(0, 12).join('\n  - ');
+    const renderingHints = RENDERING_TAGS_LIBRARY.join('\n  - ');
     const tag = sanitizeUpperTag(trackerTag);
     const snakeTag = sanitizeSnakeTag(gmTag);
 
@@ -1601,7 +1670,7 @@ export async function openGameSystemWizard(existingSystem = null) {
         if (!result || result.back) return;
 
         saveGameSystemFromPreview(result, existingSystem.id);
-        if (result.saveMode === 'apply') await applyCustomSysprompts();
+        if (result.saveMode === 'apply') await autoApplySysprompt(true);
         toastr['success'](`Game System "${result.name}" saved! ✅`, 'Game System Wizard');
         return;
     }
@@ -1635,7 +1704,7 @@ export async function openGameSystemWizard(existingSystem = null) {
             if (result.back) break;
 
             saveGameSystemFromPreview(result, null);
-            if (result.saveMode === 'apply') await applyCustomSysprompts();
+            if (result.saveMode === 'apply') await autoApplySysprompt(true);
             toastr['success'](`Game System "${result.name}" saved! ✅`, 'Game System Wizard');
             return;
         }
@@ -1715,8 +1784,61 @@ export async function importGameSystem() {
     const result = await showGameSystemPreview(parsed, { description: '', isEdit: false });
     if (!result) return;
     saveGameSystemFromPreview(result, null);
-    if (result.saveMode === 'apply') await applyCustomSysprompts();
+    if (result.saveMode === 'apply') await autoApplySysprompt(true);
     toastr['success'](`Game System "${result.name}" imported! ✅`, 'Game Systems');
+}
+
+/**
+ * Enables/disables a Game System bundle and its linked GM section + tracker
+ * module together. Shared by Manage Game Systems and the Control Room's
+ * wizard-badged rows so both stay perfectly in sync.
+ */
+export async function setGameSystemEnabled(gs, enabled, options = {}) {
+    const { deferPersistence = false } = options;
+    const settings = getSettings();
+    gs.enabled = enabled;
+    if (gs.syspromptLibraryId) {
+        const lib = (settings.customSyspromptLibrary || []).find(p => p.id === gs.syspromptLibraryId);
+        if (lib) lib.enabled = enabled;
+    }
+    if (gs.customFieldTag) {
+        const field = (settings.customFields || []).find(f => f.tag.toUpperCase() === gs.customFieldTag);
+        if (field) field.enabled = enabled;
+    }
+    if (deferPersistence) return;
+    saveSettings();
+    refreshOrderList();
+    refreshRenderedView();
+    await autoApplySysprompt(true);
+}
+
+/**
+ * Deletes a Game System bundle (GM section + tracker module + order entry)
+ * after user confirmation. Shared by Manage Game Systems and the Control
+ * Room's wizard-badged rows. Returns true if the deletion went through.
+ */
+export async function deleteGameSystemWithConfirm(gs, options = {}) {
+    const { deferPersistence = false } = options;
+    if (!confirm(`Delete the Game System "${gs.name}"? This removes both its GM section and tracker module. This cannot be undone.`)) return false;
+    const settings = getSettings();
+    if (gs.syspromptLibraryId) {
+        settings.customSyspromptLibrary = (settings.customSyspromptLibrary || []).filter(p => p.id !== gs.syspromptLibraryId);
+        if (settings.syspromptSectionOrder) {
+            settings.syspromptSectionOrder = settings.syspromptSectionOrder.filter(k => k !== `lib:${gs.syspromptLibraryId}`);
+        }
+    }
+    if (gs.customFieldTag) {
+        settings.customFields = (settings.customFields || []).filter(f => f.tag.toUpperCase() !== gs.customFieldTag);
+        if (settings.blockOrder) settings.blockOrder = settings.blockOrder.filter(t => t.toUpperCase() !== gs.customFieldTag);
+    }
+    settings.gameSystems = (settings.gameSystems || []).filter(g => g.id !== gs.id);
+    if (deferPersistence) return true;
+    saveSettings();
+    refreshOrderList();
+    refreshRenderedView();
+    await autoApplySysprompt(true);
+    toastr['info'](`Game System "${gs.name}" deleted.`, 'Game Systems');
+    return true;
 }
 
 export async function openManageGameSystems() {
@@ -1772,19 +1894,7 @@ export async function openManageGameSystems() {
                 el.addEventListener('change', async (e) => {
                     const idx = parseInt(e.target.dataset.index);
                     const gs = settings.gameSystems[idx];
-                    gs.enabled = e.target.checked;
-                    if (gs.syspromptLibraryId) {
-                        const lib = (settings.customSyspromptLibrary || []).find(p => p.id === gs.syspromptLibraryId);
-                        if (lib) lib.enabled = e.target.checked;
-                    }
-                    if (gs.customFieldTag) {
-                        const field = (settings.customFields || []).find(f => f.tag.toUpperCase() === gs.customFieldTag);
-                        if (field) field.enabled = e.target.checked;
-                    }
-                    saveSettings();
-                    refreshOrderList();
-                    refreshRenderedView();
-                    await applyCustomSysprompts();
+                    await setGameSystemEnabled(gs, e.target.checked);
                 });
             });
 
@@ -1810,22 +1920,10 @@ export async function openManageGameSystems() {
                 el.addEventListener('click', async (e) => {
                     const idx = parseInt(e.currentTarget.dataset.index);
                     const gs = settings.gameSystems[idx];
-                    if (!confirm(`Delete the Game System "${gs.name}"? This removes both its GM section and tracker module. This cannot be undone.`)) return;
-                    if (gs.syspromptLibraryId) {
-                        settings.customSyspromptLibrary = (settings.customSyspromptLibrary || []).filter(p => p.id !== gs.syspromptLibraryId);
-                    }
-                    if (gs.customFieldTag) {
-                        settings.customFields = (settings.customFields || []).filter(f => f.tag.toUpperCase() !== gs.customFieldTag);
-                        if (settings.blockOrder) settings.blockOrder = settings.blockOrder.filter(t => t.toUpperCase() !== gs.customFieldTag);
-                    }
-                    settings.gameSystems.splice(idx, 1);
-                    saveSettings();
-                    refreshOrderList();
-                    refreshRenderedView();
-                    await applyCustomSysprompts();
+                    const deleted = await deleteGameSystemWithConfirm(gs);
+                    if (!deleted) return;
                     const w = document.getElementById('rt-gs-manage-list-wrap');
                     if (w) { w.innerHTML = generateListHtml(); bindEvents(); }
-                    toastr['info'](`Game System "${gs.name}" deleted.`, 'Game Systems');
                 });
             });
         };
@@ -1848,42 +1946,8 @@ export async function openManageGameSystems() {
 // Unlock Base Sections — fully override a built-in sysprompt.txt section
 // ─────────────────────────────────────────────────────────────────────────
 
-const KNOWN_TOGGLE_DEFAULTS = { loot: true, random_events: true, resting: true, quests: true };
-
-/** Checkbox ids from the Narrator Configuration panel, keyed by syspromptModules tag. */
-const NARRATOR_TOGGLE_IDS = {
-    loot: 'rpg_sysprompt_mod_loot',
-    random_events: 'rpg_sysprompt_mod_random_events',
-    resting: 'rpg_sysprompt_mod_resting',
-    quests: 'rpg_sysprompt_mod_quests',
-};
-
-export function isSectionUnlocked(settings, tag) {
-    return (settings.customSyspromptLibrary || []).some(p => p.origin === 'unlocked_base' && p.baseTag === tag);
-}
-
-function syncNarratorToggleUiForUnlock(tag, unlocked) {
-    const id = NARRATOR_TOGGLE_IDS[tag];
-    if (!id) return;
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.disabled = unlocked;
-    const label = el.closest('label');
-    if (label) label.title = unlocked ? 'Managed in Game Systems (unlocked) — edit it there instead.' : '';
-}
-
-/**
- * Disables the Narrator Configuration checkboxes for any section already
- * unlocked in a previous session. Call once on settings init.
- */
-export function syncAllNarratorTogglesForUnlockState() {
-    const settings = getSettings();
-    Object.keys(NARRATOR_TOGGLE_IDS).forEach(tag => {
-        syncNarratorToggleUiForUnlock(tag, isSectionUnlocked(settings, tag));
-    });
-}
-
-export async function unlockBaseSection(tag) {
+export async function unlockBaseSection(tag, options = {}) {
+    const { deferPersistence = false } = options;
     const settings = getSettings();
     if (isSectionUnlocked(settings, tag)) {
         toastr['info'](`<${tag}> is already unlocked.`, 'Game Systems');
@@ -1916,13 +1980,15 @@ export async function unlockBaseSection(tag) {
     if (!settings.syspromptModules) settings.syspromptModules = {};
     settings.syspromptModules[tag] = false;
 
-    saveSettings();
-    await autoApplySysprompt(true);
-    syncNarratorToggleUiForUnlock(tag, true);
-    toastr['success'](`<${tag}> unlocked for customization.`, 'Game Systems');
+    await persistSyspromptChanges(deferPersistence);
+    if (!deferPersistence) {
+        syncNarratorToggleUi(tag, settings);
+        toastr['success'](`<${tag}> unlocked for customization.`, 'Game Systems');
+    }
 }
 
-export async function relockBaseSection(tag) {
+export async function relockBaseSection(tag, options = {}) {
+    const { deferPersistence = false } = options;
     const settings = getSettings();
     settings.customSyspromptLibrary = (settings.customSyspromptLibrary || []).filter(p => !(p.origin === 'unlocked_base' && p.baseTag === tag));
 
@@ -1933,13 +1999,15 @@ export async function relockBaseSection(tag) {
         delete settings.syspromptModules[tag];
     }
 
-    saveSettings();
-    await autoApplySysprompt(true);
-    syncNarratorToggleUiForUnlock(tag, false);
-    toastr['success'](`<${tag}> re-locked and restored to default.`, 'Game Systems');
+    await persistSyspromptChanges(deferPersistence);
+    if (!deferPersistence) {
+        syncNarratorToggleUi(tag, settings);
+        toastr['success'](`<${tag}> re-locked and restored to default.`, 'Game Systems');
+    }
 }
 
-export async function editUnlockedSection(tag) {
+export async function editUnlockedSection(tag, options = {}) {
+    const { deferPersistence = false } = options;
     const settings = getSettings();
     const item = (settings.customSyspromptLibrary || []).find(p => p.origin === 'unlocked_base' && p.baseTag === tag);
     if (!item) return;
@@ -1966,80 +2034,301 @@ export async function editUnlockedSection(tag) {
 
     item.content = normalizeGmContent(tag, result.content);
     item.description = result.description || item.description;
-    saveSettings();
-    await applyCustomSysprompts();
-    toastr['success'](`<${tag}> updated.`, 'Game Systems');
+    await persistSyspromptChanges(deferPersistence);
+    if (!deferPersistence) {
+        toastr['success'](`<${tag}> updated.`, 'Game Systems');
+    }
 }
 
-export async function openUnlockSectionsMenu() {
+// ─────────────────────────────────────────────────────────────────────────
+// System Prompt Control Room — unified reorder/toggle/add/unlock popup.
+// Replaces "Unlock Base Sections" + "Advanced: Manual Sysprompt Sections"
+// with one drag-and-drop-reorderable list of every top-level sysprompt
+// section (built-in and custom), with AI Builder / Add Manually / Reset
+// folded in as toolbar actions.
+// ─────────────────────────────────────────────────────────────────────────
+
+function controlRoomRowIcon(row) {
+    if (row.kind === 'base') return `<i class="fa-solid fa-lock" style="width:20px; text-align:center; opacity:0.5;"></i>`;
+    if (row.kind === 'unlocked') return `<i class="fa-solid fa-lock-open" style="width:20px; text-align:center; color:#ffb43c;"></i>`;
+    if (row.kind === 'wizard') return `<div style="font-size:15px; width:20px; text-align:center;">🧙</div>`;
+    return `<i class="fa-solid ${row.icon || 'fa-puzzle-piece'}" style="width:20px; text-align:center; color:var(--rt-accent, #5588ff);"></i>`;
+}
+
+function controlRoomRowBadge(row) {
+    if (row.kind === 'unlocked') {
+        return `<span style="font-size:9px; padding:1px 5px; border-radius:3px; margin-left:6px; background:rgba(255,180,60,0.2); color:#ffb43c;" title="Unlocked override of a built-in section">UNLOCKED</span>`;
+    }
+    if (row.kind === 'wizard') {
+        return `<span style="font-size:9px; padding:1px 5px; border-radius:3px; margin-left:6px; background:rgba(180,100,255,0.2); color:#c9a0ff;" title="Created via Game System Wizard — Edit/Delete redirect there to stay in sync with the linked tracker module">WIZARD</span>`;
+    }
+    return '';
+}
+
+function controlRoomRowActions(row) {
+    if (row.kind === 'base') {
+        return `<button class="rt-cr-unlock menu_button interactable" data-tag="${escapeHtml(row.tag)}" style="font-size:11px; padding:2px 8px; white-space:nowrap; background:rgba(255,180,60,0.15); border-color:rgba(255,180,60,0.4);">Unlock</button>`;
+    }
+    if (row.kind === 'unlocked') {
+        return `
+            <button class="rt-cr-edit-unlocked" data-tag="${escapeHtml(row.tag)}" style="background:none; border:none; color:#88bbff; cursor:pointer; padding:4px;" title="Edit override"><i class="fa-solid fa-pen-to-square"></i></button>
+            <button class="rt-cr-relock menu_button interactable" data-tag="${escapeHtml(row.tag)}" style="font-size:11px; padding:2px 8px; white-space:nowrap;">Re-lock</button>`;
+    }
+    if (row.kind === 'wizard') {
+        return `
+            <button class="rt-cr-edit-wizard" data-libid="${escapeHtml(row.libId)}" style="background:none; border:none; color:#88bbff; cursor:pointer; padding:4px;" title="Edit in Game System Wizard"><i class="fa-solid fa-pen-to-square"></i></button>
+            <button class="rt-cr-delete-wizard" data-libid="${escapeHtml(row.libId)}" style="background:none; border:none; color:#ff5555; cursor:pointer; padding:4px;" title="Delete Game System (removes tracker module too)"><i class="fa-solid fa-trash-can"></i></button>`;
+    }
+    return `
+        <button class="rt-cr-edit-custom" data-libid="${escapeHtml(row.libId)}" style="background:none; border:none; color:#88bbff; cursor:pointer; padding:4px;" title="Edit Section"><i class="fa-solid fa-pen-to-square"></i></button>
+        <button class="rt-cr-delete-custom" data-libid="${escapeHtml(row.libId)}" style="background:none; border:none; color:#ff5555; cursor:pointer; padding:4px;" title="Delete Section"><i class="fa-solid fa-trash-can"></i></button>`;
+}
+
+function renderControlRoomRow(row) {
+    return `
+        <div class="rt-cr-row" data-key="${escapeHtml(row.key)}" style="display:flex; align-items:center; gap:8px; border:1px solid rgba(255,255,255,0.1); border-radius:6px; background:rgba(0,0,0,0.2); padding:8px 10px; opacity:${row.enabled ? '1' : '0.55'}; cursor:grab;">
+            <i class="fa-solid fa-grip-vertical" style="opacity:0.35; width:14px; text-align:center; pointer-events:none;" aria-hidden="true"></i>
+            ${controlRoomRowIcon(row)}
+            <div style="flex:1; min-width:0;">
+                <div style="font-family:monospace; font-size:12px; font-weight:bold;">${escapeHtml(row.label)}${controlRoomRowBadge(row)}</div>
+                ${row.description ? `<div style="font-size:10px; opacity:0.65; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(row.description)}</div>` : ''}
+            </div>
+            <label class="checkbox_label" style="margin:0; font-size:11px; white-space:nowrap;">
+                <input type="checkbox" class="rt-cr-enable" data-key="${escapeHtml(row.key)}" ${row.enabled ? 'checked' : ''}>
+                <span>Enabled</span>
+            </label>
+            ${controlRoomRowActions(row)}
+        </div>
+    `;
+}
+
+export async function openSystemPromptControlRoom() {
     const { Popup } = SillyTavern.getContext();
     const settings = getSettings();
+    const initialSnapshot = snapshotControlRoomSettings(settings);
+    const deferOpts = { deferPersistence: true };
+    const isDirty = () => JSON.stringify(snapshotControlRoomSettings(settings)) !== JSON.stringify(initialSnapshot);
 
     let raw;
     try {
         raw = await fetchBaseSyspromptRaw(settings);
     } catch (err) {
-        toastr['error']('Could not fetch sysprompt.txt.', 'Game Systems');
+        toastr['error']('Could not fetch sysprompt.txt.', 'System Prompt Control Room');
         return;
     }
-    const sections = extractTopLevelSections(raw);
+    const baseSections = extractTopLevelSections(raw);
+    const baseSectionMap = new Map(baseSections.map(s => [s.tag, s.content]));
+
+    const getRows = () => {
+        const order = normalizeSectionOrder(settings, baseSections);
+        return order.map(key => getSectionRowDescriptor(key, settings, baseSectionMap)).filter(Boolean);
+    };
 
     const generateListHtml = () => {
-        return '<div style="display:flex; flex-direction:column; gap:8px;">' + sections.map(s => {
-            const unlocked = isSectionUnlocked(settings, s.tag);
-            return `
-                <div class="rt-unlock-item" data-tag="${escapeHtml(s.tag)}" style="display:flex; align-items:center; gap:10px; border:1px solid rgba(255,255,255,0.1); border-radius:6px; background:rgba(0,0,0,0.2); padding:8px 10px;">
-                    <i class="fa-solid ${unlocked ? 'fa-lock-open' : 'fa-lock'}" style="width:18px; text-align:center; color:${unlocked ? '#ffb43c' : 'inherit'}; opacity:${unlocked ? '1' : '0.5'};"></i>
-                    <div style="flex:1; font-family:monospace; font-size:12px;">&lt;${escapeHtml(s.tag)}&gt;</div>
-                    ${unlocked ? `
-                        <button class="rt-unlock-edit" data-tag="${escapeHtml(s.tag)}" style="background:none; border:none; color:#88bbff; cursor:pointer; padding:4px;" title="Edit override"><i class="fa-solid fa-pen-to-square"></i></button>
-                        <button class="rt-unlock-relock menu_button interactable" data-tag="${escapeHtml(s.tag)}" style="font-size:11px; padding:2px 8px;">Re-lock</button>
-                    ` : `
-                        <button class="rt-unlock-btn menu_button interactable" data-tag="${escapeHtml(s.tag)}" style="font-size:11px; padding:2px 8px; background:rgba(255,180,60,0.15); border-color:rgba(255,180,60,0.4);">Unlock</button>
-                    `}
-                </div>
-            `;
-        }).join('') + '</div>';
+        const rows = getRows();
+        if (rows.length === 0) {
+            return `<div style="text-align:center; padding:30px; opacity:0.5; font-style:italic;">No sections found.</div>`;
+        }
+        return '<div id="rt-cr-list" style="display:flex; flex-direction:column; gap:8px;">' + rows.map(renderControlRoomRow).join('') + '</div>';
     };
 
     const html = `
-        <div id="rt-unlock-container" style="display:flex; flex-direction:column; gap:10px; width:100%; box-sizing:border-box; max-height:85vh;">
-            <div style="font-size:11px; opacity:0.8; line-height:1.4;">Unlock a built-in sysprompt section to fully customize it. The rest of the auto-derived prompt (from Narrator Configuration) stays intact — only the unlocked section is replaced by your own version.</div>
-            <div id="rt-unlock-list-wrap" style="overflow-y:auto; padding-right:10px; flex:1;">
+        <div id="rt-cr-container" style="display:flex; flex-direction:column; gap:10px; width:100%; box-sizing:border-box; max-height:85vh;">
+            <div style="font-size:11px; opacity:0.8; line-height:1.4;">
+                Drag any row to reorder sections, toggle <b>Enabled</b> to turn it on/off, or use the tools below to unlock a built-in section or add a brand-new one. 🧙 rows are managed by the Game System Wizard — Edit/Delete there keeps the linked tracker module in sync.
+                <div style="margin-top:4px; opacity:0.75;">Changes are kept in memory until you click <b>Save</b>.</div>
+            </div>
+            <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                <button id="rt_cr_btn_ai_add" class="menu_button interactable" style="flex:1; background:rgba(180,100,255,0.15); border-color:rgba(180,100,255,0.4); font-size:11px; padding:4px 8px;">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> AI Builder
+                </button>
+                <button id="rt_cr_btn_manual_add" class="menu_button interactable" style="flex:1; background:rgba(80,180,120,0.15); border-color:rgba(80,180,120,0.4); font-size:11px; padding:4px 8px;">
+                    <i class="fa-solid fa-plus"></i> Add Manually
+                </button>
+                <button id="rt_cr_btn_reset" class="menu_button interactable" style="width:auto; padding:4px 12px; background:rgba(255,100,100,0.15); border-color:rgba(255,100,100,0.4); font-size:11px;" title="Remove all AI/manually-added sections and reset the order to defaults">
+                    <i class="fa-solid fa-rotate-left"></i>
+                </button>
+            </div>
+            <div id="rt-cr-list-wrap" style="overflow-y:auto; padding-right:10px; flex:1;">
                 ${generateListHtml()}
             </div>
         </div>
     `;
 
     setTimeout(() => {
-        const container = document.getElementById('rt-unlock-container');
+        const container = document.getElementById('rt-cr-container');
         if (!container) return;
+
+        const refresh = () => {
+            const wrap = document.getElementById('rt-cr-list-wrap');
+            if (wrap) wrap.innerHTML = generateListHtml();
+            bindEvents();
+        };
+
         const bindEvents = () => {
-            const wrap = document.getElementById('rt-unlock-list-wrap');
-            if (!wrap) return;
-            wrap.querySelectorAll('.rt-unlock-btn').forEach(el => {
-                el.addEventListener('click', async (e) => {
-                    await unlockBaseSection(e.currentTarget.dataset.tag);
-                    wrap.innerHTML = generateListHtml();
-                    bindEvents();
+            const wrap = document.getElementById('rt-cr-list-wrap');
+            const list = document.getElementById('rt-cr-list');
+            if (!wrap || !list) return;
+
+            // ── Drag-and-drop reorder ──
+            const $list = $(list);
+            if ($list.sortable('instance') !== undefined) {
+                $list.sortable('destroy');
+            }
+            $list.sortable({
+                items: '.rt-cr-row',
+                cancel: 'input, textarea, button, select, option, label, a',
+                delay: getSortableDelay(),
+                start: () => {
+                    list.querySelectorAll('.rt-cr-row').forEach(el => { el.style.cursor = 'grabbing'; });
+                },
+                stop: () => {
+                    list.querySelectorAll('.rt-cr-row').forEach(el => { el.style.cursor = 'grab'; });
+                    settings.syspromptSectionOrder = Array.from(list.querySelectorAll('.rt-cr-row')).map(el => el.dataset.key);
+                },
+            });
+
+            // ── Enable/disable toggle ──
+            wrap.querySelectorAll('.rt-cr-enable').forEach(el => {
+                el.addEventListener('change', async (e) => {
+                    const key = e.currentTarget.dataset.key;
+                    const row = getSectionRowDescriptor(key, settings, baseSectionMap);
+                    if (!row) return;
+                    const checked = e.currentTarget.checked;
+
+                    if (row.kind === 'wizard' && row.gameSystemId) {
+                        const gs = (settings.gameSystems || []).find(g => g.id === row.gameSystemId);
+                        if (gs) {
+                            await setGameSystemEnabled(gs, checked, deferOpts);
+                            refresh();
+                            return;
+                        }
+                    }
+
+                    if (row.kind === 'base') {
+                        if (row.tag === 'relationship_tracking') {
+                            settings.npcRelationshipBars = checked;
+                        } else {
+                            if (!settings.syspromptModules) settings.syspromptModules = {};
+                            settings.syspromptModules[row.tag] = checked;
+                        }
+                    } else {
+                        const item = (settings.customSyspromptLibrary || []).find(p => p.id === row.libId);
+                        if (item) item.enabled = checked;
+                    }
+                    refresh();
                 });
             });
-            wrap.querySelectorAll('.rt-unlock-relock').forEach(el => {
+
+            // ── Base row: Unlock ──
+            wrap.querySelectorAll('.rt-cr-unlock').forEach(el => {
                 el.addEventListener('click', async (e) => {
-                    if (!confirm(`Re-lock <${e.currentTarget.dataset.tag}>? Your custom override will be deleted and the section restored to default.`)) return;
-                    await relockBaseSection(e.currentTarget.dataset.tag);
-                    wrap.innerHTML = generateListHtml();
-                    bindEvents();
+                    await unlockBaseSection(e.currentTarget.dataset.tag, deferOpts);
+                    refresh();
                 });
             });
-            wrap.querySelectorAll('.rt-unlock-edit').forEach(el => {
+
+            // ── Unlocked row: Edit / Re-lock ──
+            wrap.querySelectorAll('.rt-cr-edit-unlocked').forEach(el => {
                 el.addEventListener('click', async (e) => {
-                    await editUnlockedSection(e.currentTarget.dataset.tag);
+                    await editUnlockedSection(e.currentTarget.dataset.tag, deferOpts);
+                    refresh();
+                });
+            });
+            wrap.querySelectorAll('.rt-cr-relock').forEach(el => {
+                el.addEventListener('click', async (e) => {
+                    const tag = e.currentTarget.dataset.tag;
+                    if (!confirm(`Re-lock <${tag}>? Your custom override will be deleted and the section restored to default.`)) return;
+                    await relockBaseSection(tag, deferOpts);
+                    refresh();
+                });
+            });
+
+            // ── Wizard row: Edit / Delete (redirect to Game System Wizard logic) ──
+            wrap.querySelectorAll('.rt-cr-edit-wizard').forEach(el => {
+                el.addEventListener('click', async (e) => {
+                    const libId = e.currentTarget.dataset.libid;
+                    const gs = (settings.gameSystems || []).find(g => g.syspromptLibraryId === libId);
+                    if (!gs) { toastr['warning']('Could not find the linked Game System. Try Manage Game Systems instead.', 'System Prompt Control Room'); return; }
+                    await openGameSystemWizard(gs);
+                    refresh();
+                });
+            });
+            wrap.querySelectorAll('.rt-cr-delete-wizard').forEach(el => {
+                el.addEventListener('click', async (e) => {
+                    const libId = e.currentTarget.dataset.libid;
+                    const gs = (settings.gameSystems || []).find(g => g.syspromptLibraryId === libId);
+                    if (!gs) { toastr['warning']('Could not find the linked Game System. Try Manage Game Systems instead.', 'System Prompt Control Room'); return; }
+                    const deleted = await deleteGameSystemWithConfirm(gs, deferOpts);
+                    if (!deleted) return;
+                    refresh();
+                });
+            });
+
+            // ── Custom row: Edit / Delete ──
+            wrap.querySelectorAll('.rt-cr-edit-custom').forEach(el => {
+                el.addEventListener('click', async (e) => {
+                    const libId = e.currentTarget.dataset.libid;
+                    const item = (settings.customSyspromptLibrary || []).find(p => p.id === libId);
+                    if (!item) return;
+                    const result = await showSectionEditor({
+                        mode: 'edit',
+                        tag: item.tag,
+                        description: item.description || '',
+                        content: item.content,
+                    });
+                    if (!result) return;
+                    item.tag = result.tag;
+                    item.description = result.description;
+                    item.content = result.content;
+                    refresh();
+                });
+            });
+            wrap.querySelectorAll('.rt-cr-delete-custom').forEach(el => {
+                el.addEventListener('click', async (e) => {
+                    if (!confirm('Delete this custom section permanently?')) return;
+                    const libId = e.currentTarget.dataset.libid;
+                    settings.customSyspromptLibrary = (settings.customSyspromptLibrary || []).filter(p => p.id !== libId);
+                    if (settings.syspromptSectionOrder) {
+                        settings.syspromptSectionOrder = settings.syspromptSectionOrder.filter(k => k !== `lib:${libId}`);
+                    }
+                    refresh();
                 });
             });
         };
         bindEvents();
+
+        const aiBtn = document.getElementById('rt_cr_btn_ai_add');
+        if (aiBtn) aiBtn.addEventListener('click', async () => { await runAiSectionBuilder(deferOpts); refresh(); });
+
+        const manualBtn = document.getElementById('rt_cr_btn_manual_add');
+        if (manualBtn) manualBtn.addEventListener('click', async () => { await runManualSectionBuilder(deferOpts); refresh(); });
+
+        const resetBtn = document.getElementById('rt_cr_btn_reset');
+        if (resetBtn) resetBtn.addEventListener('click', async () => { await resetSyspromptLibrary(deferOpts); refresh(); });
     }, 100);
 
-    await Popup.show.confirm('🔓 Unlock Base Sections', html, { okButton: 'Close', cancelButton: false, ...GS_POPUP_LARGE });
+    const result = await Popup.show.confirm('🎛️ System Prompt Control Room', html, {
+        okButton: 'Save',
+        cancelButton: 'Cancel',
+        onClosing: async (popup) => {
+            if (popup.result === POPUP_RESULT.AFFIRMATIVE) return true;
+            if (!isDirty()) return true;
+            return confirm('Discard unsaved changes to the system prompt sections?');
+        },
+        ...GS_POPUP_LARGE,
+    });
+
+    if (result === POPUP_RESULT.AFFIRMATIVE) {
+        saveSettings();
+        syncAllNarratorTogglesForUnlockState();
+        refreshOrderList();
+        refreshRenderedView();
+        await autoApplySysprompt(true);
+        toastr['success']('System prompt sections saved.', 'System Prompt Control Room');
+        return;
+    }
+
+    restoreControlRoomSettings(settings, initialSnapshot);
+    syncAllNarratorTogglesForUnlockState();
 }

@@ -549,6 +549,16 @@ You may be asked to use Markers: ((PLS)), ((B)), ((XB)), ((BDG)), ((HGT)). These
         customFields: [],
         customSyspromptLibrary: [],
         /**
+         * System Prompt Control Room — explicit render order for every top-level
+         * sysprompt section, mixing built-in tags and customSyspromptLibrary entries.
+         * Entries are string keys: "base:<tag>" for one of the fixed built-in
+         * sysprompt.txt tags, or "lib:<id>" for a customSyspromptLibrary entry
+         * (unlocked_base overrides ride along on their "base:<tag>" slot — they
+         * never get their own separate key). Empty array = not yet initialized;
+         * normalizeSectionOrder() in game-systems.js lazily seeds/reconciles it.
+         */
+        syspromptSectionOrder: [],
+        /**
          * Game System Wizard bundles — link a customSyspromptLibrary entry and/or a
          * customFields entry as a single manageable unit.
          * Shape: { id, name, icon, enabled, needsTracker,
