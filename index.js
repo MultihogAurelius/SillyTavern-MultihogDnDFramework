@@ -451,12 +451,11 @@ async function syncCampaignPrefixAndWorldsForChat(newChatId, source) {
  * the Chat-Linked State for the active chat.
  */
 let _saveSettingsTimer = null;
-export function saveSettings() {
+export function saveSettings(force = false) {
     // Keep UI synchronization immediate so toggle checkboxes and forms respond instantly
     syncOnboardingUI();
 
-    if (_saveSettingsTimer) clearTimeout(_saveSettingsTimer);
-    _saveSettingsTimer = setTimeout(() => {
+    const doSave = () => {
         _saveSettingsTimer = null;
         const s = getSettings();
         const ctx = SillyTavern.getContext();
@@ -465,7 +464,16 @@ export function saveSettings() {
         if (s.chatLinkEnabled && activeChatId) {
             saveChatState(activeChatId);
         }
-    }, 150);
+    };
+
+    if (force) {
+        if (_saveSettingsTimer) clearTimeout(_saveSettingsTimer);
+        doSave();
+        return;
+    }
+
+    if (_saveSettingsTimer) clearTimeout(_saveSettingsTimer);
+    _saveSettingsTimer = setTimeout(doSave, 2000);
 }
 
 /** When NPC portraits are disabled, turn off NPC auto-generation and sync dependent UI. */
@@ -8346,17 +8354,37 @@ Rules:
     // Handle manual edits to live memo
     const textarea = panel.querySelector('#rpg-tracker-memo');
     let _rawEditDebounce = null;
+
+    const flushRawMemoChanges = () => {
+        if (_rawEditDebounce) {
+            clearTimeout(_rawEditDebounce);
+            _rawEditDebounce = null;
+            if (textarea && _historyViewIndex === -1) {
+                const newText = textarea.value;
+                settings.currentMemo = newText;
+                settings.currentMemo = applyQuestSyncAndStripMemo(settings.currentMemo);
+                saveSettings(true);
+            }
+        }
+    };
+    globalThis._rpgFlushRawMemoChanges = flushRawMemoChanges;
+
     textarea.addEventListener('input', (e) => {
         if (_historyViewIndex !== -1) return;
         const newText = /** @type {HTMLTextAreaElement} */ (e.target).value;
-        settings.currentMemo = newText;
-        settings.currentMemo = applyQuestSyncAndStripMemo(settings.currentMemo);
 
-        panel.querySelector('#rpg-tracker-count').textContent = `~${Math.round(settings.currentMemo.length / 2.62)} tokens`;
-        saveSettings();
-        // Refresh the rendered view live so changes are visible without toggling modes
+        // Update token counter immediately in-place
+        panel.querySelector('#rpg-tracker-count').textContent = `~${Math.round(newText.length / 2.62)} tokens`;
+
+        // Debounce actual sync, save, and rendered view updates by 2000ms
         clearTimeout(_rawEditDebounce);
-        _rawEditDebounce = setTimeout(refreshRenderedView, 400);
+        _rawEditDebounce = setTimeout(() => {
+            _rawEditDebounce = null;
+            settings.currentMemo = newText;
+            settings.currentMemo = applyQuestSyncAndStripMemo(settings.currentMemo);
+            saveSettings();
+            refreshRenderedView();
+        }, 2000);
     });
 
     // (RNG footer toggles removed; managed via settings.html)
@@ -8402,6 +8430,7 @@ Rules:
     applyViewState();
 
     _viewBtn.addEventListener('click', () => {
+        if (typeof flushRawMemoChanges === 'function') flushRawMemoChanges();
         _renderedViewActive = !_renderedViewActive;
         settings.renderedViewActive = _renderedViewActive;
         localStorage.setItem('rpg_tracker_rendered_view_active', String(_renderedViewActive));

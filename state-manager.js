@@ -1496,6 +1496,9 @@ export function persistRouterLastRunTimestamp(epochMs = Date.now()) {
  */
 export function saveChatState(chatId) {
     if (!chatId) return;
+    if (typeof globalThis._rpgFlushRawMemoChanges === 'function') {
+        globalThis._rpgFlushRawMemoChanges();
+    }
     const s = getSettings();
     if (!s.chatStates) s.chatStates = {};
     // Preserve fields that are written outside the normal save cycle (e.g. campaignBooks)

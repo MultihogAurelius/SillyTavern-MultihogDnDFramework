@@ -249,7 +249,7 @@ export function handleRecolor(barId, currentBg, targetEl) {
         const ss = getSettings();
         if (!ss.barColors) ss.barColors = {};
         ss.barColors[barId] = { ...cfg };
-        saveSettings();
+        saveSettings(true);
         refreshRenderedView();
     };
 
@@ -355,7 +355,7 @@ export function handleRecolor(barId, currentBg, targetEl) {
             const ss = getSettings();
             if (initialCfg) ss.barColors[barId] = initialCfg;
             else delete ss.barColors[barId];
-            saveSettings();
+            saveSettings(true);
             refreshRenderedView();
             popup.remove();
         });
@@ -363,7 +363,7 @@ export function handleRecolor(barId, currentBg, targetEl) {
         popup.querySelector('#recolor-reset').addEventListener('click', () => {
             const ss = getSettings();
             if (ss.barColors) delete ss.barColors[barId];
-            saveSettings();
+            saveSettings(true);
             refreshRenderedView();
             popup.remove();
         });
