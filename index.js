@@ -10833,8 +10833,12 @@ RULES:
             const themeClass = panel ? Array.from(panel.classList).find(c => c.startsWith('rt-theme-')) || 'rt-theme-native' : 'rt-theme-native';
 
             let html = `<div class="rpg-tracker-panel ${themeClass}" style="display:flex; flex-direction:column; gap:8px; max-height:60vh; overflow-y:auto; padding-right:10px; position:relative; top:auto; right:auto; width:100%; height:auto; background:transparent; border:none; box-shadow:none; resize:none;">`;
-            for (const item of RENDERING_TAGS_LIBRARY) {
-                const rendered = tryRenderMarker(item) || `<i>(Failed to render)</i>`;
+            for (let i = 0; i < RENDERING_TAGS_LIBRARY.length; i++) {
+                const item = RENDERING_TAGS_LIBRARY[i];
+                // Pass a unique per-item line index so preview entries that share
+                // a default label (e.g. no colon in the example text) don't all
+                // resolve to the same barId and recolor together.
+                const rendered = tryRenderMarker(item, 'TAGLIB', '', i) || `<i>(Failed to render)</i>`;
                 html += `<div style="border: 1px solid rgba(255,255,255,0.1); padding: 8px; border-radius: 6px; background: rgba(0,0,0,0.2);">
                     <div style="font-family:monospace; font-size:11px; opacity:0.8; margin-bottom:6px; color:#ffdd88;">${escapeHtml(item)}</div>
                     <div>${rendered}</div>

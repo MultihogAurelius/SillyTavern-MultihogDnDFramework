@@ -591,14 +591,22 @@ export function getTimeOfDayInfo(str) {
      *
      * Example (two columns on one line):
      *   Spells: ((PLS)) Fireball, Magic Missile ((BAR)) Charges: 3/5
+     *
+     * `lineIdx` is the line's position within its block. It's only used as a
+     * barId disambiguator when there's no `entityName` to anchor to (i.e. custom
+     * [TAG] blocks and other non-entity blocks) — without it, several unrelated
+     * lines that happen to share a label (or have no label at all, defaulting to
+     * "Bar") would collapse onto the same barId and recolor together.
      */
-    export function tryRenderMarker(line, tag = '', entityName = '') {
+    export function tryRenderMarker(line, tag = '', entityName = '', lineIdx = null) {
         const segments = tokenizeMarkers(line);
         if (segments.length === 0) return null;
 
+        const lineAnchor = (!entityName && lineIdx !== null) ? `L${lineIdx}` : '';
+
         if (segments.length === 1) {
             // Single-marker fast path — identical to the previous behaviour.
-            return renderMarkerSegment(segments[0], tag, entityName);
+            return renderMarkerSegment(segments[0], tag, entityName, lineAnchor);
         }
 
         // Multi-marker: render each segment and wrap it in a typed cell.
@@ -611,10 +619,11 @@ export function getTimeOfDayInfo(str) {
         const segContents = segments.map(s => (s.preText ? `${s.preText} ${s.content}` : s.content).trim());
 
         const childrenHtml = segments.map((seg, i) => {
-            // rowContext = sibling's content + this segment's index.
+            // rowContext = sibling's content + this segment's index (+ line anchor).
             // The sibling content disambiguates bars across different rows;
-            // the index disambiguates multiple identical bars on the SAME row.
-            const rowContext = `${segContents[i === 0 ? 1 : 0] ?? ''}:${i}`;
+            // the index disambiguates multiple identical bars on the SAME row;
+            // the line anchor disambiguates across different lines with no entity context.
+            const rowContext = `${segContents[i === 0 ? 1 : 0] ?? ''}:${i}${lineAnchor ? ':' + lineAnchor : ''}`;
             const html = renderMarkerSegment(seg, tag, entityName, rowContext);
             const cellClass = STRETCH_TYPES.has(seg.rule.renderType)
                 ? 'rt-mmc-cell rt-mmc-cell--stretch'
@@ -654,7 +663,7 @@ export function getTimeOfDayInfo(str) {
      * Renders a single line from a custom block (non-built-in tag).
      */
     export function renderCustomBlockLine(tag, line, lineIdx = 0) {
-        const asMarker = tryRenderMarker(line, tag);
+        const asMarker = tryRenderMarker(line, tag, '', lineIdx);
         if (asMarker !== null) return asMarker;
 
         // Plain kv fallback
@@ -1171,7 +1180,7 @@ function formatValueToCurrency(totalCp, detectedCurrency) {
                     }
                 }
 
-                return lines.map(line => {
+                return lines.map((line, idx) => {
                     if (line.toLowerCase().startsWith('last rest:')) {
                         const restVal = line.substring(line.indexOf(':') + 1).trim();
                         let append = "";
@@ -1186,7 +1195,7 @@ function formatValueToCurrency(totalCp, detectedCurrency) {
                         }
                         return `<div class="rt-card-line"><b>Last Rest:</b>&nbsp;${escapeHtmlWithColor(restVal)}${append}</div>`;
                     }
-                    const asMarker = tryRenderMarker(line, tag);
+                    const asMarker = tryRenderMarker(line, tag, '', idx);
                     if (asMarker !== null) return asMarker;
                     const { emoji: lineEmoji, color } = getTimeOfDayInfo(line);
                     const linePrefix = lineEmoji ? `<span class="rt-tod-emoji" style="margin-right:4px;">${lineEmoji}</span>` : '';
@@ -1197,8 +1206,8 @@ function formatValueToCurrency(totalCp, detectedCurrency) {
                 });
             }
             case 'XP':
-                return lines.map(line => {
-                    const asMarker = tryRenderMarker(line, tag);
+                return lines.map((line, idx) => {
+                    const asMarker = tryRenderMarker(line, tag, '', idx);
                     if (asMarker !== null) return asMarker;
 
                     // New format: Total: 1,200 / 2,700 XP (Level 3)
@@ -1250,8 +1259,8 @@ function formatValueToCurrency(totalCp, detectedCurrency) {
                 });
             case 'SPELLS': {
                 // Lines: "Level N (avail/max): Spell1, Spell2" or "Cantrips: Spell1, Spell2"
-                return lines.map(line => {
-                    const asMarker = tryRenderMarker(line, tag);
+                return lines.map((line, idx) => {
+                    const asMarker = tryRenderMarker(line, tag, '', idx);
                     if (asMarker !== null) return asMarker;
 
                     const m = line.match(/^(Level\s*\d+|Cantrips?)\s*(?:\((\d+)\/(\d+)[^)]*\))?\s*:\s*(.+)$/i);
@@ -1385,8 +1394,9 @@ function formatValueToCurrency(totalCp, detectedCurrency) {
                     pendingBullets.length = 0;
                 };
 
-                for (const line of lines) {
-                    const asMarker = tryRenderMarker(line, tag);
+                for (let invIdx = 0; invIdx < lines.length; invIdx++) {
+                    const line = lines[invIdx];
+                    const asMarker = tryRenderMarker(line, tag, '', invIdx);
                     if (asMarker !== null) {
                         flushBullets();
                         inventoryResults.push(asMarker);
@@ -1426,8 +1436,9 @@ function formatValueToCurrency(totalCp, detectedCurrency) {
             }
             case 'ABILITIES': {
                 const abilityResults = [];
-                for (const line of lines) {
-                    const asMarker = tryRenderMarker(line, tag);
+                for (let abIdx = 0; abIdx < lines.length; abIdx++) {
+                    const line = lines[abIdx];
+                    const asMarker = tryRenderMarker(line, tag, '', abIdx);
                     if (asMarker !== null) { abilityResults.push(asMarker); continue; }
                     const l = line.trim();
                     const items = l.match(/^[-*]\s+/) ? [l.replace(/^[-*]\s*/, '')] : splitSmart(l);
