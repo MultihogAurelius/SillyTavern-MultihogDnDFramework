@@ -17,7 +17,7 @@ import {
     bindRenderedCardEvents,
     _sectionPages
 } from './index.js';
-import { renderMemoAsCards, MARKER_TYPE_MAP } from './renderer.js';
+import { renderMemoAsCards, MARKER_TYPE_MAP, getMarkerLibraryKeys } from './renderer.js';
 
 export function handleCategorySettings(tag, targetEl) {
     const existing = document.getElementById('rt-cat-settings-popup');
@@ -318,7 +318,7 @@ function buildAiCustomModuleRules(existingTags, editingTag = null) {
     const filter = editingTag ? existingTags.filter(t => t.toUpperCase() !== editingTag.toUpperCase()) : existingTags;
     const list = filter.map(t => `[${t.toUpperCase()}]`).join(', ');
 
-    const markerExamples = Object.keys(MARKER_TYPE_MAP).map(key => {
+    const markerExamples = getMarkerLibraryKeys().map(key => {
         const rule = MARKER_TYPE_MAP[key];
         const example = rule.example || 'Example text';
         return `  - ((${key})) ${example}`;

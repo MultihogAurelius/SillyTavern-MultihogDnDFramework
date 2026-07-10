@@ -447,18 +447,18 @@ export function getTimeOfDayInfo(str) {
 
     // Shared marker type map used by tokenizeMarkers and tryRenderMarker.
     export const MARKER_TYPE_MAP = {
-        PILLS:{ renderType: 'pills', example: 'Status (Hover for details), Condition (Another detail)' }, PLS:{ renderType: 'pills', example: 'Status (Hover for details)' },
-        BAR:{ renderType: 'hp_bar', example: '50/100 (Red HP/Standing)' }, B:{ renderType: 'hp_bar', example: '50/100 (Red HP/Standing)' }, HPBAR:{ renderType: 'hp_bar', example: '50/100 (Red HP/Standing)' }, HPB:{ renderType: 'hp_bar', example: '50/100 (Red HP/Standing)' }, HP: { renderType: 'hp_bar', example: '50/100 (Red HP/Standing)' },
+        PILLS:{ renderType: 'pills', example: 'Status (Hover for details), Condition (Another detail)' }, PLS:{ renderType: 'pills', example: 'Status (Hover for details)', aliasOf: 'PILLS' },
+        BAR:{ renderType: 'hp_bar', example: '50/100 (Red HP/Standing)' }, B:{ renderType: 'hp_bar', example: '50/100 (Red HP/Standing)', aliasOf: 'BAR' }, HPBAR:{ renderType: 'hp_bar', example: '50/100 (Red HP/Standing)', aliasOf: 'BAR' }, HPB:{ renderType: 'hp_bar', example: '50/100 (Red HP/Standing)', aliasOf: 'BAR' }, HP: { renderType: 'hp_bar', example: '50/100 (Red HP/Standing)', aliasOf: 'BAR' },
         BARRED:{ renderType: 'hp_bar', color: 'linear-gradient(90deg,#e74c3c,#c0392b)', example: '50/100 (Crimson Blood)' },
         BARBLUE:{ renderType: 'hp_bar', color: 'linear-gradient(90deg,#3498db,#2980b9)', example: '50/100 (Blue Mana/Mana)' },
         BARGREEN:{ renderType: 'hp_bar', color: 'linear-gradient(90deg,#2ecc71,#27ae60)', example: '50/100 (Green Stamina)' },
         BARYELLOW:{ renderType: 'hp_bar', color: 'linear-gradient(90deg,#f1c40f,#f39c12)', example: '50/100 (Yellow Energy)' },
         BARPURPLE:{ renderType: 'hp_bar', color: 'linear-gradient(90deg,#9b59b6,#8e44ad)', example: '50/100 (Purple Void)' },
         BARORANGE:{ renderType: 'hp_bar', color: 'linear-gradient(90deg,#e67e22,#d35400)', example: '50/100 (Orange Heat)' },
-        XPBAR:{ renderType: 'xp_bar', example: '450/1000 Level 3 (XP/Progress)' }, XB:{ renderType: 'xp_bar', example: '450/1000 Level 3 (XP/Progress)' },
+        XPBAR:{ renderType: 'xp_bar', example: '450/1000 Level 3 (XP/Progress)' }, XB:{ renderType: 'xp_bar', example: '450/1000 Level 3 (XP/Progress)', aliasOf: 'XPBAR' },
         TEXT:{ renderType: 'text', example: 'Some text (Plain)' },
-        BADGE:{ renderType: 'badge', example: 'Neutral (Reputation badge)' }, BDG:{ renderType: 'badge', example: 'Neutral (Reputation badge)' },
-        HIGHLIGHT:{ renderType: 'highlight', example: 'Emphasis (Bright highlight text)' }, HGT:{ renderType: 'highlight', example: 'Emphasis (Bright highlight text)' },
+        BADGE:{ renderType: 'badge', example: 'Neutral (Reputation badge)' }, BDG:{ renderType: 'badge', example: 'Neutral (Reputation badge)', aliasOf: 'BADGE' },
+        HIGHLIGHT:{ renderType: 'highlight', example: 'Emphasis (Bright highlight text)' }, HGT:{ renderType: 'highlight', example: 'Emphasis (Bright highlight text)', aliasOf: 'HIGHLIGHT' },
         OBJ:{ renderType: 'objective', example: '✓ Done (Checked quest bullet)' },
         REWARD:{ renderType: 'reward', example: '500 XP (Loot reward badge)' },
         DIFFICULTY:{ renderType: 'difficulty', example: 'Hard (Difficulty star badge)' },
@@ -488,18 +488,23 @@ export function getTimeOfDayInfo(str) {
         CLOCK:{ renderType: 'clock', example: '4/8 (Guard Alertness)' },
         STARS:{ renderType: 'stars', example: '3/5 (Merchant Favor)' },
         WEIGHT:{ renderType: 'weight', example: '45/50 lbs (Encumbered)' },
-        CAPACITY:{ renderType: 'weight', example: '45/50 lbs (Encumbered)' },
+        CAPACITY:{ renderType: 'weight', example: '45/50 lbs (Encumbered)', aliasOf: 'WEIGHT' },
         WEATHER:{ renderType: 'weather', example: 'Heavy Rain (Poor Visibility)' },
         ORBS:{ renderType: 'orbs', example: '3/5 (Ki Points)' },
-        AP:{ renderType: 'orbs', example: '3/5 (Ki Points)' },
+        AP:{ renderType: 'orbs', example: '3/5 (Ki Points)', aliasOf: 'ORBS' },
         SLOTS:{ renderType: 'slots', example: '4/10 (Backpack)' },
         PHASE:{ renderType: 'phase', example: '2/4 (Ritual Summoning)' },
-        STEP:{ renderType: 'phase', example: '2/4 (Ritual Summoning)' },
+        STEP:{ renderType: 'phase', example: '2/4 (Ritual Summoning)', aliasOf: 'PHASE' },
         GAUGE:{ renderType: 'gauge', example: '75/100 (Party Morale)' },
-        METER:{ renderType: 'gauge', example: '75/100 (Party Morale)' },
+        METER:{ renderType: 'gauge', example: '75/100 (Party Morale)', aliasOf: 'GAUGE' },
         CHARGE:{ renderType: 'charge', example: '2/5 (Wand of Fireballs)' },
-        BATTERY:{ renderType: 'charge', example: '2/5 (Wand of Fireballs)' }
+        BATTERY:{ renderType: 'charge', example: '2/5 (Wand of Fireballs)', aliasOf: 'CHARGE' }
     };
+
+    /** Canonical marker keys for UI library / AI hints (excludes shorthand aliases). */
+    export function getMarkerLibraryKeys() {
+        return Object.keys(MARKER_TYPE_MAP).filter(k => !MARKER_TYPE_MAP[k].aliasOf);
+    }
 
     // Regex that matches the NEXT ((MARKER)) token anywhere in a string.
     // Used iteratively by tokenizeMarkers.
