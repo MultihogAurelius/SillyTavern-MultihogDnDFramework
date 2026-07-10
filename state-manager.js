@@ -954,8 +954,57 @@ export function getFactoryCartridgePayload() {
     return payload;
 }
 
+/**
+ * Compares two dotted version strings numerically (segment-by-segment), so
+ * e.g. compareVersions('4.10.0', '4.5.0') correctly returns > 0. A plain
+ * string comparison would treat '4.10.0' < '4.5.0' because '1' < '5'.
+ * @param {string} a
+ * @param {string} b
+ * @returns {number} negative if a<b, 0 if equal, positive if a>b
+ */
+function compareVersions(a, b) {
+    const pa = String(a || '0').split('.').map(n => parseInt(n, 10) || 0);
+    const pb = String(b || '0').split('.').map(n => parseInt(n, 10) || 0);
+    const len = Math.max(pa.length, pb.length);
+    for (let i = 0; i < len; i++) {
+        const diff = (pa[i] || 0) - (pb[i] || 0);
+        if (diff !== 0) return diff;
+    }
+    return 0;
+}
+
+/** True when the stored settingsVersion is older than `target` (or unset). */
+function isOlderThan(currentVersion, target) {
+    return !currentVersion || compareVersions(currentVersion, target) < 0;
+}
+
+// Re-entrancy guard: some migration blocks below call buildNpcInstruction()/
+// buildLocInstruction()/buildFacInstruction(), which themselves call
+// getSettings() to read a couple of flags (useDdMmYyFormat, npcRelationshipBars).
+// Without this guard, a fresh install (no settingsVersion yet) re-enters
+// getSettings() from inside itself before settingsVersion has been bumped,
+// re-running the same migration block over and over → infinite recursion /
+// stack overflow that hangs the page on load. See CHANGELOG for details.
+let _gettingSettings = false;
+
 export function getSettings() {
     const { extensionSettings } = SillyTavern.getContext();
+
+    // Re-entrant call from within a migration block (e.g. via one of the
+    // instruction builders) — just hand back the in-progress settings object
+    // rather than re-running the merge/migration pipeline recursively.
+    if (_gettingSettings) {
+        return extensionSettings[MODULE_NAME] || (extensionSettings[MODULE_NAME] = {});
+    }
+    _gettingSettings = true;
+    try {
+        return getSettingsInternal(extensionSettings);
+    } finally {
+        _gettingSettings = false;
+    }
+}
+
+function getSettingsInternal(extensionSettings) {
     const defaults = buildDefaultSettings();
 
     if (!extensionSettings[MODULE_NAME]) {
@@ -1081,7 +1130,7 @@ export function getSettings() {
     }
 
     // Migrate NPC prompt to include appearance recording (v3.5.2 one-time migration)
-    if (!s.settingsVersion || s.settingsVersion < '3.5.2') {
+    if (isOlderThan(s.settingsVersion, '3.5.2')) {
         if (s.routerModules?.npc?.instruction === 'Named characters. Do NOT create an entry for {{user}}. Mention {{user}} in EVENT or QUEST entries as needed.') {
             s.routerModules.npc.instruction = DEFAULT_MODULES.npc.instruction;
         }
@@ -1089,7 +1138,7 @@ export function getSettings() {
     }
 
     // Migrate NPC prompt to include Friendship/Affection relationship tracking (v3.6.0)
-    if (!s.settingsVersion || s.settingsVersion < '3.6.0') {
+    if (isOlderThan(s.settingsVersion, '3.6.0')) {
         if (s.routerModules?.npc?.instruction && typeof s.routerModules.npc.instruction === 'string') {
             const ins = s.routerModules.npc.instruction;
             // Only migrate if it doesn't already mention Friendship/Rapport
@@ -1101,7 +1150,7 @@ export function getSettings() {
     }
 
     // Migrate NPC prompt to structured sections format (v3.7.0)
-    if (!s.settingsVersion || s.settingsVersion < '3.7.0') {
+    if (isOlderThan(s.settingsVersion, '3.7.0')) {
         if (s.routerModules?.npc?.instruction && typeof s.routerModules.npc.instruction === 'string') {
             // Replace wholesale — the new format is significantly different
             s.routerModules.npc.instruction = DEFAULT_MODULES.npc.instruction;
@@ -1110,7 +1159,7 @@ export function getSettings() {
     }
 
     // Migrate NPC prompt — fix sections-outside-tags issue + remove sentence counts (v3.8.0)
-    if (!s.settingsVersion || s.settingsVersion < '3.8.0') {
+    if (isOlderThan(s.settingsVersion, '3.8.0')) {
         if (s.routerModules?.npc?.instruction && typeof s.routerModules.npc.instruction === 'string') {
             s.routerModules.npc.instruction = DEFAULT_MODULES.npc.instruction;
         }
@@ -1118,7 +1167,7 @@ export function getSettings() {
     }
 
     // Migrate NPC prompt — tighter token defaults + conciseness emphasis (v3.9.0)
-    if (!s.settingsVersion || s.settingsVersion < '3.9.0') {
+    if (isOlderThan(s.settingsVersion, '3.9.0')) {
         if (s.routerModules?.npc?.instruction && typeof s.routerModules.npc.instruction === 'string') {
             s.routerModules.npc.instruction = DEFAULT_MODULES.npc.instruction;
         }
@@ -1126,7 +1175,7 @@ export function getSettings() {
     }
 
     // Migrate NPC prompt — relationship bars off by default + settings-driven instruction (v3.10.0)
-    if (!s.settingsVersion || s.settingsVersion < '3.10.0') {
+    if (isOlderThan(s.settingsVersion, '3.10.0')) {
         // Ensure NPC settings exist with defaults
         if (s.npcMajorTokens === undefined) s.npcMajorTokens = 125;
         if (s.npcMinorTokens === undefined) s.npcMinorTokens = 100;
@@ -1139,7 +1188,7 @@ export function getSettings() {
     }
 
     // Migrate NPC system to [CORE] tag, code-owned relationship bars, and delta-based updates (v3.11.0)
-    if (!s.settingsVersion || s.settingsVersion < '3.11.0') {
+    if (isOlderThan(s.settingsVersion, '3.11.0')) {
         // Initialize relationship value store
         if (!s.npcRelationshipValues) s.npcRelationshipValues = {};
         // Force-rebuild NPC instruction to new format
@@ -1153,7 +1202,7 @@ export function getSettings() {
     }
 
     // Migrate NPC limits from tokens to words (v3.12.0)
-    if (!s.settingsVersion || s.settingsVersion < '3.12.0') {
+    if (isOlderThan(s.settingsVersion, '3.12.0')) {
         // Convert old token keys to word keys using approximate conversion (125t→90w, 100t→60w)
         if (s.npcMajorWords === undefined) {
             s.npcMajorWords = s.npcMajorTokens !== undefined ? Math.round(s.npcMajorTokens * 0.72) : 25;
@@ -1169,7 +1218,7 @@ export function getSettings() {
     }
 
     // Migrate NPC limits from total words to per-section word targets (v3.13.0)
-    if (!s.settingsVersion || s.settingsVersion < '3.13.0') {
+    if (isOlderThan(s.settingsVersion, '3.13.0')) {
         // Convert old total word limits (90/60) to reasonable per-section defaults (25/15).
         // Only reset clearly legacy token-era values — NOT arbitrary high word counts.
         // Threshold raised to 1000 so users can freely set values like 200, 300, 400+.
@@ -1187,7 +1236,7 @@ export function getSettings() {
     }
 
     // Wrap CORE_FORMAT and CORE LENGTH TARGETS in XML tags (v3.14.0)
-    if (!s.settingsVersion || s.settingsVersion < '3.14.0') {
+    if (isOlderThan(s.settingsVersion, '3.14.0')) {
         if (s.routerModules?.npc) {
             s.routerModules.npc.instruction = buildNpcInstruction(s.npcMajorWords, s.npcMinorWords);
         }
@@ -1195,7 +1244,7 @@ export function getSettings() {
     }
 
     // Ensure entry starts directly with [CORE] and add relationship editing (v3.15.0)
-    if (!s.settingsVersion || s.settingsVersion < '3.15.0') {
+    if (isOlderThan(s.settingsVersion, '3.15.0')) {
         if (s.routerModules?.npc) {
             s.routerModules.npc.instruction = buildNpcInstruction(s.npcMajorWords, s.npcMinorWords);
         }
@@ -1203,7 +1252,7 @@ export function getSettings() {
     }
 
     // Enforce {{user}} macro usage and prevent literal "user" or "player" text (v3.16.0)
-    if (!s.settingsVersion || s.settingsVersion < '3.16.0') {
+    if (isOlderThan(s.settingsVersion, '3.16.0')) {
         if (s.routerModules?.npc) {
             s.routerModules.npc.instruction = buildNpcInstruction(s.npcMajorWords, s.npcMinorWords);
         }
@@ -1212,7 +1261,7 @@ export function getSettings() {
     }
 
     // Reinforce NPC and Event prompts regarding combat granularity and logs (v3.16.13)
-    if (!s.settingsVersion || s.settingsVersion < '3.16.13') {
+    if (isOlderThan(s.settingsVersion, '3.16.13')) {
         if (s.routerModules?.npc) {
             s.routerModules.npc.instruction = buildNpcInstruction(s.npcMajorWords, s.npcMinorWords);
         }
@@ -1224,7 +1273,7 @@ export function getSettings() {
     }
 
     // Expand NPC relationship delta guidance with situational examples (v3.16.14)
-    if (!s.settingsVersion || s.settingsVersion < '3.16.14') {
+    if (isOlderThan(s.settingsVersion, '3.16.14')) {
         if (s.routerModules?.npc) {
             s.routerModules.npc.instruction = buildNpcInstruction(s.npcMajorWords, s.npcMinorWords);
         }
@@ -1236,7 +1285,7 @@ export function getSettings() {
     }
 
     // Reinforce that NPC Description must start directly with [CORE] without timestamp (v3.16.16)
-    if (!s.settingsVersion || s.settingsVersion < '3.16.16') {
+    if (isOlderThan(s.settingsVersion, '3.16.16')) {
         if (s.routerModules?.npc) {
             s.routerModules.npc.instruction = buildNpcInstruction(s.npcMajorWords, s.npcMinorWords, false);
         }
@@ -1244,7 +1293,7 @@ export function getSettings() {
     }
 
     // Move ongoing relationship tracking from lorebook agent to narrative AI direct parsing (v3.16.17)
-    if (!s.settingsVersion || s.settingsVersion < '3.16.17') {
+    if (isOlderThan(s.settingsVersion, '3.16.17')) {
         if (s.routerModules?.npc) {
             s.routerModules.npc.instruction = buildNpcInstruction(s.npcMajorWords, s.npcMinorWords, false);
         }
@@ -1252,7 +1301,7 @@ export function getSettings() {
     }
 
     // Force rebuild of NPC instruction to restore length targets that were incorrectly stripped by a previous bug (v3.16.18)
-    if (!s.settingsVersion || s.settingsVersion < '3.16.18') {
+    if (isOlderThan(s.settingsVersion, '3.16.18')) {
         if (s.routerModules?.npc) {
             s.routerModules.npc.instruction = buildNpcInstruction(s.npcMajorWords, s.npcMinorWords, false);
         }
@@ -1260,7 +1309,7 @@ export function getSettings() {
     }
 
     // Tighten perennial [CORE] guidance — ban plot-tied scene recaps (v3.16.19)
-    if (!s.settingsVersion || s.settingsVersion < '3.16.19') {
+    if (isOlderThan(s.settingsVersion, '3.16.19')) {
         if (s.routerModules?.npc) {
             s.routerModules.npc.instruction = buildNpcInstruction(s.npcMajorWords, s.npcMinorWords, false);
         }
@@ -1268,19 +1317,19 @@ export function getSettings() {
     }
 
     // Baseline since-last-run watermark after lookback reliability fix (v3.16.20)
-    if (!s.settingsVersion || s.settingsVersion < '3.16.20') {
+    if (isOlderThan(s.settingsVersion, '3.16.20')) {
         s.routerWatermarkBaselinePending = true;
         s.settingsVersion = '3.16.20';
     }
 
     // NPC portrait card view toggle (v3.16.21)
-    if (!s.settingsVersion || s.settingsVersion < '3.16.21') {
+    if (isOlderThan(s.settingsVersion, '3.16.21')) {
         if (s.npcPortraits === undefined) s.npcPortraits = true;
         s.settingsVersion = '3.16.21';
     }
 
     // Quest archive UI toggle default (v3.16.22)
-    if (!s.settingsVersion || s.settingsVersion < '3.16.22') {
+    if (isOlderThan(s.settingsVersion, '3.16.22')) {
         if (s.syspromptModules && s.syspromptModules.questsShowArchive === undefined) {
             s.syspromptModules.questsShowArchive = true;
         }
@@ -1288,7 +1337,7 @@ export function getSettings() {
     }
 
     // LOC module: plain [CORE] without NPC field headers (v4.3.9)
-    if (!s.settingsVersion || s.settingsVersion < '4.3.9') {
+    if (isOlderThan(s.settingsVersion, '4.3.9')) {
         if (s.routerModules?.loc) {
             s.routerModules.loc.instruction = buildLocInstruction();
         }
@@ -1296,7 +1345,7 @@ export function getSettings() {
     }
 
     // NPC relationship max: global default + per-chat live value (v4.4.0)
-    if (!s.settingsVersion || s.settingsVersion < '4.4.0') {
+    if (isOlderThan(s.settingsVersion, '4.4.0')) {
         if (s.npcRelationshipMaxDefault === undefined) {
             s.npcRelationshipMaxDefault = s.npcRelationshipMax ?? 150;
         }
@@ -1307,7 +1356,7 @@ export function getSettings() {
     }
 
     // Hardened player safeguard prompts & Faction [CORE] tags (v4.5.0)
-    if (!s.settingsVersion || s.settingsVersion < '4.5.0') {
+    if (isOlderThan(s.settingsVersion, '4.5.0')) {
         if (s.routerModules?.npc) {
             s.routerModules.npc.instruction = buildNpcInstruction(s.npcMajorWords, s.npcMinorWords, false);
         }

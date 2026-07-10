@@ -2,6 +2,12 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [4.8.6] - 2026-07-10
+
+### Fixed
+- **Critical: Fresh-Install Hang (Infinite Recursion)**: Fixed a bug where `getSettings()` and the NPC/LOC/FAC instruction builders (`buildNpcInstruction`, `buildLocInstruction`, `buildFacInstruction`) could recurse into each other during the settings-migration pipeline. Each migration block called a builder *before* bumping `settingsVersion`, and the builders called `getSettings()` back to read `useDdMmYyFormat`/`npcRelationshipBars` — so the nested call would see the still-old version, re-enter the same migration block, and call the builder again, looping until the stack overflowed. This only affected brand-new installs (no saved `settingsVersion`) and configs below `4.5.0`, silently freezing SillyTavern on load. Added a re-entrancy guard to `getSettings()` so nested calls return the in-progress settings object instead of restarting the migration pipeline.
+- **Version Comparison in Migrations**: Migration gates previously compared `settingsVersion` with plain string comparison (e.g. `'4.10.0' < '4.5.0'` incorrectly evaluates `true`), which would misfire once a double-digit minor/patch version is reached. Replaced with a proper numeric segment-by-segment version comparison.
+
 ## [4.8.5] - 2026-07-09
 
 ### Added
