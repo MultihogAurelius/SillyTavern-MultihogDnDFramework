@@ -940,15 +940,15 @@ async function importPcFromCard(charCard, mode, el) {
 
     // Gather world context
     const contextLines = [];
-    contextLines.push(`CHARACTER CARD:\nName: ${name}\nDescription: ${(charCard.description || '').substring(0, 3000)}\nPersonality: ${(charCard.personality || '').substring(0, 1000)}`);
-    if (s.currentMemo) contextLines.push(`CURRENT GAME STATE:\n${s.currentMemo.substring(0, 2000)}`);
+    contextLines.push(`CHARACTER CARD:\nName: ${name}\nDescription: ${(charCard.description || '')}\nPersonality: ${(charCard.personality || '')}`);
+    if (s.currentMemo) contextLines.push(`CURRENT GAME STATE:\n${s.currentMemo}`);
     if (ctx.chat && Array.isArray(ctx.chat)) {
         const msgs = ctx.chat.filter(m => !m.is_system && m.mes?.trim()).slice(-8);
-        if (msgs.length > 0) contextLines.push(`RECENT CHAT:\n${msgs.map(m => `${m.name || (m.is_user ? 'User' : 'Character')}: ${m.mes}`).join('\n\n').substring(0, 3000)}`);
+        if (msgs.length > 0) contextLines.push(`RECENT CHAT:\n${msgs.map(m => `${m.name || (m.is_user ? 'User' : 'Character')}: ${m.mes}`).join('\n\n')}`);
     }
     try {
         const charData = ctx.characters?.[ctx.characterId];
-        if (charData?.description) contextLines.push(`NARRATOR/WORLD CARD:\n${charData.description.substring(0, 1500)}`);
+        if (charData?.description) contextLines.push(`NARRATOR/WORLD CARD:\n${charData.description}`);
     } catch (_) {}
     const worldCtx = contextLines.join('\n\n---\n\n');
 
@@ -1044,7 +1044,7 @@ async function generatePcImportBio(charCard, mode, wordCount) {
     let worldHint = '';
     try {
         const charData = ctx.characters?.[ctx.characterId];
-        if (charData?.description) worldHint = charData.description.substring(0, 1500).trim();
+        if (charData?.description) worldHint = charData.description.trim();
     } catch (_) {}
 
     if (mode === 'minimal') {
