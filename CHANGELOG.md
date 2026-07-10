@@ -23,6 +23,43 @@ All notable changes to the **Multihog D&D Framework** will be documented in this
 ### Fixed
 - **Centralized Tag Examples**: Moved all rendering tag example strings directly into the core `MARKER_TYPE_MAP` definition instead of maintaining them in separate UI files. This architectural improvement ensures that whenever a new tag is added to the engine, its AI context and UI preview are automatically defined and synchronized in one place.
 
+## [4.8.7] - 2026-07-10
+
+### Added
+- **Game System Wizard Upgrades**: Improved the prompt generation wizard to support compound meters, scaled magnitudes, and natural-language inline delta annotations (e.g., `*(Food eaten: Chocolate Bar. +75 Hunger)*`).
+- **UI Feedback for Wizard**: The Game System Wizard button now disables and displays a loading spinner (`Generating...`) while the LLM is generating drafts.
+- **Bar Percentage Mode**: Added a "Show as Percentage" option to HP/XP and custom status bars in the recolor popup. When enabled, it displays the value scaled out of 100 (e.g., `50/100`), keeping the backend math identical for AI parsing.
+- **Native Portrait Generator Default**: Swapped the default portrait generator from Pollinations.ai to the SillyTavern native Image Generation Extension to bypass the new Pollinations PAYG paywall, and added an informative configuration tooltip.
+- **Unlock Base Sections**: Added capability to fully override built-in system prompt sections (e.g. `<combat>`) directly from the settings panel.
+
+### Changed
+- **Modular Code Architecture**: Split the monolithic `index.js` into dedicated, domain-specific modules:
+  - `game-systems.js`: Core RPG game system logic, template building, and AI wizards.
+  - `character-creator.js`: Character creator panel, attributes, and onboarding flow.
+  - `theme-manager.js`: UI themes, CSS injection, and the custom bar recolor popup.
+  - `ui-editors.js`: Custom fields editor, prompt templates, and imports/exports.
+  - `ui-geometry.js`: Resizing math, dragging handlers, and viewport geometry adjustments.
+
+### Fixed
+- **State Save Performance**: Solved the UI lag/freeze during typing by debouncing live setting saves by 2000ms, and implemented smart flushing that instantly commits edits before switching views or switching chats.
+- **State Leakage**: Fixed cross-chat state leakage in `saveChatState` by using the authoritative `getActiveChatId()` rather than potentially stale event sources.
+- **Custom Field Editor Sandbox**:
+  - Restored correct synchronous `renderMemoAsCards` preview rendering in the custom fields editor.
+  - Fixed page navigation in the testing sandbox live preview.
+  - Forced live preview to default to a clean, non-paginated mode.
+- **Full NPC Card**: Fixed the NPC detail popup failing to open due to missing `portraitSrc`, `hidePortrait`, and `ctx` bindings in `openNpcDetailPopup`.
+
+## [4.8.6] - 2026-07-10
+
+### Added
+- **Full Module Context for Wizard**: The Game System Wizard now receives the complete prompting instructions, templates, and active states of all enabled stock modules, custom fields, and custom GM sections. This enables the AI generator to be fully influenced by existing formatting and rules in the workspace.
+- **Complete Tags Library Exposure**: Expanded the wizard's rendering library hints to expose all 30+ available tags, resolving a bug where the AI was unaware of advanced tags like `((PROGRESS))` due to a hardcoded 12-item slice limit.
+- **Pill Hygiene Instructions**: Added explicit guidelines to the Game System Wizard and AI Custom Field Creator prompts to prevent the AI from prefixing every item in a list with the `((PILLS))` tag, avoiding visual rendering issues.
+
+### Fixed
+- **Settings UI Cartridge Sync**: Modified settings UI loading code to immediately re-sync toggles (including RNG settings) when loading a game cartridge or closing the cartridge menu, resolving the need for manual browser refreshes (F5).
+- **CORE Tag Auto-Stripping**: Corrected a regular expression filter in the content sanitization function that was accidentally stripping out `[CORE]` and `[/CORE]` tag lines from committed lorebook entries.
+
 ## [4.8.5] - 2026-07-09
 
 ### Added
