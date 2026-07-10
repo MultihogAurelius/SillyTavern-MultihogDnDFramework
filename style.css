@@ -3892,3 +3892,144 @@ textarea.rt-cr-input {
     flex-shrink: 0;
 }
 
+
+/* NEW PROGRESSION TAGS */
+/* CLOCK */
+.rt-clock-row { display: flex; align-items: center; gap: 6px; }
+.rt-clock-icon {
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    border: 1px solid rgba(255,255,255,0.2);
+    box-shadow: inset 0 0 4px rgba(0,0,0,0.5);
+    flex-shrink: 0;
+    cursor: pointer;
+}
+.rt-clock-label { font-size: 0.9em; opacity: 0.9; }
+
+/* STARS */
+.rt-stars-row { display: flex; align-items: center; gap: 6px; }
+.rt-stars-icon { font-size: 1.1em; letter-spacing: 2px; text-shadow: 0 0 5px currentColor; cursor: pointer; }
+.rt-stars-label { font-size: 0.9em; opacity: 0.8; }
+
+/* WEIGHT */
+.rt-weight-row { display: flex; align-items: center; gap: 6px; }
+.rt-weight-icon { font-size: 1.1em; }
+.rt-weight-bar-wrap {
+    flex-grow: 1;
+    height: 8px;
+    background: rgba(0, 0, 0, 0.4);
+    border-radius: 2px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    overflow: hidden;
+    cursor: pointer;
+}
+.rt-weight-bar { height: 100%; transition: width 0.3s, background 0.3s; }
+.rt-weight-label { font-size: 0.85em; opacity: 0.9; white-space: nowrap; }
+
+/* WEATHER */
+.rt-weather-badge {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 12px;
+    padding: 2px 8px;
+    font-size: 0.9em;
+}
+
+/* ORBS */
+.rt-orbs-row { display: flex; align-items: center; gap: 8px; }
+.rt-orbs-container { display: flex; gap: 4px; cursor: pointer; }
+.rt-orb {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    transition: all 0.3s ease;
+}
+.rt-orb.filled { border-color: transparent; }
+
+/* SLOTS */
+.rt-slots-row { display: flex; align-items: center; gap: 8px; }
+.rt-slots-container { display: flex; gap: 2px; flex-wrap: wrap; max-width: 150px; cursor: pointer; }
+.rt-slot {
+    width: 12px; height: 12px;
+    border-radius: 2px;
+    background: rgba(0,0,0,0.5);
+    border: 1px solid rgba(255,255,255,0.3);
+    transition: background 0.3s ease;
+}
+.rt-slot.filled { border-color: transparent; }
+
+/* PHASE */
+.rt-phase-row { display: flex; align-items: center; gap: 8px; }
+.rt-phase-container { display: flex; align-items: center; cursor: pointer; }
+.rt-phase-node {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.2);
+    background: transparent;
+    transition: all 0.3s ease;
+}
+.rt-phase-line {
+    width: 15px; height: 2px;
+    background: rgba(255,255,255,0.2);
+    transition: background 0.3s ease;
+}
+
+/* GAUGE */
+.rt-gauge-row { display: flex; align-items: center; gap: 8px; }
+.rt-gauge-wrap {
+    position: relative;
+    width: 40px; height: 20px;
+    overflow: hidden;
+    cursor: pointer;
+}
+.rt-gauge-bg {
+    position: absolute;
+    top: 0; left: 0;
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    -webkit-mask-image: radial-gradient(circle at center, transparent 40%, black 41%);
+    mask-image: radial-gradient(circle at center, transparent 40%, black 41%);
+}
+.rt-gauge-needle {
+    position: absolute;
+    bottom: 0; left: 19px;
+    width: 2px; height: 16px;
+    background: #fff;
+    transform-origin: bottom center;
+    transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 2;
+    box-shadow: 0 0 2px rgba(0,0,0,0.8);
+}
+
+/* CHARGE */
+.rt-charge-row { display: flex; align-items: center; gap: 8px; }
+.rt-battery-wrap {
+    position: relative;
+    width: 40px; height: 14px;
+    border: 1px solid #fff;
+    border-radius: 2px;
+    padding: 1px;
+    display: flex;
+    cursor: pointer;
+}
+.rt-battery-nub {
+    position: absolute;
+    right: -3px; top: 3px;
+    width: 2px; height: 6px;
+    border-radius: 0 2px 2px 0;
+}
+.rt-battery-fill {
+    height: 100%;
+    border-radius: 1px;
+    transition: width 0.3s, background 0.3s;
+}
+@keyframes rt-battery-flash {
+    0% { opacity: 1; }
+    50% { opacity: 0.3; }
+    100% { opacity: 1; }
+}
+.rt-battery-wrap.empty-flash {
+    animation: rt-battery-flash 1s infinite;
+}
+

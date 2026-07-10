@@ -2,6 +2,27 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [4.8.9] - 2026-07-10
+
+### Added
+- **Colored Progress Variants**: Added a full suite of color-coded variants for the `((PROGRESS))` marker (e.g. `((PROGRESSRED))`, `((PROGRESSBLUE))`, `((PROGRESSGREEN))`) to expand dynamic visual tracking options in the library.
+- **Dynamic AI Tag Engine**: The Game Wizard AI now automatically synchronizes with the core renderer library, meaning it instantly understands the visual formatting and contextual meaning of all existing and future progress tag variants when generating new custom tracking modules.
+- **Progress Bar Recoloring**: All `((PROGRESS))` markers in the state tracker are now natively clickable. They utilize the same intuitive color-wheel picker as standard bars, allowing players to dynamically override their fill colors on the fly.
+- **Nine New Visual Components**: Vastly expanded the rendering engine with 9 entirely new, fully dynamic visual markers:
+  - `((CLOCK))` - Blades in the Dark style rotating conic-gradient clocks.
+  - `((STARS))` - 5-star rating icons for reputation/quality.
+  - `((WEIGHT))` - Encumbrance bars that dynamically shift color at 75% and 100%.
+  - `((WEATHER))` - Dynamic weather badges that automatically match string keywords to thematic emoji (e.g. 🌧️, ☀️, ❄️).
+  - `((ORBS))` - Glowing resource action points (similar to Ki or spell slots).
+  - `((SLOTS))` - Hollow grid slots for tracking discrete inventory capacity.
+  - `((PHASE))` - Connected "subway map" style breadcrumb nodes for multi-stage events.
+  - `((GAUGE))` - Semi-circle speedometers with a rotating needle for tension/morale tracking.
+  - `((CHARGE))` - Segmented battery icons that flash red when depleted.
+  *Note: All progression-based tags natively support color-wheel recoloring by clicking them in the state tracker!*
+
+### Fixed
+- **Centralized Tag Examples**: Moved all rendering tag example strings directly into the core `MARKER_TYPE_MAP` definition instead of maintaining them in separate UI files. This architectural improvement ensures that whenever a new tag is added to the engine, its AI context and UI preview are automatically defined and synchronized in one place.
+
 ## [4.8.7] - 2026-07-10
 
 ### Fixed

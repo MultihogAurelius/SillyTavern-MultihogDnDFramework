@@ -17,7 +17,7 @@ import {
     bindRenderedCardEvents,
     _sectionPages
 } from './index.js';
-import { renderMemoAsCards } from './renderer.js';
+import { renderMemoAsCards, MARKER_TYPE_MAP } from './renderer.js';
 
 export function handleCategorySettings(tag, targetEl) {
     const existing = document.getElementById('rt-cat-settings-popup');
@@ -317,44 +317,20 @@ async function showAiStockPromptPreviewPopup(displayTag, promptText) {
 function buildAiCustomModuleRules(existingTags, editingTag = null) {
     const filter = editingTag ? existingTags.filter(t => t.toUpperCase() !== editingTag.toUpperCase()) : existingTags;
     const list = filter.map(t => `[${t.toUpperCase()}]`).join(', ');
+
+    const markerExamples = Object.keys(MARKER_TYPE_MAP).map(key => {
+        const rule = MARKER_TYPE_MAP[key];
+        const example = rule.example || 'Example text';
+        return `  - ((${key})) ${example}`;
+    }).join('\n');
+
     return `Instructions:
 - Output ONLY the JSON block. Do NOT include markdown fences, preambles, or postscripts.
 - The tag name must be short, alpha-numeric, uppercase, and UNIQUE. Avoid clashes with existing custom tags: ${list || '(none)'} or stock tags: [COMBAT], [CHARACTER], [PARTY], [INVENTORY], [ABILITIES], [SPELLS], [XP], [TIME].
 - Choose a beautiful, fitting single emoji icon.
 - Write precise, concise instructions for the tracking model. Explain what state properties/values to increment, decrement, or add.
 - Define a realistic, matching sample block template in the "template" key matching your instructions. Use inline rendering tags for visuals:
-  - ((BAR)) 50/100 (Red HP/Standing)
-  - ((BARRED)) 50/100 (Crimson Blood)
-  - ((BARBLUE)) 50/100 (Blue Mana/Mana)
-  - ((BARGREEN)) 50/100 (Green Stamina)
-  - ((BARYELLOW)) 50/100 (Yellow Energy)
-  - ((BARPURPLE)) 50/100 (Purple Void)
-  - ((BARORANGE)) 50/100 (Orange Heat)
-  - ((XPBAR)) 450/1000 Level 3 (XP/Progress)
-  - ((PILLS)) A, B (Gray pills)
-  - ((PILLRED)) Debuffs, Stunned
-  - ((PILLGREEN)) Buffs, Blessed
-  - ((PILLBLUE)) Wards, Shielded
-  - ((BADGE)) Neutral (Reputation badge)
-  - ((WARNING)) Caution (Amber badge)
-  - ((DANGER)) Hostile (Red badge)
-  - ((SUCCESS)) Active (Green badge)
-  - ((INFO)) Role (Blue badge)
-  - ((GOLD)) 150 (Gold coins)
-  - ((SILVER)) 45 (Silver coins)
-  - ((BRONZE)) 12 (Bronze coins)
-  - ((DOLLAR)) 500 (Paper cash)
-  - ((SKULL)) 12 (Kills/Deaths)
-  - ((HEART)) 3 (Lives/Hearts)
-  - ((SOUL)) 42 (Souls)
-  - ((OBJ)) ○ To-do (Empty quest bullet)
-  - ((OBJ)) ✓ Done (Checked quest bullet)
-  - ((OBJ)) ✗ Failed (Failed quest bullet)
-  - ((REWARD)) 500 XP (Loot reward badge)
-  - ((DIFFICULTY)) Hard (Difficulty star badge)
-  - ((PROGRESS)) 3/5 (Fraction progress)
-  - ((ROLL)) 1d20+5 = 18 (Dice roll badge)
-  - ((HIGHLIGHT)) Emphasis (Bright highlight text)`;
+${markerExamples}`;
 }
 
 async function runAiEditCustomModule(settings, field, description) {

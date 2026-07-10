@@ -325,10 +325,31 @@ export function handleRecolor(barId, currentBg, targetEl) {
             } else {
                 bg = cfg.color;
             }
-            // Patch the actual bar fill element directly — O(1), no DOM rebuild.
-            document.querySelectorAll(`.rt-hp-bar-wrap[data-recolor-id="${CSS.escape(barId)}"] .rt-hp-bar,
-                                       .rt-xp-bar-wrap[data-recolor-id="${CSS.escape(barId)}"] .rt-xp-bar`)
-                .forEach(bar => { bar.style.background = bg; });
+            document.querySelectorAll(`[data-recolor-id="${CSS.escape(barId)}"]`).forEach(wrap => {
+                if (wrap.classList.contains('rt-hp-bar-wrap')) { wrap.querySelector('.rt-hp-bar').style.background = bg; }
+                else if (wrap.classList.contains('rt-xp-bar-wrap')) { wrap.querySelector('.rt-xp-bar').style.background = bg; }
+                else if (wrap.classList.contains('rt-progress-bar-wrap')) { wrap.querySelector('.rt-progress-bar').style.background = bg; }
+                else if (wrap.classList.contains('rt-weight-bar-wrap')) { wrap.querySelector('.rt-weight-bar').style.background = bg; }
+                else if (wrap.classList.contains('rt-gauge-wrap')) { wrap.querySelector('.rt-gauge-bg').style.background = bg; }
+                else if (wrap.classList.contains('rt-clock-icon')) {
+                    const m = wrap.style.background.match(/(\d+(?:\.\d+)?)%/);
+                    const pct = m ? m[1] : '0';
+                    wrap.style.background = `conic-gradient(${bg} ${pct}%, transparent 0)`;
+                }
+                else if (wrap.classList.contains('rt-battery-wrap')) { 
+                    wrap.style.borderColor = bg;
+                    wrap.querySelector('.rt-battery-fill').style.background = bg; 
+                    wrap.querySelector('.rt-battery-nub').style.background = bg;
+                }
+                else if (wrap.classList.contains('rt-orbs-container')) { wrap.querySelectorAll('.rt-orb.filled').forEach(el => { el.style.background = bg; el.style.boxShadow = `0 0 5px ${bg}`; }); }
+                else if (wrap.classList.contains('rt-slots-container')) { wrap.querySelectorAll('.rt-slot.filled').forEach(el => { el.style.background = bg; }); }
+                else if (wrap.classList.contains('rt-phase-container')) { 
+                    wrap.querySelectorAll('.rt-phase-node.past, .rt-phase-node.current').forEach(el => { el.style.background = bg; el.style.borderColor = bg; });
+                    wrap.querySelectorAll('.rt-phase-node.current').forEach(el => { el.style.boxShadow = `0 0 8px ${bg}`; });
+                    wrap.querySelectorAll('.rt-phase-line.filled').forEach(el => { el.style.background = bg; });
+                }
+                else if (wrap.classList.contains('rt-stars-icon')) { wrap.style.color = bg; }
+            });
         };
 
         if (c1) {
