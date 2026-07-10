@@ -447,7 +447,7 @@ export function getTimeOfDayInfo(str) {
 
     // Shared marker type map used by tokenizeMarkers and tryRenderMarker.
     export const MARKER_TYPE_MAP = {
-        PILLS:{ renderType: 'pills', example: 'A, B (Gray pills)' }, PLS:{ renderType: 'pills', example: 'A, B (Gray pills)' },
+        PILLS:{ renderType: 'pills', example: 'Status (Hover for details), Condition (Another detail)' }, PLS:{ renderType: 'pills', example: 'Status (Hover for details)' },
         BAR:{ renderType: 'hp_bar', example: '50/100 (Red HP/Standing)' }, B:{ renderType: 'hp_bar', example: '50/100 (Red HP/Standing)' }, HPBAR:{ renderType: 'hp_bar', example: '50/100 (Red HP/Standing)' }, HPB:{ renderType: 'hp_bar', example: '50/100 (Red HP/Standing)' }, HP: { renderType: 'hp_bar', example: '50/100 (Red HP/Standing)' },
         BARRED:{ renderType: 'hp_bar', color: 'linear-gradient(90deg,#e74c3c,#c0392b)', example: '50/100 (Crimson Blood)' },
         BARBLUE:{ renderType: 'hp_bar', color: 'linear-gradient(90deg,#3498db,#2980b9)', example: '50/100 (Blue Mana/Mana)' },
@@ -470,9 +470,9 @@ export function getTimeOfDayInfo(str) {
         PROGRESSPURPLE:{ renderType: 'progress', color: '#9b59b6', example: '3/5 (Purple fraction progress)' },
         PROGRESSORANGE:{ renderType: 'progress', color: '#e67e22', example: '3/5 (Orange fraction progress)' },
         PROGRESSCYAN:{ renderType: 'progress', color: '#00ffff', example: '3/5 (Cyan fraction progress)' },
-        PILLRED:{ renderType: 'pill_colored', pillClass: 'rt-pill-debuff', example: 'Debuffs, Stunned' },
-        PILLGREEN:{ renderType: 'pill_colored', pillClass: 'rt-pill-buff', example: 'Buffs, Blessed' },
-        PILLBLUE:{ renderType: 'pill_colored', pillClass: 'rt-pill-magic', example: 'Wards, Shielded' },
+        PILLRED:{ renderType: 'pill_colored', pillClass: 'rt-pill-debuff', example: 'Stunned (Cannot take actions)' },
+        PILLGREEN:{ renderType: 'pill_colored', pillClass: 'rt-pill-buff', example: 'Focused (Clear minded, no distractions)' },
+        PILLBLUE:{ renderType: 'pill_colored', pillClass: 'rt-pill-magic', example: 'Shielded (Absorbs 10 damage)' },
         WARNING:{ renderType: 'badge_colored', color: '#f1c40f', example: 'Caution (Amber badge)' },
         DANGER:{ renderType: 'badge_colored', color: '#e74c3c', example: 'Hostile (Red badge)' },
         SUCCESS:{ renderType: 'badge_colored', color: '#2ecc71', example: 'Active (Green badge)' },
