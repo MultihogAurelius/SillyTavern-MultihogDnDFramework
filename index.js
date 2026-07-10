@@ -6744,11 +6744,11 @@ RULES:
             const contextParts = [];
 
             // Character card data
-            contextParts.push(`CHARACTER CARD:\nName: ${name}\nDescription: ${(charCard.description || '').substring(0, 2000)}\nPersonality: ${(charCard.personality || '').substring(0, 500)}`);
+            contextParts.push(`CHARACTER CARD:\nName: ${name}\nDescription: ${(charCard.description || '')}\nPersonality: ${(charCard.personality || '')}`);
 
             // Current game state
             if (s.currentMemo) {
-                contextParts.push(`CURRENT GAME STATE:\n${s.currentMemo.substring(0, 2000)}`);
+                contextParts.push(`CURRENT GAME STATE:\n${s.currentMemo}`);
             }
 
             // Recent chat
@@ -6756,7 +6756,7 @@ RULES:
                 const msgs = ctx.chat.filter(m => !m.is_system && m.mes?.trim()).slice(-10);
                 if (msgs.length > 0) {
                     const msgText = msgs.map(m => `${m.name || (m.is_user ? 'User' : 'Character')}: ${m.mes}`).join('\n\n');
-                    contextParts.push(`RECENT CHAT (for setting context):\n${msgText.substring(0, 6000)}`);
+                    contextParts.push(`RECENT CHAT (for setting context):\n${msgText}`);
                 }
             }
 
@@ -6764,7 +6764,7 @@ RULES:
             try {
                 const charData = ctx.characters?.[ctx.characterId];
                 if (charData?.description) {
-                    contextParts.push(`NARRATOR/WORLD CARD:\n${charData.description.substring(0, 1500)}`);
+                    contextParts.push(`NARRATOR/WORLD CARD:\n${charData.description}`);
                 }
             } catch (_) {}
 
@@ -6777,7 +6777,7 @@ RULES:
                         const [bk, uid] = k.split('::');
                         if (!loaded[bk]) loaded[bk] = await ctx.loadWorldInfo(bk);
                         const entry = loaded[bk]?.entries?.[uid];
-                        if (entry) summaries.push(`[${entry.comment || 'Entry'}]: ${(entry.content || '').substring(0, 200)}`);
+                        if (entry) summaries.push(`[${entry.comment || 'Entry'}]: ${(entry.content || '')}`);
                     }
                     if (summaries.length > 0) {
                         contextParts.push(`ACTIVE LOREBOOK ENTRIES (world context):\n${summaries.join('\n')}`);
@@ -6842,19 +6842,19 @@ Rules:
             const ctx = SillyTavern.getContext();
             const parts = [];
             if (s.currentMemo) {
-                parts.push(`CURRENT GAME STATE:\n${s.currentMemo.substring(0, 2000)}`);
+                parts.push(`CURRENT GAME STATE:\n${s.currentMemo}`);
             }
             if (ctx.chat && Array.isArray(ctx.chat)) {
                 const msgs = ctx.chat.filter(m => !m.is_system && m.mes?.trim()).slice(-8);
                 if (msgs.length > 0) {
                     const msgText = msgs.map(m => `${m.name || (m.is_user ? 'User' : 'Character')}: ${m.mes}`).join('\n\n');
-                    parts.push(`RECENT CHAT (for setting/tone context):\n${msgText.substring(0, 4000)}`);
+                    parts.push(`RECENT CHAT (for setting/tone context):\n${msgText}`);
                 }
             }
             try {
                 const charData = ctx.characters?.[ctx.characterId];
                 if (charData?.description) {
-                    parts.push(`NARRATOR/WORLD CARD:\n${charData.description.substring(0, 1500)}`);
+                    parts.push(`NARRATOR/WORLD CARD:\n${charData.description}`);
                 }
             } catch (_) {}
             try {
@@ -6865,7 +6865,7 @@ Rules:
                         const [bk, uid] = k.split('::');
                         if (!loaded[bk]) loaded[bk] = await ctx.loadWorldInfo(bk);
                         const entry = loaded[bk]?.entries?.[uid];
-                        if (entry) summaries.push(`[${entry.comment || 'Entry'}]: ${(entry.content || '').substring(0, 180)}`);
+                        if (entry) summaries.push(`[${entry.comment || 'Entry'}]: ${(entry.content || '')}`);
                     }
                     if (summaries.length > 0) {
                         parts.push(`ACTIVE LOREBOOK ENTRIES (world context):\n${summaries.join('\n')}`);
@@ -7028,10 +7028,10 @@ Rules:
                     allChars = (Array.isArray(raw) ? raw : []).map(c => ({
                         name: c.name || '',
                         avatar: c.avatar || '',
-                        description: (c.description || '').substring(0, 1500),
-                        personality: (c.personality || '').substring(0, 500),
-                        scenario: (c.scenario || '').substring(0, 500),
-                        first_mes: (c.first_mes || '').substring(0, 500),
+                        description: (c.description || ''),
+                        personality: (c.personality || ''),
+                        scenario: (c.scenario || ''),
+                        first_mes: (c.first_mes || ''),
                         date_added: c.date_added || 0,
                     }));
                     allChars.sort((a, b) => (b.date_added || 0) - (a.date_added || 0));
