@@ -419,7 +419,11 @@ async function syncCampaignPrefixAndWorldsForChat(newChatId, source) {
  * the Chat-Linked State for the active chat.
  */
 let _saveSettingsTimer = null;
-export function saveSettings(force = false) {
+/**
+ * @param {boolean} force Skip the debounce and save immediately.
+ * @param {number} delay Debounce delay in ms when not forcing (default 2000).
+ */
+export function saveSettings(force = false, delay = 2000) {
     // Keep UI synchronization immediate so toggle checkboxes and forms respond instantly
     syncOnboardingUI();
 
@@ -441,7 +445,7 @@ export function saveSettings(force = false) {
     }
 
     if (_saveSettingsTimer) clearTimeout(_saveSettingsTimer);
-    _saveSettingsTimer = setTimeout(doSave, 2000);
+    _saveSettingsTimer = setTimeout(doSave, delay);
 }
 
 /** When NPC portraits are disabled, turn off NPC auto-generation and sync dependent UI. */
