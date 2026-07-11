@@ -1314,9 +1314,9 @@ function formatValueToCurrency(totalCp, detectedCurrency) {
                         { rx: /\b(bronze|copper|cp)\b/i,                       color: '#cd7f32', icon: '🪙' },
                     ];
 
-                    // Bare currency item: a line that IS the currency (e.g. "45 GP", "💰 45 GP", "$500")
+                    // Bare currency item: a line that IS the currency (e.g. "45 GP", "💰 45 GP", "$500", "130 Gold Dragons")
                     // — no parenthesised worth annotation, just a number + currency unit
-                    const BARE_CURRENCY_RX = /^[^(]*?(?:([$£€])\s*\d[\d,]*|\d[\d,]*\s*(gp|sp|cp|gold|silver|bronze|copper|dollar|usd|euro|eur|pound|gbp|£|\$|€))\s*$/i;
+                    const BARE_CURRENCY_RX = /^[^(]*?(?:([$£€])\s*\d[\d,]*|\d[\d,]*\s*(gp|sp|cp|gold|silver|bronze|copper|dollar|usd|euro|eur|pound|gbp|£|\$|€)(?:\s+[a-z]+){0,2})\s*$/i;
 
                     const worthMode = getSettings().inventoryWorthMode || 'hover'; // 'hover' | 'display'
                     const worthRx = /\s*\(~([^)]+)\)\s*$|\s*\(Worth:\s*([^)]+)\)\s*$/i;

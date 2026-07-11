@@ -25,6 +25,7 @@ All notable changes to the **Multihog D&D Framework** will be documented in this
 
 ### Fixed
 - **PC Import Portrait Sync**: Fixed a bug during "Fit into Story" PC imports where the AI deciding to rename the character (e.g. inventing a surname to a firstname only Card) would break the portrait binding in the State Tracker. The system now extracts the newly generated name from the state memo and maps it back to the original card's avatar.
+- **Custom Currency Rendering**: Fixed a bug where custom fantasy currencies containing additional words (e.g. "130 Gold Dragons", "50 Silver Staggs") would fail to render as inline coin badges. The inventory currency parser now correctly captures up to two trailing descriptor words.
 
 
 ## [4.8.9] - 2026-07-10
