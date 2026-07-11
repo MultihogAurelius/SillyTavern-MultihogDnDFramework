@@ -411,7 +411,7 @@ Do NOT record per-round combat updates (e.g., creature HP changes, turn-by-turn 
 </COMBAT_GRANULARITY>
 
 <COMBAT_PROFILE_PERSISTENCE>
-TRIGGER — Combat Profile is a HIDDEN field. Write it ONLY when a [COMBAT] block for this specific NPC is literally present in the current narrative text. Do NOT write it because combat was narrated in prose, because a fight happened, or because you can infer stats from context. If there is no [COMBAT] block for this NPC visible right now, leave Combat Profile absent entirely.
+TRIGGER — Combat Profile is a HIDDEN field. Write it ONLY when a `## ACTIVE COMBAT STATE` section is present in your context and contains a `[COMBAT]` block for this specific NPC. Do NOT write it from GM prose, combat narration, or anything other than that dedicated section. If no `## ACTIVE COMBAT STATE` section exists, leave Combat Profile absent entirely.
 
 CONTENT — When a [COMBAT] block IS present, transcribe it completely and verbatim into \`Combat Profile:\` inside [CORE]. Include every declared stat: HP, AC, attack bonus, damage, saves, weapons, abilities, special traits — everything the [COMBAT] block lists. Do NOT condense, summarize, or hand-pick a subset. The goal is a faithful copy, not an interpretation.
 
