@@ -14,13 +14,14 @@ All notable changes to the **Multihog D&D Framework** will be documented in this
   - **📋 Add as is** — Performs a minimal AI review (era/world conflict fixes only) then generates a persona bio from the card.
   - **🤖 Fit into Story** — Fully adapts the character to the current campaign setting before generating a state memo and persona bio.
   - Both modes: (1) send a `sendDirectPrompt` to generate the tracker state memo blocks directly in the chat, then (2) generate a persona bio via the router AI and surface it in the existing Persona Confirm overlay for review and one-click lorebook registration.
-- **"Fit into Story" Background Adaptation**: The persona bio `Background` section generated when importing a character card via "🤖 Fit into Story" now explicitly adapts the character's backstory to the current campaign setting and world context, rather than grounding it solely in the source card. The overall rewrite instruction was also strengthened to actively integrate the character into the world's lore and ongoing story.
+
 - **✨ Edit with AI — Full PC Card & Full NPC Card**: Both the Full PC Card and Full NPC Card popups now include an **"✨ Edit with AI"** button stacked below the existing "✏️ Edit Text" button. Clicking it opens an AI edit pane where you describe the changes you want (e.g. *"Make the background more tied to the ongoing war"*). The AI rewrites the entire character entry with those changes applied, then surfaces a preview textarea. From the preview you can **✅ Apply** the result (persisted to `pc.bio` for the PC, or saved to the lorebook entry for NPCs) or **🔄 Regenerate** for a fresh attempt — all without leaving the popup.
 
 ### Changed
 - **`buildNpcInstruction` / `router.js` field lists**: All NPC-related field enumerations, tool schemas, update instructions, and legacy wrap patterns now include `Strengths` and `Flaws`.
 - **NPC section parser / renderer**: `parseNpcSections` and `renderSectionsHtml` now recognize and visually distinguish `Strengths` (green, ⚡) and `Flaws` (red, ⚠️) from the rest of the Core Identity sections.
 - **Literal add verbatim limit**: Raised the character card description slice from 1,500 to 3,000 characters for literal adds to avoid silently truncating long cards. Personality is only appended when it is not already embedded in the description.
+- **"Fit into Story" Background Adaptation**: The persona bio `Background` section generated when importing a character card via "🤖 Fit into Story" now explicitly adapts the character's backstory to the current campaign setting and world context, rather than grounding it solely in the source card. The overall rewrite instruction was also strengthened to actively integrate the character into the world's lore and ongoing story.
 
 
 ## [4.8.9] - 2026-07-10
