@@ -1,9 +1,10 @@
-import { getSettings, saveChatState } from './state-manager.js';
+import { getSettings, saveChatState, DEFAULT_PC_SECTIONS } from './state-manager.js';
 import { sendStateRequest } from './llm-client.js';
 import { buildOnboardingXpHint } from './constants.js';
 import { escapeHtml } from './memo-processor.js';
 import { getRequestHeaders } from '../../../../script.js';
 import { saveSettings, sendDirectPrompt, refreshAgentManifestNow, refreshRenderedView } from './index.js';
+import { openPcSectionEditor } from './ui-editors.js';
 
 const _CR_CLASS_LISTS = {
     fantasy: [
@@ -185,6 +186,12 @@ export function showCharacterRollPanel(el) {
     if (configWrap) configWrap.style.display = 'none';
     allBtnGroups.forEach(g => { g.style.display = 'none'; });
     panel.style.display = 'flex';
+
+    const editBtn = panel.querySelector('.rt-edit-pc-sections-btn');
+    if (editBtn && !editBtn._bound) {
+        editBtn._bound = true;
+        editBtn.addEventListener('click', () => openPcSectionEditor());
+    }
 
     const s = getSettings();
     const genreSelect = /** @type {HTMLSelectElement|null} */ (panel.querySelector('#rt-cr-genre'));
@@ -501,32 +508,18 @@ export async function generatePersonaBio(charName, wordCount, extraHints = '') {
     const rawMemo = s.currentMemo || '';
     const cleanMemo = rawMemo.replace(/<\/?memo>/gi, '').replace(/<[^>]+>/g, ' ').trim();
 
+    const coreSections = s.pcCoreSections && Array.isArray(s.pcCoreSections) && s.pcCoreSections.length > 0 ? s.pcCoreSections : DEFAULT_PC_SECTIONS;
+    const sectionsTemplate = coreSections.map(sec => `${sec.name}:\n${sec.description}`).join('\n\n');
+
     const systemPrompt = `You are a persona writer for a roleplay system. Based on the character state card provided, write a persona description for ${charName || 'this character'} in third person.${extraHints}
 
 You MUST use this exact section format — each section on its own line with the label followed by a colon:
 
-Appearance/Species:
-[Describe physical features and species: body type, height, hair, eyes, skin tone, distinguishing marks, scars, and natural body language. You MUST explicitly state their Species, Ethnicity, and Gender based on the character card and Player Preferences. You MUST explicitly incorporate any appearance notes provided in the card/preferences. Do NOT describe clothing, armor, or worn gear — those are handled dynamically elsewhere and will change.]
-
-Personality:
-[Describe temperament, how they act around others, and emotional tendencies. You MUST incorporate any traits provided.]
-
-Background:
-[Provide backstory context grounded in the character card. You MUST incorporate any background hints provided. Brief but meaningful.]
-
-Habits & Behaviors:
-[Describe recurring mannerisms, habits, quirks, or behavioral patterns.]
-
-Strengths:
-[Concise bullet phrases formatted in bullet points of their most notable strengths, skills, or virtues. Sharp and specific — no vague generalities. A kind character may have more strengths than flaws.]
-
-Flaws:
-[Concise bullet phrases formatted in bullet points of their most notable weaknesses, bad habits, or moral failings. Be honest and specific. A troubled character may have more flaws than strengths.]
-
-(Note: The split between strengths and flaws does not need to be even. It is perfectly fine to have an uneven split—like having more strengths than flaws, or more flaws than strengths—so long as it authentically reflects the character. However, it can be evenly split if it makes sense.)
+${sectionsTemplate}
 
 Rules:
 - Use the exact section headers shown above. Do not add extra sections or merge them.
+- CRITICAL: Do NOT blindly copy the formatting or sections of other characters found in ACTIVE MEMORY or the character card. You MUST strictly use ONLY the sections instructed above and ignore any other sections.
 - Total word count across all sections: approximately ${wordCount} words.
 - Write in third person (he/she/they).
 - Keep the prose grounded and natural. Avoid purple prose, excessive em-dashes, or clichés (e.g. "deliberate step", "breath hitched").
@@ -785,6 +778,12 @@ export function showPcImportPanel(el) {
     if (configWrap) configWrap.style.display = 'none';
     allBtnGroups.forEach(g => { g.style.display = 'none'; });
     panel.style.display = 'flex';
+
+    const editBtn = panel.querySelector('.rt-edit-pc-sections-btn');
+    if (editBtn && !editBtn._bound) {
+        editBtn._bound = true;
+        editBtn.addEventListener('click', () => openPcSectionEditor());
+    }
 
     // Back button — restore exactly what was hidden, not a blank reset
     const backBtn = panel.querySelector('#rt-pc-import-back');
@@ -1098,35 +1097,21 @@ RULES — read carefully:
         }
     }
 
-    // Full mode: structured 6-section bio adapted to the campaign setting
+    // Full mode: structured section bio adapted to the campaign setting
+    const coreSections = s.pcCoreSections && Array.isArray(s.pcCoreSections) && s.pcCoreSections.length > 0 ? s.pcCoreSections : DEFAULT_PC_SECTIONS;
+    const sectionsTemplate = coreSections.map(sec => `${sec.name}:\n${sec.description}`).join('\n\n');
+
     const systemPrompt = `You are a persona writer for a roleplay system. Based on the provided character card, write a persona description for ${name} in third person.
 
 Rewrite the bio as if this character were native to the current campaign setting. Actively adapt and integrate their appearance, background, and mannerisms so they feel like a natural part of the world's lore and ongoing story.
 
 You MUST use this exact section format — each section on its own line with the label followed by a colon:
 
-Appearance/Species:
-[Describe physical features and species: body type, height, hair, eyes, skin tone, distinguishing marks, and natural body language. State species, ethnicity, and gender explicitly. Do NOT describe clothing or worn gear.]
-
-Personality:
-[Describe temperament, how they act around others, emotional tendencies, and core drives.]
-
-Background:
-[Provide backstory context grounded in the character card, but actively adapted and strongly influenced by the current campaign setting and world context. Brief but meaningful.]
-
-Habits & Behaviors:
-[Describe recurring mannerisms, habits, quirks, or behavioral patterns.]
-
-Strengths:
-[Concise bullet phrases formatted in bullet points of their most notable strengths, skills, or virtues. Sharp and specific — no vague generalities. A kind character may have more strengths than flaws.]
-
-Flaws:
-[Concise bullet phrases formatted in bullet points of their most notable weaknesses, bad habits, or moral failings. Be honest and specific. A troubled character may have more flaws than strengths.]
-
-(Note: The split between strengths and flaws does not need to be even. It is perfectly fine to have an uneven split—like having more strengths than flaws, or more flaws than strengths—so long as it authentically reflects the character. However, it can be evenly split if it makes sense.)
+${sectionsTemplate}
 
 Rules:
 - Use the exact section headers shown above. Do not add extra sections or merge them.
+- CRITICAL: Do NOT blindly copy the formatting or sections of other characters found in ACTIVE MEMORY or the original character card. You MUST strictly use ONLY the sections instructed above and ignore any other sections.
 ${wordCount === 'same' 
     ? '- MATCH LENGTH: Aim to make your output approximately the same length/word count as the original character card.'
     : `- Total word count across all sections: approximately ${wordCount} words.`}

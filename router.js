@@ -1,4 +1,4 @@
-import { getSettings, getEffectiveRouterCampaignPrefix, persistWorldProgressionTimer, persistRouterLastRunWatermark, persistRouterLastRunTimestamp, getNpcRelationshipMax, clampRelationshipValue, buildRouterRelationshipInstruction, sanitizeRouterState, adjustPromptTimestamps } from './state-manager.js';
+import { getSettings, getEffectiveRouterCampaignPrefix, persistWorldProgressionTimer, persistRouterLastRunWatermark, persistRouterLastRunTimestamp, getNpcRelationshipMax, clampRelationshipValue, buildRouterRelationshipInstruction, sanitizeRouterState, adjustPromptTimestamps, DEFAULT_NPC_SECTIONS } from './state-manager.js';
 import { sendStateRequest, sendAgentTurn } from './llm-client.js';
 import { getRequestHeaders } from '../../../../script.js';
 import { extractCurrentTimeStr, cleanMessageContent, parseInWorldTime, formatInWorldTime, findNthUserMessageStartIdx, formatAgentChatLogFromIndex, sanitizeLorebookRecordContent } from './memo-processor.js';
@@ -868,6 +868,18 @@ Action: commit({"rewrite": [{"id": "Eldoria_Events::3", "content": "Compressed v
 ${buildRouterRelationshipInstruction(getNpcRelationshipMax(settings))}
 ` : '';
 
+            let coreSections = settings.npcCoreSections;
+            if (!coreSections || !Array.isArray(coreSections) || coreSections.length === 0) {
+                coreSections = DEFAULT_NPC_SECTIONS;
+            }
+            const sectionNamesList = coreSections.map(s => s.name).join(', ');
+            let exampleCoreLines = '';
+            if (coreSections[0]) exampleCoreLines += `${coreSections[0].name}: A burly human blacksmith with a scar on his cheek.\n`;
+            if (coreSections[1]) exampleCoreLines += `${coreSections[1].name}: Gruff but reliable.\n`;
+            if (coreSections[2]) exampleCoreLines += `${coreSections[2].name}: Retired from the militia to open his own forge.\n`;
+            if (coreSections[3]) exampleCoreLines += `${coreSections[3].name}: Wipes his brow with a greasy rag.\n`;
+            exampleCoreLines = exampleCoreLines.trim();
+
             const basicSystemPrompt = `You are the Research Assistant. Your task is to identify and record important narrative entities and events.
 
 ${modularPrompt}
@@ -880,7 +892,7 @@ ${modularPrompt}
 5. **LIMIT**: You are limited to **${settings.routerMaxActivations || 8} active entries**. Nothing is archived automatically. If you exceed this limit you will see a **BUDGET VIOLATION** line and you MUST use [[DEACTIVATE: Name]] on the least relevant active entries to return within budget before this pass ends.
 ${relSection}
 ## [CORE] BY CATEGORY
-- **NPC**: structured \`[CORE]\` with Appearance/Species, Personality, Brief Background, Habits/Behaviors (see NPC field instructions below).
+- **NPC**: structured \`[CORE]\` with ${sectionNamesList} (see NPC field instructions below).
 - **LOC**: plain \`[CORE]\` with 1–2 sentences describing the place. No field headers.
 - **FAC**: plain \`[CORE]\` wrapping permanent history, ideology, schemes, and members. No field headers.
 - **QUEST, EVENT**: do NOT use \`[CORE]\`. Use timestamped chronicle lines only.
@@ -892,9 +904,9 @@ ${relSection}
 - Always use the exact macro string \`{{user}}\` when referring to the player. Do NOT write the plain word "user", "player", "Player", or the player's roleplay character name (like "Dave Davidson") in plain text in any entry updates or descriptions.
 
 ## NPC CORE UPDATES (NPC only)
-If any field inside the permanent [CORE] block changes, is updated, or new information is revealed (Appearance/Species, Personality, Brief Background, Habits/Behaviors), output:
+If any field inside the permanent [CORE] block changes, is updated, or new information is revealed (${sectionNamesList}), output:
   [[UPDATE_CORE: Book::UID | FieldName | New field text]]
-Use the exact FieldName (e.g. Personality, Brief Background, Appearance/Species, Habits/Behaviors). Do NOT log core updates as normal event/update entries.
+Use the exact FieldName (e.g. ${sectionNamesList}). Do NOT log core updates as normal event/update entries.
 
 ## RULES
 1. Only record persistent or significant entities/events.
@@ -902,15 +914,13 @@ Use the exact FieldName (e.g. Personality, Brief Background, Appearance/Species,
 3. Use DEACTIVATE to remove an entry that is no longer relevant to the scene.
 4. Use DELETE to permanently remove duplicate or redundant entries.
 5. Do NOT create any entry for the player character (e.g. "Player" or "Dave Davidson").
-6. Output your thoughts first, then the tags.
+6. CRITICAL: Do NOT blindly copy the formatting or sections of other characters found in ACTIVE MEMORY. You MUST strictly use ONLY the sections instructed below (${sectionNamesList}) for NPCs and ignore any other sections.
+7. Output your thoughts first, then the tags.
 
 Example:
 Thought: I see a new NPC named Barnaby in Khelt's Rust-Lantern District. I will record him and the tavern.
 [[NPC: Barnaby | [CORE]
-Appearance/Species: A burly human blacksmith with a scar on his cheek.
-Personality: Gruff but reliable.
-Brief Background: Retired from the militia to open his own forge.
-Habits/Behaviors: Wipes his brow with a greasy rag.
+${exampleCoreLines}
 [/CORE] | Barnaby, blacksmith, ally]]
 [[LOC: Khelt :: Rust-Lantern District :: Barnaby's Forge | [CORE]
 A squat iron building managing mining contracts; soot-stained walls and a clanging workshop floor.
@@ -964,7 +974,7 @@ A squat iron building managing mining contracts; soot-stained walls and a clangi
                         properties: {
                             label: { type: 'string', description: 'Entity name only. NO tag prefix (e.g. "Iron Syndicate", NOT "FAC: Iron Syndicate"). Do NOT record the player character under any name (including "Player" or their roleplay character name/alias like "Dave Davidson").' },
                             keys:  { type: 'array', items: { type: 'string' }, description: 'Search keywords. Include the entity name/title itself (without timestamps like "[Day 1]") as a keyword, plus any ancestor location names.' },
-                            content:  { type: 'string', description: 'Full entry body. NPC: structured [CORE] with Appearance/Species, Personality, Brief Background, Habits/Behaviors. LOC: plain [CORE] with 1–2 sentences (no field headers). FAC: plain [CORE] wrapping permanent history, ideology, schemes. QUEST/EVENT: no [CORE]; use chronicle format.' },
+                            content:  { type: 'string', description: `Full entry body. NPC: structured [CORE] with ${sectionNamesList}. LOC: plain [CORE] with 1–2 sentences (no field headers). FAC: plain [CORE] wrapping permanent history, ideology, schemes. QUEST/EVENT: no [CORE]; use chronicle format.` },
                             category: { type: 'string', enum: categoryEnum, description: 'Determines which lorebook the entry goes into.' }
                         },
                         required: ['label', 'keys', 'content', 'category']
@@ -1061,12 +1071,12 @@ A squat iron building managing mining contracts; soot-stained walls and a clangi
 
             commitProperties.core = {
                 type: 'array',
-                description: 'Surgically update one of the fields inside an NPC\'s [CORE] block (Appearance/Species, Personality, Brief Background, Habits/Behaviors). Only use when new information is revealed or permanent changes occur.',
+                description: `Surgically update one of the fields inside an NPC's [CORE] block (${sectionNamesList}). Only use when new information is revealed or permanent changes occur.`,
                 items: {
                     type: 'object',
                     properties: {
                         id:      { type: 'string', description: 'Book::UID of the NPC entry.' },
-                        field:   { type: 'string', enum: ['Appearance/Species', 'Personality', 'Brief Background', 'Habits/Behaviors'], description: 'The exact field inside [CORE] to update.' },
+                        field:   { type: 'string', enum: coreSections.map(s => s.name), description: 'The exact field inside [CORE] to update.' },
                         content: { type: 'string', description: 'New field content text.' }
                     },
                     required: ['id', 'field', 'content']
@@ -1154,6 +1164,7 @@ Include the entity name/title itself (without timestamps like "[Day 1]") as a ke
 - Correct: '[Day 2, 10:42] Corruption manifests.\n[Day 2, 10:44] Sentry targets Rozach.'
 - Wrong:   '[Day 2, 10:42] Corruption manifests. [Day 2, 10:44] Sentry targets Rozach.'
 - **[CORE] by category:** NPC = structured fields inside [CORE] (see NPC instructions). LOC = plain [CORE], 1–2 sentences, no field headers. FAC = plain [CORE] wrapping permanent history/ideology, no field headers. QUEST/EVENT = no [CORE].
+- CRITICAL: Do NOT blindly copy the formatting or sections of other characters found in ACTIVE MEMORY. You MUST strictly use ONLY the sections instructed below for NPCs and ignore any other sections.
 
 ## FIELD INSTRUCTIONS
 ${Object.values(settings.routerModules || {}).filter(m => m.enabled).map(m => `- ${m.tag}: ${m.instruction}`).join('\n')}${(settings.routerCustomTags || []).length ? '\n\n### CUSTOM CATEGORIES\n' + (settings.routerCustomTags || []).map(m => `- ${m.tag.toUpperCase()}: ${m.instruction}`).join('\n') : ''}`;
@@ -1198,7 +1209,7 @@ Available actions:
 commit record items: {"label": "Name only (NO tag prefix)", "keys": ["kw1","kw2"], "content": "...", "category": "NPC|LOC|FAC|QUEST|EVENT"}
 commit update items: {"id": "Book::UID", "content": "new text to append"}
 commit rename items: {"id": "Book::UID", "label": "New Name (optional)", "keys": ["kw1","kw2"] (optional, max 6)}${commitRelDescription}
-commit core items: {"id": "Book::UID", "field": "Appearance/Species|Personality|Brief Background|Habits/Behaviors", "content": "new field content"} — surgically updates a field inside [CORE] on NPC entries only
+commit core items: {"id": "Book::UID", "field": "${coreSections.map(s => s.name).join('|')}", "content": "new field content"} — surgically updates a field inside [CORE] on NPC entries only
 
 ## EXAMPLE
 Thought: I see a new faction called Iron Syndicate. I will record it.
@@ -2012,6 +2023,13 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
 
         const escapedPatterns = fieldPatterns.map(p => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
         const otherHeaders = ['Appearance/Species', 'Appearance', 'Personality', 'Brief Background', 'Background', 'Habits/Behaviors', 'Habits', 'Behaviors', 'Relationship'];
+        try {
+            const s = getSettings();
+            const coreSecs = (s.npcCoreSections && Array.isArray(s.npcCoreSections) && s.npcCoreSections.length > 0) ? s.npcCoreSections : DEFAULT_NPC_SECTIONS;
+            coreSecs.forEach(sec => {
+                if (!otherHeaders.includes(sec.name)) otherHeaders.push(sec.name);
+            });
+        } catch (_) {}
         const otherHeadersRegexStr = otherHeaders.map(h => h.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
 
         // Match from the target field's colon to the next core field header or the end of the string

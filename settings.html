@@ -405,6 +405,13 @@
                             <i class="fa-solid fa-circle-question interactable" style="font-size: 0.85em; opacity: 0.7; margin-left: 4px;" title="How often the State Tracker runs. Set to 1 to run every message, 2 to run every other message, etc. Useful for reducing API costs."></i>
                         </label>
                         <input id="rpg_tracker_state_run_every" type="text" inputmode="numeric" pattern="[0-9]*" class="text_pole" value="1" title="Run the State Tracker every N messages. 1 = every message." />
+                        
+                        <div style="margin-top: 15px; margin-bottom: 5px;">
+                            <label style="margin-bottom: 4px;">Playable Character Formatting
+                                <i class="fa-solid fa-circle-question interactable" style="font-size: 0.85em; opacity: 0.7; margin-left: 4px;" title="Customize the persona sections for Player Characters (e.g. Appearance, Personality, Strengths). These fields will be used when generating new characters or importing existing cards."></i>
+                            </label>
+                            <button id="rpg_tracker_btn_edit_pc_sections" class="menu_button interactable" style="width: 100%; background: rgba(180, 100, 255, 0.15); border-color: rgba(180, 100, 255, 0.4);" title="Customize the persona sections for Player Characters (e.g. Appearance, Personality, Strengths). These fields will be used when generating new characters or importing existing cards."><i class="fa-solid fa-user"></i> Edit Playable Character Sections</button>
+                        </div>
                         <label class="checkbox_label" title="When enabled, automatically restores the State Tracker memo to the snapshot taken before the previous swipe if the user swipes away to a different generation.">
                             <input id="rpg_tracker_state_swipe_rollback" type="checkbox" checked />
                             Auto Rollback Memo on Swipe
@@ -589,6 +596,8 @@
                                         </div>
                                         <div style="font-size: 10px; opacity: 0.5; margin-top: 3px;">Controls what happens when you click "+ Add as is" on a character card.</div>
                                     </div>
+                                    <button id="rpg_tracker_btn_edit_npc_sections" class="menu_button interactable" style="margin-top: 8px; width: 100%; background: rgba(180, 100, 255, 0.15); border-color: rgba(180, 100, 255, 0.4);"><i class="fa-solid fa-puzzle-piece"></i> Edit NPC Sections</button>
+
 
                             </div>
                         </div>
