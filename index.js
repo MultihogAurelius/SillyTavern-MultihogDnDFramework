@@ -1864,6 +1864,9 @@ async function runStateModelPass(narrativeOutput, isFullContext = false, overrid
             syncMemoView();
             refreshRenderedView();
             saveSettings();
+            // Keep chatStates in sync immediately so a same-session reload (F5) can never
+            // resurrect a stale/empty per-chat snapshot over this freshly-committed memo.
+            if (settings.chatLinkEnabled && _currentChatId) saveChatState(_currentChatId);
 
             if (/LEVEL_UP=true/i.test(merged)) {
                 handleLevelUp();
@@ -2093,6 +2096,7 @@ export async function sendDirectPrompt(message) {
                 syncMemoView();
                 refreshRenderedView();
                 saveSettings();
+                if (settings.chatLinkEnabled && _currentChatId) saveChatState(_currentChatId);
                 toastr['success']('Tracker updated.', 'RPG Tracker');
             } else {
                 toastr['info']('No changes were made.', 'RPG Tracker');
@@ -2355,7 +2359,7 @@ async function showComponentsExplanation() {
         `Resting is limited to once every 9 hours of in-game time. Prevents exploiting rest as a free heal between every fight, and reflects the reality that you can't just nap on demand.`
     )}
                 ${card('🏕️', 'Benched Party',
-        `Tracks party members who are temporarily away from you — hospitalized, scouting ahead, captured, sent on a side task, etc. — in a separate [BENCHED PARTY] roster while reunion remains plausible. The GM is told what this means so it won't narrate them back at your side until the story brings them back on-screen. Turn off if you don't want temporary separations tracked separately from your active party.`
+        `Tracks party members who are temporarily away from you — hospitalized, scouting ahead, captured, sent on a side task, etc. — in a separate [BENCHED PARTY] roster while reunion remains plausible. The GM is told what this means so it won't narrate them back at your side until the story brings them back on-screen. Benched members become eligible for off-screen simulation updates via World Reports (🌍), allowing the simulator to advance their individual subplots in the background. Turn off if you don't want temporary separations tracked separately from your active party.`
     )}
             </div>`;
     await Popup.show.confirm('🧩 Components Explained', popupBody, { okButton: 'Got it', cancelButton: false });
@@ -8808,6 +8812,7 @@ Rules:
                 settings.currentMemo = newText;
                 settings.currentMemo = applyQuestSyncAndStripMemo(settings.currentMemo);
                 saveSettings(true);
+                if (settings.chatLinkEnabled && _currentChatId) saveChatState(_currentChatId);
             }
         }
     };
@@ -8827,6 +8832,7 @@ Rules:
             settings.currentMemo = newText;
             settings.currentMemo = applyQuestSyncAndStripMemo(settings.currentMemo);
             saveSettings();
+            if (settings.chatLinkEnabled && _currentChatId) saveChatState(_currentChatId);
             refreshRenderedView();
         }, 2000);
     });
@@ -9167,6 +9173,7 @@ Rules:
         s.historyIndex = _historyViewIndex;
         _historyViewIndex = -1;
         saveSettings();
+        if (s.chatLinkEnabled && _currentChatId) saveChatState(_currentChatId);
         syncMemoView();
         toastr['success']('Historical state restored as LIVE.', 'RPG Tracker');
     });
@@ -9182,6 +9189,7 @@ Rules:
             settings.lastDelta = "";
             _historyViewIndex = -1;
             saveSettings();
+            if (settings.chatLinkEnabled && _currentChatId) saveChatState(_currentChatId);
             syncMemoView();
             const dp = document.getElementById('rpg-tracker-delta-content');
             if (dp) dp.innerHTML = '<span class="delta-empty">Log cleared.</span>';
@@ -10126,6 +10134,31 @@ function tryBindConnectionProfileDropdown(selector, initialProfileId, onProfileI
         if (bootChatId && settings.chatLinkEnabled) {
             loadChatState(bootChatId);
         }
+
+        // ─── Flush-on-unload safety net ───
+        // saveSettings() normally debounces its disk write by ~2s. If the page reloads or
+        // closes before that timer fires (e.g. reloading right after an action to pick up
+        // a code change), the newest currentMemo/chatStates never reach disk and the next
+        // load resurrects the last flushed (older) snapshot — looks like a "revert."
+        // Force a synchronous flush on unload so nothing in flight is ever lost this way.
+        const flushOnUnload = () => {
+            try {
+                if (typeof globalThis._rpgFlushRawMemoChanges === 'function') {
+                    globalThis._rpgFlushRawMemoChanges();
+                }
+                const s = getSettings();
+                if (_saveSettingsTimer) {
+                    clearTimeout(_saveSettingsTimer);
+                    _saveSettingsTimer = null;
+                }
+                const flushCtx = SillyTavern.getContext();
+                if (typeof flushCtx.saveSettings === 'function') flushCtx.saveSettings();
+                else flushCtx.saveSettingsDebounced?.();
+                if (s.chatLinkEnabled && _currentChatId) saveChatState(_currentChatId);
+            } catch (_) { /* best-effort — never block unload */ }
+        };
+        window.addEventListener('beforeunload', flushOnUnload);
+        window.addEventListener('pagehide', flushOnUnload);
         // Always run activation when routerEnabled — regardless of chatLinkEnabled —
         // so the correct lorebook stack is live from the very first message.
         if (settings.routerEnabled && bootChatId) {
@@ -12982,6 +13015,7 @@ RULES:
                 settings.historyIndex = -1;
                 _historyViewIndex = -1;
                 saveSettings();
+                if (settings.chatLinkEnabled && _currentChatId) saveChatState(_currentChatId);
                 updateUIMemo("");
                 refreshRenderedView();
                 const dp = document.getElementById('rpg-tracker-delta-content');
