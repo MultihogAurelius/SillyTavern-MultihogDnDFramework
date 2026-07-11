@@ -839,6 +839,13 @@ Action: commit({"rewrite": [{"id": "Eldoria_Events::3", "content": "Compressed v
         }
         // ── End Cleanup Mode ──────────────────────────────────────────────────
 
+        // -- Section Names List Setup ------------------------------------------
+        let coreSections = settings.npcCoreSections;
+        if (!coreSections || !Array.isArray(coreSections) || coreSections.length === 0) {
+            coreSections = DEFAULT_NPC_SECTIONS;
+        }
+        const sectionNamesList = coreSections.map(s => s.name).join(', ');
+
         // -- Basic Mode (tag-based, one-shot, no tool calling) -----------------
         if (settings.routerBasicMode) {
 
@@ -868,11 +875,7 @@ Action: commit({"rewrite": [{"id": "Eldoria_Events::3", "content": "Compressed v
 ${buildRouterRelationshipInstruction(getNpcRelationshipMax(settings))}
 ` : '';
 
-            let coreSections = settings.npcCoreSections;
-            if (!coreSections || !Array.isArray(coreSections) || coreSections.length === 0) {
-                coreSections = DEFAULT_NPC_SECTIONS;
-            }
-            const sectionNamesList = coreSections.map(s => s.name).join(', ');
+            // coreSections and sectionNamesList are defined above
             let exampleCoreLines = '';
             if (coreSections[0]) exampleCoreLines += `${coreSections[0].name}: A burly human blacksmith with a scar on his cheek.\n`;
             if (coreSections[1]) exampleCoreLines += `${coreSections[1].name}: Gruff but reliable.\n`;
