@@ -2040,7 +2040,15 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
         const fieldMatch = coreBody.match(targetFieldRegex);
         
         if (!fieldMatch) {
-            errors.push(`Core field "${field}" not found inside [CORE] block for ${id} — no update made.`);
+            // Lazily append the field to the end of the [CORE] block
+            const fieldName = field.trim();
+            const replacement = `${fieldName}: ${newContent.trim()}\n`;
+            let newCoreBody = coreBody.trimEnd();
+            newCoreBody = newCoreBody ? `${newCoreBody}\n${replacement}` : replacement;
+            
+            book.entries[uid].content = entryContent.replace(coreMatch[0], `[CORE]\n${newCoreBody}[/CORE]`);
+            await ctx.saveWorldInfo(bookName, book);
+            changed = true;
             continue;
         }
 
