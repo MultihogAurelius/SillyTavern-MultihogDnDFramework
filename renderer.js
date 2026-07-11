@@ -76,7 +76,7 @@ export function getTimeOfDayInfo(str) {
         const value     = hasLabel ? line.substring(colonIdx + 1).trim() : line.trim();
         const labelStyle = rule.color ? ` style="color:${rule.color}"` : '';
         const labelHtml  = labelText
-            ? `<span class="rt-entity-sub-label"${labelStyle}>${escapeHtml(labelText)}</span>`
+            ? `<span class="rt-entity-sub-label"${labelStyle}>${escapeHtmlWithColor(labelText)}</span>`
             : '';
 
         switch (rule.renderType) {
@@ -562,7 +562,47 @@ export function getTimeOfDayInfo(str) {
      */
     function renderMarkerSegment(seg, tag, entityName, rowContext = '') {
         const { preText, content, rule } = seg;
-        const reconstructedContent = preText ? `${preText} ${content}`.trim() : content.trim();
+
+        // renderSubFieldByRule splits on the first colon to separate label from value.
+        // We must reconstruct the line so that split works correctly for every placement
+        // of the ((MARKER)) token:
+        //
+        //   Marker-at-start:  ((GAUGE)) 75/100              → preText="", content="75/100"
+        //   Marker-in-middle: [Epic] Sword - ((GAUGE)) 75/100 → preText="[Epic] Sword -", content="75/100"
+        //   Marker-at-end:    [Epic] Sword - Durability 75/100 ((GAUGE)) → preText="[Epic] Sword - Durability 75/100", content=""
+        //   With colon:       Durability: ((GAUGE)) 75/100   → preText="Durability:", content="75/100"
+        let reconstructedContent;
+        if (!preText) {
+            // ── Marker at start of line — content is everything ──
+            reconstructedContent = content.trim();
+        } else if (content.trim()) {
+            // ── Marker in middle — text on both sides ──
+            if (preText.includes(':')) {
+                // preText already has colon structure (e.g. "Durability: ((GAUGE)) 75/100")
+                reconstructedContent = `${preText} ${content}`.trim();
+            } else {
+                // No colon — synthesize one so preText becomes the label
+                reconstructedContent = `${preText}: ${content}`.trim();
+            }
+        } else {
+            // ── Marker at end of line — content is empty, everything is in preText ──
+            if (preText.includes(':')) {
+                // Already has colon structure (e.g. "Durability: 75/100 ((GAUGE))")
+                reconstructedContent = preText.trim();
+            } else {
+                // No colon. For progression types, try to split "Label X/Y" into "Label: X/Y"
+                // by finding the X/Y numeric pattern.
+                const PROGRESSION = new Set(['hp_bar', 'xp_bar', 'progress', 'clock', 'stars', 'weight', 'orbs', 'slots', 'phase', 'gauge', 'charge']);
+                const numMatch = PROGRESSION.has(rule.renderType)
+                    ? preText.match(/^(.*?)\s+(\d[\d,]*\s*\/\s*\d[\d,]*.*)$/)
+                    : null;
+                if (numMatch && numMatch[1].trim()) {
+                    reconstructedContent = `${numMatch[1].trim()}: ${numMatch[2].trim()}`;
+                } else {
+                    reconstructedContent = preText.trim();
+                }
+            }
+        }
 
         let barId = null;
         const progressionTypes = ['hp_bar', 'xp_bar', 'progress', 'clock', 'stars', 'weight', 'orbs', 'slots', 'phase', 'gauge', 'charge'];
@@ -577,6 +617,7 @@ export function getTimeOfDayInfo(str) {
 
         return renderSubFieldByRule(rule, reconstructedContent, barId);
     }
+
 
     /**
      * If `line` contains one or more ((MARKER)) tokens, renders it and returns HTML.

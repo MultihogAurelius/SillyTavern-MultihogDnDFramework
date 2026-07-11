@@ -282,7 +282,7 @@ async function showAiCustomModulePreviewPopup(parsed, settings) {
 }
 
 async function promptForAiModuleEditDescription(moduleLabel) {
-    const { Popup } = SillyTavern.getContext();
+    const { Popup, POPUP_TYPE, POPUP_RESULT } = SillyTavern.getContext();
     const body = `
         <div style="display:flex; flex-direction:column; gap:8px; min-width:360px; text-align:left;">
             <div style="font-size:12px; opacity:0.8; line-height:1.4;">
@@ -291,12 +291,23 @@ async function promptForAiModuleEditDescription(moduleLabel) {
             <textarea id="rt_pe_edit_desc" class="text_pole" rows="5" style="width:100%; resize:vertical;" placeholder="Example: Make it also track a progress ratio for quests, showing 'Progress: 2/5 collected'. Add a wallet badge for gold, silver, bronze coins."></textarea>
         </div>
     `;
-    const ok = await Popup.show.confirm('🤖 Describe Revision for AI', body, {
+
+    // Capture the textarea value via onClosing, which fires while the DOM is still live —
+    // before the popup dialog element is removed. Reading the element AFTER show() resolves
+    // is too late: Popup removes its DOM before settling the promise.
+    let capturedDescription = null;
+    const popup = new Popup(body, POPUP_TYPE.CONFIRM, null, {
         okButton: 'Revise Instructions',
-        cancelButton: 'Cancel'
+        cancelButton: 'Cancel',
+        onClosing: (p) => {
+            const ta = /** @type {HTMLTextAreaElement|null} */ (p.dlg.querySelector('#rt_pe_edit_desc'));
+            capturedDescription = ta ? ta.value.trim() : null;
+            return true; // allow close
+        },
     });
-    if (ok !== 1) return null;
-    return /** @type {HTMLTextAreaElement} */ (document.getElementById('rt_pe_edit_desc'))?.value?.trim() || null;
+    const result = await popup.show();
+    if (result !== POPUP_RESULT.AFFIRMATIVE) return null;
+    return capturedDescription || null;
 }
 
 async function showAiStockPromptPreviewPopup(displayTag, promptText) {
