@@ -992,6 +992,13 @@ ${worldCtx}`;
         s.customPortraits['PC'] = avatarUrl;
         s.customPortraits[safeName] = avatarUrl;
         
+        // Also map the AI-generated clean name (if any) from the new state memo,
+        // so the State Tracker can match the portrait even if the AI changed the name.
+        const extractedName = extractCharNameFromMemo(s.currentMemo);
+        if (extractedName && extractedName !== safeName) {
+            s.customPortraits[extractedName] = avatarUrl;
+        }
+        
         const currentChatId = SillyTavern.getContext().chatId;
         if (currentChatId && typeof saveChatState === 'function') {
             saveChatState(currentChatId);
