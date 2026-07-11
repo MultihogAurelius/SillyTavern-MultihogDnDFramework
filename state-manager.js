@@ -11,6 +11,24 @@
 
 import { DEFAULT_STOCK_PROMPTS, BLOCK_ORDER } from './constants.js';
 
+export const DEFAULT_NPC_SECTIONS = [
+    { id: 'sec_appearance', name: 'Appearance/Species', description: 'Species, build, age, features, usual attire — not current pose or activity.', icon: '👁️', color: '#d4a940' },
+    { id: 'sec_personality', name: 'Personality', description: 'Stable temperament and drives — not today\'s mood, fear, or stress.', icon: '🧠', color: '#8b5cf6' },
+    { id: 'sec_background', name: 'Brief Background', description: 'Standing role, origin, history — not their part in the current plot.', icon: '📜', color: '#3b82f6' },
+    { id: 'sec_habits', name: 'Habits/Behaviors', description: 'Recurring mannerisms and patterns — not one scene\'s behavior.', icon: '🔄', color: '#10b981' },
+    { id: 'sec_strengths', name: 'Strengths', description: '[Concise bullet phrases formatted in bullet points of their most notable strengths, skills, or virtues. Sharp and specific — no vague generalities. A kind character may have more strengths than flaws.]', icon: '⚡', color: '#22c55e' },
+    { id: 'sec_flaws', name: 'Flaws', description: '[Concise bullet phrases formatted in bullet points of their most notable weaknesses, bad habits, or moral failings. Be honest and specific. A troubled character may have more flaws than strengths.]\n(Note: The split between strengths and flaws does not need to be even. It is perfectly fine to have an uneven split—like having more strengths than flaws, or more flaws than strengths—so long as it authentically reflects the character. However, it can be evenly split if it makes sense.)', icon: '⚠️', color: '#ef4444' }
+];
+
+export const DEFAULT_PC_SECTIONS = [
+    { id: 'sec_appearance', name: 'Appearance/Species', description: '[Describe physical features and species: body type, height, hair, eyes, skin tone, distinguishing marks, scars, and natural body language. You MUST explicitly state their Species, Ethnicity, and Gender based on the character card and Player Preferences. You MUST explicitly incorporate any appearance notes provided in the card/preferences. Do NOT describe clothing, armor, or worn gear — those are handled dynamically elsewhere and will change.]', icon: '👁️', color: '#d4a940' },
+    { id: 'sec_personality', name: 'Personality', description: '[Describe temperament, how they act around others, and emotional tendencies. You MUST incorporate any traits provided.]', icon: '🧠', color: '#8b5cf6' },
+    { id: 'sec_background', name: 'Background', description: '[Provide backstory context grounded in the character card. You MUST incorporate any background hints provided. Brief but meaningful.]', icon: '📜', color: '#3b82f6' },
+    { id: 'sec_habits', name: 'Habits & Behaviors', description: '[Describe recurring mannerisms, habits, quirks, or behavioral patterns.]', icon: '🔄', color: '#10b981' },
+    { id: 'sec_strengths', name: 'Strengths', description: '[Concise bullet phrases formatted in bullet points of their most notable strengths, skills, or virtues. Sharp and specific — no vague generalities. A kind character may have more strengths than flaws.]', icon: '⚡', color: '#22c55e' },
+    { id: 'sec_flaws', name: 'Flaws', description: '[Concise bullet phrases formatted in bullet points of their most notable weaknesses, bad habits, or moral failings. Be honest and specific. A troubled character may have more flaws than strengths.]\n(Note: The split between strengths and flaws does not need to be even. It is perfectly fine to have an uneven split—like having more strengths than flaws, or more flaws than strengths—so long as it authentically reflects the character. However, it can be evenly split if it makes sense.)', icon: '⚠️', color: '#ef4444' }
+];
+
 // ── Module name (shared constant, settings key) ────────────────────────────────
 export const MODULE_NAME = 'rpg_tracker';
 
@@ -317,10 +335,18 @@ export function applyRelTierBadgeElement(el, type, value, max) {
  * @returns {string}
  */
 export function buildNpcInstruction(majorWords = 25, minorWords = 15, ignoreLimits = false) {
-    let useDdMmYy = false;
+    let settings = {};
     try {
-        useDdMmYy = !!getSettings().useDdMmYyFormat;
+        settings = getSettings();
     } catch (_) {}
+    let useDdMmYy = !!settings.useDdMmYyFormat;
+    
+    let coreSections = settings.npcCoreSections;
+    if (!coreSections || !Array.isArray(coreSections) || coreSections.length === 0) {
+        coreSections = DEFAULT_NPC_SECTIONS;
+    }
+    const sectionsList = coreSections.map(s => s.name).join(', ');
+    const sectionsTemplate = coreSections.map(s => `${s.name}: ${s.description}`).join('\n');
 
     let instruction = `Significant named characters the party interacts with (do NOT record every random enemy or nameless bartender, only characters who are somehow significant).
 Do NOT create an NPC entry for the player character (controlled by the user) under any circumstances.
@@ -329,27 +355,21 @@ Under no circumstances should you create an NPC entry for the player character, 
 Always use the exact macro string \`{{user}}\` when referring to the player character in EVENT, QUEST, or NPC relationship descriptions; do NOT write the plain word "user" or "player" or their actual character name in entry contents.
 
 <CORE_FORMAT — NPC only>
-IMPORTANT: The Description field inside the [[ ]] tags MUST start directly with the [CORE] tag. Do NOT prepend any timestamps, dates, or other text before the [CORE] tag under any circumstances (e.g. do NOT write "[4:47 PM, ${useDdMmYy ? '01/01/2026' : 'Day 1'}] [CORE]" or "[${useDdMmYy ? 'DD/MM/YYYY' : 'Day X'}, HH:MM] [CORE]"). The very first character of the Description MUST be the "[" of the "[CORE]" tag. Wrap the identity sections (Appearance/Species, Personality, Brief Background, Habits/Behaviors, Strengths, Flaws) inside a single \`[CORE]\` and \`[/CORE]\` tag block.
+IMPORTANT: The Description field inside the [[ ]] tags MUST start directly with the [CORE] tag. Do NOT prepend any timestamps, dates, or other text before the [CORE] tag under any circumstances (e.g. do NOT write "[4:47 PM, ${useDdMmYy ? '01/01/2026' : 'Day 1'}] [CORE]" or "[${useDdMmYy ? 'DD/MM/YYYY' : 'Day X'}, HH:MM] [CORE]"). The very first character of the Description MUST be the "[" of the "[CORE]" tag. Wrap the identity sections (${sectionsList}) inside a single \`[CORE]\` and \`[/CORE]\` tag block.
 
 CRITICAL — [CORE] is permanent identity, still true after this arc ends. Extrapolate enduring traits from behavior; never recap this turn, voyage, or crisis.
 BANNED in [CORE]: momentary actions/states; plot progress ("increasingly…", "first to notice…", "this voyage"); roles defined by ongoing events ("crewman on X who became unhinged by Y"). Scene facts go in timestamped lines after [/CORE] only.
 
 [CORE]
-Appearance/Species: Species, build, age, features, usual attire — not current pose or activity.
-Personality: Stable temperament and drives — not today's mood, fear, or stress.
-Brief Background: Standing role, origin, history — not their part in the current plot.
-Habits/Behaviors: Recurring mannerisms and patterns — not one scene's behavior.
-Strengths: [Concise bullet phrases formatted in bullet points of their most notable strengths, skills, or virtues. Sharp and specific — no vague generalities. A kind character may have more strengths than flaws.]
-Flaws: [Concise bullet phrases formatted in bullet points of their most notable weaknesses, bad habits, or moral failings. Be honest and specific. A troubled character may have more flaws than strengths.]
-(Note: The split between strengths and flaws does not need to be even. It is perfectly fine to have an uneven split—like having more strengths than flaws, or more flaws than strengths—so long as it authentically reflects the character. However, it can be evenly split if it makes sense.)
+${sectionsTemplate}
 [/CORE]
 
 After the [/CORE] block, append timestamped narrative updates as usual ([${useDdMmYy ? 'DD/MM/YYYY' : 'Day X'}, HH:MM] ...).
 </CORE_FORMAT>
 ## CORE IDENTITY UPDATES
-If any field inside the permanent [CORE] block changes, is updated, or new information is revealed (Appearance/Species, Personality, Brief Background, Habits/Behaviors, Strengths, Flaws), output:
+If any field inside the permanent [CORE] block changes, is updated, or new information is revealed (${sectionsList}), output:
   [[UPDATE_CORE: Book::UID | FieldName | New field text]]
-Use the exact FieldName (e.g. Personality, Brief Background, Appearance/Species, Habits/Behaviors, Strengths, Flaws). Do NOT log core updates as normal event/update entries.`;
+Use the exact FieldName (e.g. ${sectionsList}). Do NOT log core updates as normal event/update entries.`;
 
     let enableRelBars = false;
     try {
@@ -384,14 +404,20 @@ Do NOT record per-round combat updates (e.g., creature HP changes, turn-by-turn 
  */
 export function buildLocInstruction() {
     let useDdMmYy = false;
+    let coreSections = DEFAULT_NPC_SECTIONS;
     try {
-        useDdMmYy = !!getSettings().useDdMmYyFormat;
+        const s = getSettings();
+        useDdMmYy = !!s.useDdMmYyFormat;
+        if (s.npcCoreSections && Array.isArray(s.npcCoreSections) && s.npcCoreSections.length > 0) {
+            coreSections = s.npcCoreSections;
+        }
     } catch (_) {}
+    const sectionsList = coreSections.map(s => s.name).join(', ');
 
     return `Named places and sub-locations. The Name MUST be the full hierarchical path using " :: " as the separator (e.g. "Khelt :: Rust-Lantern District :: Marrow-Deep Mines Office"). Include each ancestor name as a keyword (e.g. "Khelt", "Rust-Lantern District", "mines").
 
 <CORE_FORMAT — LOC only>
-When FIRST recording a location, wrap a short permanent description (1–2 sentences: what the place is, notable features, typical atmosphere) inside a plain \`[CORE]\` … \`[/CORE]\` block. Do NOT use NPC field headers (Appearance/Species, Personality, Brief Background, Habits/Behaviors) — those structured sections are NPC-only.
+When FIRST recording a location, wrap a short permanent description (1–2 sentences: what the place is, notable features, typical atmosphere) inside a plain \`[CORE]\` … \`[/CORE]\` block. Do NOT use NPC field headers (${sectionsList}) — those structured sections are NPC-only.
 
 Correct:
 [CORE]
@@ -400,8 +426,8 @@ A well-worn dusty track through Mulgore's golden savannah, lined with sparse tre
 
 Wrong:
 [CORE]
-Appearance/Species: A dusty track...
-Personality: A vital artery...
+${coreSections[0] ? coreSections[0].name : 'Appearance'}: A dusty track...
+${coreSections[1] ? coreSections[1].name : 'Personality'}: A vital artery...
 [/CORE]
 
 The Description MUST start directly with \`[CORE]\`. Do NOT prepend timestamps before the opening tag (e.g. do NOT write "[${useDdMmYy ? '01/01/2026' : 'Day 1'}, 08:00] [CORE]").
@@ -415,14 +441,20 @@ After \`[/CORE]\`, append timestamped deltas when the place changes ([${useDdMmY
  */
 export function buildFacInstruction() {
     let useDdMmYy = false;
+    let coreSections = DEFAULT_NPC_SECTIONS;
     try {
-        useDdMmYy = !!getSettings().useDdMmYyFormat;
+        const s = getSettings();
+        useDdMmYy = !!s.useDdMmYyFormat;
+        if (s.npcCoreSections && Array.isArray(s.npcCoreSections) && s.npcCoreSections.length > 0) {
+            coreSections = s.npcCoreSections;
+        }
     } catch (_) {}
+    const sectionsList = coreSections.map(s => s.name).join(', ');
 
     return `Named factions, guilds, organisations. **Status**: short current-state line (standing with the party, active conflicts, what changed recently). **Description**: permanent history, ideology, schemes, and notable members.
 
 <CORE_FORMAT — FAC only>
-When FIRST recording a faction, wrap the permanent description (history, ideology, schemes, and notable members) inside a plain \`[CORE]\` … \`[/CORE]\` block. Do NOT use NPC field headers (Appearance/Species, Personality, Brief Background, Habits/Behaviors) — those structured sections are NPC-only.
+When FIRST recording a faction, wrap the permanent description (history, ideology, schemes, and notable members) inside a plain \`[CORE]\` … \`[/CORE]\` block. Do NOT use NPC field headers (${sectionsList}) — those structured sections are NPC-only.
 
 Correct:
 [CORE]
@@ -493,6 +525,10 @@ function buildDefaultSettings() {
         pollinationsApiKey: "",
         pollinationsModel: "zimage",
         inventoryWorthMode: "hover",   // 'hover' = worth shown as tooltip only | 'display' = coin badge shown inline
+        npcCoreSections: [],
+        pcCoreSections: [],
+        npcSectionPresets: {},
+        pcSectionPresets: {},
         npcMajorWords: 25,
         npcMinorWords: 15,
         npcRelationshipMaxDefault: 150,
@@ -1482,6 +1518,16 @@ function getSettingsInternal(extensionSettings) {
                     'DELETION: To REMOVE a section entirely, you MUST output: \\`[TAG]REMOVED[/TAG]\\`.\nNO RELATIONSHIPS: Never track relationships, and never create a relationship section (e.g., [RELATIONSHIPS]). NPC relationships are handled by a separate, dedicated system.'
                 );
             }
+        }
+    }
+    // ── MIGRATION: Auto-fix legacy corrupted PC Core Section colors ────────────────
+    if (s.pcCoreSections && Array.isArray(s.pcCoreSections) && s.pcCoreSections.length === 6) {
+        const namesMatch = s.pcCoreSections.every((sec, idx) => sec.name === DEFAULT_PC_SECTIONS[idx].name);
+        const colorsMatch = s.pcCoreSections.every((sec, idx) => sec.color === DEFAULT_PC_SECTIONS[idx].color);
+        if (namesMatch && !colorsMatch) {
+            s.pcCoreSections.forEach((sec, idx) => {
+                sec.color = DEFAULT_PC_SECTIONS[idx].color;
+            });
         }
     }
 
