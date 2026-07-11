@@ -5152,7 +5152,10 @@ function createPanel() {
                                 <div style="flex:1;min-width:220px;display:flex;flex-direction:column;gap:8px;">
                                     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
                                         <div style="font-size:24px;font-weight:bold;color:#c4b5fd;line-height:1.2;">${escapeHtml(pc.name)}</div>
-                                        <button class="rt-npc-popup-edit-btn menu_button" style="flex-shrink:0;font-size:12px;padding:4px 12px;white-space:nowrap;">✏️ Edit Text</button>
+                                        <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;">
+                                            <button class="rt-npc-popup-edit-btn menu_button" style="flex-shrink:0;font-size:12px;padding:4px 12px;white-space:nowrap;">✏️ Edit Text</button>
+                                            <button class="rt-npc-popup-ai-edit-btn menu_button" style="flex-shrink:0;font-size:12px;padding:4px 12px;white-space:nowrap;background:rgba(120,80,220,0.15);border-color:rgba(120,80,220,0.5);color:#c4b5fd;">✨ Edit with AI</button>
+                                        </div>
                                     </div>
                                     <span style="font-size:11px;padding:3px 10px;border-radius:10px;font-weight:bold;align-self:flex-start;background:rgba(120,80,220,0.15);color:#c4b5fd;border:1px solid rgba(120,80,220,0.5);">Player Character</span>
                                 </div>
@@ -5169,47 +5172,130 @@ function createPanel() {
                                         <button class="rt-npc-popup-save-btn menu_button" style="font-size:12px;padding:5px 18px;background:rgba(120,80,220,0.2);border-color:rgba(120,80,220,0.5);color:#c4b5fd;font-weight:bold;">💾 Save</button>
                                     </div>
                                 </div>
+                                <div class="rt-npc-popup-ai-edit" style="display:none;flex-direction:column;gap:10px;">
+                                    <div style="font-size:11px;font-weight:bold;color:rgba(120,80,220,0.9);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:4px;">✨ AI Edit Request</div>
+                                    <textarea class="rt-npc-popup-ai-instructions" spellcheck="true" placeholder="Describe what you want changed or iterated on… e.g. 'Make the background more tied to the ongoing war' or 'Give her a more cynical personality'" style="width:100%;min-height:90px;box-sizing:border-box;background:var(--SmartThemeBlurTintColor, rgba(0,0,0,0.3));color:var(--SmartThemeBodyColor, inherit);border:1px solid rgba(120,80,220,0.5);border-radius:8px;padding:12px;font-family:inherit;font-size:13px;line-height:1.6;resize:vertical;"></textarea>
+                                    <div style="display:flex;gap:8px;justify-content:flex-end;">
+                                        <button class="rt-npc-popup-ai-cancel-btn menu_button" style="font-size:12px;padding:5px 14px;">Cancel</button>
+                                        <button class="rt-npc-popup-ai-generate-btn menu_button" style="font-size:12px;padding:5px 18px;background:rgba(120,80,220,0.2);border-color:rgba(120,80,220,0.5);color:#c4b5fd;font-weight:bold;">✨ Generate</button>
+                                    </div>
+                                    <div class="rt-npc-popup-ai-preview" style="display:none;flex-direction:column;gap:8px;">
+                                        <div style="font-size:11px;font-weight:bold;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:1.5px;">Preview — Review before applying</div>
+                                        <textarea class="rt-npc-popup-ai-preview-text" spellcheck="false" style="width:100%;min-height:320px;box-sizing:border-box;background:rgba(0,0,0,0.35);color:var(--SmartThemeBodyColor, inherit);border:1px solid rgba(120,80,220,0.3);border-radius:8px;padding:12px;font-family:monospace;font-size:13px;line-height:1.6;resize:vertical;"></textarea>
+                                        <div style="display:flex;gap:8px;justify-content:flex-end;">
+                                            <button class="rt-npc-popup-ai-regen-btn menu_button" style="font-size:12px;padding:5px 14px;">🔄 Regenerate</button>
+                                            <button class="rt-npc-popup-ai-apply-btn menu_button" style="font-size:12px;padding:5px 18px;background:rgba(0,200,140,0.15);border-color:rgba(0,200,140,0.5);color:#00c88c;font-weight:bold;">✅ Apply</button>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         `;
                         
                         const viewPane = popupDom.querySelector('.rt-npc-popup-view');
                         const editPane = popupDom.querySelector('.rt-npc-popup-edit');
+                        const aiEditPane = popupDom.querySelector('.rt-npc-popup-ai-edit');
                         const textarea = /** @type {HTMLTextAreaElement} */ (popupDom.querySelector('.rt-npc-popup-textarea'));
                         const editBtn = popupDom.querySelector('.rt-npc-popup-edit-btn');
+                        const aiEditBtn = popupDom.querySelector('.rt-npc-popup-ai-edit-btn');
                         const cancelBtn = popupDom.querySelector('.rt-npc-popup-cancel-btn');
                         const saveBtn = /** @type {HTMLButtonElement} */ (popupDom.querySelector('.rt-npc-popup-save-btn'));
                         const sectionsDiv = popupDom.querySelector('.rt-npc-popup-sections');
-                        
+                        const aiInstructionsEl = /** @type {HTMLTextAreaElement} */ (popupDom.querySelector('.rt-npc-popup-ai-instructions'));
+                        const aiCancelBtn = popupDom.querySelector('.rt-npc-popup-ai-cancel-btn');
+                        const aiGenerateBtn = /** @type {HTMLButtonElement} */ (popupDom.querySelector('.rt-npc-popup-ai-generate-btn'));
+                        const aiPreviewPane = popupDom.querySelector('.rt-npc-popup-ai-preview');
+                        const aiPreviewText = /** @type {HTMLTextAreaElement} */ (popupDom.querySelector('.rt-npc-popup-ai-preview-text'));
+                        const aiRegenBtn = /** @type {HTMLButtonElement} */ (popupDom.querySelector('.rt-npc-popup-ai-regen-btn'));
+                        const aiApplyBtn = /** @type {HTMLButtonElement} */ (popupDom.querySelector('.rt-npc-popup-ai-apply-btn'));
+
+                        const showPane = (pane) => {
+                            viewPane.style.display = 'none';
+                            editPane.style.display = 'none';
+                            aiEditPane.style.display = 'none';
+                            if (pane) pane.style.display = 'flex';
+                        };
+
                         const startEdit = () => {
                             textarea.value = pc.bio || '';
-                            viewPane.style.display = 'none';
-                            editPane.style.display = 'flex';
+                            showPane(editPane);
                             textarea.focus();
                         };
-                        
+
                         editBtn.addEventListener('click', startEdit);
-                        
-                        cancelBtn.addEventListener('click', () => {
-                            editPane.style.display = 'none';
-                            viewPane.style.display = 'block';
-                        });
-                        
+
+                        cancelBtn.addEventListener('click', () => showPane(viewPane));
+
                         saveBtn.addEventListener('click', async () => {
                             pc.bio = textarea.value;
                             if (typeof saveChatState === 'function') saveChatState(_currentChatId);
-                            
                             const newHtml = renderSectionsHtml(pc.bio) || `<div style="font-size:14px;color:var(--SmartThemeBodyColor, inherit);opacity:0.5;font-style:italic;padding:16px 0;">No structured sections found.</div>`;
                             sectionsDiv.innerHTML = newHtml;
-                            
-                            editPane.style.display = 'none';
-                            viewPane.style.display = 'block';
-                            
+                            showPane(viewPane);
                             if (typeof refreshAgentManifestNow === 'function') refreshAgentManifestNow();
-                            
                             // @ts-ignore
                             if (typeof toastr !== 'undefined') toastr.success('Player Character saved.', 'Campaign Records');
                         });
-                        
+
+                        // ── AI Edit ────────────────────────────────────────────
+                        aiEditBtn.addEventListener('click', () => {
+                            aiPreviewPane.style.display = 'none';
+                            aiInstructionsEl.value = '';
+                            showPane(aiEditPane);
+                            aiInstructionsEl.focus();
+                        });
+
+                        aiCancelBtn.addEventListener('click', () => showPane(viewPane));
+
+                        const runAiEdit = async () => {
+                            const instructions = aiInstructionsEl.value.trim();
+                            if (!instructions) { toastr['warning']('Please describe what you want changed.', 'Edit with AI'); return; }
+                            aiGenerateBtn.disabled = true; aiRegenBtn.disabled = true;
+                            aiGenerateBtn.textContent = '⏳ Generating…';
+                            const curSettings = getSettings();
+                            const aiSettings = {
+                                connectionSource: curSettings.routerConnectionSource ?? 'default',
+                                connectionProfileId: curSettings.routerConnectionProfileId || '',
+                                completionPresetId: curSettings.routerCompletionPresetId || '',
+                                ollamaUrl: curSettings.routerOllamaUrl || 'http://localhost:11434',
+                                ollamaModel: curSettings.routerOllamaModel || '',
+                                openaiUrl: curSettings.routerOpenaiUrl || '',
+                                openaiKey: curSettings.routerOpenaiKey || '',
+                                openaiModel: curSettings.routerOpenaiModel || '',
+                                maxTokens: curSettings.routerMaxTokens || 0,
+                                debugMode: curSettings.debugMode,
+                            };
+                            const sysPrompt = `You are a persona editor for a roleplay system. The user wants to make specific changes to an existing character persona. Output the ENTIRE revised persona with the requested changes applied — keep everything else identical. Do not add preambles or commentary. Output only the revised persona text.`;
+                            const userMsg = `CURRENT PERSONA:\n${pc.bio || ''}\n\nREQUESTED CHANGES:\n${instructions}\n\nOutput the full revised persona now.`;
+                            try {
+                                const result = await sendStateRequest(aiSettings, sysPrompt, userMsg);
+                                const trimmed = (result || '').trim();
+                                if (trimmed) {
+                                    aiPreviewText.value = trimmed;
+                                    aiPreviewPane.style.display = 'flex';
+                                } else {
+                                    toastr['warning']('AI returned an empty result. Please try again.', 'Edit with AI');
+                                }
+                            } catch (err) {
+                                toastr['error'](`AI edit failed: ${String(err.message || err).substring(0, 120)}`, 'Edit with AI');
+                            }
+                            aiGenerateBtn.disabled = false; aiRegenBtn.disabled = false;
+                            aiGenerateBtn.textContent = '✨ Generate';
+                        };
+
+                        aiGenerateBtn.addEventListener('click', runAiEdit);
+                        aiRegenBtn.addEventListener('click', runAiEdit);
+
+                        aiApplyBtn.addEventListener('click', async () => {
+                            pc.bio = aiPreviewText.value;
+                            if (typeof saveChatState === 'function') saveChatState(_currentChatId);
+                            const newHtml = renderSectionsHtml(pc.bio) || `<div style="font-size:14px;color:var(--SmartThemeBodyColor, inherit);opacity:0.5;font-style:italic;padding:16px 0;">No structured sections found.</div>`;
+                            sectionsDiv.innerHTML = newHtml;
+                            showPane(viewPane);
+                            if (typeof refreshAgentManifestNow === 'function') refreshAgentManifestNow();
+                            // @ts-ignore
+                            if (typeof toastr !== 'undefined') toastr.success('Player Character updated via AI.', 'Campaign Records');
+                        });
+
                         if (startInEditMode) startEdit();
                         
                         const popupOpts = { okButton: 'Close', cancelButton: false, wide: true, large: true };
@@ -5746,7 +5832,10 @@ function createPanel() {
                                     <div style="flex:1;min-width:220px;display:flex;flex-direction:column;gap:8px;">
                                         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
                                             <div style="font-size:24px;font-weight:bold;color:#d4a940;line-height:1.2;">${escapeHtml(item.label)}</div>
-                                            <button class="rt-npc-popup-edit-btn menu_button" style="flex-shrink:0;font-size:12px;padding:4px 12px;white-space:nowrap;">✏️ Edit Text</button>
+                                            <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;">
+                                                <button class="rt-npc-popup-edit-btn menu_button" style="flex-shrink:0;font-size:12px;padding:4px 12px;white-space:nowrap;">✏️ Edit Text</button>
+                                                <button class="rt-npc-popup-ai-edit-btn menu_button" style="flex-shrink:0;font-size:12px;padding:4px 12px;white-space:nowrap;background:rgba(212,169,64,0.1);border-color:rgba(212,169,64,0.5);color:#d4a940;">✨ Edit with AI</button>
+                                            </div>
                                         </div>
                                         <span style="font-size:11px;padding:3px 10px;border-radius:10px;font-weight:bold;align-self:flex-start;${activeStyle}">${activeLabel}</span>
                                         ${barsBlockHtml}
@@ -5766,6 +5855,23 @@ function createPanel() {
                                             <button class="rt-npc-popup-save-btn menu_button" style="font-size:12px;padding:5px 18px;background:rgba(212,169,64,0.2);border-color:rgba(212,169,64,0.5);color:#d4a940;font-weight:bold;">💾 Save</button>
                                         </div>
                                     </div>
+                                    <!-- AI EDIT PANE -->
+                                    <div class="rt-npc-popup-ai-edit" style="display:none;flex-direction:column;gap:10px;">
+                                        <div style="font-size:11px;font-weight:bold;color:rgba(212,169,64,0.9);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:4px;">✨ AI Edit Request</div>
+                                        <textarea class="rt-npc-popup-ai-instructions" spellcheck="true" placeholder="Describe what you want changed or iterated on… e.g. 'Make her backstory more tragic' or 'Add a rivalry with the player character'" style="width:100%;min-height:90px;box-sizing:border-box;background:var(--SmartThemeBlurTintColor, rgba(0,0,0,0.3));color:var(--SmartThemeBodyColor, inherit);border:1px solid rgba(212,169,64,0.5);border-radius:8px;padding:12px;font-family:inherit;font-size:13px;line-height:1.6;resize:vertical;"></textarea>
+                                        <div style="display:flex;gap:8px;justify-content:flex-end;">
+                                            <button class="rt-npc-popup-ai-cancel-btn menu_button" style="font-size:12px;padding:5px 14px;">Cancel</button>
+                                            <button class="rt-npc-popup-ai-generate-btn menu_button" style="font-size:12px;padding:5px 18px;background:rgba(212,169,64,0.15);border-color:rgba(212,169,64,0.5);color:#d4a940;font-weight:bold;">✨ Generate</button>
+                                        </div>
+                                        <div class="rt-npc-popup-ai-preview" style="display:none;flex-direction:column;gap:8px;">
+                                            <div style="font-size:11px;font-weight:bold;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:1.5px;">Preview — Review before applying</div>
+                                            <textarea class="rt-npc-popup-ai-preview-text" spellcheck="false" style="width:100%;min-height:320px;box-sizing:border-box;background:rgba(0,0,0,0.35);color:var(--SmartThemeBodyColor, inherit);border:1px solid rgba(212,169,64,0.3);border-radius:8px;padding:12px;font-family:monospace;font-size:13px;line-height:1.6;resize:vertical;"></textarea>
+                                            <div style="display:flex;gap:8px;justify-content:flex-end;">
+                                                <button class="rt-npc-popup-ai-regen-btn menu_button" style="font-size:12px;padding:5px 14px;">🔄 Regenerate</button>
+                                                <button class="rt-npc-popup-ai-apply-btn menu_button" style="font-size:12px;padding:5px 18px;background:rgba(0,200,140,0.15);border-color:rgba(0,200,140,0.5);color:#00c88c;font-weight:bold;">✅ Apply</button>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                                 ${relLogHtml}
                             `;
@@ -5775,22 +5881,114 @@ function createPanel() {
                             // Wire up in-popup edit/save/cancel
                             const viewPane = popupDom.querySelector('.rt-npc-popup-view');
                             const editPane = popupDom.querySelector('.rt-npc-popup-edit');
+                            const aiEditPane = popupDom.querySelector('.rt-npc-popup-ai-edit');
                             const sectionsDiv = popupDom.querySelector('.rt-npc-popup-sections');
                             const textarea = /** @type {HTMLTextAreaElement} */ (popupDom.querySelector('.rt-npc-popup-textarea'));
                             const editBtn = popupDom.querySelector('.rt-npc-popup-edit-btn');
+                            const aiEditBtn = popupDom.querySelector('.rt-npc-popup-ai-edit-btn');
                             const cancelBtn = popupDom.querySelector('.rt-npc-popup-cancel-btn');
                             const saveBtn = /** @type {HTMLButtonElement} */ (popupDom.querySelector('.rt-npc-popup-save-btn'));
+                            const aiInstructionsEl = /** @type {HTMLTextAreaElement} */ (popupDom.querySelector('.rt-npc-popup-ai-instructions'));
+                            const aiCancelBtn = popupDom.querySelector('.rt-npc-popup-ai-cancel-btn');
+                            const aiGenerateBtn = /** @type {HTMLButtonElement} */ (popupDom.querySelector('.rt-npc-popup-ai-generate-btn'));
+                            const aiPreviewPane = popupDom.querySelector('.rt-npc-popup-ai-preview');
+                            const aiPreviewText = /** @type {HTMLTextAreaElement} */ (popupDom.querySelector('.rt-npc-popup-ai-preview-text'));
+                            const aiRegenBtn = /** @type {HTMLButtonElement} */ (popupDom.querySelector('.rt-npc-popup-ai-regen-btn'));
+                            const aiApplyBtn = /** @type {HTMLButtonElement} */ (popupDom.querySelector('.rt-npc-popup-ai-apply-btn'));
+
+                            const npcShowPane = (pane) => {
+                                viewPane.style.display = 'none';
+                                editPane.style.display = 'none';
+                                aiEditPane.style.display = 'none';
+                                if (pane) pane.style.display = 'flex';
+                            };
 
                             editBtn.addEventListener('click', () => {
                                 textarea.value = item.content || '';
-                                viewPane.style.display = 'none';
-                                editPane.style.display = 'flex';
+                                npcShowPane(editPane);
                                 textarea.focus();
                             });
 
-                            cancelBtn.addEventListener('click', () => {
-                                editPane.style.display = 'none';
-                                viewPane.style.display = 'block';
+                            cancelBtn.addEventListener('click', () => npcShowPane(viewPane));
+
+                            // ── AI Edit ─────────────────────────────────────────
+                            aiEditBtn.addEventListener('click', () => {
+                                aiPreviewPane.style.display = 'none';
+                                aiInstructionsEl.value = '';
+                                npcShowPane(aiEditPane);
+                                aiInstructionsEl.focus();
+                            });
+
+                            aiCancelBtn.addEventListener('click', () => npcShowPane(viewPane));
+
+                            const runNpcAiEdit = async () => {
+                                const instructions = aiInstructionsEl.value.trim();
+                                if (!instructions) { toastr['warning']('Please describe what you want changed.', 'Edit with AI'); return; }
+                                aiGenerateBtn.disabled = true; aiRegenBtn.disabled = true;
+                                aiGenerateBtn.textContent = '⏳ Generating…';
+                                const curSettings = getSettings();
+                                const aiSettings = {
+                                    connectionSource: curSettings.routerConnectionSource ?? 'default',
+                                    connectionProfileId: curSettings.routerConnectionProfileId || '',
+                                    completionPresetId: curSettings.routerCompletionPresetId || '',
+                                    ollamaUrl: curSettings.routerOllamaUrl || 'http://localhost:11434',
+                                    ollamaModel: curSettings.routerOllamaModel || '',
+                                    openaiUrl: curSettings.routerOpenaiUrl || '',
+                                    openaiKey: curSettings.routerOpenaiKey || '',
+                                    openaiModel: curSettings.routerOpenaiModel || '',
+                                    maxTokens: curSettings.routerMaxTokens || 0,
+                                    debugMode: curSettings.debugMode,
+                                };
+                                const sysPrompt = `You are a character editor for a roleplay lorebook system. The user wants to make specific changes to an existing NPC entry. Output the ENTIRE revised entry with the requested changes applied — keep the same format and everything else identical. Do not add preambles or commentary. Output only the revised entry text.`;
+                                const userMsg = `CURRENT NPC ENTRY:\n${item.content || ''}\n\nREQUESTED CHANGES:\n${instructions}\n\nOutput the full revised entry now.`;
+                                try {
+                                    const result = await sendStateRequest(aiSettings, sysPrompt, userMsg);
+                                    const trimmed = (result || '').trim();
+                                    if (trimmed) {
+                                        aiPreviewText.value = trimmed;
+                                        aiPreviewPane.style.display = 'flex';
+                                    } else {
+                                        toastr['warning']('AI returned an empty result. Please try again.', 'Edit with AI');
+                                    }
+                                } catch (err) {
+                                    toastr['error'](`AI edit failed: ${String(err.message || err).substring(0, 120)}`, 'Edit with AI');
+                                }
+                                aiGenerateBtn.disabled = false; aiRegenBtn.disabled = false;
+                                aiGenerateBtn.textContent = '✨ Generate';
+                            };
+
+                            aiGenerateBtn.addEventListener('click', runNpcAiEdit);
+                            aiRegenBtn.addEventListener('click', runNpcAiEdit);
+
+                            aiApplyBtn.addEventListener('click', async () => {
+                                if (isRouterRunning()) {
+                                    // @ts-ignore
+                                    toastr.warning('Agent is running — wait for it to finish before saving.', 'Lorebook Agent');
+                                    return;
+                                }
+                                aiApplyBtn.disabled = true;
+                                aiApplyBtn.textContent = '…';
+                                const ok = await updateLorebookEntry(item.id, {
+                                    content: aiPreviewText.value,
+                                    key: item.keys,
+                                    comment: item.label,
+                                });
+                                if (ok) {
+                                    item.content = aiPreviewText.value;
+                                    _dirtyEntries.delete(item.id);
+                                    document.dispatchEvent(new CustomEvent('rt_lore_agent_updated'));
+                                    await refreshManifest();
+                                    const newHtml = renderSectionsHtml(item.content);
+                                    sectionsDiv.innerHTML = newHtml || `<div style="font-size:14px;color:var(--SmartThemeBodyColor, inherit);opacity:0.5;font-style:italic;padding:16px 0;">No structured sections found.</div>`;
+                                    npcShowPane(viewPane);
+                                    // @ts-ignore
+                                    toastr.success('NPC entry updated via AI.', 'Lorebook Agent');
+                                } else {
+                                    // @ts-ignore
+                                    toastr.error('Save failed.', 'Lorebook Agent');
+                                }
+                                aiApplyBtn.disabled = false;
+                                aiApplyBtn.textContent = '✅ Apply';
                             });
 
                             const clearLogBtn = popupDom.querySelector('.rt-npc-log-clear-btn');

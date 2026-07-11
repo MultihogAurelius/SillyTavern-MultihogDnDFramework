@@ -1094,7 +1094,7 @@ RULES — read carefully:
     // Full mode: structured 6-section bio adapted to the campaign setting
     const systemPrompt = `You are a persona writer for a roleplay system. Based on the provided character card, write a persona description for ${name} in third person.
 
-Rewrite the bio as if this character were native to the current campaign setting, fitting their appearance, background, and mannerisms naturally into the world.
+Rewrite the bio as if this character were native to the current campaign setting. Actively adapt and integrate their appearance, background, and mannerisms so they feel like a natural part of the world's lore and ongoing story.
 
 You MUST use this exact section format — each section on its own line with the label followed by a colon:
 
@@ -1105,7 +1105,7 @@ Personality:
 [Describe temperament, how they act around others, emotional tendencies, and core drives.]
 
 Background:
-[Provide backstory context grounded in the character card. Brief but meaningful.]
+[Provide backstory context grounded in the character card, but actively adapted and strongly influenced by the current campaign setting and world context. Brief but meaningful.]
 
 Habits & Behaviors:
 [Describe recurring mannerisms, habits, quirks, or behavioral patterns.]
