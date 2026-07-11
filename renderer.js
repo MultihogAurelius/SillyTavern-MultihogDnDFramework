@@ -783,6 +783,54 @@ export function getTimeOfDayInfo(str) {
         }).join('');
     };
 
+    /**
+     * Renders a single ability line as a structured pill.
+     * Splits on the FIRST colon only: everything before is the "name"
+     * (may include a resource annotation like "Rage (2/2 per day)"),
+     * everything after is the description.  This intentionally does NOT
+     * split on commas inside the description (unlike renderPills/splitSmart),
+     * so ability text like "Resistance to bludgeoning, piercing, slashing"
+     * stays as one contiguous pill description instead of being shattered
+     * into multiple pills.
+     */
+    const renderAbilityLine = (text) => {
+        let pillClass = 'rt-unit-pill';
+        let displayText = text.trim();
+
+        // Strip buff/debuff prefix markers
+        if (displayText.startsWith('(+)') || displayText.startsWith('(+) ')) {
+            pillClass += ' rt-pill-buff';
+            displayText = displayText.replace(/^\(\+\)\s*/, '');
+        } else if (displayText.startsWith('(-)') || displayText.startsWith('(-) ')) {
+            pillClass += ' rt-pill-debuff';
+            displayText = displayText.replace(/^\(-\)\s*/, '');
+        }
+
+        const colonIdx = displayText.indexOf(':');
+        if (colonIdx !== -1) {
+            const namePart = displayText.substring(0, colonIdx).trim();
+            const descPart = displayText.substring(colonIdx + 1).trim();
+
+            // Extract resource count from the name part (e.g. "Rage (2/2 per day)")
+            let iconHtml = '';
+            const resourceMatch = namePart.match(/(\d+)\s*\/\s*(\d+)/);
+            if (resourceMatch) {
+                iconHtml = `<span class="rt-unit-icon">${escapeHtmlWithColor(resourceMatch[0])}</span>`;
+            }
+
+            if (descPart) {
+                return `<div class="rt-entity-sub-line rt-units-container"><span class="${pillClass}">
+                    <span class="rt-unit-name">${escapeHtmlWithColor(namePart)}</span>
+                    ${iconHtml}
+                    <span class="rt-unit-descr">${escapeHtmlWithColor(descPart)}</span>
+                </span></div>`;
+            }
+        }
+
+        // No colon — fall back to a simple no-description pill
+        return `<div class="rt-entity-sub-line rt-units-container"><span class="${pillClass} no-desc"><span class="rt-unit-name">${escapeHtmlWithColor(displayText)}</span></span></div>`;
+    };
+
 
     /**
      * Parse the memo's [TAG]...[/TAG] blocks and return structured object.
@@ -1440,9 +1488,44 @@ function formatValueToCurrency(totalCp, detectedCurrency) {
                     const line = lines[abIdx];
                     const asMarker = tryRenderMarker(line, tag, '', abIdx);
                     if (asMarker !== null) { abilityResults.push(asMarker); continue; }
-                    const l = line.trim();
-                    const items = l.match(/^[-*]\s+/) ? [l.replace(/^[-*]\s*/, '')] : splitSmart(l);
-                    items.forEach(t => abilityResults.push(renderPills(t)));
+                    const l = line.trim().replace(/^[-*]\s*/, '');
+
+                    // Format detection: does this line use the "Name: description" format
+                    // (colon before any unparenthesised comma) or the old comma-separated
+                    // pill format ("Rage (2/2 per day), Reckless Attack, Danger Sense")?
+                    //
+                    // Walk through the string tracking paren depth; the first character
+                    // that is ',' at depth 0 is the "first unparenthesised comma", and
+                    // the first ':' at depth 0 is the "first unparenthesised colon".
+                    // If the colon comes first (or there is no comma at all), treat the
+                    // whole line as a single ability via renderAbilityLine so that commas
+                    // inside the description (e.g. "bludgeoning, piercing, slashing")
+                    // are not mis-split into separate pills.
+                    // If a comma comes first (old format), fall back to renderPills so
+                    // that multi-ability single-line entries still work exactly as before.
+                    let firstCommaIdx = -1, firstColonIdx = -1, depth = 0;
+                    for (let ci = 0; ci < l.length; ci++) {
+                        const ch = l[ci];
+                        if (ch === '(') depth++;
+                        else if (ch === ')') depth--;
+                        else if (depth === 0) {
+                            if (ch === ',' && firstCommaIdx === -1) firstCommaIdx = ci;
+                            if (ch === ':' && firstColonIdx === -1) firstColonIdx = ci;
+                        }
+                        if (firstCommaIdx !== -1 && firstColonIdx !== -1) break;
+                    }
+
+                    const isColonFormat = firstColonIdx !== -1 &&
+                        (firstCommaIdx === -1 || firstColonIdx < firstCommaIdx);
+
+                    if (isColonFormat) {
+                        abilityResults.push(renderAbilityLine(l));
+                    } else {
+                        // Old comma-separated pill format — wrap in a container div
+                        abilityResults.push(
+                            `<div class="rt-entity-sub-line rt-units-container">${renderPills(l)}</div>`
+                        );
+                    }
                 }
                 return abilityResults;
             }
