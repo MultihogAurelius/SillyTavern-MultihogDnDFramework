@@ -204,13 +204,14 @@ export function isBlankSectionContent(content) {
 }
 
 /** Narrator Configuration tags whose enabled-state doubles as a base sysprompt toggle. */
-const KNOWN_TOGGLE_DEFAULTS = { loot: true, random_events: true, resting: true, quests: true };
+const KNOWN_TOGGLE_DEFAULTS = { loot: true, random_events: true, resting: true, party_bench: true, quests: true };
 
 /** Checkbox ids from the Narrator Configuration panel, keyed by base sysprompt tag. */
 const NARRATOR_TOGGLE_IDS = {
     loot: 'rpg_sysprompt_mod_loot',
     random_events: 'rpg_sysprompt_mod_random_events',
     resting: 'rpg_sysprompt_mod_resting',
+    party_bench: 'rpg_sysprompt_mod_party_bench',
     quests: 'rpg_sysprompt_mod_quests',
     relationship_tracking: 'rpg_sysprompt_mod_npc_rel_bars',
 };

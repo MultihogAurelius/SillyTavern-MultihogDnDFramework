@@ -14,7 +14,7 @@
 
 import { getSettings, hydrateWorldProgressionFromChatState, persistWorldProgressionTimer, persistRouterLastRunWatermark, getNpcRelationshipMax, clampRelationshipValue, relationshipBarPct, getFriendshipTier, getAffectionTier, applyRelTierBadgeElement, saveChatState, getActiveChatId } from './state-manager.js';
 import { syncCombatProfile } from './llm-client.js';
-import { parseQuestsFromMemo, extractCurrentTimeStr, cleanMessageContent, formatInWorldTime } from './memo-processor.js';
+import { parseQuestsFromMemo, extractCurrentTimeStr, cleanMessageContent, formatInWorldTime, memoForGmContext } from './memo-processor.js';
 import { runRouterPass, saveSceneToLorebook, scanAssistantOutputForKeywords, parseInWorldMinutes, runWorldProgressionPass, updateLorebookEntry, getLorebookManifest } from './router.js';
 import { logTransaction } from './debug-viewer.js';
 
@@ -646,9 +646,7 @@ export function installInterceptor() {
             }
 
             if (settings.currentMemo && !content.includes("### STATE MEMO (DO NOT REPEAT)")) {
-                // Strip the JSON [QUESTS] block from the narrative context to save tokens and avoid redundancy
-                // Strip the JSON [QUESTS] block from the narrative context to save tokens and avoid redundancy
-                const memoText = stripMemoHtml(settings.currentMemo).replace(/\[QUESTS\][\s\S]*?\[\/QUESTS\]/gi, '').trim();
+                const memoText = stripMemoHtml(memoForGmContext(settings.currentMemo)).trim();
                 injections += `### STATE MEMO (DO NOT REPEAT)\n${memoText}\n\n`;
             }
 

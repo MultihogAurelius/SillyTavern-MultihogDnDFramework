@@ -2,7 +2,7 @@ import { getSettings, getEffectiveRouterCampaignPrefix } from './state-manager.j
 import { saveSettings } from './index.js';
 import { sendStateRequest } from './llm-client.js';
 import { parseMemoBlocks } from './renderer.js';
-import { escapeHtml } from './memo-processor.js';
+import { escapeHtml, memoForGmContext } from './memo-processor.js';
 import { getLorebookManifest } from './router.js';
 
 // Read an image File as a full-resolution Base64 data URL
@@ -200,7 +200,7 @@ export async function generatePortraitPrompt(entityName) {
     // 7. Current game state (memo) — full state for rich context
     try {
         if (s.currentMemo) {
-            contextParts.push(`Current Game State:\n${s.currentMemo.substring(0, 2000)}`);
+            contextParts.push(`Current Game State:\n${memoForGmContext(s.currentMemo).substring(0, 2000)}`);
         }
     } catch { /* ignore */ }
 

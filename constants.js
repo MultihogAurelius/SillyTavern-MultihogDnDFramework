@@ -60,12 +60,15 @@ Status: Effect (duration Xh Xm)
 
 For spells: output ONE \`Spells:\` line per spell level. Do NOT merge multiple levels onto one line with pipes.
 
-Only add party members if you see (X joins the party.)
-Only remove party members if you see (X leaves the party.)
+[PARTY] is the active roster (max 5 + {{user}}). Temporary separations are handled by the separate [BENCHED PARTY] module via [BENCH]/[UNBENCH] commands — do NOT remove members from [PARTY] for benching, and do NOT output [PARTY] on a turn where your only roster change is benching someone (output [BENCH] only; code removes them). If [BENCHED PARTY] is disabled, separations are just narration and nothing here changes.
 
-PERSISTENCE: If the party changes, you MUST output the ENTIRE [PARTY] block including all existing characters. Never omit a character unless they leave the party.
+TRIGGERS:
+- ADD a new member if you see (X joins the party.)
+- REMOVE a member entirely ONLY if you see the exact annotation *(Left the party: X — reason)* — do NOT infer this from narration alone, no matter how final it looks. This is a hard, permanent deletion, so it always requires this exact string with no exceptions. (This applies regardless of whether [BENCHED PARTY] is enabled — remove the member from whichever block currently holds them.)
 
-Example party: [PARTY]Elara (Ranger): 26/45 HP
+PERSISTENCE: If [PARTY] changes, you MUST output the ENTIRE block (all remaining members), per standard BLOCK PERSISTENCE rules. If it had no changes this turn, omit it entirely from your output.
+
+Example: [PARTY]Elara (Ranger): 26/45 HP
 Combat: BAB: +3 | Ranged: +6 | Melee: +4 | Base AC: 13 | Total AC: 15
 Gear: Shortbow (1d6+3 P) | Leather Armor (+2 AC)
 Proficiencies: Simple Weapons, Martial Weapons
@@ -79,6 +82,27 @@ Spells: Level 1 (2/2): Hunter's Mark, Goodberry
 HD: d10 (5/5)
 Status: Healthy
 [/PARTY]`,
+  'benched party': `Members temporarily separated from {{user}} while reunion remains plausible. Code moves their full [PARTY] stat sheet automatically — never output stat blocks here.
+
+Output [BENCHED PARTY] only when a bench or unbench occurs this turn; otherwise omit entirely. Do NOT also output [PARTY] on a bench/unbench turn — code handles roster moves. If other [PARTY] members had real changes (HP, gear, status, etc.), output [PARTY] for those changes only; still do not list the benched/unbenched member there.
+
+One command per line inside the block:
+- [BENCH] Name — reason   — member separates (hospitalized, scouting ahead, captured, sent on extended task, stranded, etc.). Name must match their [PARTY] entry. Reason required; derive from narrative.
+- [UNBENCH] Name          — member reunites with {{user}} on-screen.
+
+Infer benching/reunion from the narrative — no GM annotation exists for either. Bias toward under-triggering on bench: brief scene absence is NOT a bench. Wrong bench is worse than a missed one (missed benches self-heal on a later turn).
+
+Permanent removal uses *(Left the party: Name — reason)* from the [PARTY] module, not these commands.
+
+Example (bench only — no [PARTY] output):
+[BENCHED PARTY]
+[BENCH] Gareth — stayed at the lodging to rest and study
+[/BENCHED PARTY]
+
+Example (reunite only):
+[BENCHED PARTY]
+[UNBENCH] Gareth
+[/BENCHED PARTY]`,
   combat: `Active enemies/NPCs in combat. Track the current COMBAT ROUND starting from 1. Decrement buff/debuff durations by 1 each round. Format each combatant as:
 COMBAT ROUND X
 Name: current/max HP
@@ -100,7 +124,7 @@ MANDATORY FORMAT FOR EVERY ITEM:
 - Every item MUST have a thematic emoji prefix before the rarity tag
 - Gear with combat stats MUST include them in parentheses before the worth: e.g. (1d8+1 Slashing) or (AC +2)
 - Every item MUST have an estimated worth at the end: (~X currency) where currency fits the world setting (GP, SP, CP, Dollars, Caps, etc.)
-- Bare currency (e.g. "💰 1,200 GP") goes under Other Items — no rarity tag needed
+- Bare currency (e.g. "💰 1,200 GP" or "💵 $500") goes under Other Items — no rarity tag needed. Use "💵" for modern/paper currency (like Dollars) and "💰" for gold/coins.
 
 EQUIPPED ITEMS: Tag any actively worn or held item with [E] immediately after the rarity tag.
 - An item in 'Gear:' without [E] is carried but NOT currently worn or held.
@@ -902,11 +926,18 @@ ${XP_LEVEL_THRESHOLDS_TEXT}`;
 // ── Renderer / block layout constants ─────────────────────────────────────────
 
 export const BLOCK_ICONS = {
-  TIME: '🕒', XP: '🌟', CHARACTER: '🧙', PARTY: '👥',
+  TIME: '🕒', XP: '🌟', CHARACTER: '🧙', PARTY: '👥', 'BENCHED PARTY': '🏕️',
   COMBAT: '⚔️', INVENTORY: '🎒', ABILITIES: '✨', SPELLS: '📖',
   QUESTS: '📋',
 };
 
+// NOTE: 'BENCHED PARTY' has its OWN enable toggle + editable prompt (settings.modules['benched
+// party'] / DEFAULT_STOCK_PROMPTS['benched party']) — see ui-editors.js's refreshOrderList,
+// which renders it as a nested sub-row directly under PARTY rather than a normal flat entry.
+// It's deliberately NOT in BLOCK_ORDER, because BLOCK_ORDER also drives render/tab ordering
+// (renderer.js), and [BENCHED PARTY] is intentionally never its own top-level tab/card — it
+// always renders folded into PARTY's own section as a compact roster sub-panel, since visually
+// it's a sub-state of party membership, not an independent trackable system.
 export const BLOCK_ORDER = ['COMBAT', 'CHARACTER', 'PARTY', 'INVENTORY', 'ABILITIES', 'SPELLS', 'XP', 'TIME', 'QUESTS'];
 
 export const PAGE_SIZE = 8;

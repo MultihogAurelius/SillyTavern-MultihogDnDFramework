@@ -3241,7 +3241,8 @@ ${rawDump}`;
     const skeletonFactionDescs = []; // { name, desc }
     const skeletonLocationDescs = []; // { name, desc }
 
-    // Compute exclusion list
+    // Compute exclusion list (manual, general-purpose — soft: only affects the
+    // randomized designation pool, not raw context visibility, by long-standing design).
     const excludedTerms = [];
     if (settings.worldProgressionExclusionList) {
         settings.worldProgressionExclusionList
@@ -3250,22 +3251,42 @@ ${rawDump}`;
             .filter(Boolean)
             .forEach(term => excludedTerms.push(term));
     }
-    if (settings.worldProgressionAutoExcludeParty) {
-        const memo = settings.currentMemo || '';
-        const partyMatch = memo.match(/\[PARTY\]([\s\S]*?)\[\/PARTY\]/i);
-        if (partyMatch) {
-            const blockContent = partyMatch[1];
-            const lines = blockContent.split('\n').map(l => l.trim()).filter(Boolean);
-            for (const line of lines) {
-                const colonIdx = line.indexOf(':');
-                const entityPart = colonIdx !== -1 ? line.substring(0, colonIdx).trim() : line;
-                const namePart = entityPart.replace(/\s*\([^)]*\)/g, '').trim();
-                if (namePart && namePart !== '(unnamed)') {
-                    excludedTerms.push(namePart.toLowerCase());
-                }
-            }
+
+    // Party presence, unconditional (no toggle) — [PARTY] members are HARD-excluded below
+    // (stripped from context entirely, not just the randomization pool), because they are
+    // physically with {{user}} right now and any off-screen activity for them risks
+    // contradicting the live scene. [BENCHED PARTY] members are the opposite: eligible for
+    // simulation, with their benching note captured as flavor for their designation entry.
+    // See <party_bench> in sysprompt.txt / DEFAULT_STOCK_PROMPTS['benched party'] for the
+    // inference contract that keeps these two blocks in sync with the narrative.
+    function extractPartyRoster(memo, tagName) {
+        const roster = [];
+        const re = new RegExp(`\\[${tagName}\\]([\\s\\S]*?)\\[\\/${tagName}\\]`, 'i');
+        const match = memo.match(re);
+        if (!match) return roster;
+        const blockContent = match[1];
+        // Each member starts a new "Name (Class): cur/max HP" line — split on those anchors
+        // rather than every line, so we can carry a member's Status line along with their name.
+        const memberChunks = blockContent.split(/\n(?=[^\n]*\([^)]*\):\s*\d)/);
+        for (const chunk of memberChunks) {
+            const lines = chunk.split('\n').map(l => l.trim()).filter(Boolean);
+            if (!lines.length) continue;
+            const headerLine = lines[0];
+            const colonIdx = headerLine.indexOf(':');
+            const entityPart = colonIdx !== -1 ? headerLine.substring(0, colonIdx).trim() : headerLine;
+            const namePart = entityPart.replace(/\s*\([^)]*\)/g, '').trim();
+            if (!namePart || namePart === '(unnamed)') continue;
+            const statusLine = lines.find(l => l.toLowerCase().startsWith('status:'));
+            const note = statusLine ? statusLine.substring(statusLine.indexOf(':') + 1).trim() : '';
+            roster.push({ name: namePart, note });
         }
+        return roster;
     }
+
+    const memoForParty = settings.currentMemo || '';
+    const presentPartyRoster = extractPartyRoster(memoForParty, 'PARTY');
+    const benchedPartyRoster = extractPartyRoster(memoForParty, 'BENCHED PARTY');
+    const presentPartyNames = new Set(presentPartyRoster.map(m => m.name.toLowerCase()));
 
     function getBookCategoryHeader(bookName, prefix) {
         let cleanName = bookName;
@@ -3304,6 +3325,19 @@ ${rawDump}`;
                           (!isSkeletonBook && (categoryHeader === 'FAC' || categoryHeader === 'FACTIONS' || nameLower.includes('faction') || nameLower.includes('guild')));
             const isConflict = (isSkeletonBook && entry.extensions?.rpgCategory === 'EVENT') ||
                                (!isSkeletonBook && (categoryHeader === 'EVENT' || categoryHeader === 'EVENTS' || categoryHeader === 'QUEST' || categoryHeader === 'QUESTS' || nameLower.includes('event') || nameLower.includes('conflict') || nameLower.includes('quest')));
+
+            // HARD exclusion for present party members: skip this entry entirely (never enters
+            // skeletonLines/loreGrouped/any name pool) if it's an NPC-type entry representing
+            // someone currently in [PARTY]. Historical [_World] reports are exempt — they're
+            // archived record of the past, not something being freshly selected now.
+            if (isNpc && !isWorldBook && presentPartyNames.size > 0) {
+                const labelLower = label.toLowerCase();
+                const primaryKeysForParty = Array.isArray(entry.key) ? entry.key.map(k => String(k).trim().toLowerCase()) : [];
+                const matchesPresentParty = [...presentPartyNames].some(name =>
+                    labelLower.includes(name) || primaryKeysForParty.some(k => k.includes(name))
+                );
+                if (matchesPresentParty) continue;
+            }
 
             // Check exclusion list
             let isExcluded = false;
@@ -3353,6 +3387,19 @@ ${rawDump}`;
         }
     }
 
+    // Benched party members are eligible for simulation regardless of whether they also have
+    // a standalone NPC lorebook entry — synthesize a category so WP has real content to work
+    // with (their benching note as flavor), and make them selectable via the same NPC
+    // designation pool as any other narrative NPC.
+    if (benchedPartyRoster.length > 0) {
+        const benchedLabel = 'PARTY MEMBERS (BENCHED)';
+        loreGrouped[benchedLabel] = benchedPartyRoster.map(m =>
+            `### ${m.name}\n${m.note || 'Currently separated from {{user}}.'}`
+        );
+        for (const m of benchedPartyRoster) {
+            narrativeNpcNames.push(m.name);
+        }
+    }
 
     const skeletonDump = skeletonLines.length
         ? skeletonLines.join('\n\n')
@@ -3539,6 +3586,71 @@ ${historicalDump}`;
         record: [{ label: periodLabel, keys: entryKeys, content: reportContent.trim(), category: 'WORLD' }],
         reason: `World Progression: auto-generated report for ${periodLabel}`,
     }, archiveBooks, timeStr, '');
+
+    // 7b. Breadcrumb write-back: for each benched party member mentioned in this report,
+    // concatenate the matching bullet(s) into their [BENCHED PARTY] Status field as a
+    // period-timestamped "last update" trailer. This keeps a benched companion's thread
+    // alive in the always-injected memo even after the _World book's rolling window
+    // (worldProgressionKeepActive) moves past the report that mentioned them. Bullets in a
+    // single report are synchronous (one shared period timestamp) — there is no ordering to
+    // exploit across multiple matches, so all matches are kept, not just "the last one".
+    if (benchedPartyRoster.length > 0) {
+        const bullets = reportContent
+            .split(/\n\s*\n/)
+            .map(b => b.replace(/^[-*]\s*/, '').trim())
+            .filter(Boolean);
+
+        let memoForBreadcrumbs = settings.currentMemo || '';
+        let anyBreadcrumbWritten = false;
+
+        for (const member of benchedPartyRoster) {
+            const escapedName = member.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const nameRx = new RegExp(`\\b${escapedName}\\b`, 'i');
+            const matchingBullets = bullets.filter(b => nameRx.test(b));
+            if (matchingBullets.length === 0) continue;
+
+            const breadcrumb = matchingBullets.join('; ');
+
+            // Locate this member's chunk within [BENCHED PARTY] the same way extractPartyRoster
+            // split it, so we only touch this member's Status line, not the whole block.
+            const blockRe = /\[BENCHED PARTY\]([\s\S]*?)\[\/BENCHED PARTY\]/i;
+            const blockMatch = memoForBreadcrumbs.match(blockRe);
+            if (!blockMatch) break; // block vanished mid-loop (shouldn't happen) — bail safely
+
+            const blockContent = blockMatch[1];
+            const chunks = blockContent.split(/\n(?=[^\n]*\([^)]*\):\s*\d)/);
+            const chunkIdx = chunks.findIndex(c => {
+                const headerLine = c.split('\n').map(l => l.trim()).filter(Boolean)[0] || '';
+                const colonIdx = headerLine.indexOf(':');
+                const entityPart = colonIdx !== -1 ? headerLine.substring(0, colonIdx).trim() : headerLine;
+                const namePart = entityPart.replace(/\s*\([^)]*\)/g, '').trim();
+                return namePart.toLowerCase() === member.name.toLowerCase();
+            });
+            if (chunkIdx === -1) continue;
+
+            let chunk = chunks[chunkIdx];
+            const statusLineRe = /^(\s*Status:\s*)(.*)$/im;
+            if (statusLineRe.test(chunk)) {
+                chunk = chunk.replace(statusLineRe, (full, prefix, value) => {
+                    // Strip any prior "— Last update: ..." trailer before appending the fresh one.
+                    const baseValue = value.replace(/\s*—\s*Last update:.*$/i, '').trim();
+                    return `${prefix}${baseValue} — Last update: ${periodLabel}: ${breadcrumb}`;
+                });
+            } else {
+                chunk = chunk.trim() + `\nStatus: Benched — Last update: ${periodLabel}: ${breadcrumb}`;
+            }
+            chunks[chunkIdx] = chunk;
+
+            const newBlockContent = chunks.join('\n');
+            memoForBreadcrumbs = memoForBreadcrumbs.replace(blockRe, `[BENCHED PARTY]${newBlockContent}[/BENCHED PARTY]`);
+            anyBreadcrumbWritten = true;
+        }
+
+        if (anyBreadcrumbWritten) {
+            settings.currentMemo = memoForBreadcrumbs;
+            ctx.saveSettingsDebounced();
+        }
+    }
 
     // 8. Rolling window: keep only the N most recent WORLD entries active.
     await new Promise(r => setTimeout(r, 300));

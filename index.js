@@ -2,8 +2,8 @@ import { EXAMPLES, COLOR_EXAMPLES, DEFAULT_STOCK_PROMPTS, RT_PROMPTS, BLOCK_ICON
 import { MODULE_NAME, DEFAULT_MODULES, getSettings, getBarBackground, migrateCustomFields, saveChatState, saveProfile, deleteProfile, getEffectiveRouterCampaignPrefix, sanitizeCampaignPrefixString, buildNpcInstruction, loadStockPromptsFromProfile, getNpcRelationshipMax, getNpcRelationshipMaxDefault, clampRelationshipValue, relationshipBarPct, getFriendshipTier, getAffectionTier, getRelTierBadgeStyle, getRelTierDetailedStyle, getRelTierDetailedLabelStyle, applyRelTierBadgeElement, sanitizeRouterState, rebuildAllModuleInstructions, adjustAllStoredTemplatesForTimeFormat, DEFAULT_NPC_SECTIONS } from './state-manager.js';
 import { sendStateRequest, fetchOllamaModels, fetchOpenAIModels, testOpenAIConnection, getConnectionProfiles, getCurrentCompletionPreset, setCompletionPreset, syncCombatProfile, resetCombatProfileOverride } from './llm-client.js';
 import { getDiceToolName, getDiceCommandName, getDiceCommandAliases, doDiceRoll, registerDiceFunctionTool, registerDiceSlashCommand, installInterceptor, getNarrativeBlocks, onGenerationStarted, onGenerationEnded, ensureRelTagRegex, resetRouterTick, getRouterTick, resetRouterAutoTick, makeRngQueue, buildRngBlock, RNG_QUEUE_LEN, parseAndApplyNarrativeRelTags } from './narrative-hooks.js';
-import { deduplicateMemo, mergeMemo, computeDelta, escapeHtml, escapeRegex, highlightParens, cleanToolCallMessage, cleanMessageContent, getLastUserAction, buildLorebookContext, buildModulesInstructionText, buildModuleFormatInstruction, parseQuestsFromMemo, syncQuestsFromMemo, syncQuestsToMemo, writeQuestsToMemo, getQuestMood, extractCurrentTimeStr, stripArchivedQuestsFromMemo, stripCompletedQuestsFromMemo, applyQuestSyncAndStripMemo, isArchivedQuestStatus, removeArchivedQuest, parseInWorldTime, formatInWorldTime, sanitizeLorebookRecordContent } from './memo-processor.js';
-import { renderSubFieldByRule, tryRenderMarker, renderCustomBlockLine, stripMemoHtml, escapeHtmlWithColor, parseMemoBlocks, getPageSize, loadCollapsed, saveCollapsed, loadDetached, saveDetached, blockToItems, renderMemoAsCards, renderTabModeView, renderQuestLog, renderLorebookTerminal, loadActiveTab, saveActiveTab, getTimeOfDayInfo, MARKER_TYPE_MAP, getMarkerLibraryKeys } from './renderer.js';
+import { deduplicateMemo, mergeMemo, computeDelta, escapeHtml, escapeRegex, highlightParens, cleanToolCallMessage, cleanMessageContent, getLastUserAction, buildLorebookContext, buildModulesInstructionText, buildModuleFormatInstruction, parseQuestsFromMemo, syncQuestsFromMemo, syncQuestsToMemo, writeQuestsToMemo, getQuestMood, extractCurrentTimeStr, stripArchivedQuestsFromMemo, stripCompletedQuestsFromMemo, applyQuestSyncAndStripMemo, isArchivedQuestStatus, removeArchivedQuest, parseInWorldTime, formatInWorldTime, sanitizeLorebookRecordContent, memoForTrackerContext, memoForGmContext } from './memo-processor.js';
+import { renderSubFieldByRule, tryRenderMarker, renderCustomBlockLine, stripMemoHtml, escapeHtmlWithColor, parseMemoBlocks, getPageSize, loadCollapsed, saveCollapsed, loadDetached, saveDetached, blockToItems, renderMemoAsCards, renderTabModeView, renderQuestLog, renderLorebookTerminal, loadActiveTab, saveActiveTab, getTimeOfDayInfo, MARKER_TYPE_MAP, getMarkerLibraryKeys, loadBenchedExpanded, saveBenchedExpanded } from './renderer.js';
 import { unregisterLogQuestTool, checkQuestDeadlines, renderQuestsAsPlainText } from './quests.js';
 import { initializeDebugViewer, toggleDebugViewer } from './debug-viewer.js';
 import { runRouterPass, rollbackRouterPass, reapplyRouterPass, getLorebookManifest, deleteLorebookEntry, updateLorebookEntry, disableManagedEntries, isRouterRunning, stopRouterPass } from './router.js';
@@ -658,7 +658,7 @@ function syncOnboardingUI() {
 
 
     // Optional Components Sync
-    const mods = { 'loot': '#rt_onboarding_mod_loot', 'random_events': '#rt_onboarding_mod_random_events', 'resting': '#rt_onboarding_mod_resting' };
+    const mods = { 'loot': '#rt_onboarding_mod_loot', 'random_events': '#rt_onboarding_mod_random_events', 'resting': '#rt_onboarding_mod_resting', 'party_bench': '#rt_onboarding_mod_party_bench' };
     for (const [key, id] of Object.entries(mods)) {
         const cb = /** @type {HTMLInputElement|null} */ (onboarding.querySelector(id));
         if (cb) cb.checked = !!s.syspromptModules?.[key];
@@ -1086,7 +1086,6 @@ function loadChatState(chatId) {
     s.worldProgressionSkeletonAtmosphereLookback = saved.worldProgressionSkeletonAtmosphereLookback ?? 30;
     s.worldProgressionSkeletonUseExisting = saved.worldProgressionSkeletonUseExisting ?? true;
     s.worldProgressionExclusionList = saved.worldProgressionExclusionList ?? '';
-    s.worldProgressionAutoExcludeParty = saved.worldProgressionAutoExcludeParty ?? false;
     s.worldProgressionLastFiredAtMinutes = saved.worldProgressionLastFiredAtMinutes ?? -1;
     s.worldProgressionLastFiredPeriodLabel = saved.worldProgressionLastFiredPeriodLabel || '';
     s.worldProgressionConsolidateEnabled = saved.worldProgressionConsolidateEnabled ?? false;
@@ -1146,7 +1145,6 @@ function loadChatState(chatId) {
     $('#rpg_world_progression_skeleton_atmosphere_lookback').val(s.worldProgressionSkeletonAtmosphereLookback);
     $('#rpg_world_progression_skeleton_use_existing').prop('checked', !!s.worldProgressionSkeletonUseExisting);
     $('#rpg_world_progression_exclusion_list').val(s.worldProgressionExclusionList);
-    $('#rpg_world_progression_auto_exclude_party').prop('checked', !!s.worldProgressionAutoExcludeParty);
 
     // Sync portrait connection settings UI
     $('#rpg_portrait_generator_source').val(s.portraitGeneratorSource || 'native');
@@ -1823,13 +1821,13 @@ async function runStateModelPass(narrativeOutput, isFullContext = false, overrid
             chunks.push(chatLogLines);
         }
 
-        let priorMemoText = `## TRACKER STATE 0 (Current)\n${stripMemoHtml(stripCompletedQuestsFromMemo(settings.currentMemo))}\n\n`;
+        let priorMemoText = `## TRACKER STATE 0 (Current)\n${stripMemoHtml(memoForTrackerContext(settings.currentMemo))}\n\n`;
         const historyCount = (settings.trackerHistoryCount || 1) - 1;
         if (historyCount > 0 && settings.memoHistory && settings.memoHistory.length > 0) {
             const historyToInclude = settings.memoHistory.slice(0, historyCount).reverse();
             const historyString = historyToInclude.map((memo, i) => {
                 const offset = -(historyToInclude.length - i);
-                return `## TRACKER STATE ${offset}\n${stripMemoHtml(stripCompletedQuestsFromMemo(memo))}`;
+                return `## TRACKER STATE ${offset}\n${stripMemoHtml(memoForTrackerContext(memo))}`;
             }).join('\n\n');
             priorMemoText = historyString + '\n\n' + priorMemoText;
         }
@@ -1894,7 +1892,7 @@ async function runStateModelPass(narrativeOutput, isFullContext = false, overrid
                 // For full audit, always read the LIVE committed memo for the prior
                 userPrompt =
                     worldLoreSection +
-                    `## PRIOR MEMO\n${stripMemoHtml(stripCompletedQuestsFromMemo(settings.currentMemo)) || '(empty)'}\n\n` +
+                    `## PRIOR MEMO\n${stripMemoHtml(memoForTrackerContext(settings.currentMemo)) || '(empty)'}\n\n` +
                     `## NARRATIVE HISTORY (Chunk ${i + 1} of ${chunks.length})\n${chatLog}\n\n` +
                     `## TASK\nAnalyze the narrative chunk provided above. Rebuild the State Memo to ensure every detail is perfectly accurate to this point in the story. Correct any errors or omissions found in the Prior Memo.\n\n` +
                     `## OUTPUT THE COMPLETE VERIFIED STATE MEMO:`;
@@ -2027,7 +2025,8 @@ export async function sendDirectPrompt(message) {
                 .replace(/Day\s+X/g, 'DD/MM/YYYY');
         }
 
-        const sanitizedCurrent = stripMemoHtml(settings.currentMemo.replace(/<\/?memo>/gi, '').trim());
+        const sanitizedCurrentFull = stripMemoHtml(settings.currentMemo.replace(/<\/?memo>/gi, '').trim());
+        const sanitizedCurrentForPrompt = stripMemoHtml(memoForTrackerContext(sanitizedCurrentFull));
 
         const { chat } = SillyTavern.getContext();
         const N = settings.directPromptContext !== undefined ? settings.directPromptContext : 5;
@@ -2050,7 +2049,7 @@ export async function sendDirectPrompt(message) {
         const userPrompt =
             worldLoreSection +
             chatLog +
-            `## PRIOR MEMO\n${sanitizedCurrent || '(empty — this is the initial setup)'}\n\n` +
+            `## PRIOR MEMO\n${sanitizedCurrentForPrompt || '(empty — this is the initial setup)'}\n\n` +
             `## USER INSTRUCTION\n${message}\n\n` +
             `## OUTPUT ONLY CHANGED OR NEW SECTIONS:`;
 
@@ -2065,18 +2064,18 @@ export async function sendDirectPrompt(message) {
                 cleanedOutput = result.replace(/<\/?memo>/gi, '').trim();
             }
 
-            const merged = mergeMemo(sanitizedCurrent, cleanedOutput);
+            const merged = mergeMemo(sanitizedCurrentFull, cleanedOutput);
 
-            if (merged !== sanitizedCurrent) {
-                const delta = computeDelta(sanitizedCurrent, merged);
+            if (merged !== sanitizedCurrentFull) {
+                const delta = computeDelta(sanitizedCurrentFull, merged);
                 settings.lastDelta = delta;
 
                 // Linear Stone History Logic
                 if (settings.historyIndex !== undefined && settings.historyIndex !== -1) {
                     settings.memoHistory = settings.memoHistory.slice(settings.historyIndex);
                 }
-                if (settings.memoHistory[0] !== sanitizedCurrent) {
-                    settings.memoHistory.unshift(sanitizedCurrent);
+                if (settings.memoHistory[0] !== sanitizedCurrentFull) {
+                    settings.memoHistory.unshift(sanitizedCurrentFull);
                 }
                 settings.memoHistory.unshift(merged);
                 if (settings.memoHistory.length > 1000) settings.memoHistory.length = 1000;
@@ -2087,7 +2086,7 @@ export async function sendDirectPrompt(message) {
                 if (dp) dp.innerHTML = delta;
 
                 settings.prevMemo2 = settings.prevMemo1;
-                settings.prevMemo1 = sanitizedCurrent;
+                settings.prevMemo1 = sanitizedCurrentFull;
                 settings.currentMemo = merged;
 
                 updateUIMemo(merged);
@@ -2154,7 +2153,6 @@ function loadProfile(name) {
     s.worldProgressionLastFiredAtMinutes = p.worldProgressionLastFiredAtMinutes ?? -1;
     s.worldProgressionLastFiredPeriodLabel = p.worldProgressionLastFiredPeriodLabel || '';
     s.worldProgressionExclusionList = p.worldProgressionExclusionList ?? '';
-    s.worldProgressionAutoExcludeParty = p.worldProgressionAutoExcludeParty ?? false;
 
     s.portraitGeneratorSource = p.portraitGeneratorSource ?? "native";
     s.portraitSkipPromptDialog = p.portraitSkipPromptDialog ?? false;
@@ -2204,7 +2202,6 @@ function loadProfile(name) {
     $('#rpg_world_progression_skeleton_npcs').val(s.worldProgressionSkeletonNPCs ?? 0);
     $('#rpg_world_progression_skeleton_conflicts').val(s.worldProgressionSkeletonConflicts ?? 3);
     $('#rpg_world_progression_exclusion_list').val(s.worldProgressionExclusionList);
-    $('#rpg_world_progression_auto_exclude_party').prop('checked', !!s.worldProgressionAutoExcludeParty);
 
     // Sync portrait connection settings UI
     $('#rpg_portrait_generator_source').val(s.portraitGeneratorSource || 'native');
@@ -2356,6 +2353,9 @@ async function showComponentsExplanation() {
     )}
                 ${card('💤', 'Resting',
         `Resting is limited to once every 9 hours of in-game time. Prevents exploiting rest as a free heal between every fight, and reflects the reality that you can't just nap on demand.`
+    )}
+                ${card('🏕️', 'Benched Party',
+        `Tracks party members who are temporarily away from you — hospitalized, scouting ahead, captured, sent on a side task, etc. — in a separate [BENCHED PARTY] roster while reunion remains plausible. The GM is told what this means so it won't narrate them back at your side until the story brings them back on-screen. Turn off if you don't want temporary separations tracked separately from your active party.`
     )}
             </div>`;
     await Popup.show.confirm('🧩 Components Explained', popupBody, { okButton: 'Got it', cancelButton: false });
@@ -2965,6 +2965,11 @@ Gear:
                 syncSettingsAndUI(settings => {
                     if (!settings.syspromptModules) settings.syspromptModules = {};
                     settings.syspromptModules[settingKey] = !!cb.checked;
+                    if (settingKey === 'party_bench') {
+                        if (!settings.modules) settings.modules = {};
+                        settings.modules['benched party'] = !!cb.checked;
+                        if (cb.checked) settings.modules.party = true;
+                    }
                 });
             });
         }
@@ -2972,6 +2977,7 @@ Gear:
     syncOptionalMod('#rt_onboarding_mod_loot', 'loot');
     syncOptionalMod('#rt_onboarding_mod_random_events', 'random_events');
     syncOptionalMod('#rt_onboarding_mod_resting', 'resting');
+    syncOptionalMod('#rt_onboarding_mod_party_bench', 'party_bench');
 
     // Onboarding Relationship System Sync
     const onboardingRelBarsCb = el.querySelector('#rt_onboarding_mod_npc_rel_bars');
@@ -3162,6 +3168,20 @@ Gear:
             const tag = btn.dataset.jumpTag;
             if (!tag) return;
             saveActiveTab(tag);
+            refresh();
+        });
+    });
+
+    // Benched Party camp-roster chips: click toggles that one member's inline expand
+    // (full stat card accordion) — independent of the panel-level collapse above.
+    el.querySelectorAll('.rt-benched-chip[data-benched-toggle]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const name = btn.dataset.benchedToggle;
+            if (!name) return;
+            const expanded = loadBenchedExpanded();
+            if (expanded.has(name)) expanded.delete(name); else expanded.add(name);
+            saveBenchedExpanded(expanded);
             refresh();
         });
     });
@@ -6989,7 +7009,7 @@ function createPanel() {
 
             const contextParts = [];
             contextParts.push(`CHARACTER CARD:\nName: ${name}\nDescription: ${(charCard.description || '').substring(0, 3000)}\nPersonality: ${(charCard.personality || '').substring(0, 1000)}`);
-            if (s.currentMemo) contextParts.push(`CURRENT GAME STATE:\n${s.currentMemo.substring(0, 2000)}`);
+            if (s.currentMemo) contextParts.push(`CURRENT GAME STATE:\n${memoForGmContext(s.currentMemo).substring(0, 2000)}`);
             if (ctx.chat && Array.isArray(ctx.chat)) {
                 const msgs = ctx.chat.filter(m => !m.is_system && m.mes?.trim()).slice(-8);
                 if (msgs.length > 0) {
@@ -7054,7 +7074,7 @@ RULES:
 
             // Current game state
             if (s.currentMemo) {
-                contextParts.push(`CURRENT GAME STATE:\n${s.currentMemo}`);
+                contextParts.push(`CURRENT GAME STATE:\n${memoForGmContext(s.currentMemo)}`);
             }
 
             // Recent chat
@@ -7152,7 +7172,7 @@ Rules:
             const ctx = SillyTavern.getContext();
             const parts = [];
             if (s.currentMemo) {
-                parts.push(`CURRENT GAME STATE:\n${s.currentMemo}`);
+                parts.push(`CURRENT GAME STATE:\n${memoForGmContext(s.currentMemo)}`);
             }
             if (ctx.chat && Array.isArray(ctx.chat)) {
                 const msgs = ctx.chat.filter(m => !m.is_system && m.mes?.trim()).slice(-8);
@@ -11554,6 +11574,7 @@ RULES:
             { key: 'loot', id: 'rpg_sysprompt_mod_loot' },
             { key: 'random_events', id: 'rpg_sysprompt_mod_random_events' },
             { key: 'resting', id: 'rpg_sysprompt_mod_resting' },
+            { key: 'party_bench', id: 'rpg_sysprompt_mod_party_bench' },
             { key: 'quests', id: 'rpg_sysprompt_mod_quests' },
         ];
         _syspromptModDefs.forEach(({ key, id }) => {
@@ -11566,6 +11587,12 @@ RULES:
 
                 if (key === 'quests') {
                     $('#rpg_quests_options').toggle(!!$(this).prop('checked'));
+                    refreshOrderList();
+                }
+                if (key === 'party_bench') {
+                    if (!fresh.modules) fresh.modules = {};
+                    fresh.modules['benched party'] = !!$(this).prop('checked');
+                    if ($(this).prop('checked')) fresh.modules.party = true;
                     refreshOrderList();
                 }
 
@@ -12498,11 +12525,6 @@ RULES:
             getSettings().worldProgressionExclusionList = String($(this).val() || '');
             saveSettings();
         });
-        const $wpAutoExcludeParty = $('#rpg_world_progression_auto_exclude_party');
-        $wpAutoExcludeParty.prop('checked', !!settings.worldProgressionAutoExcludeParty).on('change', function () {
-            getSettings().worldProgressionAutoExcludeParty = !!$(this).prop('checked');
-            saveSettings();
-        });
         $wpSystemPrompt.val(settings.worldProgressionSystemPrompt || '').on('input', function () {
             getSettings().worldProgressionSystemPrompt = String($(this).val() || '');
             saveSettings();
@@ -13088,7 +13110,6 @@ RULES:
             $('#rpg_world_progression_randomize_locations').prop('checked', !!s.worldProgressionRandomizeLocations);
             $('#rpg_world_progression_randomize_factions').prop('checked', !!s.worldProgressionRandomizeFactions);
             $('#rpg_world_progression_skeleton_use_existing').prop('checked', !!s.worldProgressionSkeletonUseExisting);
-            $('#rpg_world_progression_auto_exclude_party').prop('checked', !!s.worldProgressionAutoExcludeParty);
             $('#rpg_world_progression_consolidate_enabled').prop('checked', !!s.worldProgressionConsolidateEnabled);
 
             // Textareas (Agent prompt templates)
