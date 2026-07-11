@@ -5073,15 +5073,31 @@ function createPanel() {
                 const escRgx = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
                 const customNames = customSecs.map(s => escRgx(s.name.trim())).join('|');
                 const legacyNames = 'Appearance\\/Species|Appearance|Personality|Brief Background|Background|Habits(?:\\/|\\s*&\\s*|\\s+and\\s+)Behaviors|Habits|(?<!Habits\\/)(?<!Habits & )(?<!Habits and )Behaviors|Strengths|Flaws|Relationship with\\s*\\{\\{user\\}\\}|(?<!Friendship\\/)(?<!Affection\\/)Relationship';
-                const allNamesPattern = customNames ? `${customNames}|${legacyNames}` : legacyNames;
+
+                // Discover any lazily-appended fields (e.g. "Combat Profile:") not in the known sets
+                const knownNamesForScan = new Set(customSecs.map(s => s.name.trim().toLowerCase()));
+                const legacySet = new Set(['appearance/species','appearance','personality','brief background','background','habits/behaviors','habits','behaviors','strengths','flaws','relationship']);
+                const discoveredNames = [];
+                for (const rawLine of coreContent.split('\n')) {
+                    const hm = rawLine.trim().match(/^([A-Z][A-Za-z0-9 \/&]+?)\s*:/);
+                    if (hm) {
+                        const nm = hm[1].trim();
+                        const nmLc = nm.toLowerCase();
+                        if (!knownNamesForScan.has(nmLc) && !legacySet.has(nmLc)) {
+                            discoveredNames.push(escRgx(nm));
+                        }
+                    }
+                }
+                const extraNames = discoveredNames.length ? discoveredNames.join('|') : '';
+                const allNamesPattern = [customNames, extraNames, legacyNames].filter(Boolean).join('|');
                 const sectionMarkers = new RegExp(`(?=(?:${allNamesPattern})\\s*:)`, 'gi');
 
                 const normalizedCore = coreContent.replace(sectionMarkers, '\n');
                 const coreLines = normalizedCore.split('\n');
                 let currentSection = 'General';
 
-                const allNamesPatternStart = customNames ? `(${customNames}|Appearance\\/Species|Appearance|Personality|Brief Background|Background|Habits(?:\\/|\\s*&\\s*|\\s+and\\s+)Behaviors|Habits|Behaviors|Strengths|Flaws|Relationship with\\s*\\{\\{user\\}\\}|Relationship)` : `(Appearance\\/Species|Appearance|Personality|Brief Background|Background|Habits(?:\\/|\\s*&\\s*|\\s+and\\s+)Behaviors|Habits|Behaviors|Strengths|Flaws|Relationship with\\s*\\{\\{user\\}\\}|Relationship)`;
-                const sectionPattern = new RegExp(`^${allNamesPatternStart}\\s*:`, 'i');
+                const allNamesPatternStart = [customNames, extraNames, 'Appearance\\/Species|Appearance|Personality|Brief Background|Background|Habits(?:\\/|\\s*&\\s*|\\s+and\\s+)Behaviors|Habits|Behaviors|Strengths|Flaws|Relationship with\\s*\\{\\{user\\}\\}|Relationship'].filter(Boolean).join('|');
+                const sectionPattern = new RegExp(`^(${allNamesPatternStart})\\s*:`, 'i');
 
                 for (const line of coreLines) {
                     const trimmed = line.trim();

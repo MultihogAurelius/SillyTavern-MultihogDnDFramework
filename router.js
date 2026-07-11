@@ -2033,6 +2033,14 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
                 if (!otherHeaders.includes(sec.name)) otherHeaders.push(sec.name);
             });
         } catch (_) {}
+        // Also discover any lazily-appended fields present in the actual coreBody (e.g. "Combat Profile")
+        for (const rawLine of coreBody.split('\n')) {
+            const hm = rawLine.trim().match(/^([A-Z][A-Za-z0-9 \/&]+?)\s*:/);
+            if (hm) {
+                const nm = hm[1].trim();
+                if (!otherHeaders.includes(nm)) otherHeaders.push(nm);
+            }
+        }
         const otherHeadersRegexStr = otherHeaders.map(h => h.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
 
         // Match from the target field's colon to the next core field header or the end of the string
