@@ -175,12 +175,16 @@ EXAMPLE — end of a response where {{user}} complimented Elena:
 export function getFriendshipTier(value, max) {
     const m = max ?? getNpcRelationshipMax();
     const v = clampRelationshipValue(value, m);
-    if (v <= -0.65 * m) return { label: 'HOSTILE',             hint: 'open contempt, refuses cooperation, may sabotage or attack' };
-    if (v <= -0.35 * m) return { label: 'COLD/DISTRUSTFUL',    hint: 'curt and guarded, answers with bare minimum, visible irritation' };
-    if (v <= -0.01 * m) return { label: 'WARY/UNEASY',        hint: 'polite but distant, avoids personal topics, second-guesses motives' };
-    if (v <=  0.25 * m) return { label: 'NEUTRAL/ACQUAINTANCE', hint: 'civil and transactional, neither warm nor cold' };
-    if (v <=  0.55 * m) return { label: 'FRIENDLY',            hint: 'genuine warmth, light humor, willing to help when asked' };
-    if (v <=  0.80 * m) return { label: 'CLOSE FRIEND',        hint: 'deep trust, confides worries, stands up for {{user}}, proactive help' };
+    if (v <= -0.85 * m) return { label: 'HOSTILE',              hint: 'open contempt, refuses cooperation, may sabotage or attack' };
+    if (v <= -0.60 * m) return { label: 'ENEMY/HATEFUL',        hint: 'deeply despises you, actively seeks to undermine your goals' };
+    if (v <= -0.40 * m) return { label: 'UNFRIENDLY/BITTER',    hint: 'hostile tone, uncooperative, holds active grudges' };
+    if (v <= -0.20 * m) return { label: 'COLD/DISTRUSTFUL',     hint: 'curt and guarded, answers with bare minimum, visible irritation' };
+    if (v <= -0.03 * m) return { label: 'WARY/UNEASY',          hint: 'polite but distant, avoids personal topics, second-guesses motives' };
+    if (v <=  0.03 * m) return { label: 'NEUTRAL/ACQUAINTANCE', hint: 'civil and transactional, neither warm nor cold' };
+    if (v <=  0.20 * m) return { label: 'WARMING/FAVORABLE',    hint: 'small smiles, starting to open up, shows basic goodwill' };
+    if (v <=  0.40 * m) return { label: 'FRIENDLY',             hint: 'genuine warmth, light humor, willing to help when asked' };
+    if (v <=  0.60 * m) return { label: 'CLOSE FRIEND',         hint: 'deep trust, confides worries, stands up for you, proactive help' };
+    if (v <=  0.85 * m) return { label: 'DEEP BOND/TRUSTED',    hint: 'fiercely protective, emotional bedrock, treats you as inner circle' };
     return                      { label: 'BONDED/FAMILY',       hint: 'unbreakable loyalty, would risk life without hesitation, shares deepest secrets' };
 }
 
@@ -192,13 +196,17 @@ export function getFriendshipTier(value, max) {
 export function getAffectionTier(value, max) {
     const m = max ?? getNpcRelationshipMax();
     const v = clampRelationshipValue(value, m);
-    if (v <= -0.65 * m) return { label: 'REVULSION',               hint: 'finds {{user}} repulsive, recoils from proximity, hostile to any advance' };
-    if (v <= -0.35 * m) return { label: 'AVERSION',                hint: 'clearly uninterested, dismisses flirtation coldly, steers away from intimacy' };
-    if (v <= -0.01 * m) return { label: 'INDIFFERENT/UNINTERESTED', hint: 'no romantic spark, gentle deflection of any advances' };
-    if (v <=  0.25 * m) return { label: 'NEUTRAL/NO AFFECTION',    hint: 'no romantic or emotional attachment toward {{user}}' };
-    if (v <=  0.55 * m) return { label: 'INTERESTED',              hint: 'steals glances, responds warmly to compliments, comfortable with proximity' };
-    if (v <=  0.80 * m) return { label: 'ATTRACTED',               hint: 'seeks {{user}}\'s company, flustered by bold compliments, visible tension' };
-    return                      { label: 'DEEPLY IN LOVE',         hint: 'emotionally devoted, craves closeness, expresses tenderness openly' };
+    if (v <= -0.85 * m) return { label: 'REVULSION',                hint: 'finds your presence repulsive, recoils from proximity, hostile to advances' };
+    if (v <= -0.60 * m) return { label: 'DISGUSTED',                hint: 'active disdain for romantic or physical proximity, harsh rejections' };
+    if (v <= -0.40 * m) return { label: 'AVERSION',                 hint: 'clearly uninterested, dismisses flirtation coldly, steers away from intimacy' };
+    if (v <= -0.20 * m) return { label: 'AVOIDANT',                 hint: 'uncomfortable with romantic attention, subtly creates physical distance' };
+    if (v <= -0.03 * m) return { label: 'INDIFFERENT/UNINTERESTED', hint: 'no romantic spark, gentle deflection of any advances' };
+    if (v <=  0.03 * m) return { label: 'NEUTRAL/NO AFFECTION',     hint: 'no romantic or emotional attachment toward you' };
+    if (v <=  0.20 * m) return { label: 'CURIOUS/INTRIGUED',        hint: 'brief lingering looks, receptive to mild flirting, testing waters' };
+    if (v <=  0.40 * m) return { label: 'INTERESTED',               hint: 'steals glances, responds warmly to compliments, comfortable with proximity' };
+    if (v <=  0.60 * m) return { label: 'ATTRACTED',                hint: 'seeks your company, flustered by bold compliments, visible tension' };
+    if (v <=  0.85 * m) return { label: 'SMITTEN/INFATUATED',       hint: 'cannot hide feelings, heavily romantic, deeply emotionally invested' };
+    return                      { label: 'DEEPLY IN LOVE',          hint: 'emotionally devoted, craves closeness, expresses tenderness openly' };
 }
 
 /** @param {number} a @param {number} b @param {number} t */
