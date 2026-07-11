@@ -2,6 +2,17 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [4.9.1] - 2026-07-11
+
+### Added
+- **Editable Portrait Prompt Templates**: The system prompts used to generate AI image-generation prompts for portraits are no longer hardcoded. Two new editable, resettable prompt templates are available under AI Character Portraits → Portrait Prompt Templates:
+  - **NPC / PC Portrait Prompt** — used when generating portraits for NPCs and Player Characters opened from the Lorebook Agent. This prompt already receives the NPC's full lorebook entry verbatim, so you can instruct the AI to prioritize a custom `[CORE]` field (e.g. an "Image Tags"/Danbooru-tags section added via the NPC Section Editor) by referencing it by name.
+  - **Character / Party / Combat Portrait Prompt** — used for the main character, party members, and combatants.
+  - **Saved Setups**: Save your current pair of prompts (plus the word target below) as a named, reloadable preset (library-style, like Saved Themes), so you can swap between different portrait-prompt styles (e.g. Danbooru-tag-focused vs. natural-language descriptions) without rewriting them each time. Saved setups and the prompt templates themselves now travel with Game Cartridge export/import.
+  - **Portrait Prompt Word Target**: The "Keep it under 200 words" instruction in both prompts is now a `{{wordtarget}}` token backed by a new, independent numeric setting (default 200), so the length limit is configurable instead of hardcoded. This is unrelated to the "Major/Minor NPC Section Word Target" fields used for lorebook `[CORE]` sections.
+- **NPC/PC Section Editor now included in Game Cartridges**: Your custom Core Identity section layouts (names, descriptions, colors, icons, and ordering for both NPC and PC cards) and their saved presets now travel with Game Cartridge export/import, so a shared cartridge can enforce a specific way of recording characters for that game/system instead of falling back to your locally configured layout.
+- **Portrait Generation on the Full NPC Card**: The large portrait shown in the Full NPC Card popup now supports the same click-to-generate/manage overlay as the small NPC card thumbnails in the Lorebook Agent list. Hovering reveals a 🎨/⚙️ icon; clicking opens the portrait settings menu (URL, upload, or AI Generate), and the popup's portrait updates in place immediately after applying, without needing to close and reopen the card.
+
 ## [4.9.0] - 2026-07-10
 
 ### Added

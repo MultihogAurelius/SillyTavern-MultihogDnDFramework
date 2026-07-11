@@ -2361,6 +2361,72 @@ async function showComponentsExplanation() {
     await Popup.show.confirm('🧩 Components Explained', popupBody, { okButton: 'Got it', cancelButton: false });
 }
 
+function refreshPortraitPromptPresetsList() {
+    const settings = getSettings();
+    const container = document.getElementById('rpg_portrait_prompt_presets_container');
+    const list = document.getElementById('rpg_portrait_prompt_presets_list');
+    if (!container || !list) return;
+
+    const entries = Object.entries(settings.savedPortraitPromptPresets || {});
+    if (entries.length === 0) {
+        container.style.display = 'none';
+        return;
+    }
+
+    container.style.display = 'block';
+    list.innerHTML = '';
+
+    entries.forEach(([name, preset]) => {
+        const row = document.createElement('div');
+        row.className = 'flex-container alignitemscenter gap-1';
+        row.style.background = 'rgba(255,255,255,0.05)';
+        row.style.padding = '4px 8px';
+        row.style.borderRadius = '4px';
+
+        const nameSpan = document.createElement('span');
+        nameSpan.textContent = name;
+        nameSpan.style.flex = '1';
+        nameSpan.style.fontSize = '0.85em';
+        nameSpan.style.cursor = 'pointer';
+        nameSpan.className = 'interactable';
+        nameSpan.title = 'Click to load this portrait prompt setup';
+        nameSpan.addEventListener('click', () => {
+            settings.portraitNpcSystemPrompt = preset.npcSystemPrompt || '';
+            settings.portraitCharacterSystemPrompt = preset.characterSystemPrompt || '';
+            if (preset.wordTarget !== undefined) {
+                settings.portraitPromptWordTarget = preset.wordTarget;
+            }
+            saveSettings();
+
+            $('#rpg_portrait_npc_system_prompt').val(settings.portraitNpcSystemPrompt);
+            $('#rpg_portrait_character_system_prompt').val(settings.portraitCharacterSystemPrompt);
+            if (preset.wordTarget !== undefined) {
+                $('#rpg_portrait_prompt_word_target').val(settings.portraitPromptWordTarget);
+            }
+
+            toastr['success'](`Loaded portrait prompt setup: ${name}`, 'Portrait Prompt Library');
+        });
+
+        const delBtn = document.createElement('i');
+        delBtn.className = 'fa-solid fa-trash-can interactable';
+        delBtn.style.fontSize = '0.8em';
+        delBtn.style.opacity = '0.5';
+        delBtn.title = 'Delete setup';
+        delBtn.addEventListener('click', () => {
+            if (confirm(`Are you sure you want to delete the portrait prompt setup "${name}"?`)) {
+                delete settings.savedPortraitPromptPresets[name];
+                saveSettings();
+                refreshPortraitPromptPresetsList();
+                toastr['info'](`Deleted setup: ${name}`, 'Portrait Prompt Library');
+            }
+        });
+
+        row.appendChild(nameSpan);
+        row.appendChild(delBtn);
+        list.appendChild(row);
+    });
+}
+
 async function showPortraitSettingsMenu(entityName, onRefresh, npcContent = null) {
     const refresh = onRefresh || refreshRenderedView;
     const s = getSettings();
@@ -5796,10 +5862,15 @@ function createPanel() {
                                     const portraitSrc = s.customPortraits?.[normLabel] || '';
                                     const hidePortrait = s.npcPortraits === false;
 
-                                    // Full-size portrait (512px stored, display at native res)
-                                    const portraitEl = portraitSrc
-                                        ? `<img src="${escapeHtml(portraitSrc)}" style="width:100%;height:auto;aspect-ratio:1;object-fit:cover;border-radius:12px;border:2px solid rgba(212,169,64,0.3);box-shadow:0 4px 20px rgba(0,0,0,0.4);" alt="${escapeHtml(item.label)}">`
-                                        : `<div style="width:100%;aspect-ratio:1;border-radius:12px;background:var(--SmartThemeBorderColor, rgba(128,128,128,0.1));border:2px solid rgba(212,169,64,0.2);display:flex;align-items:center;justify-content:center;font-size:64px;opacity:0.25;color:var(--SmartThemeBodyColor, inherit);">👤</div>`;
+                                    // Full-size portrait (512px stored, display at native res), with the same
+                                    // click-to-generate/manage overlay used on the small NPC card thumbnails.
+                                    const renderNpcPopupPortraitInner = (src) => {
+                                        const imgOrPlaceholder = src
+                                            ? `<img src="${escapeHtml(src)}" alt="${escapeHtml(item.label)}">`
+                                            : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:64px;opacity:0.25;color:var(--SmartThemeBodyColor, inherit);">👤</div>`;
+                                        return `${imgOrPlaceholder}<div class="rt-npc-portrait-gen-overlay" title="${src ? 'Manage portrait' : 'Generate portrait'}" style="font-size:32px;">${src ? '⚙️' : '🎨'}</div>`;
+                                    };
+                                    const portraitEl = `<div class="rt-npc-portrait-wrap rt-npc-popup-portrait-wrap" style="width:100%;height:auto;aspect-ratio:1;border-radius:12px;border:2px solid rgba(212,169,64,0.3);box-shadow:0 4px 20px rgba(0,0,0,0.4);">${renderNpcPopupPortraitInner(portraitSrc)}</div>`;
 
                                     // Build popup DOM
                                     const popupDom = document.createElement('div');
@@ -5916,6 +5987,22 @@ function createPanel() {
                                     const aiPreviewText = /** @type {HTMLTextAreaElement} */ (popupDom.querySelector('.rt-npc-popup-ai-preview-text'));
                                     const aiRegenBtn = /** @type {HTMLButtonElement} */ (popupDom.querySelector('.rt-npc-popup-ai-regen-btn'));
                                     const aiApplyBtn = /** @type {HTMLButtonElement} */ (popupDom.querySelector('.rt-npc-popup-ai-apply-btn'));
+
+                                    // Portrait click/generate overlay — same behavior as the small NPC card thumbnail.
+                                    const popupPortraitWrap = popupDom.querySelector('.rt-npc-popup-portrait-wrap');
+                                    if (popupPortraitWrap) {
+                                        popupPortraitWrap.addEventListener('click', async (e) => {
+                                            e.stopPropagation();
+                                            const refreshPopupPortrait = () => {
+                                                const norm = item.label.replace(/\s*\(.*?\)/g, '').trim();
+                                                const newSrc = getSettings().customPortraits?.[norm] || '';
+                                                popupPortraitWrap.innerHTML = renderNpcPopupPortraitInner(newSrc);
+                                                if (typeof refreshManifest === 'function') refreshManifest();
+                                                if (typeof refreshRenderedView === 'function') refreshRenderedView();
+                                            };
+                                            await showPortraitSettingsMenu(item.label, refreshPopupPortrait, item.content || '');
+                                        });
+                                    }
 
                                     const npcShowPane = (pane) => {
                                         viewPane.style.display = 'none';
@@ -10321,6 +10408,77 @@ function tryBindConnectionProfileDropdown(selector, initialProfileId, onProfileI
             settings.portraitCompletionPresetId = String($(this).val() || '');
             saveSettings();
         });
+
+        // ── Portrait Prompt Templates ──
+        $('#rpg_portrait_prompt_word_target').val(settings.portraitPromptWordTarget ?? 200).on('input', function () {
+            const raw = parseInt(String($(this).val() || ''), 10);
+            settings.portraitPromptWordTarget = isNaN(raw) ? 200 : Math.max(1, Math.min(2000, raw));
+            saveSettings();
+        });
+
+        $('#rpg_portrait_npc_system_prompt').val(settings.portraitNpcSystemPrompt).on('input', function () {
+            settings.portraitNpcSystemPrompt = String($(this).val() || '');
+            saveSettings();
+        });
+
+        $('#rpg_portrait_character_system_prompt').val(settings.portraitCharacterSystemPrompt).on('input', function () {
+            settings.portraitCharacterSystemPrompt = String($(this).val() || '');
+            saveSettings();
+        });
+
+        $('#rpg_portrait_npc_btn_reset_prompt').on('click', function () {
+            if (!confirm('Reset NPC/PC Portrait Prompt to default?')) return;
+
+            const { extensionSettings } = SillyTavern.getContext();
+            if (extensionSettings[MODULE_NAME]) {
+                delete extensionSettings[MODULE_NAME].portraitNpcSystemPrompt;
+            }
+            const freshDefault = getSettings().portraitNpcSystemPrompt;
+
+            const s = getSettings();
+            s.portraitNpcSystemPrompt = freshDefault;
+
+            $('#rpg_portrait_npc_system_prompt').val(freshDefault);
+            saveSettings();
+            toastr['success']('NPC/PC Portrait Prompt reset to default.', 'RPG Tracker');
+        });
+
+        $('#rpg_portrait_character_btn_reset_prompt').on('click', function () {
+            if (!confirm('Reset Character/Party/Combat Portrait Prompt to default?')) return;
+
+            const { extensionSettings } = SillyTavern.getContext();
+            if (extensionSettings[MODULE_NAME]) {
+                delete extensionSettings[MODULE_NAME].portraitCharacterSystemPrompt;
+            }
+            const freshDefault = getSettings().portraitCharacterSystemPrompt;
+
+            const s = getSettings();
+            s.portraitCharacterSystemPrompt = freshDefault;
+
+            $('#rpg_portrait_character_system_prompt').val(freshDefault);
+            saveSettings();
+            toastr['success']('Character/Party/Combat Portrait Prompt reset to default.', 'RPG Tracker');
+        });
+
+        $('#rpg_portrait_prompt_preset_save_btn').on('click', function () {
+            const name = prompt('Enter a name for this portrait prompt setup:', 'My Portrait Prompts');
+            if (!name || !name.trim()) return;
+            const trimmedName = name.trim();
+            if (settings.savedPortraitPromptPresets && settings.savedPortraitPromptPresets[trimmedName]) {
+                if (!confirm(`A setup named "${trimmedName}" already exists. Overwrite?`)) return;
+            }
+            if (!settings.savedPortraitPromptPresets) settings.savedPortraitPromptPresets = {};
+            settings.savedPortraitPromptPresets[trimmedName] = {
+                npcSystemPrompt: settings.portraitNpcSystemPrompt,
+                characterSystemPrompt: settings.portraitCharacterSystemPrompt,
+                wordTarget: settings.portraitPromptWordTarget,
+            };
+            saveSettings();
+            refreshPortraitPromptPresetsList();
+            toastr['success'](`Saved "${trimmedName}" to library.`, 'Portrait Prompt Library');
+        });
+
+        refreshPortraitPromptPresetsList();
 
         // ── World Progression Connection Settings UI Bindings ──
         const worldSourceSelect = $('#rpg_world_connection_source');

@@ -944,6 +944,37 @@ Example: [[FAC: Iron Syndicate | ...]]  NOT  [[FAC: Khelt :: Iron Syndicate | ..
         portraitOpenaiUrl: "",
         portraitOpenaiKey: "",
         portraitOpenaiModel: "",
+        portraitPromptWordTarget: 200,
+        portraitNpcSystemPrompt: `You are a portrait prompt generator for AI image models. Given an NPC's lorebook description from an RPG campaign, output a single detailed image generation prompt.
+
+Focus on:
+- Physical appearance (race, build, facial features, skin color, hair) — draw primarily from the NPC's lorebook entry
+- Clothing, armor, equipment visible on the character
+- Pose and expression appropriate to the character's personality
+- Art style: high-quality fantasy portrait, dramatic lighting, detailed
+
+Rules:
+- Output ONLY the prompt text, nothing else. No preamble, no explanation.
+- Keep it under {{wordtarget}} words.
+- The NPC lorebook entry is your PRIMARY source of truth for this character's appearance.
+- Use the narrator card and scene context only for world setting/art style guidance.
+- Focus on visual details. Do not include game stats, relationship values, or non-visual information.`,
+        portraitCharacterSystemPrompt: `You are a portrait prompt generator for AI image models. Given character context from an RPG game, output a single detailed image generation prompt suitable for an AI image model.
+
+You are provided with the full Lorebook Agent context — all currently active lore entries with their keywords and content — as well as the current game state. Use these to infer accurate visual details about the character, their world, and their situation.
+
+Focus on:
+- Physical appearance (race, build, facial features, skin color, hair)
+- Clothing, armor, equipment visible on the character
+- Pose and expression appropriate to the character's personality
+- Art style: high-quality fantasy portrait, dramatic lighting, detailed
+
+Rules:
+- Output ONLY the prompt text, nothing else. No preamble, no explanation.
+- Keep it under {{wordtarget}} words.
+- A user persona is provided for reference. If it does NOT describe the character "{{name}}", ignore it entirely and do not use any of its details in the portrait prompt.
+- Focus on visual details. Do not include game stats, abilities, or non-visual information.`,
+        savedPortraitPromptPresets: {},
         worldConnectionSource: "default",
         worldConnectionProfileId: "",
         worldCompletionPresetId: "",
@@ -988,6 +1019,14 @@ const CARTRIDGE_PAYLOAD_KEYS = [
     'modules',
     'stockPrompts',
     'systemPromptTemplate',
+    'portraitNpcSystemPrompt',
+    'portraitCharacterSystemPrompt',
+    'portraitPromptWordTarget',
+    'savedPortraitPromptPresets',
+    'npcCoreSections',
+    'pcCoreSections',
+    'npcSectionPresets',
+    'pcSectionPresets',
 ];
 
 /**

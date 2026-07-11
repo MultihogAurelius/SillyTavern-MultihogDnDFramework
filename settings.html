@@ -125,6 +125,50 @@
                                     </div>
                                 </div>
                             </div>
+
+                            <!-- Portrait Prompt Templates -->
+                            <div class="inline-drawer" style="margin-top: 6px; margin-bottom: 2px; margin-left: 20px;">
+                                <div class="inline-drawer-toggle inline-drawer-header" style="font-size: 0.82em; padding: 3px 6px;">
+                                    <b>Portrait Prompt Templates</b>
+                                    <div class="inline-drawer-icon fa-solid fa-circle-down down" style="font-size: 0.8em;"></div>
+                                </div>
+                                <div class="inline-drawer-content" style="padding: 6px 4px 0 4px;">
+                                    <div class="flex-container flexFlowColumn gap-1">
+                                        <div style="font-size: 0.72em; opacity: 0.55; line-height: 1.35; margin-bottom: 2px;">
+                                            These are the system prompts sent to the LLM to write an image-generation prompt. The NPC/PC prompt receives the full lorebook entry verbatim — including any custom <code>[CORE]</code> field you've added (e.g. an "Image Tags" section via the NPC Section Editor), so you can instruct it to prioritize that field by name. Tokens: <code>{{name}}</code> is replaced with the entity's name, <code>{{wordtarget}}</code> is replaced with the word target set below.
+                                        </div>
+
+                                        <div style="display:flex; align-items:center; gap:8px; margin-bottom: 4px;">
+                                            <label style="font-size: 0.8em; opacity: 0.85; white-space: nowrap;" title="The maximum word count the LLM is instructed to target for the generated image prompt. Referenced by the {{wordtarget}} token in both prompts below.">Portrait Prompt Word Target</label>
+                                            <input id="rpg_portrait_prompt_word_target" type="text" inputmode="numeric" pattern="[0-9]*" class="text_pole" value="200" style="max-width: 90px; font-size: 0.8em;" />
+                                        </div>
+
+                                        <div style="display:flex; align-items:center; gap:6px; margin-bottom: 2px;">
+                                            <label style="font-size: 0.8em; font-weight: bold; flex:1; margin:0;">NPC / PC Portrait Prompt</label>
+                                            <button id="rpg_portrait_npc_btn_reset_prompt" class="menu_button interactable" style="font-size:0.72em; padding:2px 8px;" title="Reset to default prompt">
+                                                <i class="fa-solid fa-arrow-rotate-left"></i> Reset
+                                            </button>
+                                        </div>
+                                        <textarea id="rpg_portrait_npc_system_prompt" class="text_pole" rows="8" style="width:100%; font-size:0.78em; font-family:monospace; resize:vertical; background:rgba(0,0,0,0.3); color:var(--SmartThemeBodyColor); border:1px solid rgba(255,255,255,0.1); border-radius:4px; padding:6px; box-sizing:border-box;" placeholder="System prompt used for NPC/PC portrait prompt generation…"></textarea>
+
+                                        <div style="display:flex; align-items:center; gap:6px; margin-bottom: 2px; margin-top: 6px;">
+                                            <label style="font-size: 0.8em; font-weight: bold; flex:1; margin:0;">Character / Party / Combat Portrait Prompt</label>
+                                            <button id="rpg_portrait_character_btn_reset_prompt" class="menu_button interactable" style="font-size:0.72em; padding:2px 8px;" title="Reset to default prompt">
+                                                <i class="fa-solid fa-arrow-rotate-left"></i> Reset
+                                            </button>
+                                        </div>
+                                        <textarea id="rpg_portrait_character_system_prompt" class="text_pole" rows="8" style="width:100%; font-size:0.78em; font-family:monospace; resize:vertical; background:rgba(0,0,0,0.3); color:var(--SmartThemeBodyColor); border:1px solid rgba(255,255,255,0.1); border-radius:4px; padding:6px; box-sizing:border-box;" placeholder="System prompt used for Character/Party/Combat portrait prompt generation…"></textarea>
+
+                                        <div class="flex-container gap-1" style="margin-top: 6px;">
+                                            <button id="rpg_portrait_prompt_preset_save_btn" class="menu_button interactable" style="flex: 1; font-size: 11px;"><i class="fa-solid fa-bookmark"></i> Save Setup to Library</button>
+                                        </div>
+                                        <div id="rpg_portrait_prompt_presets_container" style="display:none; margin-top: 8px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 8px;">
+                                            <b style="font-size: 0.85em; opacity: 0.8;">Saved Setups</b>
+                                            <div id="rpg_portrait_prompt_presets_list" class="flex-container flexFlowColumn gap-1"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         <div id="rpg_inventory_config_block" style="margin-top: 6px; border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; padding: 8px 10px;">
@@ -601,6 +645,7 @@
 
                             </div>
                         </div>
+                    </div><!-- /.inline-drawer (NPC Settings) -->
 
 
                         <!-- Active Lore Injection Settings -->
