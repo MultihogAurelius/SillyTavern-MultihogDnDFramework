@@ -540,7 +540,7 @@ function buildDefaultSettings() {
         npcRelationshipValues: {},
         npcRelationshipLog: {},      // { [fullId]: [{timestamp,field,delta,newValue,source}] } — capped 50/NPC
         experimentalNpcImport: true,
-        ignoreNpcImportLimits: false,
+        ignoreNpcImportLimits: true,
         npcAddAsIsMode: 'ai_review',   // 'literal' = wrap card verbatim in [CORE]; 'ai_review' = minimal world/era fix before adding
         use24hTime: false,
         useDdMmYyFormat: false,
