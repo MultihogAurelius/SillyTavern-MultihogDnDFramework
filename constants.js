@@ -60,12 +60,15 @@ Status: Effect (duration Xh Xm)
 
 For spells: output ONE \`Spells:\` line per spell level. Do NOT merge multiple levels onto one line with pipes.
 
-Only add party members if you see (X joins the party.)
-Only remove party members if you see (X leaves the party.)
+[PARTY] is the active roster (max 5 + {{user}}). Temporary separations are handled by the separate [BENCHED PARTY] module via [BENCH]/[UNBENCH] commands — do NOT remove members from [PARTY] for benching, and do NOT output [PARTY] on a turn where your only roster change is benching someone (output [BENCH] only; code removes them). If [BENCHED PARTY] is disabled, separations are just narration and nothing here changes.
 
-PERSISTENCE: If the party changes, you MUST output the ENTIRE [PARTY] block including all existing characters. Never omit a character unless they leave the party.
+TRIGGERS:
+- ADD a new member if you see (X joins the party.)
+- REMOVE a member entirely ONLY if you see the exact annotation *(Left the party: X — reason)* — do NOT infer this from narration alone, no matter how final it looks. This is a hard, permanent deletion, so it always requires this exact string with no exceptions. (This applies regardless of whether [BENCHED PARTY] is enabled — remove the member from whichever block currently holds them.)
 
-Example party: [PARTY]Elara (Ranger): 26/45 HP
+PERSISTENCE: If [PARTY] changes, you MUST output the ENTIRE block (all remaining members), per standard BLOCK PERSISTENCE rules. If it had no changes this turn, omit it entirely from your output.
+
+Example: [PARTY]Elara (Ranger): 26/45 HP
 Combat: BAB: +3 | Ranged: +6 | Melee: +4 | Base AC: 13 | Total AC: 15
 Gear: Shortbow (1d6+3 P) | Leather Armor (+2 AC)
 Proficiencies: Simple Weapons, Martial Weapons
@@ -79,6 +82,27 @@ Spells: Level 1 (2/2): Hunter's Mark, Goodberry
 HD: d10 (5/5)
 Status: Healthy
 [/PARTY]`,
+  'benched party': `Members temporarily separated from {{user}} while reunion remains plausible. Code moves their full [PARTY] stat sheet automatically — never output stat blocks here.
+
+Output [BENCHED PARTY] only when a bench or unbench occurs this turn; otherwise omit entirely. Always close the block: \`[/BENCHED PARTY]\`. Do NOT also output [PARTY] on a bench/unbench turn — code handles roster moves. If other [PARTY] members had real changes (HP, gear, status, etc.), output [PARTY] for those changes only; still do not list the benched/unbenched member there.
+
+One command per line inside the block:
+- [BENCH] Name — reason   — member separates. Name may be first name only (e.g. Robin) or full header (Robin (Class)). Reason required; derive from narrative.
+- [UNBENCH] Name          — member reunites with {{user}} on-screen.
+
+Infer benching/reunion from the narrative — no GM annotation exists for either. Bias toward under-triggering on bench: brief scene absence is NOT a bench. Wrong bench is worse than a missed one (missed benches self-heal on a later turn).
+
+Permanent removal uses *(Left the party: Name — reason)* from the [PARTY] module, not these commands.
+
+Example (bench only — no [PARTY] output):
+[BENCHED PARTY]
+[BENCH] Gareth — stayed at the lodging to rest and study
+[/BENCHED PARTY]
+
+Example (reunite only):
+[BENCHED PARTY]
+[UNBENCH] Gareth
+[/BENCHED PARTY]`,
   combat: `Active enemies/NPCs in combat. Track the current COMBAT ROUND starting from 1. Decrement buff/debuff durations by 1 each round. Format each combatant as:
 COMBAT ROUND X
 Name: current/max HP
@@ -430,8 +454,7 @@ The active context contains recent "World Progression" reports detailing backgro
 </world_progression>
 
 <party_join_leave>
-When a character joins/leaves, explicitly state (Name joins/leaves the party).
-Declare their COMBAT PROFILE immediately using this exact structural database layout:
+When a character JOINS the party, explicitly state (Name joins the party) and declare their COMBAT PROFILE immediately using this exact structural database layout:
 [PARTY]
 Name (Class): current/max HP
 Combat: BAB: +X | Ranged: +X | Melee: +X | Base AC: X | Total AC: Z
@@ -445,6 +468,13 @@ Spells: Cantrips, spell slots by level (if applicable).
 HD: dX (current/max)
 Status: Condition
 [/PARTY]
+<leaving_vs_benching>
+The ONLY annotation you are responsible for regarding a member leaving is permanent departure. When a party member's departure is truly final — death, explicit permanent farewell, defection, or any closure that forecloses reunion — narrate it and immediately follow it with:
+*(Left the party: Name — reason)*
+This is the exact string the Tracker matches on to remove that member's entry entirely. Do not emit it for a temporary separation, no matter how dramatic — only for closure that rules out reunion.
+
+If a character temporarily leaves but does not completely cut contact or die, then they are considered benched. This is what mostly happens.
+</leaving_vs_benching>
 </party_join_leave>
 
 <resting>
@@ -902,11 +932,18 @@ ${XP_LEVEL_THRESHOLDS_TEXT}`;
 // ── Renderer / block layout constants ─────────────────────────────────────────
 
 export const BLOCK_ICONS = {
-  TIME: '🕒', XP: '🌟', CHARACTER: '🧙', PARTY: '👥',
+  TIME: '🕒', XP: '🌟', CHARACTER: '🧙', PARTY: '👥', 'BENCHED PARTY': '🏕️',
   COMBAT: '⚔️', INVENTORY: '🎒', ABILITIES: '✨', SPELLS: '📖',
   QUESTS: '📋',
 };
 
+// NOTE: 'BENCHED PARTY' has its OWN enable toggle + editable prompt (settings.modules['benched
+// party'] / DEFAULT_STOCK_PROMPTS['benched party']) — see ui-editors.js's refreshOrderList,
+// which renders it as a nested sub-row directly under PARTY rather than a normal flat entry.
+// It's deliberately NOT in BLOCK_ORDER, because BLOCK_ORDER also drives render/tab ordering
+// (renderer.js), and [BENCHED PARTY] is intentionally never its own top-level tab/card — it
+// always renders folded into PARTY's own section as a compact roster sub-panel, since visually
+// it's a sub-state of party membership, not an independent trackable system.
 export const BLOCK_ORDER = ['COMBAT', 'CHARACTER', 'PARTY', 'INVENTORY', 'ABILITIES', 'SPELLS', 'XP', 'TIME', 'QUESTS'];
 
 export const PAGE_SIZE = 8;

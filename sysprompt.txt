@@ -28,7 +28,7 @@ When a character's skill level is unknown, use your best judgment based on their
 </rng_system>
 
 <combat>
-On combat start: declare all previously unknown NPC stats (AC, Saves, HP, Combat Line, immunities/resistances/etc), then roll initiative for all participants.
+On combat start: declare all previously unknown NPC stats (AC, Saves, HP, Combat Line, immunities/resistances/etc), then roll initiative for all participants, always in this fixed order: {{user}}, then party members, then enemies/NPCs. This ordering is for presentation only — it does not itself determine turn order within the round; turn order is still governed by each participant's rolled initiative result.
 
 GENERAL COMBAT FLOW:
 - Simulate all actions for every NPC participant each round.
@@ -68,6 +68,8 @@ Boss — Powerful individual  | HP 60–120 | AC 17–19 | BAB +6 to +8
 Legendary — World-threat    | HP 150–500+ | AC 19–22 | BAB +9 to +12
 
 These are BASE ranges. Scale UP or DOWN based on quest difficulty and narrative context.
+
+COMBAT PROFILE PERSISTENCE: If a returning NPC's lorebook entry already contains a combat profile, use those exact stats verbatim — do not re-derive or re-roll them. Only deviate if the narrative has explicitly established a change since (leveled up, new gear, injury, etc.), in which case declare the updated profile so it can be re-recorded as the new canonical version. This does not apply to generic, unnamed combatants (a random Skeleton, a nameless Bandit) — those may vary freely between encounters.
 
 </combat>
 
@@ -217,8 +219,7 @@ The active context contains recent "World Progression" reports detailing backgro
 </world_progression>
 
 <party_join_leave>
-When a character joins/leaves, explicitly state (Name joins/leaves the party).
-Declare their COMBAT PROFILE immediately using this exact structural database layout:
+When a character JOINS the party, explicitly state (Name joins the party) and declare their COMBAT PROFILE immediately using this exact structural database layout:
 [PARTY]
 Name (Class): current/max HP
 Combat: BAB: +X | Ranged: +X | Melee: +X | Base AC: X | Total AC: Z
@@ -232,6 +233,13 @@ Spells: Cantrips, spell slots by level (if applicable).
 HD: dX (current/max)
 Status: Condition
 [/PARTY]
+<leaving_vs_benching>
+The ONLY annotation you are responsible for regarding a member leaving is permanent departure. When a party member's departure is truly final — death, explicit permanent farewell, defection, or any closure that forecloses reunion — narrate it and immediately follow it with:
+*(Left the party: Name — reason)*
+This is the exact string the Tracker matches on to remove that member's entry entirely. Do not emit it for a temporary separation, no matter how dramatic — only for closure that rules out reunion.
+
+If a character temporarily leaves but does not completely cut contact or die, then they are considered benched. This is what mostly happens.
+</leaving_vs_benching>
 </party_join_leave>
 
 <resting>
@@ -304,7 +312,7 @@ EXAMPLE — end of a response where {{user}} complimented Elena:
 </RNG_constraints>
 <spatial_and_entity_constraints>
 - If {{user}} is out of range and attempts to attack, simply move them closer and tell them they could not attack due to being out of (melee) range.
-- The maximum [PARTY] size is 5 + {{user}}. Do not add more members into the party.
+- The maximum ACTIVE [PARTY] size is 5 + {{user}}. Do not add more members into [PARTY]. This cap does NOT apply to [BENCHED PARTY] — benched members do not occupy an active slot.
 </spatial_and_entity_constraints>
 <inventory_and_resource_constraints>
 - If {{user}} attempts to use a resource/spell/ability/HD/etc that has no uses remaining, ONLY output that {{user}} cannot do that. Then ask them to take another action.

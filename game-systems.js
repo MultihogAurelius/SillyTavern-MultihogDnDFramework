@@ -204,13 +204,14 @@ export function isBlankSectionContent(content) {
 }
 
 /** Narrator Configuration tags whose enabled-state doubles as a base sysprompt toggle. */
-const KNOWN_TOGGLE_DEFAULTS = { loot: true, random_events: true, resting: true, quests: true };
+const KNOWN_TOGGLE_DEFAULTS = { loot: true, random_events: true, resting: true, party_bench: true, quests: true };
 
 /** Checkbox ids from the Narrator Configuration panel, keyed by base sysprompt tag. */
 const NARRATOR_TOGGLE_IDS = {
     loot: 'rpg_sysprompt_mod_loot',
     random_events: 'rpg_sysprompt_mod_random_events',
     resting: 'rpg_sysprompt_mod_resting',
+    party_bench: 'rpg_sysprompt_mod_party_bench',
     quests: 'rpg_sysprompt_mod_quests',
     relationship_tracking: 'rpg_sysprompt_mod_npc_rel_bars',
 };
@@ -314,6 +315,18 @@ export function transformBaseSectionContent(tag, innerContent, settings) {
             result = result.replace(/- If a quest is time-sensitive and the deadline passes.*\n/g, '');
         }
         return result;
+    }
+
+    if (tag === 'party_join_leave') {
+        let content = innerContent.trim();
+        if (mods.party_bench === false) {
+            content = content.replace(/\s*<leaving_vs_benching>[\s\S]*?<\/leaving_vs_benching>/i, '').trim();
+        }
+        return `<party_join_leave>\n${content}\n</party_join_leave>`;
+    }
+
+    if (tag === 'party_bench') {
+        return '';
     }
 
     if (tag === 'end_of_output_footer') {

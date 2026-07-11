@@ -249,6 +249,7 @@
                                 <label class="checkbox_label"><input type="checkbox" id="rpg_sysprompt_mod_loot" /><span>🎲 Loot</span></label>
                                 <label class="checkbox_label"><input type="checkbox" id="rpg_sysprompt_mod_random_events" /><span>🌍 Events</span></label>
                                 <label class="checkbox_label"><input type="checkbox" id="rpg_sysprompt_mod_resting" /><span>💤 Resting</span></label>
+                                <label class="checkbox_label"><input type="checkbox" id="rpg_sysprompt_mod_party_bench" /><span>🏕️ Benched Party</span></label>
                                 <label class="checkbox_label"><input type="checkbox" id="rpg_sysprompt_mod_npc_rel_bars" /><span>💞 Relationship System (BETA)</span></label>
                                 <label class="checkbox_label"><input type="checkbox" id="rpg_sysprompt_mod_time_ddmmyy" /><span>📅 Use DD/MM/YYYY Calendar format</span></label>
                             </div>
@@ -1035,11 +1036,9 @@
                                         </div>
                                     </div>
 
-                                    <label class="checkbox_label" style="margin-top: 4px;">
-                                        <input id="rpg_world_progression_auto_exclude_party" type="checkbox" />
-                                        <span>Auto-exclude active party members</span>
-                                        <i class="fa-solid fa-circle-question interactable" style="font-size: 0.85em; opacity: 0.7; margin-left: 4px;" title="When enabled, automatically excludes all characters listed in the State Tracker [PARTY] block from focus randomization pools. Names are parsed to strip any parenthesis details (e.g. 'Gary (Ranger)' becomes 'Gary')."></i>
-                                    </label>
+                                    <div style="margin-top: 6px; font-size: 0.85em; opacity: 0.7;">
+                                        <i class="fa-solid fa-circle-info"></i> Party members currently in [PARTY] (active) are always excluded from World Progression automatically. Members in [BENCHED PARTY] are eligible for focus randomization like any other NPC — no toggle needed.
+                                    </div>
 
                                     <div style="margin-top: 6px;">
                                         <label style="font-size: 0.85em; font-weight: bold; display: block; margin-bottom: 2px;">World Report Exclusion List

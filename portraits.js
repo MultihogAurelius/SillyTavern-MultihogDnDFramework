@@ -2,7 +2,7 @@ import { getSettings, getEffectiveRouterCampaignPrefix } from './state-manager.j
 import { saveSettings } from './index.js';
 import { sendStateRequest } from './llm-client.js';
 import { parseMemoBlocks } from './renderer.js';
-import { escapeHtml } from './memo-processor.js';
+import { escapeHtml, memoForGmContext } from './memo-processor.js';
 import { getLorebookManifest } from './router.js';
 
 // Read an image File as a full-resolution Base64 data URL
@@ -46,7 +46,9 @@ export function applyPortraitData(entityName, src) {
     } else {
         delete s.customPortraits[normName];
     }
-    saveSettings();
+    // Portrait sets are infrequent, deliberate actions (not rapid keystrokes like the memo
+    // textarea) — force an immediate flush instead of risking the 2s debounce window.
+    saveSettings(true);
 }
 
 // ── Pollinations.ai model list (image-only, sorted cheapest → most expensive) ──
@@ -200,7 +202,7 @@ export async function generatePortraitPrompt(entityName) {
     // 7. Current game state (memo) — full state for rich context
     try {
         if (s.currentMemo) {
-            contextParts.push(`Current Game State:\n${s.currentMemo.substring(0, 2000)}`);
+            contextParts.push(`Current Game State:\n${memoForGmContext(s.currentMemo).substring(0, 2000)}`);
         }
     } catch { /* ignore */ }
 
@@ -879,7 +881,7 @@ export async function autoGenerateEnemyPortraits(refresh) {
 export function removeAllPortraits(refresh) {
     const s = getSettings();
     s.customPortraits = {};
-    saveSettings();
+    saveSettings(true);
     toastr['success']('All custom portraits removed.', 'RPG Tracker');
     if (typeof refresh === 'function') refresh();
 }

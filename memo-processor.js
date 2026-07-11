@@ -299,11 +299,25 @@ export function deduplicateMemo(memo) {
  */
 export function mergeMemo(currentMemo, aiOutput) {
     const settings = getSettings();
+    const benchCommands = benchCommandsEnabled()
+        ? extractBenchCommands(aiOutput)
+        : { benches: [], unbenches: [] };
 
     const tagPattern = /\[([^\]\/][^\]]*)\]([\s\S]*?)\[\/\1\]/gi;
     const matches = [...aiOutput.matchAll(tagPattern)];
 
+    const hasBenchWork = benchCommands.benches.length > 0 || benchCommands.unbenches.length > 0;
+
     if (matches.length === 0) {
+        if (hasBenchWork) {
+            if (settings.debugMode) {
+                console.log('[RPG Tracker] mergeMemo: no closed [TAG] blocks but [BENCH]/[UNBENCH] found — applying bench splice');
+            }
+            return hydratePartyRelocationStats(
+                currentMemo,
+                applyBenchCommands(currentMemo, currentMemo, benchCommands),
+            );
+        }
         console.warn("[RPG Tracker] No valid [TAG]...[/TAG] blocks found in model output — treating as no-change. Output was:", aiOutput);
         return currentMemo;
     }
@@ -315,6 +329,13 @@ export function mergeMemo(currentMemo, aiOutput) {
     for (const match of matches) {
         const tag = match[1].trim();
         const newContent = match[2].trim();
+
+        if (tag.toUpperCase() === 'BENCHED PARTY' && isBenchCommandOnlyContent(newContent)) {
+            if (settings.debugMode) {
+                console.log(`[RPG Tracker] mergeMemo: [${tag}] command-only — deferring to applyBenchCommands`);
+            }
+            continue;
+        }
 
         const isRemoval = /^(?:REMOVED|EXPIRED|CLEARED|NONE|END_COMBAT)$/i.test(newContent);
 
@@ -345,7 +366,12 @@ export function mergeMemo(currentMemo, aiOutput) {
     }
 
     const cleaned = memo.replace(/\n{3,}/g, '\n\n').trim();
-    return deduplicateMemo(cleaned);
+    const deduped = deduplicateMemo(cleaned);
+    let result = deduped;
+    if (benchCommands.benches.length || benchCommands.unbenches.length) {
+        result = applyBenchCommands(currentMemo, result, benchCommands);
+    }
+    return hydratePartyRelocationStats(currentMemo, result);
 }
 
 /**
@@ -465,6 +491,413 @@ export function stripArchivedQuestsFromMemo(memoText) {
 
 /** @deprecated Use stripArchivedQuestsFromMemo */
 export const stripCompletedQuestsFromMemo = stripArchivedQuestsFromMemo;
+
+// ── Benched Party: [BENCH]/[UNBENCH] commands + context compaction ────────────
+//
+// Tracker emits lean commands; code splices full stat sheets between [PARTY] and
+// [BENCHED PARTY]. Full stat sheets live in the persisted memo; LLM context only
+// needs name + benching reason while a member stays benched.
+
+const BENCH_CMD_RX = /^\[BENCH\]\s*(.+?)(?:\s*[—–-]\s*(.+))?$/i;
+const UNBENCH_CMD_RX = /^\[UNBENCH\]\s*(.+)$/i;
+
+function benchCommandsEnabled() {
+    const settings = getSettings();
+    return settings.modules?.['benched party'] !== false && settings.modules?.party !== false;
+}
+
+/** @returns {{ benches: {name: string, reason: string}[], unbenches: string[] }} */
+export function extractBenchCommands(aiOutput) {
+    const benches = [];
+    const unbenches = [];
+    for (const line of (aiOutput || '').split('\n')) {
+        const trimmed = line.trim();
+        const bench = trimmed.match(BENCH_CMD_RX);
+        if (bench) {
+            benches.push({ name: bench[1].trim(), reason: (bench[2] || '').trim() });
+            continue;
+        }
+        const unbench = trimmed.match(UNBENCH_CMD_RX);
+        if (unbench) unbenches.push(unbench[1].trim());
+    }
+    return { benches, unbenches };
+}
+
+function isBenchCommandOnlyContent(content) {
+    if (!content || /^(?:REMOVED|EXPIRED|CLEARED|NONE)$/i.test(content.trim())) return false;
+    const lines = content.trim().split('\n').map(l => l.trim()).filter(Boolean);
+    if (!lines.length) return false;
+    return lines.every(l => /^\[(?:BENCH|UNBENCH)\]/i.test(l));
+}
+
+function resolveMemberEntry(entries, queryName) {
+    const q = (queryName || '').trim().toLowerCase();
+    if (!q) return null;
+    for (const entry of entries) {
+        if (memberNameKey(entry.name) === q) return entry;
+    }
+    for (const entry of entries) {
+        const nk = memberNameKey(entry.name);
+        if (nk.startsWith(q + ' ') || nk.startsWith(q + '(')) return entry;
+        if (entry.name.toLowerCase().startsWith(q)) return entry;
+    }
+    return null;
+}
+
+function rebuildPartyBlockContent(entries) {
+    return entries.map(entry => {
+        const lines = [...entry.lines];
+        if (lines.length && !/^-/.test(lines[0])) lines[0] = `- ${lines[0]}`;
+        return lines.join('\n');
+    }).join('\n');
+}
+
+function removeMemberFromBlock(blockContent, queryName) {
+    const entries = splitPartyMemberEntries(blockContent);
+    const removed = resolveMemberEntry(entries, queryName);
+    if (!removed) return { blockContent, removed: null, empty: false };
+    const remaining = entries.filter(e => e !== removed);
+    return {
+        blockContent: rebuildPartyBlockContent(remaining),
+        removed,
+        empty: !remaining.length,
+    };
+}
+
+function setEntryStatus(entry, statusText) {
+    const lines = [...entry.lines];
+    const idx = lines.findIndex(l => /^status:/i.test(l));
+    const newLine = `Status: ${statusText}`;
+    if (idx >= 0) lines[idx] = newLine;
+    else lines.push(newLine);
+    return { name: entry.name, lines };
+}
+
+function clearBenchedStatus(entry) {
+    const lines = [...entry.lines];
+    const idx = lines.findIndex(l => /^status:/i.test(l));
+    if (idx >= 0 && /benched\s*\(/i.test(lines[idx])) {
+        lines[idx] = 'Status: Healthy';
+    }
+    return { name: entry.name, lines };
+}
+
+function getBenchTimestamp(memo) {
+    const timeBlock = parseMemoBlockContent(memo, 'TIME');
+    return extractCurrentTimeStr(timeBlock) || '';
+}
+
+function blockContentFromMemo(memo, tag) {
+    return parseMemoBlockContent(memo, tag) ?? '';
+}
+
+function findMemberEntry(blockContent, queryName) {
+    if (!blockContent) return null;
+    return resolveMemberEntry(splitPartyMemberEntries(blockContent), queryName);
+}
+
+function benchedMemberKeys(memo) {
+    const content = blockContentFromMemo(memo, 'BENCHED PARTY');
+    if (!content || /^(?:REMOVED|EXPIRED|CLEARED|NONE)$/i.test(content.trim())) return new Set();
+    return new Set(splitPartyMemberEntries(content).map(e => memberNameKey(e.name)));
+}
+
+/** Ensures no member appears in both [PARTY] and [BENCHED PARTY] — benched wins. */
+function dedupePartyAgainstBenched(memo) {
+    const benchedKeys = benchedMemberKeys(memo);
+    if (!benchedKeys.size) return memo;
+
+    const partyContent = blockContentFromMemo(memo, 'PARTY');
+    if (!partyContent) return memo;
+
+    const entries = splitPartyMemberEntries(partyContent).filter(
+        e => !benchedKeys.has(memberNameKey(e.name)),
+    );
+    if (!entries.length) return stripMemoBlock(memo, 'PARTY');
+    return replaceMemoBlock(memo, 'PARTY', rebuildPartyBlockContent(entries));
+}
+
+/**
+ * Applies [BENCH]/[UNBENCH] commands by splicing full stat entries between blocks.
+ * @param {string} priorMemo
+ * @param {string} memo
+ * @param {{ benches: {name: string, reason: string}[], unbenches: string[] }} commands
+ * @returns {string}
+ */
+export function applyBenchCommands(priorMemo, memo, commands) {
+    if (!commands?.benches?.length && !commands?.unbenches?.length) return memo || '';
+
+    let result = memo || '';
+    const timeStr = getBenchTimestamp(result) || getBenchTimestamp(priorMemo);
+
+    for (const { name, reason } of commands.benches) {
+        const resultParty = blockContentFromMemo(result, 'PARTY');
+        const priorParty = blockContentFromMemo(priorMemo, 'PARTY');
+        let removed = null;
+
+        if (findMemberEntry(resultParty, name)) {
+            const { blockContent: newParty, removed: r, empty } = removeMemberFromBlock(resultParty, name);
+            removed = r;
+            if (empty) result = stripMemoBlock(result, 'PARTY');
+            else if (r) result = replaceMemoBlock(result, 'PARTY', newParty);
+        } else if (priorParty) {
+            // Tracker may have already dropped them from a simultaneous [PARTY] output — pull stats from prior memo.
+            ({ removed } = removeMemberFromBlock(priorParty, name));
+        }
+
+        if (!removed) continue;
+
+        const statusText = reason
+            ? `Benched (${timeStr || 'unknown time'}, ${reason})`
+            : `Benched (${timeStr || 'unknown time'})`;
+        const benchedEntry = setEntryStatus(removed, statusText);
+
+        let benchedContent = blockContentFromMemo(result, 'BENCHED PARTY') || blockContentFromMemo(priorMemo, 'BENCHED PARTY');
+        const benchedEntries = splitPartyMemberEntries(benchedContent).filter(
+            e => memberNameKey(e.name) !== memberNameKey(benchedEntry.name),
+        );
+        benchedEntries.push(benchedEntry);
+        result = replaceMemoBlock(result, 'BENCHED PARTY', rebuildPartyBlockContent(benchedEntries));
+    }
+
+    for (const name of commands.unbenches) {
+        const resultBenched = blockContentFromMemo(result, 'BENCHED PARTY');
+        const priorBenched = blockContentFromMemo(priorMemo, 'BENCHED PARTY');
+        let removed = null;
+        let newBenched = resultBenched;
+
+        if (findMemberEntry(resultBenched, name)) {
+            const attempt = removeMemberFromBlock(resultBenched, name);
+            removed = attempt.removed;
+            newBenched = attempt.blockContent;
+        } else if (priorBenched) {
+            ({ removed, blockContent: newBenched } = removeMemberFromBlock(priorBenched, name));
+        }
+
+        if (!removed) continue;
+
+        if (!newBenched || !splitPartyMemberEntries(newBenched).length) result = stripMemoBlock(result, 'BENCHED PARTY');
+        else result = replaceMemoBlock(result, 'BENCHED PARTY', newBenched);
+
+        const partyEntry = clearBenchedStatus(removed);
+        const resultParty = blockContentFromMemo(result, 'PARTY');
+
+        if (findMemberEntry(resultParty, name)) {
+            // Tracker may have already re-added them to [PARTY] — leave roster as-is, hydrate fixes stats.
+            continue;
+        }
+
+        // Never fall back to priorMemo [PARTY] — a same-turn [BENCH] may have removed members
+        // or stripped the block entirely; prior roster would resurrect them as duplicates.
+        const partyEntries = splitPartyMemberEntries(resultParty).filter(
+            e => memberNameKey(e.name) !== memberNameKey(partyEntry.name),
+        );
+        partyEntries.push(partyEntry);
+        result = replaceMemoBlock(result, 'PARTY', rebuildPartyBlockContent(partyEntries));
+    }
+
+    return dedupePartyAgainstBenched(result);
+}
+
+function parseMemoBlockContent(memo, tag) {
+    const re = new RegExp(`\\[${escapeRegex(tag)}\\]([\\s\\S]*?)\\[\\/${escapeRegex(tag)}\\]`, 'i');
+    const m = (memo || '').match(re);
+    return m ? m[1].trim() : null;
+}
+
+function stripMemoBlock(memo, tag) {
+    const re = new RegExp(`\\s*\\[${escapeRegex(tag)}\\][\\s\\S]*?\\[\\/${escapeRegex(tag)}\\]`, 'i');
+    return (memo || '').replace(re, '').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+function replaceMemoBlock(memo, tag, innerContent) {
+    const re = new RegExp(`\\s*\\[${escapeRegex(tag)}\\][\\s\\S]*?\\[\\/${escapeRegex(tag)}\\]`, 'i');
+    const block = `[${tag}]\n${innerContent}\n[/${tag}]`;
+    if (re.test(memo)) return memo.replace(re, () => '\n\n' + block).replace(/\n{3,}/g, '\n\n').trim();
+    return (memo ? memo.trimEnd() + '\n\n' : '') + block;
+}
+
+// Member boundary: ONLY a true entity header line (Name (Class): X/Y HP), never a sub-field
+// like "Combat:" or "Status:". Sub-field lines are continuations of the current entry.
+const PARTY_MEMBER_HEADER_RX = /^\s*[-*+•–—]?(?:\s+)?(.+?):\s*([\d,]+)(?:\/([\d,]+))?\s*HP\b/i;
+const PARTY_MEMBER_COMPACT_HEADER_RX = /^\s*[-*+•–—]?(?:\s+)?(.+?):\s*(Benched\s*\([^)]*\)|Benched\b.*)$/i;
+const PARTY_SUBFIELD_LABELS = /^(Combat|Gear|Proficiencies|Attr|Saves|Skills|Traits|Abilities|Spells|HD|Status):/i;
+
+function isPartyMemberHeaderLine(line) {
+    const trimmed = line.trim().replace(/^\s*[-*+•–—](?:\s+|(?=[A-Za-z]))/, '');
+    if (PARTY_SUBFIELD_LABELS.test(trimmed)) return false;
+    return PARTY_MEMBER_HEADER_RX.test(trimmed) || PARTY_MEMBER_COMPACT_HEADER_RX.test(trimmed);
+}
+
+/** @returns {{name: string, lines: string[]}[]} */
+function splitPartyMemberEntries(blockContent) {
+    if (!blockContent || /^(?:REMOVED|EXPIRED|CLEARED|NONE)$/i.test(blockContent.trim())) return [];
+    const rawLines = blockContent.split('\n');
+    const entries = [];
+    let currentName = null;
+    let currentLines = [];
+
+    const headerName = (line) => {
+        const trimmed = line.trim().replace(/^\s*[-*+•–—](?:\s+|(?=[A-Za-z]))/, '');
+        if (!isPartyMemberHeaderLine(line)) return null;
+        const hp = trimmed.match(PARTY_MEMBER_HEADER_RX);
+        if (hp) return hp[1].trim();
+        const compact = trimmed.match(PARTY_MEMBER_COMPACT_HEADER_RX);
+        if (compact) return compact[1].trim();
+        return null;
+    };
+
+    for (const rawLine of rawLines) {
+        if (!rawLine.trim()) continue;
+        const name = headerName(rawLine);
+        if (name !== null) {
+            if (currentName) entries.push({ name: currentName, lines: [...currentLines] });
+            currentName = name;
+            currentLines = [rawLine.trim().replace(/^\s*[-*+•–—](?:\s+|(?=[A-Za-z]))/, '')];
+            continue;
+        }
+        if (currentName) currentLines.push(rawLine.trim());
+    }
+    if (currentName) entries.push({ name: currentName, lines: [...currentLines] });
+    return entries;
+}
+
+function entryText(entry) {
+    return entry.lines.join('\n');
+}
+
+function isFullPartyStatEntry(text) {
+    return /Combat:/i.test(text);
+}
+
+function memberNameKey(name) {
+    return (name || '').trim().toLowerCase();
+}
+
+function buildMemberLookup(blockContent) {
+    const map = new Map();
+    for (const entry of splitPartyMemberEntries(blockContent)) {
+        map.set(memberNameKey(entry.name), entry);
+    }
+    return map;
+}
+
+/**
+ * Replaces [BENCHED PARTY] full stat entries with compact name + Status lines for LLM
+ * context injection only. Never call this on the persisted memo.
+ *
+ * Gate rule: only the member name (from the HP header line) and the Status: line survive.
+ * Combat/Gear/Attr/etc. are discarded entirely — not rewritten, not re-labeled.
+ * @param {string} memo
+ * @returns {string}
+ */
+export function compactBenchedPartyForContext(memo) {
+    const settings = getSettings();
+    if (settings.modules?.['benched party'] === false) {
+        return stripMemoBlock(memo, 'BENCHED PARTY');
+    }
+
+    const content = parseMemoBlockContent(memo, 'BENCHED PARTY');
+    if (!content || /^(?:REMOVED|EXPIRED|CLEARED|NONE)$/i.test(content)) return memo || '';
+
+    const compactLines = [];
+    for (const entry of splitPartyMemberEntries(content)) {
+        let status = '';
+        for (const line of entry.lines) {
+            if (/^status:/i.test(line)) {
+                status = line.replace(/^status:\s*/i, '').trim();
+                break;
+            }
+        }
+        if (!status) {
+            const inline = entry.lines[0]?.match(/:\s*(Benched\s*\([^)]*\)|Benched\b.*)$/i);
+            status = inline ? inline[1].trim() : 'Benched';
+        }
+        compactLines.push(`- ${entry.name}: ${status}`);
+    }
+
+    if (!compactLines.length) return memo || '';
+    return replaceMemoBlock(memo, 'BENCHED PARTY', compactLines.join('\n'));
+}
+
+/**
+ * After mergeMemo, restore full stat entries when the Tracker only had compact
+ * [BENCHED PARTY] context (or emitted a header-only relocation).
+ * @param {string} priorMemo
+ * @param {string} mergedMemo
+ * @returns {string}
+ */
+export function hydratePartyRelocationStats(priorMemo, mergedMemo) {
+    if (!priorMemo || !mergedMemo) return mergedMemo || '';
+
+    const priorParty = buildMemberLookup(parseMemoBlockContent(priorMemo, 'PARTY'));
+    const priorBenched = buildMemberLookup(parseMemoBlockContent(priorMemo, 'BENCHED PARTY'));
+
+    let result = mergedMemo;
+    for (const tag of ['PARTY', 'BENCHED PARTY']) {
+        const content = parseMemoBlockContent(result, tag);
+        if (!content) continue;
+        if (/^(?:REMOVED|EXPIRED|CLEARED|NONE)$/i.test(content.trim())) continue;
+
+        const hydrated = splitPartyMemberEntries(content).map(entry => {
+            const text = entryText(entry);
+            if (isFullPartyStatEntry(text)) return entry;
+
+            const key = memberNameKey(entry.name);
+            const full = priorBenched.get(key) || priorParty.get(key);
+            if (!full || !isFullPartyStatEntry(entryText(full))) return entry;
+
+            const fullLines = [...full.lines];
+            if (tag === 'BENCHED PARTY') {
+                const statusIdx = fullLines.findIndex(l => /^status:/i.test(l));
+                const newStatus = entry.lines.find(l => /^status:/i.test(l))
+                    || entry.lines.find(l => /Benched\s*\(/i.test(l));
+                if (newStatus) {
+                    const statusVal = newStatus.replace(/^status:\s*/i, '').trim();
+                    if (statusIdx >= 0) fullLines[statusIdx] = `Status: ${statusVal}`;
+                    else fullLines.push(`Status: ${statusVal}`);
+                }
+            } else if (tag === 'PARTY') {
+                const statusIdx = fullLines.findIndex(l => /^status:/i.test(l));
+                if (statusIdx >= 0) {
+                    const statusLine = fullLines[statusIdx];
+                    if (/Benched\s*\(/i.test(statusLine)) {
+                        fullLines[statusIdx] = 'Status: Healthy';
+                    }
+                }
+            }
+            return { name: entry.name, lines: fullLines };
+        });
+
+        const rebuilt = hydrated.map(e => {
+            const lines = [...e.lines];
+            if (lines.length && !/^-/.test(lines[0])) lines[0] = `- ${lines[0]}`;
+            return lines.join('\n');
+        }).join('\n');
+
+        result = replaceMemoBlock(result, tag, rebuilt);
+    }
+    return result;
+}
+
+/**
+ * Prepares memo text for Tracker LLM context (TRACKER STATE injection).
+ * @param {string} memo
+ * @returns {string}
+ */
+export function memoForTrackerContext(memo) {
+    return compactBenchedPartyForContext(stripCompletedQuestsFromMemo(memo || ''));
+}
+
+/**
+ * Prepares memo text for GM narrative context (STATE MEMO injection).
+ * @param {string} memo
+ * @returns {string}
+ */
+export function memoForGmContext(memo) {
+    const stripped = (memo || '').replace(/\[QUESTS\][\s\S]*?\[\/QUESTS\]/gi, '').trim();
+    return compactBenchedPartyForContext(stripped);
+}
 
 // ── Legacy quest text format ───────────────────────────────────────────────────
 

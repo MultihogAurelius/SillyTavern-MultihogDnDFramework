@@ -877,6 +877,44 @@ export function getTimeOfDayInfo(str) {
 
 
     /**
+     * 'BENCHED PARTY' is never rendered as its own section/tab — it's folded into PARTY's
+     * own card as a compact camp roster sub-panel (see renderBenchedPartyPanel). It has its
+     * own enable toggle + editable prompt (settings.modules['benched party']) but is
+     * deliberately NOT in BLOCK_ORDER (constants.js), since BLOCK_ORDER also drives render
+     * order here — without stripping it explicitly, it'd fall into the "unlisted tag"
+     * fallback below and render as a standalone card. blocks['BENCHED PARTY'] itself is
+     * untouched by this — renderSectionCard reads it directly to build the nested panel.
+     */
+    function stripBenchedPartyTag(tags) {
+        return tags.filter(t => t !== 'BENCHED PARTY');
+    }
+
+    /**
+     * When [BENCHED PARTY] has members but [PARTY] was removed/emptied (everyone benched),
+     * synthesize an empty PARTY shell so the PARTY card still renders and hosts the camp
+     * roster sub-panel. Only when the benched-party module is enabled.
+     * @param {object} blocks
+     * @returns {object}
+     */
+    function ensurePartyShellForBenchedRoster(blocks) {
+        const s = getSettings();
+        if (s.modules?.['benched party'] === false || s.modules?.party === false) return blocks;
+
+        const benched = blocks['BENCHED PARTY'];
+        if (!benched || /^(?:REMOVED|EXPIRED|CLEARED|NONE)$/i.test(benched.trim())) return blocks;
+
+        const party = blocks['PARTY'];
+        const partyMissing = party === undefined
+            || !String(party).trim()
+            || /^(?:REMOVED|EXPIRED|CLEARED|NONE)$/i.test(String(party).trim());
+
+        if (partyMissing) {
+            blocks['PARTY'] = '';
+        }
+        return blocks;
+    }
+
+    /**
      * Parse the memo's [TAG]...[/TAG] blocks and return structured object.
      */
     export function parseMemoBlocks(memo) {
@@ -1080,6 +1118,7 @@ function formatValueToCurrency(totalCp, detectedCurrency) {
         switch (renderType) {
             case 'COMBAT':
             case 'PARTY':
+            case 'BENCHED PARTY':
             case 'CHARACTER': {
                 const results = [];
                 let lastEntityIdx = -1;
@@ -1936,6 +1975,10 @@ function formatValueToCurrency(totalCp, detectedCurrency) {
                             <span>💤 Time-Limited Resting and interruption rolls based on location danger</span>
                         </label>
                         <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                            <input type="checkbox" id="rt_onboarding_mod_party_bench" />
+                            <span>🏕️ Benched Party (Tracks temporarily separated companions)</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
                             <input type="checkbox" id="rt_onboarding_mod_npc_rel_bars" />
                             <span>💞 Relationship System (BETA)</span>
                         </label>
@@ -1953,16 +1996,16 @@ function formatValueToCurrency(totalCp, detectedCurrency) {
             </div>`;
         }
 
-        const blocks = parseMemoBlocks(memo);
+        const blocks = ensurePartyShellForBenchedRoster(parseMemoBlocks(memo));
         if (Object.keys(blocks).length === 0) {
             return `<div class="rt-empty">No structured blocks found.<br><small>Switch to Raw view to inspect the memo.</small></div>`;
         }
 
         const s = getSettings();
-        const order = s.blockOrder || BLOCK_ORDER;
+        const order = stripBenchedPartyTag(s.blockOrder || BLOCK_ORDER);
         const sorted = [
             ...order.filter(k => blocks[k] !== undefined),
-            ...Object.keys(blocks).filter(k => !order.includes(k)).sort()
+            ...stripBenchedPartyTag(Object.keys(blocks).filter(k => !order.includes(k))).sort()
         ];
 
         const collapsed = loadCollapsed();
@@ -2062,6 +2105,13 @@ function formatValueToCurrency(totalCp, detectedCurrency) {
         if (renderOptions.textColor && renderOptions.textColor !== 'inherit') catStyles.push(`--rt-cat-text-color: ${renderOptions.textColor}`);
         const catStyleAttr = catStyles.length ? ` style='${catStyles.join('; ')}'` : '';
 
+        // [BENCHED PARTY] is never its own section — it's folded into PARTY's card as a
+        // compact camp-roster sub-panel (see stripBenchedPartyTag / renderBenchedPartyPanel).
+        let benchedPanelHtml = '';
+        if (tag === 'PARTY' && getSettings().modules?.['benched party'] !== false && blocks['BENCHED PARTY'] !== undefined) {
+            benchedPanelHtml = renderBenchedPartyPanel(blocks['BENCHED PARTY'], collapsed.has('BENCHED PARTY'), loadBenchedExpanded());
+        }
+
         return `<div class="rt-section-card${isCollapsed ? ' rt-collapsed' : ''}" data-tag="${tag}">
             <div class="rt-section-header" data-tag="${tag}">
                 <span>${icon} ${displayName}</span>
@@ -2076,7 +2126,7 @@ function formatValueToCurrency(totalCp, detectedCurrency) {
                     <span class="rt-collapse-icon">${isCollapsed ? '&#9656;' : '&#9662;'}</span>
                 </div>
             </div>
-            <div class="${bodyClass}"${catStyleAttr}>${pageItems.join('')}${pagination}</div>
+            <div class="${bodyClass}"${catStyleAttr}>${pageItems.join('')}${pagination}${benchedPanelHtml}</div>
         </div>`;
     }
 
@@ -2148,6 +2198,94 @@ function renderPartyVitalsStrip(blocks) {
     return `<div class="rt-vitals-strip" id="rt-party-vitals-strip">${items}</div>`;
 }
 
+const BENCHED_EXPANDED_KEY = 'rpg_tracker_benched_expanded';
+
+/** Returns the set of benched member names currently expanded to their full stat card. */
+export function loadBenchedExpanded() {
+    try { return new Set(JSON.parse(localStorage.getItem(BENCHED_EXPANDED_KEY) || '[]')); }
+    catch { return new Set(); }
+}
+export function saveBenchedExpanded(set) {
+    localStorage.setItem(BENCHED_EXPANDED_KEY, JSON.stringify([...set]));
+}
+
+/**
+ * Lightweight per-member scan for [BENCHED PARTY] content — extracts just the name and
+ * Status line (the benching reason/timestamp), for the compact camp-roster chips. Mirrors
+ * extractPartyVitals's "simple scan, not the full entity-card parser" approach; the full
+ * stat card is only built on demand (via blockToItems) when a chip is expanded.
+ * @param {string} content  raw BENCHED PARTY block content
+ * @returns {{name: string, status: string}[]}
+ */
+function extractBenchedRoster(content) {
+    if (!content) return [];
+    const lines = content.split('\n').map(l => l.trim()).filter(Boolean);
+    const results = [];
+    let current = null;
+    for (const rawLine of lines) {
+        const line = rawLine.replace(/^\s*[-*+•–—](?:\s+|(?=[A-Za-z]))/, '');
+        const hpMatch = line.match(/^(.+?):\s*[\d,]+(?:\/[\d,]+)?\s*HP/i);
+        if (hpMatch) {
+            if (current) results.push(current);
+            current = { name: hpMatch[1].trim(), status: '' };
+            continue;
+        }
+        if (!current) {
+            const nameOnly = line.replace(/:\s*$/, '').trim();
+            if (nameOnly) current = { name: nameOnly, status: '' };
+            continue;
+        }
+        if (/^status:/i.test(line)) {
+            current.status = line.replace(/^status:\s*/i, '').trim();
+        }
+    }
+    if (current) results.push(current);
+    return results;
+}
+
+/**
+ * Renders the "camp" sub-panel folded into PARTY's card for benched members — a compact,
+ * portrait-based roster of chips (name + reason on hover) that expand inline into the full
+ * stat card on click. Deliberately never its own section/tab (see stripBenchedPartyTag).
+ * @param {string} benchedContent  raw BENCHED PARTY block content
+ * @param {boolean} isPanelCollapsed
+ * @param {Set<string>} expandedNames  names currently expanded to their full stat card
+ * @returns {string}
+ */
+function renderBenchedPartyPanel(benchedContent, isPanelCollapsed, expandedNames) {
+    const roster = extractBenchedRoster(benchedContent);
+    if (!roster.length) return '';
+
+    const fullCardByName = {};
+    if (expandedNames.size > 0) {
+        blockToItems('BENCHED PARTY', benchedContent).forEach(html => {
+            const m = html.match(/class="rt-entity-name"[^>]*>([^<]+)</);
+            if (m) fullCardByName[m[1].trim()] = html;
+        });
+    }
+
+    const chips = roster.map(({ name, status }) => {
+        const isOpen = expandedNames.has(name);
+        const tooltip = status ? `${name}: ${status}` : name;
+        const chipHtml = `<button class="rt-benched-chip${isOpen ? ' active' : ''}" data-benched-toggle="${escapeHtml(name)}" title="${escapeHtml(tooltip)}">
+            <span class="rt-benched-chip-portrait">${renderPortraitHtml(name)}</span>
+            <span class="rt-benched-chip-name">${escapeHtml(name.split(' ')[0])}</span>
+        </button>`;
+        const expandedHtml = isOpen
+            ? `<div class="rt-benched-expanded-card">${fullCardByName[name] || ''}</div>`
+            : '';
+        return chipHtml + expandedHtml;
+    }).join('');
+
+    return `<div class="rt-benched-panel${isPanelCollapsed ? ' rt-collapsed' : ''}">
+        <div class="rt-section-header rt-benched-panel-header" data-tag="BENCHED PARTY">
+            <span>🏕️ Benched <span class="rt-benched-count">${roster.length}</span></span>
+            <span class="rt-collapse-icon">${isPanelCollapsed ? '&#9656;' : '&#9662;'}</span>
+        </div>
+        <div class="rt-benched-chips">${chips}</div>
+    </div>`;
+}
+
 /**
  * Renders the full Tab Mode view: pinned CHARACTER/COMBAT cards, the party
  * vitals strip, the tab strip (pinned icons + overflow "More ▾" menu), and a
@@ -2160,16 +2298,16 @@ function renderPartyVitalsStrip(blocks) {
 export function renderTabModeView(memo, sectionPages, questsCtx = null) {
     if (!memo || !memo.trim()) return renderMemoAsCards(memo, null, sectionPages);
 
-    const blocks = parseMemoBlocks(memo);
+    const blocks = ensurePartyShellForBenchedRoster(parseMemoBlocks(memo));
     if (Object.keys(blocks).length === 0) {
         return `<div class="rt-empty">No structured blocks found.<br><small>Switch to Raw view to inspect the memo.</small></div>`;
     }
 
     const s = getSettings();
-    const order = s.blockOrder || BLOCK_ORDER;
+    const order = stripBenchedPartyTag(s.blockOrder || BLOCK_ORDER);
     const sorted = [
         ...order.filter(k => blocks[k] !== undefined),
-        ...Object.keys(blocks).filter(k => !order.includes(k)).sort()
+        ...stripBenchedPartyTag(Object.keys(blocks).filter(k => !order.includes(k))).sort()
     ];
 
     const collapsed = loadCollapsed();
@@ -2207,7 +2345,13 @@ export function renderTabModeView(memo, sectionPages, questsCtx = null) {
         if (blocks[tag] === undefined) return '';
         const items = blockToItems(tag, blocks[tag]);
         const count = Array.isArray(items) ? items.length : 0;
-        return count > 0 ? `<span class="rt-tab-badge">${count}</span>` : '';
+        let badges = count > 0 ? `<span class="rt-tab-badge">${count}</span>` : '';
+        // PARTY's tab carries a secondary badge for its folded-in benched sub-panel count.
+        if (tag === 'PARTY' && blocks['BENCHED PARTY'] !== undefined) {
+            const benchedCount = extractBenchedRoster(blocks['BENCHED PARTY']).length;
+            if (benchedCount > 0) badges += `<span class="rt-tab-badge rt-tab-badge-secondary" title="Benched">🏕️${benchedCount}</span>`;
+        }
+        return badges;
     };
 
     const pinnedTabTags = tabTags.slice(0, TABMODE_PIN_LIMIT);

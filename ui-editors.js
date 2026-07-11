@@ -1000,7 +1000,7 @@ export function syncSettingsAndUI(updateFn) {
     const showArchiveCb = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_quests_show_archive'));
     if (showArchiveCb) showArchiveCb.checked = fresh.syspromptModules?.questsShowArchive !== false;
 
-    const mods = { 'loot': '#rpg_sysprompt_mod_loot', 'random_events': '#rpg_sysprompt_mod_random_events', 'resting': '#rpg_sysprompt_mod_resting' };
+    const mods = { 'loot': '#rpg_sysprompt_mod_loot', 'random_events': '#rpg_sysprompt_mod_random_events', 'resting': '#rpg_sysprompt_mod_resting', 'party_bench': '#rpg_sysprompt_mod_party_bench' };
     for (const [key, id] of Object.entries(mods)) {
         const cb = /** @type {HTMLInputElement|null} */ (document.getElementById(id.replace('#', '')));
         if (cb) cb.checked = !!fresh.syspromptModules?.[key];
@@ -1105,6 +1105,12 @@ export function refreshOrderList() {
         cb.onchange = () => {
             if (isStock) {
                 s.modules[tag.toLowerCase()] = cb.checked;
+                // Benched Party is a sub-module of PARTY — the two toggles stay coupled.
+                if (tag === 'PARTY' && !cb.checked && (s.modules['benched party'] ?? true)) {
+                    s.modules['benched party'] = false;
+                    if (!s.syspromptModules) s.syspromptModules = {};
+                    s.syspromptModules.party_bench = false;
+                }
             } else {
                 field.enabled = cb.checked;
             }
@@ -1249,7 +1255,111 @@ export function refreshOrderList() {
         btnGroup.appendChild(downBtn);
         item.appendChild(btnGroup);
         list.appendChild(item);
+
+        // [BENCHED PARTY] is a sub-module of PARTY — it gets its own enable toggle +
+        // editable prompt, but is rendered nested directly under PARTY's row (indented,
+        // muted, no up/down/reorder controls) rather than as a normal flat peer entry,
+        // since it's never independently positioned or rendered as its own module.
+        if (tag === 'PARTY') {
+            list.appendChild(buildBenchedPartySubRow(s));
+        }
     });
+}
+
+/** Builds the nested "🏕️ Benched Party" sub-row shown directly under PARTY in the module list. */
+function buildBenchedPartySubRow(s) {
+    const modKey = 'benched party';
+    if (!s.modules) s.modules = {};
+    const isEnabled = s.modules[modKey] ?? true;
+
+    const item = document.createElement('div');
+    item.className = 'flex-container gap-1 alignitemscenter rt-order-item rt-order-subitem';
+    item.style.padding = '4px 5px';
+    item.style.marginLeft = '18px';
+    item.style.background = isEnabled ? 'var(--black30a)' : 'transparent';
+    item.style.opacity = isEnabled ? '0.9' : '0.55';
+    item.style.borderRadius = '4px';
+    item.style.border = '1px dashed var(--smartThemeBorderColor)';
+
+    const connector = document.createElement('span');
+    connector.textContent = '\u2514\u2500';
+    connector.style.opacity = '0.5';
+    connector.style.fontSize = '11px';
+    connector.style.marginRight = '2px';
+
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = isEnabled;
+    cb.style.margin = '0 5px';
+    cb.title = 'Sub-module of PARTY — Tracker emits [BENCH]/[UNBENCH] commands; code moves full stat sheets to the camp roster.';
+    cb.onchange = () => {
+        s.modules[modKey] = cb.checked;
+        if (cb.checked) {
+            s.modules.party = true;
+        }
+        if (!s.syspromptModules) s.syspromptModules = {};
+        s.syspromptModules.party_bench = cb.checked;
+        const quickAccessCb = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_sysprompt_mod_party_bench'));
+        if (quickAccessCb) quickAccessCb.checked = cb.checked;
+        const onboardingCb = /** @type {HTMLInputElement|null} */ (document.getElementById('rt_onboarding_mod_party_bench'));
+        if (onboardingCb) onboardingCb.checked = cb.checked;
+        saveSettings();
+        refreshOrderList();
+        refreshRenderedView();
+    };
+
+    const label = document.createElement('span');
+    label.style.flex = '1';
+    label.style.fontSize = '11px';
+    label.style.cursor = 'default';
+    label.textContent = `${BLOCK_ICONS['BENCHED PARTY'] || '🏕️'} BENCHED PARTY`;
+    label.title = 'Sub-module of PARTY — renders as a compact camp roster folded into the PARTY card, not its own tab.';
+
+    const editBtn = document.createElement('button');
+    editBtn.className = 'menu_button interactable rt-order-btn';
+    editBtn.style.padding = '2px 6px';
+    editBtn.title = 'Edit Prompt';
+    editBtn.innerHTML = '<i class="fa-solid fa-pen-to-square"></i>';
+    editBtn.onclick = () => {
+        if (!s.stockPrompts) s.stockPrompts = { ...DEFAULT_STOCK_PROMPTS };
+        openPromptEditor(
+            'BENCHED PARTY',
+            'Edit Default [BENCHED PARTY] Prompt',
+            s.stockPrompts[modKey] || DEFAULT_STOCK_PROMPTS[modKey],
+            DEFAULT_STOCK_PROMPTS[modKey],
+            (newVal) => {
+                s.stockPrompts[modKey] = newVal;
+                saveSettings();
+                toastr['success'](`[BENCHED PARTY] prompt updated.`, 'RPG Tracker');
+            },
+            modKey
+        );
+    };
+
+    const resetBtn = document.createElement('button');
+    resetBtn.className = 'menu_button interactable rt-order-btn';
+    resetBtn.style.padding = '2px 6px';
+    resetBtn.title = 'Reset Prompt to Default';
+    resetBtn.innerHTML = '<i class="fa-solid fa-rotate-left"></i>';
+    resetBtn.onclick = () => {
+        if (confirm('Reset [BENCHED PARTY] prompt to default? This will lose any custom changes.')) {
+            if (!s.stockPrompts) s.stockPrompts = { ...DEFAULT_STOCK_PROMPTS };
+            s.stockPrompts[modKey] = DEFAULT_STOCK_PROMPTS[modKey];
+            saveSettings();
+            toastr['success']('[BENCHED PARTY] prompt reset.', 'RPG Tracker');
+        }
+    };
+
+    const btnGroup = document.createElement('div');
+    btnGroup.className = 'flex-container gap-1';
+    btnGroup.appendChild(editBtn);
+    btnGroup.appendChild(resetBtn);
+
+    item.appendChild(connector);
+    item.appendChild(cb);
+    item.appendChild(label);
+    item.appendChild(btnGroup);
+    return item;
 }
 
 export function openNpcSectionEditor() {

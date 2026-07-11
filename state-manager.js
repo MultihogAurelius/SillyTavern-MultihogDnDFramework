@@ -17,7 +17,8 @@ export const DEFAULT_NPC_SECTIONS = [
     { id: 'sec_background', name: 'Brief Background', description: 'Standing role, origin, history — not their part in the current plot.', icon: '📜', color: '#3b82f6' },
     { id: 'sec_habits', name: 'Habits/Behaviors', description: 'Recurring mannerisms and patterns — not one scene\'s behavior.', icon: '🔄', color: '#10b981' },
     { id: 'sec_strengths', name: 'Strengths', description: '[Concise bullet phrases formatted in bullet points of their most notable strengths, skills, or virtues. Sharp and specific — no vague generalities. A kind character may have more strengths than flaws.]', icon: '⚡', color: '#22c55e' },
-    { id: 'sec_flaws', name: 'Flaws', description: '[Concise bullet phrases formatted in bullet points of their most notable weaknesses, bad habits, or moral failings. Be honest and specific. A troubled character may have more flaws than strengths.]\n(Note: The split between strengths and flaws does not need to be even. It is perfectly fine to have an uneven split—like having more strengths than flaws, or more flaws than strengths—so long as it authentically reflects the character. However, it can be evenly split if it makes sense.)', icon: '⚠️', color: '#ef4444' }
+    { id: 'sec_flaws', name: 'Flaws', description: '[Concise bullet phrases formatted in bullet points of their most notable weaknesses, bad habits, or moral failings. Be honest and specific. A troubled character may have more flaws than strengths.]\n(Note: The split between strengths and flaws does not need to be even. It is perfectly fine to have an uneven split—like having more strengths than flaws, or more flaws than strengths—so long as it authentically reflects the character. However, it can be evenly split if it makes sense.)', icon: '⚠️', color: '#ef4444' },
+    { id: 'sec_combat_profile', name: 'Combat Profile', description: '[HIDDEN UNTIL SET — only written when a [COMBAT] block for this NPC is visible in the narrative. Copy the full stat block verbatim: HP, AC, saves, weapons, abilities, and any other declared stats. Never fabricate or summarize.]', icon: '🤺', color: '#38bdf8', hiddenUntilSet: true }
 ];
 
 export const DEFAULT_PC_SECTIONS = [
@@ -360,7 +361,7 @@ export function buildNpcInstruction(majorWords = 25, minorWords = 15, ignoreLimi
     const sectionsList = coreSections.map(s => s.name).join(', ');
     const sectionsTemplate = coreSections.map(s => `${s.name}: ${s.description}`).join('\n');
 
-    let instruction = `Significant named characters the party interacts with (do NOT record every random enemy or nameless bartender, only characters who are somehow significant).
+    let instruction = `Significant named characters the party interacts with (do NOT record every random enemy or nameless bartender, only characters who are somehow significant). A creature's class/tier label (e.g. "Skeleton," "Bandit," "Guard Captain") is not itself a name, and having [COMBAT] stats or being the party's current opponent is not, by itself, evidence of significance — that comes from being treated as a recurring individual with motive, backstory, or a stake the story cares about.
 Do NOT create an NPC entry for the player character (controlled by the user) under any circumstances.
 In the chat history, the player character is the speaker labeled "Player" (and prompt replacement "{{user}}"). Analyze the dialogue to identify what in-character roleplay name(s) or alias(es) other characters use when addressing or referring to the "Player" (for example, if they call the Player "Dave Davidson" or "Dave", then "Dave Davidson" is the player character).
 Under no circumstances should you create an NPC entry for the player character, regardless of whether they are referred to as "Player", "{{user}}", or by their actual in-character name/alias (like "Dave Davidson").
@@ -404,9 +405,20 @@ Expand/extrapolate thematically if you can't otherwise meet the specified length
 </CORE_LENGTH TARGETS>`;
     }
 
+
     instruction += `\n\n<COMBAT_GRANULARITY>
 Do NOT record per-round combat updates (e.g., creature HP changes, turn-by-turn action lists, temporary conditions mid-fight). For long combats, limit updates to the initiation of combat (e.g., when they became hostile and attacked {{user}}), a high-level progress update every ~5 rounds (to capture major shifts or stalemates), and the final resolved outcome once it concludes.
-</COMBAT_GRANULARITY>`;
+</COMBAT_GRANULARITY>
+
+<COMBAT_PROFILE_PERSISTENCE>
+TRIGGER — Combat Profile is a HIDDEN field. Write it ONLY when a \`## ACTIVE COMBAT STATE\` section is present in your context and contains a \`[COMBAT]\` block for this specific NPC. Do NOT write it from GM prose, combat narration, or anything other than that dedicated section. If no \`## ACTIVE COMBAT STATE\` section exists, leave Combat Profile absent entirely.
+
+CONTENT — When a [COMBAT] block IS present, transcribe it completely and verbatim into \`Combat Profile:\` inside [CORE]. Include every declared stat: HP, AC, attack bonus, damage, saves, weapons, abilities, special traits — everything the [COMBAT] block lists. Do NOT condense, summarize, or hand-pick a subset. The goal is a faithful copy, not an interpretation.
+
+UPDATE — If a Combat Profile already exists in [CORE] and a new [COMBAT] block for the same NPC appears with updated stats, patch the Combat Profile line in place with the new values. Do not touch any other [CORE] field. For an EXISTING lorebook NPC, use [[UPDATE_CORE: NPC Name | Combat Profile | ...]] (basic mode) or commit core (agent mode) — do NOT re-emit a full [[NPC:...]] record or embed a new [CORE] block in a chronicle update.
+
+PLACEMENT — Combat Profile is IDENTITY data, not a chronicle event. It belongs as its own labeled line inside [CORE] (e.g. immediately before the closing [/CORE] tag) — never as a timestamped delta line, and never appended after [/CORE].
+</COMBAT_PROFILE_PERSISTENCE>`;
     return instruction;
 }
 
@@ -622,6 +634,7 @@ You may be asked to use Markers: ((PLS)), ((B)), ((XB)), ((BDG)), ((HGT)). These
         modules: {
             character: true,
             party: true,
+            'benched party': true,
             combat: true,
             inventory: true,
             abilities: true,
@@ -696,6 +709,7 @@ You may be asked to use Markers: ((PLS)), ((B)), ((XB)), ((BDG)), ((HGT)). These
             loot: true,
             random_events: true,
             resting: true,
+            party_bench: true,
             quests: true,
             questsDeadlines: false,
             questsFrustration: false,
@@ -787,7 +801,7 @@ The report covers the in-world period: **{periodLabel}**
 1. Do NOT summarize player actions. Build consequences from them instead — defeated rivals plot revenge, sympathetic contacts cover their tracks, encountered strangers react to what happened.
 2. QUESTS and EVENTS are historical records for context only — they are NOT simulatable entities. Never generate entries that describe a quest advancing, stalling, succeeding, or failing. If a quest appears in the designated entities block, ignore it entirely.
 3. Prioritize named ACTIVE WORLD LORE NPCs. Every report must include at least 2. These are your highest-value subjects. However, if the ## DESIGNATED ENTITIES FOR THIS PERIOD block is present, you MUST strictly follow it and only change the status, advance the timeline, or create new narrative beats for these designated entities. You are strictly forbidden from changing the status, advancing the timeline, or creating new narrative beats for unauthorized entities. However, you MAY mention them passively as background context if their past, established actions are a direct catalyst for the designated entities.
-4. For NPCs who were physically present with {{user}} during the reporting period, only generate plausible background activity — digital actions, private decisions, private thoughts/opinions, off-screen communications. Do not relocate them.
+4. Tracked party members currently in [PARTY] are never eligible for this report — they are with {{user}} right now and are handled upstream, not by this rule. For any OTHER NPC who was physically present with {{user}} during the reporting period, only generate plausible background activity — digital actions, private decisions, private thoughts/opinions, off-screen communications. Do not relocate them.
 5. Format as 15 bullet-pointed entries (using "- "), with a blank line (newline) between each world event. Dense, no filler, no markdown. Each entry must be exactly 1 sentence. Do NOT prefix the lines with the period or time label.
 6. Output ONLY the report content. No preamble, no tags, no meta-commentary.
 7. Do not simply repeat the same entities and always build on the previous report; take interesting entities from the ACTIVE WORLD LORE as well as the SKELETON regardless of whether they were featured in the previous report(s). If designated entities are provided, strictly limit your active scope to those, obeying the passive referencing rule for other entities.
@@ -800,7 +814,9 @@ The report covers the in-world period: **{periodLabel}**
         worldProgressionSkeletonAtmosphereLookback: 30, // messages lookback count for atmosphere generation
         worldProgressionSkeletonUseExisting: true, // toggle to feed existing entries context when appending
         worldProgressionExclusionList: '',         // comma-separated list of lore entry titles or keys to exclude from focus randomization
-        worldProgressionAutoExcludeParty: false,   // automatically exclude active party members from focus randomization
+        // NOTE: active [PARTY] members are always, unconditionally excluded from World
+        // Progression (see router.js) — no setting needed. [BENCHED PARTY] members are
+        // eligible for simulation, also unconditionally.
 
         worldProgressionSkeletonSystemPrompt: `You are a World Architect. Given a world theme/seed, generate a sparse foundational skeleton for an RPG campaign simulation.
 
@@ -886,6 +902,8 @@ When you log a quest, describe the location and the quest giver in a single para
 When an entity (location, NPC, etc.) changes in a meaningful way, update the associated lorebook entry.
 
 Entries are append-only chronicles. Provide ONLY the new information as a timestamped delta (e.g. "[Day 3, 14:00] The forge was destroyed."). Do NOT rewrite or re-summarize the full entry. Do NOT copy, paraphrase, or reconstruct content already present in the existing entry. Only the net-new development belongs in your delta.
+
+EXCEPTION — NPC combat profiles: an NPC's combat stats are NOT a chronicle event and must never be written as a timestamped delta line. Per the COMBAT_PROFILE_PERSISTENCE rule for NPCs, they belong inside [CORE] as a patched identity field, edited in place.
 
 IMPORTANT: Always use the exact macro string \`{{user}}\` when referring to the player. Do NOT write the plain word "user" or "player" in your entry updates.
 
@@ -1833,7 +1851,6 @@ export function saveChatState(chatId) {
         worldProgressionConsolidateEnabled: s.worldProgressionConsolidateEnabled ?? false,
         worldProgressionConsolidateInterval: s.worldProgressionConsolidateInterval ?? 7,
         worldProgressionExclusionList: s.worldProgressionExclusionList || '',
-        worldProgressionAutoExcludeParty: s.worldProgressionAutoExcludeParty ?? false,
 
         portraitGeneratorSource: s.portraitGeneratorSource ?? "native",
         portraitSkipPromptDialog: s.portraitSkipPromptDialog ?? false,
@@ -1984,7 +2001,6 @@ export function saveProfile(name) {
         worldProgressionSkeletonAtmosphereLookback: s.worldProgressionSkeletonAtmosphereLookback ?? 30,
         worldProgressionSkeletonUseExisting: s.worldProgressionSkeletonUseExisting ?? true,
         worldProgressionExclusionList: s.worldProgressionExclusionList || '',
-        worldProgressionAutoExcludeParty: s.worldProgressionAutoExcludeParty ?? false,
 
         portraitGeneratorSource: s.portraitGeneratorSource ?? "native",
         portraitSkipPromptDialog: s.portraitSkipPromptDialog ?? false,

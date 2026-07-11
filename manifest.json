@@ -1,11 +1,11 @@
-{
-    "display_name": "Multihog D&D Framework",
-    "version": "4.9.3",
-    "author": "Disgusting Fatbody",
-    "js": "index.js",
-    "css": "style.css",
-    "loading_order": 20,
-    "generate_interceptor": "rpgTrackerInterceptor",
-    "homePage": "https://github.com/MultihogAurelius/SillyTavern-MultihogDnDFramework",
-    "auto_update": true
-}
+{
+    "display_name": "Multihog D&D Framework",
+    "version": "5.0.0",
+    "author": "Disgusting Fatbody",
+    "js": "index.js",
+    "css": "style.css",
+    "loading_order": 20,
+    "generate_interceptor": "rpgTrackerInterceptor",
+    "homePage": "https://github.com/MultihogAurelius/SillyTavern-MultihogDnDFramework",
+    "auto_update": true
+}
