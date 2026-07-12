@@ -1,5 +1,5 @@
 import { EXAMPLES, COLOR_EXAMPLES, DEFAULT_STOCK_PROMPTS, RT_PROMPTS, BLOCK_ICONS, BLOCK_ORDER, PAGE_SIZE, NO_PAGINATE, buildOnboardingXpHint, resolveTimePromptKey, resolveTimePromptDisplayTag } from './constants.js';
-import { MODULE_NAME, DEFAULT_MODULES, getSettings, getBarBackground, migrateCustomFields, saveChatState, saveProfile, deleteProfile, getEffectiveRouterCampaignPrefix, sanitizeCampaignPrefixString, buildNpcInstruction, loadStockPromptsFromProfile, getNpcRelationshipMax, getNpcRelationshipMaxDefault, clampRelationshipValue, relationshipBarPct, getFriendshipTier, getAffectionTier, getRelTierBadgeStyle, getRelTierDetailedStyle, getRelTierDetailedLabelStyle, applyRelTierBadgeElement, sanitizeRouterState, rebuildAllModuleInstructions, adjustAllStoredTemplatesForTimeFormat, DEFAULT_NPC_SECTIONS } from './state-manager.js';
+import { MODULE_NAME, DEFAULT_MODULES, getSettings, getBarBackground, migrateCustomFields, saveChatState, saveProfile, deleteProfile, getEffectiveRouterCampaignPrefix, sanitizeCampaignPrefixString, buildNpcInstruction, loadStockPromptsFromProfile, getNpcRelationshipMax, getNpcRelationshipMaxDefault, clampRelationshipValue, relationshipBarPct, getFriendshipTier, getAffectionTier, getRelTierBadgeStyle, getRelTierDetailedStyle, getRelTierDetailedLabelStyle, applyRelTierBadgeElement, sanitizeRouterState, rebuildAllModuleInstructions, adjustAllStoredTemplatesForTimeFormat, DEFAULT_NPC_SECTIONS, DEFAULT_PC_SECTIONS } from './state-manager.js';
 import { sendStateRequest, fetchOllamaModels, fetchOpenAIModels, testOpenAIConnection, getConnectionProfiles, getCurrentCompletionPreset, setCompletionPreset, syncCombatProfile, resetCombatProfileOverride } from './llm-client.js';
 import { getDiceToolName, getDiceCommandName, getDiceCommandAliases, doDiceRoll, registerDiceFunctionTool, registerDiceSlashCommand, installInterceptor, getNarrativeBlocks, onGenerationStarted, onGenerationEnded, ensureRelTagRegex, resetRouterTick, getRouterTick, resetRouterAutoTick, makeRngQueue, buildRngBlock, RNG_QUEUE_LEN, parseAndApplyNarrativeRelTags } from './narrative-hooks.js';
 import { deduplicateMemo, mergeMemo, computeDelta, escapeHtml, escapeRegex, highlightParens, cleanToolCallMessage, cleanMessageContent, getLastUserAction, buildLorebookContext, buildModulesInstructionText, buildModuleFormatInstruction, parseQuestsFromMemo, syncQuestsFromMemo, syncQuestsToMemo, writeQuestsToMemo, getQuestMood, extractCurrentTimeStr, stripArchivedQuestsFromMemo, stripCompletedQuestsFromMemo, applyQuestSyncAndStripMemo, isArchivedQuestStatus, removeArchivedQuest, parseInWorldTime, formatInWorldTime, sanitizeLorebookRecordContent, memoForTrackerContext, memoForGmContext } from './memo-processor.js';
@@ -5055,7 +5055,7 @@ function createPanel() {
             const escapeHtml = (unsafe) => (unsafe || '').replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
 
             // Helper: parse NPC/PC content into structured sections for the detail popup
-            const parseNpcSections = (content) => {
+            const parseNpcSections = (content, isPC = false) => {
                 const sections = { core: {}, dynamic: [] };
                 if (!content) return sections;
 
@@ -5073,7 +5073,7 @@ function createPanel() {
                 }
 
                 // 2. Parse core sections
-                const customSecs = getSettings().npcCoreSections || DEFAULT_NPC_SECTIONS;
+                const customSecs = isPC ? (getSettings().pcCoreSections || DEFAULT_PC_SECTIONS) : (getSettings().npcCoreSections || DEFAULT_NPC_SECTIONS);
                 const escRgx = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
                 const customNames = customSecs.map(s => escRgx(s.name.trim())).join('|');
                 const legacyNames = 'Appearance\\/Species|Appearance|Personality|Brief Background|Background|Habits(?:\\/|\\s*&\\s*|\\s+and\\s+)Behaviors|Habits|(?<!Habits\\/)(?<!Habits & )(?<!Habits and )Behaviors|Strengths|Flaws|Relationship with\\s*\\{\\{user\\}\\}|(?<!Friendship\\/)(?<!Affection\\/)Relationship';
@@ -5147,9 +5147,9 @@ function createPanel() {
                 'Strengths': '⚡', 'Flaws': '⚠️',
             };
 
-            const renderSectionsHtml = (rawContent) => {
-                const parsed = parseNpcSections(rawContent);
-                const customSecs = getSettings().npcCoreSections || DEFAULT_NPC_SECTIONS;
+            const renderSectionsHtml = (rawContent, isPC = false) => {
+                const parsed = parseNpcSections(rawContent, isPC);
+                const customSecs = isPC ? (getSettings().pcCoreSections || DEFAULT_PC_SECTIONS) : (getSettings().npcCoreSections || DEFAULT_NPC_SECTIONS);
                 let html = '';
                 const coreEntries = Object.entries(parsed.core);
                 if (coreEntries.length > 0) {
@@ -5261,7 +5261,7 @@ function createPanel() {
                         const popupDom = document.createElement('div');
                         popupDom.style.cssText = 'width:100%;box-sizing:border-box;padding:24px;text-align:left;font-family:var(--rt-font, system-ui, sans-serif);color:var(--SmartThemeBodyColor, inherit);max-height:85vh;overflow-y:auto;';
 
-                        const sectionsInitialHtml = renderSectionsHtml(pc.bio) || '<div style="font-size:14px;color:var(--SmartThemeBodyColor, inherit);opacity:0.5;font-style:italic;padding:16px 0;">No structured sections found.</div>';
+                        const sectionsInitialHtml = renderSectionsHtml(pc.bio, true) || '<div style="font-size:14px;color:var(--SmartThemeBodyColor, inherit);opacity:0.5;font-style:italic;padding:16px 0;">No structured sections found.</div>';
 
                         popupDom.innerHTML = `
                             <div style="display:flex;gap:24px;margin-bottom:20px;align-items:flex-start;flex-wrap:wrap;">
@@ -5345,7 +5345,7 @@ function createPanel() {
                         saveBtn.addEventListener('click', async () => {
                             pc.bio = textarea.value;
                             if (typeof saveChatState === 'function') saveChatState(_currentChatId);
-                            const newHtml = renderSectionsHtml(pc.bio) || `<div style="font-size:14px;color:var(--SmartThemeBodyColor, inherit);opacity:0.5;font-style:italic;padding:16px 0;">No structured sections found.</div>`;
+                            const newHtml = renderSectionsHtml(pc.bio, true) || `<div style="font-size:14px;color:var(--SmartThemeBodyColor, inherit);opacity:0.5;font-style:italic;padding:16px 0;">No structured sections found.</div>`;
                             sectionsDiv.innerHTML = newHtml;
                             showPane(viewPane);
                             if (typeof refreshAgentManifestNow === 'function') refreshAgentManifestNow();
@@ -5405,7 +5405,7 @@ function createPanel() {
                         aiApplyBtn.addEventListener('click', async () => {
                             pc.bio = aiPreviewText.value;
                             if (typeof saveChatState === 'function') saveChatState(_currentChatId);
-                            const newHtml = renderSectionsHtml(pc.bio) || `<div style="font-size:14px;color:var(--SmartThemeBodyColor, inherit);opacity:0.5;font-style:italic;padding:16px 0;">No structured sections found.</div>`;
+                            const newHtml = renderSectionsHtml(pc.bio, true) || `<div style="font-size:14px;color:var(--SmartThemeBodyColor, inherit);opacity:0.5;font-style:italic;padding:16px 0;">No structured sections found.</div>`;
                             sectionsDiv.innerHTML = newHtml;
                             showPane(viewPane);
                             if (typeof refreshAgentManifestNow === 'function') refreshAgentManifestNow();
