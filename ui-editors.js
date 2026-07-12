@@ -481,7 +481,7 @@ export function openCustomFieldEditor(index) {
                     </div>
                 </div>
                 <!-- Footer -->
-                <div class="popup-footer flex-container gap-1 justifycontentend" style="padding:8px 14px; border-top:1px solid rgba(255,255,255,0.08); flex-shrink:0;">
+                <div class="popup-footer flex-container gap-1" style="display: flex; justify-content: flex-end; padding:8px 14px; border-top:1px solid rgba(255,255,255,0.08); flex-shrink:0;">
                     <button id="rt_cfe_delete" class="menu_button interactable" style="color:#ff5555;font-size:12px;"><i class="fa-solid fa-trash"></i> Delete</button>
                     <button id="rt_cfe_export" class="menu_button interactable" style="font-size:12px;margin-right:auto;" title="Export this module as a shareable code"><i class="fa-solid fa-file-export"></i> Export</button>
                     <button id="rt_cfe_edit_ai" class="menu_button interactable" style="font-size:12px; background:rgba(180,100,255,0.15); border-color:rgba(180,100,255,0.4);" title="Describe changes and let AI revise this module"><i class="fa-solid fa-wand-magic-sparkles"></i> Edit with AI</button>
@@ -702,7 +702,7 @@ export function openPromptEditor(blockTag, title, currentText, defaultText, onSa
                             </div>
                         </div>
                         <textarea id="rt_pe_text" class="text_pole" rows="10" style="width: 100%; resize: vertical;"></textarea>
-                        <div class="flex-container gap-1 justifycontentend">
+                        <div class="flex-container gap-1" style="display: flex; justify-content: flex-end;">
                             <button id="rt_pe_edit_ai" class="menu_button interactable" style="background:rgba(180,100,255,0.15); border-color:rgba(180,100,255,0.4);"><i class="fa-solid fa-wand-magic-sparkles"></i> Edit with AI</button>
                             <button id="rt_pe_reset" class="menu_button interactable" style="margin-right: auto;"><i class="fa-solid fa-arrow-rotate-left"></i> Reset</button>
                             <button id="rt_pe_cancel" class="menu_button interactable">Cancel</button>
@@ -1475,7 +1475,7 @@ function openSectionEditor(targetType) {
                         <i class="fa-solid fa-plus"></i> Add Custom Section
                     </button>
                 </div>
-                <div class="popup-footer flex-container gap-1 justifycontentend" style="padding:10px 14px; border-top:1px solid rgba(255,255,255,0.08); flex-shrink:0;">
+                <div class="popup-footer flex-container gap-1" style="display: flex; justify-content: flex-end; padding:10px 14px; border-top:1px solid rgba(255,255,255,0.08); flex-shrink:0;">
                     <button id="rt_sec_se_cancel" class="menu_button interactable" style="font-size:12px;">Cancel</button>
                     <button id="rt_sec_se_save" class="menu_button interactable" style="font-size:12px; background:rgba(180,100,255,0.15); border-color:rgba(180,100,255,0.4);">Save &amp; Rebuild</button>
                 </div>
