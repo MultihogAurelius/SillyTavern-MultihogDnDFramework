@@ -3,7 +3,7 @@ import { MODULE_NAME, DEFAULT_MODULES, getSettings, getBarBackground, migrateCus
 import { sendStateRequest, fetchOllamaModels, fetchOpenAIModels, testOpenAIConnection, getConnectionProfiles, getCurrentCompletionPreset, setCompletionPreset, syncCombatProfile, resetCombatProfileOverride } from './llm-client.js';
 import { getDiceToolName, getDiceCommandName, getDiceCommandAliases, doDiceRoll, registerDiceFunctionTool, registerDiceSlashCommand, installInterceptor, getNarrativeBlocks, onGenerationStarted, onGenerationEnded, ensureRelTagRegex, resetRouterTick, getRouterTick, resetRouterAutoTick, makeRngQueue, buildRngBlock, RNG_QUEUE_LEN, parseAndApplyNarrativeRelTags } from './narrative-hooks.js';
 import { deduplicateMemo, mergeMemo, computeDelta, escapeHtml, escapeRegex, highlightParens, cleanToolCallMessage, cleanMessageContent, getLastUserAction, buildLorebookContext, buildModulesInstructionText, buildModuleFormatInstruction, parseQuestsFromMemo, syncQuestsFromMemo, syncQuestsToMemo, writeQuestsToMemo, getQuestMood, extractCurrentTimeStr, stripArchivedQuestsFromMemo, stripCompletedQuestsFromMemo, applyQuestSyncAndStripMemo, isArchivedQuestStatus, removeArchivedQuest, parseInWorldTime, formatInWorldTime, sanitizeLorebookRecordContent, memoForTrackerContext, memoForGmContext } from './memo-processor.js';
-import { renderSubFieldByRule, tryRenderMarker, renderCustomBlockLine, stripMemoHtml, escapeHtmlWithColor, parseMemoBlocks, getPageSize, loadCollapsed, saveCollapsed, loadDetached, saveDetached, blockToItems, renderMemoAsCards, renderTabModeView, renderQuestLog, renderLorebookTerminal, loadActiveTab, saveActiveTab, getTimeOfDayInfo, MARKER_TYPE_MAP, getMarkerLibraryKeys, loadBenchedExpanded, saveBenchedExpanded } from './renderer.js';
+import { renderSubFieldByRule, tryRenderMarker, renderCustomBlockLine, stripMemoHtml, escapeHtmlWithColor, parseMemoBlocks, getPageSize, loadCollapsed, saveCollapsed, loadDetached, saveDetached, blockToItems, renderMemoAsCards, renderTabModeView, renderQuestLog, renderLorebookTerminal, loadActiveTab, saveActiveTab, getTimeOfDayInfo, renderDayNightBadge, MARKER_TYPE_MAP, getMarkerLibraryKeys, loadBenchedExpanded, saveBenchedExpanded } from './renderer.js';
 import { unregisterLogQuestTool, checkQuestDeadlines, renderQuestsAsPlainText } from './quests.js';
 import { initializeDebugViewer, toggleDebugViewer } from './debug-viewer.js';
 import { runRouterPass, rollbackRouterPass, reapplyRouterPass, getLorebookManifest, deleteLorebookEntry, updateLorebookEntry, disableManagedEntries, isRouterRunning, stopRouterPass } from './router.js';
@@ -3630,6 +3630,7 @@ function createPanel() {
                     <span class="rt-header-title-desktop">Multihog D&D Framework</span>
                     <span class="rt-header-title-mobile" style="display: none;">Multihog D&D</span>
                     <div class="rpg-tracker-status-indicator active" id="rpg-tracker-status"></div>
+                    <div id="rt-daynight-badge-slot"></div>
                     <button class="rpg-tracker-stop-btn" id="rpg-tracker-stop-btn" title="Stop Generation" style="display:none;">■</button>
                     <button class="rpg-tracker-icon-btn" id="rpg-tracker-chat-link-btn" style="font-size:13px;" title="Chat Link ON">🔗</button>
                     <button class="rpg-tracker-icon-btn" id="rpg-tracker-agent-btn" title="Lorebook Agent">🤖</button>
@@ -8830,6 +8831,7 @@ Rules:
                 settings.currentMemo = applyQuestSyncAndStripMemo(settings.currentMemo);
                 saveSettings(true);
                 if (settings.chatLinkEnabled && _currentChatId) saveChatState(_currentChatId);
+                refreshDayNightCycleFromMemo(settings.currentMemo);
             }
         }
     };
@@ -8841,6 +8843,9 @@ Rules:
 
         // Update token counter immediately in-place
         panel.querySelector('#rpg-tracker-count').textContent = `~${Math.round(newText.length / 2.62)} tokens`;
+
+        // Day/night tint + badge update live as the user edits (esp. [TIME] changes in Raw view)
+        refreshDayNightCycleFromMemo(newText);
 
         // Debounce actual sync, save, and rendered view updates by 2000ms
         clearTimeout(_rawEditDebounce);
@@ -8889,6 +8894,9 @@ Rules:
             viewBtnEl.textContent = '⊞';
             viewBtnEl.title = 'Switch to Rendered view';
         }
+        // Always re-apply day/night from the current textarea (covers Raw→Rendered toggles
+        // and ensures the tint matches any manual edits flushed just before the switch).
+        refreshDayNightCycleFromMemo(taEl.value || settings.currentMemo || '');
         if (typeof updateAgentBtnUI === 'function') {
             updateAgentBtnUI();
         }
@@ -9239,6 +9247,48 @@ function navigateSnapshot(direction) {
     syncMemoView();
 }
 
+/** CSS class suffixes for each day/night phase (paired with rt-phase-* on panels). */
+const DAYNIGHT_PHASE_CLASSES = [
+    'rt-phase-lateNight', 'rt-phase-dawn', 'rt-phase-morning', 'rt-phase-midday',
+    'rt-phase-afternoon', 'rt-phase-sunset', 'rt-phase-night',
+];
+
+/**
+ * Applies day/night cycle styling to all tracker panels: phase CSS vars + header badge.
+ * @param {object} settings
+ * @param {string} memoText
+ */
+function applyDayNightCycleUI(settings, memoText) {
+    let phase = '';
+    if (settings.dayNightCycleEnabled) {
+        const timeMatch = (memoText || '').match(/\[TIME\]([\s\S]*?)\[\/TIME\]/i);
+        const currentTimeStr = timeMatch ? extractCurrentTimeStr(timeMatch[1]) : '';
+        phase = currentTimeStr ? getTimeOfDayInfo(currentTimeStr).phase : '';
+    }
+
+    for (const panel of document.querySelectorAll('.rpg-tracker-panel')) {
+        panel.classList.toggle('rt-daynight-active', !!phase);
+        for (const cls of DAYNIGHT_PHASE_CLASSES) panel.classList.remove(cls);
+        if (phase) panel.classList.add(`rt-phase-${phase}`);
+    }
+
+    const daynightSlot = document.getElementById('rt-daynight-badge-slot');
+    if (daynightSlot) {
+        if (phase) {
+            const timeMatch = (memoText || '').match(/\[TIME\]([\s\S]*?)\[\/TIME\]/i);
+            const currentTimeStr = timeMatch ? extractCurrentTimeStr(timeMatch[1]) : '';
+            daynightSlot.innerHTML = currentTimeStr ? renderDayNightBadge(currentTimeStr) : '';
+        } else {
+            daynightSlot.innerHTML = '';
+        }
+    }
+}
+
+/** Re-reads [TIME] from memo text and applies day/night panel tint + header badge. */
+function refreshDayNightCycleFromMemo(memoText) {
+    applyDayNightCycleUI(getSettings(), memoText || '');
+}
+
 export function syncMemoView() {
     const s = getSettings();
     const textarea = /** @type {HTMLTextAreaElement|null} */ (document.getElementById('rpg-tracker-memo'));
@@ -9313,6 +9363,9 @@ export function syncMemoView() {
         }
         void syncCombatProfile(s.currentMemo, s);
     }
+
+    // Day/Night Cycle — tint all tracker panels + header sky badge from [TIME].
+    refreshDayNightCycleFromMemo(textarea.value || '');
 
     refreshRenderedView();
 }
@@ -9959,6 +10012,13 @@ function tryBindConnectionProfileDropdown(selector, initialProfileId, onProfileI
         $('#rpg_tracker_debug').prop('checked', settings.debugMode).on('change', function () {
             settings.debugMode = !!$(this).prop('checked');
             saveSettings();
+        });
+        $('#rpg_tracker_daynight_cycle').prop('checked', !!settings.dayNightCycleEnabled).on('change', function () {
+            settings.dayNightCycleEnabled = !!$(this).prop('checked');
+            saveSettings();
+            const ta = document.getElementById('rpg-tracker-memo');
+            refreshDayNightCycleFromMemo(ta ? ta.value : settings.currentMemo || '');
+            refreshRenderedView();
         });
         $('#rpg_tracker_auto_reset_prompts').prop('checked', !!settings.autoResetPromptsOnUpdate).on('change', function () {
             settings.autoResetPromptsOnUpdate = !!$(this).prop('checked');
@@ -13127,6 +13187,7 @@ RULES:
             // General toggles
             $('#rpg_tracker_enabled').prop('checked', !!s.enabled);
             $('#rpg_tracker_debug').prop('checked', !!s.debugMode);
+            $('#rpg_tracker_daynight_cycle').prop('checked', !!s.dayNightCycleEnabled);
             $('#rpg_tracker_auto_reset_prompts').prop('checked', !!s.autoResetPromptsOnUpdate);
             $('#rpg_tracker_enable_portraits').prop('checked', s.enablePortraits !== false);
             $('#rpg_portrait_generator_source').val(s.portraitGeneratorSource || 'native');

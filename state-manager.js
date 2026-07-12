@@ -528,6 +528,7 @@ function buildDefaultSettings() {
         agentConsoleOpen: true,
         agentModulesOpen: true,
         agentWorldOpen: false,
+        dayNightCycleEnabled: false,
         debugMode: false,
         connectionSource: "default",
         connectionProfileId: "",

@@ -4189,3 +4189,251 @@ textarea.rt-cr-input {
     animation: rt-battery-flash 1s infinite;
 }
 
+/* ── Day/Night Cycle Sky Badge ──────────────────────────────────────────────
+   Pure-CSS sun/moon + starfield badge reflecting in-world time of day, shown
+   in the panel header when the feature is enabled. No image assets — the
+   celestial body is a radial-gradient disc with a box-shadow glow, and the
+   starfield is a handful of fixed dots layered behind it via box-shadow. */
+.rt-daynight-badge {
+    position: relative;
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.rt-sky-disc {
+    position: relative;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    z-index: 1;
+    transition: background 1.2s ease, box-shadow 1.2s ease;
+}
+
+.rt-sky-stars {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    animation: rt-sky-twinkle 3s ease-in-out infinite;
+}
+
+/* Fixed cluster of star dots around the badge, drawn via box-shadow (no assets). */
+.rt-sky-stars::before {
+    content: '';
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    background: transparent;
+    box-shadow:
+        -6px -4px 0 0 #fff,
+        4px -6px 0 0 #fff,
+        7px 2px 0 0 rgba(255,255,255,0.8),
+        -3px 6px 0 0 rgba(255,255,255,0.7),
+        -8px 3px 0 0 rgba(255,255,255,0.6);
+}
+
+@keyframes rt-sky-twinkle {
+    0%, 100% { opacity: 0.9; }
+    50% { opacity: 0.45; }
+}
+
+/* Sun phases — warm gradient disc, glow intensity/hue shifts across the day. */
+.rt-sky-dawn .rt-sky-disc {
+    background: radial-gradient(circle at 35% 35%, #fff2cc, #ffaa55);
+    box-shadow: 0 0 6px 2px rgba(255, 170, 85, 0.55);
+}
+.rt-sky-morning .rt-sky-disc {
+    background: radial-gradient(circle at 35% 35%, #ffffe0, #ffd700);
+    box-shadow: 0 0 6px 2px rgba(255, 215, 0, 0.5);
+}
+.rt-sky-midday .rt-sky-disc {
+    background: radial-gradient(circle at 35% 35%, #ffffff, #fff2a8);
+    box-shadow: 0 0 8px 3px rgba(255, 255, 200, 0.75);
+}
+.rt-sky-afternoon .rt-sky-disc {
+    background: radial-gradient(circle at 35% 35%, #fff2cc, #ffcc66);
+    box-shadow: 0 0 6px 2px rgba(255, 204, 102, 0.5);
+}
+.rt-sky-sunset .rt-sky-disc {
+    background: radial-gradient(circle at 35% 35%, #ffcc88, #e6633d);
+    box-shadow: 0 0 7px 2px rgba(230, 99, 61, 0.6);
+}
+
+/* Moon phases — cool silvery disc, no glow (starfield sits behind it). */
+.rt-sky-night .rt-sky-disc,
+.rt-sky-lateNight .rt-sky-disc {
+    background: radial-gradient(circle at 35% 35%, #f5f5ff, #9999ee);
+    box-shadow: 0 0 4px 1px rgba(153, 153, 238, 0.5);
+}
+
+/* ── Day/Night Cycle — full-panel ambient tint ─────────────────────────────
+   When rt-daynight-active is set on a panel, phase classes override the theme's
+   CSS variables so the entire tracker shifts hue with in-world time. @property
+   registrations let the color vars crossfade smoothly between phases. */
+
+@property --rt-bg {
+    syntax: '<color>';
+    inherits: true;
+    initial-value: rgba(20, 20, 20, 0.94);
+}
+@property --rt-text {
+    syntax: '<color>';
+    inherits: true;
+    initial-value: #eeeeee;
+}
+@property --rt-text-muted {
+    syntax: '<color>';
+    inherits: true;
+    initial-value: #888888;
+}
+@property --rt-accent {
+    syntax: '<color>';
+    inherits: true;
+    initial-value: #00ffaa;
+}
+@property --rt-accent-dim {
+    syntax: '<color>';
+    inherits: true;
+    initial-value: rgba(0, 255, 170, 0.4);
+}
+@property --rt-accent-bg {
+    syntax: '<color>';
+    inherits: true;
+    initial-value: rgba(0, 255, 170, 0.1);
+}
+@property --rt-header-bg {
+    syntax: '<color>';
+    inherits: true;
+    initial-value: rgba(255, 255, 255, 0.05);
+}
+@property --rt-card-bg {
+    syntax: '<color>';
+    inherits: true;
+    initial-value: rgba(255, 255, 255, 0.03);
+}
+@property --rt-card-header {
+    syntax: '<color>';
+    inherits: true;
+    initial-value: rgba(255, 255, 255, 0.04);
+}
+
+.rpg-tracker-panel.rt-daynight-active {
+    transition:
+        --rt-bg 2s ease,
+        --rt-text 2s ease,
+        --rt-text-muted 2s ease,
+        --rt-accent 2s ease,
+        --rt-accent-dim 2s ease,
+        --rt-accent-bg 2s ease,
+        --rt-header-bg 2s ease,
+        --rt-card-bg 2s ease,
+        --rt-card-header 2s ease,
+        background-color 2s ease,
+        color 2s ease,
+        border-color 2s ease,
+        box-shadow 2s ease;
+}
+
+/* ── Phase palettes ─────────────────────────────────────────────────────── */
+
+/* Late night (12 AM – 4:59 AM): deep indigo, cool violet accent */
+.rpg-tracker-panel.rt-daynight-active.rt-phase-lateNight {
+    --rt-bg: rgba(8, 10, 28, 0.97);
+    --rt-text: #c8c8e8;
+    --rt-text-muted: #6a6a90;
+    --rt-accent: #8899ff;
+    --rt-accent-dim: rgba(136, 153, 255, 0.38);
+    --rt-accent-bg: rgba(100, 110, 200, 0.14);
+    --rt-header-bg: rgba(18, 22, 55, 0.55);
+    --rt-card-bg: rgba(12, 15, 40, 0.5);
+    --rt-card-header: rgba(22, 28, 60, 0.45);
+    --rt-shadow: 0 8px 32px rgba(0, 0, 20, 0.7), inset 0 0 30px rgba(40, 50, 120, 0.08);
+}
+
+/* Dawn (5 – 6:59 AM): peach horizon, rose-gold warmth */
+.rpg-tracker-panel.rt-daynight-active.rt-phase-dawn {
+    --rt-bg: rgba(32, 22, 28, 0.95);
+    --rt-text: #ffe8d8;
+    --rt-text-muted: #b09080;
+    --rt-accent: #ff9966;
+    --rt-accent-dim: rgba(255, 153, 102, 0.42);
+    --rt-accent-bg: rgba(255, 140, 90, 0.12);
+    --rt-header-bg: rgba(60, 35, 30, 0.45);
+    --rt-card-bg: rgba(45, 28, 25, 0.4);
+    --rt-card-header: rgba(70, 40, 32, 0.35);
+    --rt-shadow: 0 8px 28px rgba(40, 20, 10, 0.55), inset 0 0 40px rgba(255, 140, 80, 0.06);
+}
+
+/* Morning (7 – 11:59 AM): fresh golden daylight */
+.rpg-tracker-panel.rt-daynight-active.rt-phase-morning {
+    --rt-bg: rgba(26, 30, 36, 0.93);
+    --rt-text: #f5f0e0;
+    --rt-text-muted: #a09880;
+    --rt-accent: #ffd54f;
+    --rt-accent-dim: rgba(255, 213, 79, 0.42);
+    --rt-accent-bg: rgba(255, 200, 60, 0.12);
+    --rt-header-bg: rgba(50, 45, 30, 0.4);
+    --rt-card-bg: rgba(35, 38, 30, 0.35);
+    --rt-card-header: rgba(55, 50, 35, 0.3);
+    --rt-shadow: 0 8px 28px rgba(30, 25, 10, 0.45);
+}
+
+/* Midday (12 – 1:59 PM): bright high-noon, neutral warm white */
+.rpg-tracker-panel.rt-daynight-active.rt-phase-midday {
+    --rt-bg: rgba(34, 38, 44, 0.91);
+    --rt-text: #fafaf5;
+    --rt-text-muted: #a8a8a0;
+    --rt-accent: #fff59d;
+    --rt-accent-dim: rgba(255, 245, 157, 0.45);
+    --rt-accent-bg: rgba(255, 240, 120, 0.1);
+    --rt-header-bg: rgba(60, 60, 55, 0.35);
+    --rt-card-bg: rgba(45, 48, 42, 0.3);
+    --rt-card-header: rgba(65, 68, 60, 0.28);
+    --rt-shadow: 0 8px 28px rgba(20, 20, 15, 0.4), inset 0 0 20px rgba(255, 255, 200, 0.04);
+}
+
+/* Afternoon (2 – 5:59 PM): warm golden hour building */
+.rpg-tracker-panel.rt-daynight-active.rt-phase-afternoon {
+    --rt-bg: rgba(36, 32, 26, 0.93);
+    --rt-text: #f2ead8;
+    --rt-text-muted: #a89878;
+    --rt-accent: #ffca28;
+    --rt-accent-dim: rgba(255, 202, 40, 0.42);
+    --rt-accent-bg: rgba(255, 190, 50, 0.12);
+    --rt-header-bg: rgba(55, 45, 28, 0.42);
+    --rt-card-bg: rgba(40, 35, 25, 0.38);
+    --rt-card-header: rgba(65, 55, 35, 0.32);
+    --rt-shadow: 0 8px 28px rgba(35, 25, 10, 0.5);
+}
+
+/* Sunset (6 – 7:59 PM): orange-crimson warmth */
+.rpg-tracker-panel.rt-daynight-active.rt-phase-sunset {
+    --rt-bg: rgba(38, 20, 16, 0.95);
+    --rt-text: #ffd4b8;
+    --rt-text-muted: #b08068;
+    --rt-accent: #ff7043;
+    --rt-accent-dim: rgba(255, 112, 67, 0.42);
+    --rt-accent-bg: rgba(255, 100, 60, 0.14);
+    --rt-header-bg: rgba(70, 30, 20, 0.48);
+    --rt-card-bg: rgba(50, 22, 18, 0.42);
+    --rt-card-header: rgba(80, 35, 25, 0.38);
+    --rt-shadow: 0 8px 32px rgba(50, 15, 5, 0.6), inset 0 0 35px rgba(255, 80, 40, 0.06);
+}
+
+/* Night (8 – 11:59 PM): cool indigo twilight */
+.rpg-tracker-panel.rt-daynight-active.rt-phase-night {
+    --rt-bg: rgba(12, 16, 34, 0.96);
+    --rt-text: #d0d4e8;
+    --rt-text-muted: #7078a0;
+    --rt-accent: #7986cb;
+    --rt-accent-dim: rgba(121, 134, 203, 0.4);
+    --rt-accent-bg: rgba(90, 100, 180, 0.13);
+    --rt-header-bg: rgba(20, 25, 55, 0.5);
+    --rt-card-bg: rgba(15, 20, 45, 0.45);
+    --rt-card-header: rgba(28, 35, 65, 0.4);
+    --rt-shadow: 0 8px 32px rgba(0, 0, 25, 0.65), inset 0 0 25px rgba(60, 70, 150, 0.07);
+}
+

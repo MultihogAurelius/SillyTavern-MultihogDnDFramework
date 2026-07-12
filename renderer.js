@@ -13,19 +13,27 @@ const DEFAULT_XP_COLOR = 'linear-gradient(90deg, #0088ff, #00d4ff)';
  * an "HH:MM[ AM/PM]" clock pattern (e.g. a [TIME] block line, or a "Current Time" string).
  * Shared by the TIME card renderer and the Tab Mode footer clock so both stay in sync.
  * @param {string} str
- * @returns {{hour: number, emoji: string, color: string}}  hour is -1 when no clock pattern is found
+ * @returns {{hour: number, emoji: string, color: string, phase: string}}  hour is -1 and phase is '' when no clock pattern is found
  */
 export function getTimeOfDayInfo(str) {
     const m = String(str || '').match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
-    if (!m) return { hour: -1, emoji: '', color: 'inherit' };
+    if (!m) return { hour: -1, emoji: '', color: 'inherit', phase: '' };
     let h = parseInt(m[1], 10);
     if (m[3]) {
         const mer = m[3].toUpperCase();
         if (mer === 'AM' && h === 12) h = 0;
         if (mer === 'PM' && h !== 12) h += 12;
     }
-    if (!Number.isFinite(h) || h < 0 || h > 23) return { hour: -1, emoji: '', color: 'inherit' };
+    if (!Number.isFinite(h) || h < 0 || h > 23) return { hour: -1, emoji: '', color: 'inherit', phase: '' };
 
+    const phase =
+        h < 5  ? 'lateNight' :
+        h < 7  ? 'dawn' :
+        h < 12 ? 'morning' :
+        h < 14 ? 'midday' :
+        h < 18 ? 'afternoon' :
+        h < 20 ? 'sunset' :
+        'night';
     const emoji =
         h < 5  ? '🌙' : // late night
         h < 7  ? '🌅' : // dawn
@@ -43,7 +51,31 @@ export function getTimeOfDayInfo(str) {
         h < 20 ? '#ffaa55' : // sunset (orange)
         '#7777ee';           // night (indigo)
 
-    return { hour: h, emoji, color };
+    return { hour: h, emoji, color, phase };
+}
+
+/** Time-of-day phases that show the moon (vs. the sun) in the day/night sky badge. */
+const DAYNIGHT_MOON_PHASES = new Set(['lateNight', 'night']);
+
+/**
+ * Renders a small pure-CSS "sky" badge (sun or moon, with a starfield at night)
+ * reflecting the in-world time of day, for the panel header. Purely decorative —
+ * built entirely from CSS (radial-gradient disc + box-shadow star dots), no image
+ * assets. Colors/positioning are driven by the `rt-sky-<phase>` class; this
+ * function only decides which phase class and markup shape (moon+stars vs sun) to use.
+ * @param {string} str - any string containing an "HH:MM[ AM/PM]" pattern (e.g. current [TIME] line)
+ * @returns {string} HTML, or '' if no clock pattern was found in `str`
+ */
+export function renderDayNightBadge(str) {
+    const { hour, phase } = getTimeOfDayInfo(str);
+    if (hour === -1) return '';
+
+    const isMoon = DAYNIGHT_MOON_PHASES.has(phase);
+    const bodyHtml = `<div class="rt-sky-disc"></div>`;
+    // Stars only during moon phases — a handful of fixed dots is enough to read as a starfield.
+    const starsHtml = isMoon ? `<div class="rt-sky-stars"></div>` : '';
+
+    return `<div class="rt-daynight-badge rt-sky-${phase}" title="In-world time of day: ${escapeHtml(phase.replace(/([A-Z])/g, ' $1').toLowerCase())}">${starsHtml}${bodyHtml}</div>`;
 }
 
     export const STOCK_FIELD_RULES = {

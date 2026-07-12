@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [5.1.5] - 2026-07-13
+
+### Added
+- **Day/Night Cycle**: Optional setting that shifts the entire tracker panel's color palette and header sky badge to match the current in-world time parsed from `[TIME]`. Seven phases (late night, dawn, morning, midday, afternoon, sunset, night) override theme CSS variables with smooth crossfades. The header badge is a pure-CSS sun or moon (with twinkling stars at night) — no image assets. Updates live when the user edits time in Raw view or toggles back to Rendered view.
+
 ## [5.1.4] - 2026-07-13
 
 ### Added
