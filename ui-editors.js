@@ -1445,12 +1445,12 @@ function openSectionEditor(targetType) {
         if (activePresetName && !s[presetsKey][activePresetName]) activePresetName = '';
 
         inner.innerHTML = `
-            <div class="popup shadowBase" style="min-width: 480px; max-width: 600px; max-height: 85vh; display: flex; flex-direction: column;">
+            <div class="popup shadowBase" style="min-width: 480px; max-width: 600px; max-height: 85vh; display: flex; flex-direction: column; overflow: hidden;">
                 <div class="popup-header" style="flex-shrink:0;">
                     <h3 class="margin0">${titleText}</h3>
                     <div id="rt_sec_se_close" class="popup-close interactable" title="Close"><i class="fa-solid fa-times"></i></div>
                 </div>
-                <div class="popup-body flex-container flexFlowColumn gap-1" style="padding: 14px; overflow-y:auto; flex:1;">
+                <div style="padding: 14px 14px 0 14px; flex-shrink:0;">
                     <div style="font-size:11px; opacity:0.7; margin-bottom:10px; line-height:1.4;">
                         ${descriptionText}
                     </div>
@@ -1466,12 +1466,12 @@ function openSectionEditor(targetType) {
                         <button id="rt_sec_se_reset" class="menu_button interactable" style="padding:2px 8px; font-size:11px; color:#ffaa00;" title="Reset current editor sections to default">Reset</button>
                         <button id="rt_sec_se_preset_delete" class="menu_button interactable" style="padding:2px 8px; font-size:11px; color:#ff5555;" title="Delete selected preset">Delete</button>
                     </div>
-                    
-                    <div id="rt_sec_se_list">
-                        ${renderList()}
-                    </div>
-                    
-                    <button id="rt_sec_se_add" class="menu_button interactable" style="margin-top:8px; border: 1px dashed rgba(255,255,255,0.2); background:transparent;">
+                </div>
+                <div id="rt_sec_se_list" style="overflow-y:auto; flex:1; padding: 0 14px;">
+                    ${renderList()}
+                </div>
+                <div style="padding: 8px 14px; flex-shrink:0;">
+                    <button id="rt_sec_se_add" class="menu_button interactable" style="width:100%; border: 1px dashed rgba(255,255,255,0.2); background:transparent;">
                         <i class="fa-solid fa-plus"></i> Add Custom Section
                     </button>
                 </div>
