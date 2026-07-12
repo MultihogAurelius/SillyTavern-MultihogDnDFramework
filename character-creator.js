@@ -452,7 +452,7 @@ async function handleCharRollGenerate(el, panel) {
 
     const levelPrefix = hasXp
         ? `STARTING LEVEL: ${level} (mandatory — the character MUST be exactly Level ${level}).`
-        : `STARTING LEVEL: ${level} (mandatory — the character MUST be exactly Level ${level}; scale/adjust HP, stats, saves, and capabilities to Level ${level} accordingly, but do NOT output an [XP] block as it is disabled).`;
+        : `STARTING LEVEL: ${level} (mandatory — the character MUST be exactly Level ${level}; scale/adjust HP, stats, saves, capabilities, and gear (everything a character of that level might have) to Level ${level} accordingly, but do NOT output an [XP] block as it is disabled).`;
 
     const xpHint = hasXp ? buildOnboardingXpHint(level) : '';
     const TIME_FORMAT_HINT = hasTime
