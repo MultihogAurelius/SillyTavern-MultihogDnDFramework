@@ -1458,7 +1458,7 @@ function openSectionEditor(targetType) {
                     <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px; padding-bottom:10px; border-bottom: 1px solid rgba(255,255,255,0.08);">
                         <strong style="font-size:0.85em; opacity:0.8;">Preset</strong>
                         <select id="rt_sec_se_preset_select" class="text_pole" style="flex:1; font-size:12px; height:24px; padding:2px 4px;">
-                            <option value="">-- No Preset --</option>
+                            <option value="" disabled${!activePresetName ? ' selected' : ''}>-- Select Preset --</option>
                             ${Object.keys(s[presetsKey]).map(k => `<option value="${escapeHtml(k)}"${k === activePresetName ? ' selected' : ''}>${escapeHtml(k)}</option>`).join('')}
                         </select>
                         <button id="rt_sec_se_preset_save_overwrite" class="menu_button interactable" style="padding:2px 8px; font-size:11px; background:rgba(100,180,255,0.12);${activePresetName ? '' : ' opacity:0.4; cursor:not-allowed;'}" title="${activePresetName ? `Overwrite preset '${activePresetName}' with current sections` : 'Select a preset first'}">Save</button>
