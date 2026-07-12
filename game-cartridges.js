@@ -105,6 +105,12 @@ export function applyCartridgePayload(settings, payload) {
         const val = (payload && payload[key] !== undefined) ? payload[key] : factory[key];
         settings[key] = JSON.parse(JSON.stringify(val));
     }
+    // Clear the active-preset selection side-channel keys. These are not part of the
+    // cartridge payload, so they survive a load untouched — on another machine the stale
+    // name may not exist or may refer to a completely different preset. Always reset to
+    // "-- No Preset --" and let the user choose/save explicitly.
+    delete settings['_activePreset_npcSectionPresets'];
+    delete settings['_activePreset_pcSectionPresets'];
 }
 
 // ─────────────────────────────────────────────────────────────────────────
