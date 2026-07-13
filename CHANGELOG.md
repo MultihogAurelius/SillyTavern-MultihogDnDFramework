@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [5.1.10] - 2026-07-13
+
+### Changed
+- **Portrait storage folder**: Renamed from `user/images/rpg_tracker_portraits/` to `user/images/multihogframework_portraits/`. Legacy paths are still recognized for display and purge.
+
 ## [5.1.9] - 2026-07-13
 
 Release tag for portrait file-storage work (5.1.6–5.1.8).
@@ -19,7 +24,7 @@ Release tag for portrait file-storage work (5.1.6–5.1.8).
 ## [5.1.6] - 2026-07-13
 
 ### Fixed
-- **Portrait File Storage**: Custom portraits are no longer stored as base64 inside `settings.json`. New and migrated portraits are saved under `user/images/rpg_tracker_portraits/` with lightweight path references in settings — preventing settings bloat across many chats and auto-generated portraits.
+- **Portrait File Storage**: Custom portraits are no longer stored as base64 inside `settings.json`. New and migrated portraits are saved under `user/images/multihogframework_portraits/` with lightweight path references in settings — preventing settings bloat across many chats and auto-generated portraits.
 - **Automatic Portrait Migration**: On load, any legacy embedded base64 portraits (live state and all chat links) are migrated to disk in the background with content deduplication, then settings are re-saved without the image payloads.
 
 ### Added

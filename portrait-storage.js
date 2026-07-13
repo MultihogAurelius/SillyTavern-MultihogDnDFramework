@@ -2,7 +2,10 @@ import { getRequestHeaders } from '../../../../script.js';
 import { getActiveChatId } from './state-manager.js';
 
 /** Subfolder under `user/images/` for all Multihog portrait files. */
-export const PORTRAIT_STORAGE_FOLDER = 'rpg_tracker_portraits';
+export const PORTRAIT_STORAGE_FOLDER = 'multihogframework_portraits';
+
+/** @deprecated Pre-5.1.10 folder name — still recognized for purge/delete. */
+const LEGACY_PORTRAIT_STORAGE_FOLDERS = ['rpg_tracker_portraits'];
 
 let _portraitMigrationLocked = false;
 
@@ -38,7 +41,8 @@ export function isPortraitDataUrl(src) {
 export function isManagedPortraitPath(src) {
     if (typeof src !== 'string') return false;
     const norm = src.replace(/^\//, '');
-    return norm.includes(`user/images/${PORTRAIT_STORAGE_FOLDER}/`);
+    const folders = [PORTRAIT_STORAGE_FOLDER, ...LEGACY_PORTRAIT_STORAGE_FOLDERS];
+    return folders.some((folder) => norm.includes(`user/images/${folder}/`));
 }
 
 /** Normalize any stored portrait ref for use as an `<img src>`. */
