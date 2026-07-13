@@ -1104,7 +1104,7 @@ export const CARTRIDGE_PAYLOAD_GROUPS = [
     },
     {
         id: 'gameSystems',
-        label: 'Game Systems & Custom Fields',
+        label: 'Game Systems and Customization & Custom Fields',
         description: 'Custom game systems and custom tracker fields',
         keys: ['gameSystems', 'customFields'],
     },
