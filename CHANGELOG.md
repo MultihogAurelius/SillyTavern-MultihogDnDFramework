@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [5.3.1] - 2026-07-14
+
+### Changed
+- **Tab Mode tab strip**: All module tabs are shown in a wrapping grid that fills each row; overflow "⋯" menu removed.
+
 ## [5.3.0] - 2026-07-13
 
 ### Changed
