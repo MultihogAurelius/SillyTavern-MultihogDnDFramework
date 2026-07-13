@@ -2495,6 +2495,31 @@
     width: 100%;
 }
 
+/* System Prompt Control Room — one scroll region (section list only) */
+.popup-content:has(.rt-cr-popup-container) {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.rt-cr-popup-container {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+    flex: 1;
+    min-height: 0;
+    max-height: calc(90dvh - 9rem);
+    box-sizing: border-box;
+}
+
+.rt-cr-list-wrap {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding-right: 10px;
+}
+
 .rt-cr-field {
     display: flex;
     flex-direction: column;

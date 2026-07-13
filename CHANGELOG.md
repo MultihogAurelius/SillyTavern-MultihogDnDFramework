@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [5.3.2] - 2026-07-14
+
+### Fixed
+- **System Prompt Control Room**: Removed nested double scrollbars; only the section list scrolls while the header and toolbar stay pinned.
+
 ## [5.3.1] - 2026-07-14
 
 ### Changed

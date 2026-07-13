@@ -2184,7 +2184,7 @@ export async function openSystemPromptControlRoom() {
     };
 
     const html = `
-        <div id="rt-cr-container" style="display:flex; flex-direction:column; gap:10px; width:100%; box-sizing:border-box; max-height:85vh;">
+        <div id="rt-cr-container" class="rt-cr-popup-container">
             <div style="font-size:11px; opacity:0.8; line-height:1.4;">
                 Drag any row to reorder sections, toggle <b>Enabled</b> to turn it on/off, or use the tools below to unlock a built-in section or add a brand-new one. 🧙 rows are managed by the Game System Wizard — Edit/Delete there keeps the linked tracker module in sync.
                 <div style="margin-top:4px; opacity:0.75;">Changes are kept in memory until you click <b>Save</b>.</div>
@@ -2215,7 +2215,7 @@ export async function openSystemPromptControlRoom() {
                     <i class="fa-solid fa-compact-disc"></i>
                 </button>
             </div>
-            <div id="rt-cr-list-wrap" style="overflow-y:auto; padding-right:10px; flex:1;">
+            <div id="rt-cr-list-wrap" class="rt-cr-list-wrap">
                 ${generateListHtml()}
             </div>
         </div>
@@ -2407,7 +2407,9 @@ export async function openSystemPromptControlRoom() {
             if (!isDirty()) return true;
             return confirm('Discard unsaved changes to the system prompt sections?');
         },
-        ...GS_POPUP_LARGE,
+        wide: true,
+        large: true,
+        allowVerticalScrolling: false,
     });
 
     if (result === POPUP_RESULT.AFFIRMATIVE) {
