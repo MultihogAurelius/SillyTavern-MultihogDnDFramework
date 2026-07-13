@@ -58,6 +58,7 @@ Together they solve the four core problems of LLM tabletop RP: the AI forgetting
 - **AI-powered Game Systems Wizard** — Simply describe any mechanic to the wizard in natural language (e.g. "reputation system), and the AI will build the system for you according to the structure of the extension (sysprompt + module.) Iterate, regenerate, or manually edit any block directly within the forge before saving.
 - **Life/dating sim-style friendship/affection component.**
 - **Export your entire setup as a "Game Cartridge."**
+- **d100 (percentage-based rolls) support.**
   
 ---
 
