@@ -4552,7 +4552,7 @@ export async function runAtmosphereGenerationPass(lookbackCount) {
         }
         // Basic cleanup of tracking structures
         text = text.replace(/###\s*STATE MEMO[^]*?(?=\n\[RNG_QUEUE|\n###|\n\[(?!RNG_QUEUE)[A-Z]|$)/i, '');
-        text = text.replace(/\[RNG_QUEUE\s[^\]]*\][\s\S]*?\[\/RNG_QUEUE\][ \t]*\n?/gi, '');
+        text = text.replace(/\[RNG_QUEUE(?:_d100)?\s[^\]]*\][\s\S]*?\[\/RNG_QUEUE(?:_d100)?\][ \t]*\n?/gi, '');
         text = text.replace(/\[[A-Z_]+\][\s\S]*?\[\/[A-Z_]+\]/g, '');
         text = text.replace(/###\s*CURRENT USER INPUT[^\n]*\n?/gi, '');
         text = text.replace(/\[Continue the narrative\]/gi, '');

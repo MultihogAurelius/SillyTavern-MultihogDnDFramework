@@ -224,11 +224,50 @@
                                 <span style="font-size: 0.85em; font-weight: bold; opacity: 0.8;">RNG</span>
                                 <button class="rt-rng-help-icon" style="background: none; border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; color: inherit; font-size: 0.72em; opacity: 0.7; padding: 1px 7px; cursor: pointer;">What are these?</button>
                             </div>
-                            <div class="flex-container flexFlowColumn gap-1" style="margin-bottom: 12px; padding-left: 5px;">
+                            <div class="flex-container flexFlowColumn gap-1" style="margin-bottom: 8px; padding-left: 5px;">
                                 <label class="checkbox_label"><input type="radio" name="rpg_sysprompt_rng_mode" value="hybrid" id="rpg_rng_hybrid" /><span>Pre-Seeded + Tool Calls</span></label>
                                 <label class="checkbox_label"><input type="radio" name="rpg_sysprompt_rng_mode" value="legacy" id="rpg_rng_legacy" /><span>Pre-Seeded Only</span></label>
                                 <label class="checkbox_label"><input type="radio" name="rpg_sysprompt_rng_mode" value="none" id="rpg_rng_none" /><span>No RNG (LLM makes up numbers)</span></label>
                             </div>
+
+                            <details style="margin-top: 8px; border-top: 1px dashed rgba(255,255,255,0.1); padding-top: 6px; padding-left: 5px;">
+                                <summary style="font-size: 0.82em; font-weight: bold; opacity: 0.8; cursor: pointer; outline: none; user-select: none; padding-bottom: 2px;">⚙️ Advanced RNG Settings</summary>
+                                <div style="margin-top: 6px; display: flex; flex-direction: column; gap: 6px; cursor: default;">
+                                    
+                                    <div style="margin-bottom: 4px; border-bottom: 1px dashed rgba(255,255,255,0.06); padding-bottom: 8px;">
+                                        <label class="checkbox_label" title="Uses d100 instead of d20 for all rolls. Swaps RollTheDice ➔ RollTheDiceD100 and generates RNG_QUEUE_d100 pre-seeded values in 1-100 range. Ideal for percentage-based systems.">
+                                            <input id="rpg_tracker_dice_d100_mode" type="checkbox" />
+                                            <span>🎲 d100 Mode <i class="fa-solid fa-circle-question" style="opacity:0.6;font-size:0.85em;" title="Uses d100 instead of d20 for all rolls. Swaps RollTheDice ➔ RollTheDiceD100 and generates RNG_QUEUE_d100 pre-seeded values in 1-100 range. Ideal for percentage-based systems."></i></span>
+                                        </label>
+                                        <small style="display: block; margin-top: 4px; opacity: 0.65; font-style: italic; line-height: 1.2; font-weight: normal;">
+                                            ⚠️ Note: d100 Mode is not officially supported by the stock system prompt beyond basic <tt>&lt;rng_system&gt;</tt> tag adaptations. You may need to manually customize your system prompt content to fully support this mode using the <b>System Prompt Control Room</b> under Game Systems settings.
+                                        </small>
+                                    </div>
+
+                                    <div style="margin-bottom: 4px;">
+                                        <span style="font-size: 0.72em; font-weight: bold; opacity: 0.65; text-transform: uppercase; letter-spacing: 0.5px;">Registered RNG Tools</span>
+                                    </div>
+                                    <div class="flex-container flexFlowColumn gap-1" style="margin-bottom: 6px; padding-left: 5px;">
+                                        <label class="checkbox_label" title="Registers the RollTheDice (d20 version) function tool with the LLM.">
+                                            <input id="rpg_rng_tool_d20" type="checkbox" />
+                                            <span>RollTheDice (d20 Tool)</span>
+                                        </label>
+                                        <label class="checkbox_label" title="Registers the RollTheDiceD100 (d100 version) function tool with the LLM.">
+                                            <input id="rpg_rng_tool_d100" type="checkbox" />
+                                            <span>RollTheDiceD100 (d100 Tool)</span>
+                                        </label>
+                                        <label class="checkbox_label" title="Injects [RNG_QUEUE] pre-seeded rolls (d20 format, length 12) during combat context.">
+                                            <input id="rpg_rng_queue_d20" type="checkbox" />
+                                            <span>[RNG_QUEUE] (d20 Queue)</span>
+                                        </label>
+                                        <label class="checkbox_label" title="Injects [RNG_QUEUE_d100] pre-seeded rolls (d100 format, length 30) during combat context.">
+                                            <input id="rpg_rng_queue_d100" type="checkbox" />
+                                            <span>[RNG_QUEUE_d100] (d100 Queue)</span>
+                                        </label>
+                                    </div>
+
+                                </div>
+                            </details>
 
                             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 2px;">
                                 <span style="font-size: 0.85em; font-weight: bold; opacity: 0.8;">Quests</span>
@@ -562,6 +601,10 @@
                                     <label class="checkbox_label">
                                         <input id="rpg_tracker_router_include_hidden" type="checkbox" />
                                         <span>Include hidden msgs (summarizer)</span>
+                                    </label>
+                                    <label class="checkbox_label" title="When enabled, swiping away from a generation that triggered the Lorebook Agent undoes that pass. Swipes never advance the Run Every N counter either way.">
+                                        <input id="rpg_tracker_router_swipe_rollback" type="checkbox" />
+                                        <span>Auto-rollback lorebook pass on swipe</span>
                                     </label>
                                     
                                     <label>Context Lookback</label>

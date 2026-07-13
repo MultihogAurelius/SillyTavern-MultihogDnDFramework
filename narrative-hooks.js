@@ -33,7 +33,8 @@ function substituteLoreMacros(content) {
 // ── Dice naming helpers ────────────────────────────────────────────────────────
 
 export function getDiceToolName() {
-    return 'RollTheDice';
+    const settings = getSettings();
+    return settings.diceD100Mode ? 'RollTheDiceD100' : 'RollTheDice';
 }
 
 export function getDiceCommandName() {
@@ -56,24 +57,38 @@ export function rollDie(sides) {
     return (roll % sides) + 1;
 }
 
-export function makeRngQueue(n = RNG_QUEUE_LEN) {
+export function makeRngQueue(n, forceD100) {
+    const settings = getSettings();
+    const d100Mode = forceD100 !== undefined ? !!forceD100 : !!settings.diceD100Mode;
+    const len = n !== undefined && n !== RNG_QUEUE_LEN ? n : (d100Mode ? 30 : RNG_QUEUE_LEN);
     const out = [];
-    for (let i = 0; i < n; i++) {
-        out.push({
-            d20: rollDie(20),
-            d4:  rollDie(4),
-            d6:  rollDie(6),
-            d8:  rollDie(8),
-            d10: rollDie(10),
-            d12: rollDie(12),
-        });
+    for (let i = 0; i < len; i++) {
+        if (d100Mode) {
+            out.push({
+                d100: rollDie(100),
+            });
+        } else {
+            out.push({
+                d20: rollDie(20),
+                d4:  rollDie(4),
+                d6:  rollDie(6),
+                d8:  rollDie(8),
+                d10: rollDie(10),
+                d12: rollDie(12),
+            });
+        }
     }
     return out;
 }
 
-export function buildRngBlock(queue) {
+export function buildRngBlock(queue, d100Mode = false) {
     const turnId = Date.now();
-    const formattedQueue = queue.map(dice =>
+    let formattedQueue;
+    if (d100Mode) {
+        formattedQueue = queue.map(dice => String(dice.d100)).join(", ");
+        return `[RNG_QUEUE_d100 v6.0_PROPER]\nturn_id=${turnId}\nscope=this_response\nqueue=[${formattedQueue}]\n[/RNG_QUEUE_d100]\n\n`;
+    }
+    formattedQueue = queue.map(dice =>
         `${dice.d20}(d4:${dice.d4},d6:${dice.d6},d8:${dice.d8},d10:${dice.d10},d12:${dice.d12})`
     ).join(", ");
     return `[RNG_QUEUE v6.0_PROPER]\nturn_id=${turnId}\nscope=this_response\nqueue=[${formattedQueue}]\n[/RNG_QUEUE]\n\n`;
@@ -206,8 +221,11 @@ function sanitizeFormula(value) {
 }
 
 export async function doDiceRoll(customDiceFormula, quiet = false) {
+    const settings = getSettings();
+    const d100Mode = !!settings.diceD100Mode;
+    const defaultFormula = d100Mode ? '1d100' : '1d20';
     const nullValue = { total: '', rolls: [] };
-    let value = typeof customDiceFormula === 'string' ? customDiceFormula.trim() : '1d20';
+    let value = typeof customDiceFormula === 'string' ? customDiceFormula.trim() : defaultFormula;
 
     if (value === 'custom') {
         const { Popup } = SillyTavern.getContext();
@@ -247,13 +265,13 @@ export async function doDiceRoll(customDiceFormula, quiet = false) {
     }
 
     // Failsafe: never return empty/zero — that would auto-fail any DC check.
-    toastr['warning'](`Invalid dice formula "${value}" — defaulting to 1d20.`);
-    const fallbackRoll = rollDie(20);
+    toastr['warning'](`Invalid dice formula "${value}" — defaulting to ${defaultFormula}.`);
+    const fallbackRoll = rollDie(d100Mode ? 100 : 20);
     if (!quiet) {
         const context = SillyTavern.getContext();
-        context.sendSystemMessage('generic', `${context.name1} tried to roll an invalid formula ("${value}"), defaulting to 1d20. The result is: ${fallbackRoll}`, { isSmallSys: true });
+        context.sendSystemMessage('generic', `${context.name1} tried to roll an invalid formula ("${value}"), defaulting to ${defaultFormula}. The result is: ${fallbackRoll}`, { isSmallSys: true });
     }
-    return { total: String(fallbackRoll), rolls: [String(fallbackRoll)], formula: '1d20', invalidFormula: value };
+    return { total: String(fallbackRoll), rolls: [String(fallbackRoll)], formula: defaultFormula, invalidFormula: value };
 }
 
 // ── Tool & slash command registration ─────────────────────────────────────────
@@ -265,66 +283,111 @@ export function registerDiceFunctionTool() {
         if (!registerFunctionTool || !unregisterFunctionTool) return;
 
         unregisterFunctionTool('RollTheDice');
+        unregisterFunctionTool('RollTheDiceD100');
         unregisterFunctionTool('FatbodyRollTheDice');
         unregisterFunctionTool('MultihogRollTheDice');
 
         const settings = getSettings();
-        if (!settings.rngEnabled || !settings.diceFunctionTool) return;
-
-        const toolName = getDiceToolName();
         const isLegacy = settings.legacyDiceNaming;
 
-        const formulaDescription = 'A SINGLE dice formula to roll, e.g. "1d20", "2d6+3", "1d20+5". Supports one or more die groups joined by + or - (e.g. "1d20+1d4+2"), and keep/drop modifiers (e.g. "2d20kh1" for advantage, "2d20kl1" for disadvantage). Provide EXACTLY ONE formula string — do NOT separate multiple formulas with commas, and do NOT repeat/duplicate the same formula in one call. If you need more than one roll, call this tool again separately for each roll.';
+        // Register d20 tool if enabled
+        if (settings.rngToolD20) {
+            const baseFormula = '1d20';
+            const formulaDescription = `A SINGLE dice formula to roll, e.g. "${baseFormula}", "2d6+3", "${baseFormula}+5". Supports one or more die groups joined by + or - (e.g. "${baseFormula}+1d4+2"), and keep/drop modifiers (e.g. "2d20kh1" for advantage, "2d20kl1" for disadvantage). Provide EXACTLY ONE formula string — do NOT separate multiple formulas with commas, and do NOT repeat/duplicate the same formula in one call. If you need more than one roll, call this tool again separately for each roll.`;
 
-        const rollDiceSchema = isLegacy ? {
-            type: 'object',
-            properties: {
-                who: { type: 'string', description: 'The name of the persona rolling the dice' },
-                formula: { type: 'string', description: formulaDescription.replace('1d20', '1d6') },
-            },
-            required: ['who', 'formula'],
-        } : {
-            type: 'object',
-            properties: {
-                who: { type: 'string', description: 'The name of the persona rolling the dice' },
-                formula: { type: 'string', description: formulaDescription },
-                dc: { type: 'number', description: 'The Difficulty Class (DC) for this roll. Anchors the difficulty before the roll is made.' },
-            },
-            required: ['who', 'formula', 'dc'],
-        };
+            const rollDiceSchema = isLegacy ? {
+                type: 'object',
+                properties: {
+                    who: { type: 'string', description: 'The name of the persona rolling the dice' },
+                    formula: { type: 'string', description: formulaDescription.replace(baseFormula, '1d6') },
+                },
+                required: ['who', 'formula'],
+            } : {
+                type: 'object',
+                properties: {
+                    who: { type: 'string', description: 'The name of the persona rolling the dice' },
+                    formula: { type: 'string', description: formulaDescription },
+                    dc: { type: 'number', description: 'The Difficulty Class (DC) for this roll. Anchors the difficulty before the roll is made. A roll ≥ dc = SUCCESS.' },
+                },
+                required: ['who', 'formula', 'dc'],
+            };
 
-        registerFunctionTool({
-            name: toolName,
-            displayName: isLegacy ? 'Dice Roll' : 'Dice Roll (with DC)',
-            description: 'Rolls the dice using the provided formula and returns the numeric result. Use when it is necessary to roll the dice to determine the outcome of an action or when the user requests it. The formula parameter must be a single valid dice expression (e.g. "1d20+3") — never a comma-separated list or multiple repeated formulas.',
-            parameters: rollDiceSchema,
-            action: async (args) => {
-                const requestedFormula = args?.formula || (isLegacy ? '1d6' : '1d20');
-                const roll = await doDiceRoll(requestedFormula, true);
-                const total = parseInt(roll.total) || 0;
-                const formula = roll.formula || requestedFormula;
-                const invalidNote = roll.invalidFormula ? ` (requested formula "${roll.invalidFormula}" was invalid, defaulted to ${formula})` : '';
+            registerFunctionTool({
+                name: 'RollTheDice',
+                displayName: isLegacy ? 'Dice Roll' : 'Dice Roll (with DC)',
+                description: 'Rolls the dice using the provided formula and returns the numeric result. Use when it is necessary to roll the dice to determine the outcome of an action or when the user requests it. The formula parameter must be a single valid dice expression (e.g. "1d20+3") — never a comma-separated list or multiple repeated formulas.',
+                parameters: rollDiceSchema,
+                action: async (args) => {
+                    const requestedFormula = args?.formula || (isLegacy ? '1d6' : '1d20');
+                    const roll = await doDiceRoll(requestedFormula, true);
+                    const total = parseInt(roll.total) || 0;
+                    const formula = roll.formula || requestedFormula;
+                    const invalidNote = roll.invalidFormula ? ` (requested formula "${roll.invalidFormula}" was invalid, defaulted to ${formula})` : '';
 
-                if (isLegacy) {
-                    return (args.who
-                        ? `${args.who} rolls a ${formula}. The result is: ${total}. Individual rolls: ${roll.rolls.join(', ')}`
-                        : `The result of a ${formula} roll is: ${total}. Individual rolls: ${roll.rolls.join(', ')}`) + invalidNote;
-                }
+                    if (isLegacy) {
+                        return (args.who
+                            ? `${args.who} rolls a ${formula}. The result is: ${total}. Individual rolls: ${roll.rolls.join(', ')}`
+                            : `The result of a ${formula} roll is: ${total}. Individual rolls: ${roll.rolls.join(', ')}`) + invalidNote;
+                    }
 
-                const dc = Number(args?.dc) || 0;
-                let result = (args.who
-                    ? `${args.who} rolls a ${formula} against DC ${dc}. The result is: ${total}. Individual rolls: ${roll.rolls.join(', ')}`
-                    : `The result of a ${formula} roll against DC ${dc} is: ${total}. Individual rolls: ${roll.rolls.join(', ')}`) + invalidNote;
+                    const dc = Number(args?.dc) || 0;
+                    let result = (args.who
+                        ? `${args.who} rolls a ${formula} against DC ${dc}. The result is: ${total}. Individual rolls: ${roll.rolls.join(', ')}`
+                        : `The result of a ${formula} roll against DC ${dc} is: ${total}. Individual rolls: ${roll.rolls.join(', ')}`) + invalidNote;
 
-                if (dc > 0) {
-                    result += ` (Result: ${total >= dc ? 'SUCCESS' : 'FAILURE'})`;
-                }
-                return result;
-            },
-            formatMessage: () => '',
-        });
+                    if (dc > 0) {
+                        const success = (total >= dc);
+                        result += ` (Result: ${success ? 'SUCCESS' : 'FAILURE'})`;
+                    }
+                    return result;
+                },
+                formatMessage: () => '',
+            });
+        }
+
+        // Register d100 tool if enabled
+        if (settings.rngToolD100) {
+            const baseFormula = '1d100';
+            const formulaDescription = `A SINGLE dice formula to roll, e.g. "${baseFormula}", "2d6+3", "${baseFormula}+5". Supports one or more die groups joined by + or - (e.g. "${baseFormula}+1d4+2"), and keep/drop modifiers. Provide EXACTLY ONE formula string — do NOT separate multiple formulas with commas.`;
+
+            const rollDiceSchema = {
+                type: 'object',
+                properties: {
+                    who: { type: 'string', description: 'The name of the persona rolling the dice' },
+                    formula: { type: 'string', description: formulaDescription },
+                    dc: { type: 'number', description: 'The success/trigger percentage chance for this roll (roll-under system). Set this to the actual % probability of success or occurrence (e.g. 83 for an 83% chance to hit/succeed, or 25 for a 25% hazard failure chance). A roll ≤ dc = HIT/SUCCESS/TRIGGER, a roll > dc = MISS/FAILURE/NO-TRIGGER. Do NOT invert the percentage — always pass the probability directly.' },
+                },
+                required: ['who', 'formula', 'dc'],
+            };
+
+            registerFunctionTool({
+                name: 'RollTheDiceD100',
+                displayName: 'Dice Roll d100 (with DC)',
+                description: 'Rolls a d100 (1-100) using the provided formula and returns the numeric result. Use for absolutely any percentage probability check, including combat mechanics (e.g. hit chance, evasion, critical hits), narrative checks (e.g. hacking success, persuasion odds), or environmental/situational hazard probabilities (e.g. a ship having a 25% failure chance of breaking down due to running low on fuel, weather shifts, random encounters, etc.). The dc parameter is the direct success/trigger percentage chance (e.g. 83 for an 83% chance). A result less than or equal to the DC (roll <= DC) indicates HIT/SUCCESS, and a result greater than the DC (roll > DC) indicates MISS/FAILURE. The formula parameter must be a single valid dice expression (e.g. "1d100").',
+                parameters: rollDiceSchema,
+                action: async (args) => {
+                    const requestedFormula = args?.formula || '1d100';
+                    const roll = await doDiceRoll(requestedFormula, true);
+                    const total = parseInt(roll.total) || 0;
+                    const formula = roll.formula || requestedFormula;
+                    const invalidNote = roll.invalidFormula ? ` (requested formula "${roll.invalidFormula}" was invalid, defaulted to ${formula})` : '';
+
+                    const dc = Number(args?.dc) || 0;
+                    let result = (args.who
+                        ? `${args.who} rolls a ${formula} against DC ${dc}. The result is: ${total}. Individual rolls: ${roll.rolls.join(', ')}`
+                        : `The result of a ${formula} roll against DC ${dc} is: ${total}. Individual rolls: ${roll.rolls.join(', ')}`) + invalidNote;
+
+                    if (dc > 0) {
+                        const success = (total <= dc);
+                        result += ` (Result: ${total} ≤ ${dc}% → ${success ? 'HIT' : 'MISS'})`;
+                    }
+                    return result;
+                },
+                formatMessage: () => '',
+            });
+        }
     } catch (error) {
-        console.error('[RPG Tracker] Error registering dice function tool', error);
+        console.error('[RPG Tracker] Error registering dice function tools', error);
     }
 }
 
@@ -337,7 +400,9 @@ export function registerDiceSlashCommand() {
         aliases: getDiceCommandAliases(),
         callback: async (args, value) => {
             const quiet = String(args.quiet) === 'true';
-            const result = await doDiceRoll(String(value || (getSettings().legacyDiceNaming ? '1d6' : '1d20')), quiet);
+            const s = getSettings();
+            const defaultFormula = s.diceD100Mode ? '1d100' : (s.legacyDiceNaming ? '1d6' : '1d20');
+            const result = await doDiceRoll(String(value || defaultFormula), quiet);
             return result.total;
         },
         helpString: 'Roll the dice.',
@@ -609,7 +674,7 @@ export function installInterceptor() {
         if (settings.debugMode) {
             console.log(`Found user message at index ${idx}.`);
             console.log(`Extracted Text Content Length: ${content.length}`);
-            console.log(`Content includes RNG tag? ${content.includes("[RNG_QUEUE v6.0_PROPER]")}`);
+            console.log(`Content includes RNG tag? ${content.includes('[RNG_QUEUE v6.0_PROPER]') || content.includes('[RNG_QUEUE_d100 v6.0_PROPER]')}`);
             if (skipInjection) console.log("[RPG Tracker] Path 1 active: skipping user-message injection; keyword scan will still run.");
         }
 
@@ -631,10 +696,17 @@ export function installInterceptor() {
             const relBlock = await buildNpcRelationsBlock(settings);
             if (relBlock) injections += relBlock;
 
-            if (settings.rngEnabled && !content.includes("[RNG_QUEUE v6.0_PROPER]")) {
-                const queue = makeRngQueue(RNG_QUEUE_LEN);
-                injections += buildRngBlock(queue);
-                if (settings.debugMode) console.log("RNG Queue generated for injection.");
+            if (settings.rngEnabled) {
+                if (settings.rngQueueD20 && !content.includes('[RNG_QUEUE v6.0_PROPER]')) {
+                    const queue = makeRngQueue(RNG_QUEUE_LEN, false);
+                    injections += buildRngBlock(queue, false);
+                    if (settings.debugMode) console.log("RNG Queue (d20) generated for injection.");
+                }
+                if (settings.rngQueueD100 && !content.includes('[RNG_QUEUE_d100 v6.0_PROPER]')) {
+                    const queue = makeRngQueue(30, true);
+                    injections += buildRngBlock(queue, true);
+                    if (settings.debugMode) console.log("RNG Queue (d100) generated for injection.");
+                }
             }
 
             if (settings.currentMemo && !content.includes("### STATE MEMO (DO NOT REPEAT)")) {
@@ -1146,6 +1218,16 @@ async function maybeRollbackRouterPassForSwipe(msg) {
     if (isRouterRunning()) return;
 
     const settings = getSettings();
+    if (settings.routerSwipeRollback === false) {
+        recordSchedulerEvent('la_swipe_rollback_skipped', {
+            reason: 'setting_disabled',
+            fromSwipe: msg.extra.rpgRouterRanForSwipe,
+            toSwipe: currentSwipeId,
+        });
+        clearRouterSwipeMarkers(msg);
+        return;
+    }
+
     const runId = msg.extra.rpgRouterRunId;
     const postWm = msg.extra.rpgRouterPostPassWatermark;
     const latest = settings.routerHistory?.[0];

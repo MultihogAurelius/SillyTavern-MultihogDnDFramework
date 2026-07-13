@@ -690,6 +690,11 @@ You may be asked to use Markers: ((PLS)), ((B)), ((XB)), ((BDG)), ((HGT)). These
         fullViewSections: [],
         blockOrder: ['COMBAT', 'CHARACTER', 'PARTY', 'INVENTORY', 'ABILITIES', 'SPELLS', 'XP', 'TIME'],
         legacyDiceNaming: false,
+        diceD100Mode: false,
+        rngToolD20: true,
+        rngToolD100: false,
+        rngQueueD20: true,
+        rngQueueD100: false,
         closeCount: 0,
         lookbackMessages: 2,
         directPromptContext: 5,
@@ -754,6 +759,7 @@ You may be asked to use Markers: ((PLS)), ((B)), ((XB)), ((BDG)), ((HGT)). These
         routerPaused: false,
         routerRunEvery: 3,
         routerIncludeHidden: false,
+        routerSwipeRollback: true,   // undo lorebook pass when swiping away from the generation that triggered it
         routerLookbackSinceLastRun: true,   // default: capture all messages since the last agent run
         routerLookbackSinceLastUser: false,  // alternative: capture since last user message
         routerLastRunChatLength: 0,          // watermark: chat.length when the agent last ran (indexing only, not shown to user)
@@ -1031,6 +1037,11 @@ const CARTRIDGE_PAYLOAD_KEYS = [
     'npcRelationshipBars',
     'rngEnabled',
     'diceFunctionTool',
+    'diceD100Mode',
+    'rngToolD20',
+    'rngToolD100',
+    'rngQueueD20',
+    'rngQueueD100',
     'use24hTime',
     'useDdMmYyFormat',
     'gameSystems',
@@ -1086,7 +1097,9 @@ export const CARTRIDGE_PAYLOAD_GROUPS = [
         keys: [
             'systemPromptTemplate', 'modules', 'blockOrder', 'stockPrompts',
             'syspromptModules', 'syspromptSectionOrder', 'customSyspromptLibrary',
-            'rngEnabled', 'diceFunctionTool', 'use24hTime', 'useDdMmYyFormat',
+            'rngEnabled', 'diceFunctionTool', 'diceD100Mode',
+            'rngToolD20', 'rngToolD100', 'rngQueueD20', 'rngQueueD100',
+            'use24hTime', 'useDdMmYyFormat',
         ],
     },
     {

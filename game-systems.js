@@ -265,10 +265,11 @@ export function syncAllNarratorTogglesForUnlockState() {
  * Applies the built-in per-tag content transform (relationship_tracking swap,
  * rng_system disabled-fallback text, quests instruction/hardcore-mode stripping,
  * footer time-format) to one base section in isolation. Returns the full
- * `<tag>...</tag>` block, or '' if the transform determines it should be omitted.
+ * `<tag>...<tag>` block, or '' if the transform determines it should be omitted.
  */
 export function transformBaseSectionContent(tag, innerContent, settings) {
     const mods = settings.syspromptModules || {};
+    const d100Mode = !!settings.diceD100Mode;
 
     if (tag === 'relationship_tracking') {
         if (!settings.npcRelationshipBars) return '';
@@ -276,7 +277,8 @@ export function transformBaseSectionContent(tag, innerContent, settings) {
     }
 
     if (tag === 'rng_system' && !settings.rngEnabled) {
-        let fallbackText = "To resolve actions, simulate a fair d20 roll internally and maintain all ROLL FORMAT rules.\n\n";
+        const dieWord = d100Mode ? 'd100' : 'd20';
+        let fallbackText = `To resolve actions, simulate a fair ${dieWord} roll internally and maintain all ROLL FORMAT rules.\n\n`;
         let matchedFormat = false;
         if (innerContent.includes('[ROLL FORMAT]')) {
             const rollFormatMatch = innerContent.match(/(\[ROLL FORMAT\][\s\S]*?)(?=\n\n\[FALLBACK\]|$)/i);
@@ -286,7 +288,7 @@ export function transformBaseSectionContent(tag, innerContent, settings) {
             if (l4) { fallbackText += l4[1].replace(/5\.\s*/g, '').trim(); matchedFormat = true; }
         }
         if (!matchedFormat) {
-            fallbackText += "Output rolls as `[ROLL: 1d20+Mod vs DC X (Result: Y) -> Outcome]` or `[ROLL: 1d20+Mod (Result: Y) -> Outcome]`.";
+            fallbackText += `Output rolls as \`[ROLL: 1${dieWord}+Mod vs DC X (Result: Y) -> Outcome]\` or \`[ROLL: 1${dieWord}+Mod (Result: Y) -> Outcome]\`.`;
         }
         return `<rng_system>\n${fallbackText.trim()}\n</rng_system>`;
     }
@@ -340,7 +342,23 @@ export function transformBaseSectionContent(tag, innerContent, settings) {
         return footerContent;
     }
 
-    return `<${tag}>\n${innerContent.trim()}\n</${tag}>`;
+    // Default: wrap inner content in the section tag
+    let result = `<${tag}>\n${innerContent.trim()}\n</${tag}>`;
+
+    // ── d100 Mode substitutions ─────────────────────────────────────────────
+    // Applied last so they work across all sections (rng_system, constraints, etc.)
+    if (d100Mode) {
+        result = result
+            .replace(/\bRollTheDice\b/g, 'RollTheDiceD100')
+            .replace(/\[RNG_QUEUE v6\.0_PROPER\]/g, '[RNG_QUEUE_d100 v6.0_PROPER]')
+            .replace(/\[\/RNG_QUEUE\]/g, '[/RNG_QUEUE_d100]')
+            .replace(/\b1d20\b/g, '1d100')
+            .replace(/\bd20\b/gi, 'd100')
+            .replace(/(?:The\s+)?first\s+number\s+in\s+each\s+entry\s+is\s+the\s+d100\s+result/gi, 'Each entry in the queue is a d100 result')
+            .replace(/(queue\s+length(?:\s+is|:)\s+)12/gi, '$130');
+    }
+
+    return result;
 }
 
 /**

@@ -117,6 +117,7 @@ export function getSchedulerSnapshot() {
             npcRelationshipBars: !!settings.npcRelationshipBars,
             stateTrackerSwipeRollback: settings.stateTrackerSwipeRollback !== false,
             routerLookbackSinceLastRun: settings.routerLookbackSinceLastRun !== false,
+            routerSwipeRollback: settings.routerSwipeRollback !== false,
             routerWatermarkBaselinePending: !!settings.routerWatermarkBaselinePending,
             isRouterRunning: typeof isRouterRunning === 'function' ? isRouterRunning() : null,
             isStateModelRunning: typeof globalThis._rpgStateModelRunning === 'function'

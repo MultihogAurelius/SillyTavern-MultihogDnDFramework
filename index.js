@@ -2899,6 +2899,7 @@ Gear:
                     settings.rngEnabled = false;
                     settings.diceFunctionTool = false;
                 }
+                autoSelectRngToolsFromMode(settings);
             });
         });
     });
@@ -3764,6 +3765,11 @@ function createPanel() {
                         <label style="display: flex; align-items: center; gap: 5px; margin-bottom: 10px; cursor: pointer; font-size: 0.769em; opacity: 0.75;" title="Include hidden messages (e.g. messages collapsed by a summarizer) in the agent's lookback window.">
                             <input type="checkbox" id="rt-agent-router-include-hidden" ${settings.routerIncludeHidden ? 'checked' : ''}>
                             <span>Include hidden msgs (summarizer)</span>
+                        </label>
+
+                        <label style="display: flex; align-items: center; gap: 5px; margin-bottom: 10px; cursor: pointer; font-size: 0.769em; opacity: 0.75;" title="When enabled, swiping away from a generation that triggered the agent undoes that lorebook pass. Swipes never advance the Run Every counter either way.">
+                            <input type="checkbox" id="rt-agent-router-swipe-rollback" ${settings.routerSwipeRollback !== false ? 'checked' : ''}>
+                            <span>Auto-rollback on swipe</span>
                         </label>
 
                         <div style="display: flex; gap: 8px; margin-bottom: 10px; align-items: flex-end;">
@@ -8307,6 +8313,16 @@ Rules:
             });
         }
 
+        const swipeRollbackCheck = /** @type {HTMLInputElement} */ (agentPanel.querySelector('#rt-agent-router-swipe-rollback'));
+        if (swipeRollbackCheck) {
+            swipeRollbackCheck.addEventListener('change', () => {
+                const s = getSettings();
+                s.routerSwipeRollback = swipeRollbackCheck.checked;
+                $('#rpg_tracker_router_swipe_rollback').prop('checked', s.routerSwipeRollback);
+                saveSettings();
+            });
+        }
+
         // ── Run-every counter ──
         const runEveryInput = /** @type {HTMLInputElement} */ (agentPanel.querySelector('#rt-agent-router-run-every'));
         if (runEveryInput) {
@@ -9534,8 +9550,8 @@ export function buildSysprompt(rawText) {
 
     if (!s.rngEnabled) {
         content = content
-            .replace(/.*RollTheDice.*\n?/gi, '')
-            .replace(/.*RNG_QUEUE v6.0_PROPER.*\n?/gi, '');
+            .replace(/.*RollTheDice(?:D100)?.*\n?/gi, '')
+            .replace(/.*RNG_QUEUE(?:_d100)?\s+v6\.0_PROPER.*\n?/gi, '');
     }
 
     return content
@@ -10213,6 +10229,46 @@ async function runPortraitMigrationIfNeeded() {
             registerDiceFunctionTool();
             registerDiceSlashCommand();
             toastr['info']("Dice logic updated.", "RPG Tracker");
+        });
+
+        $('#rpg_tracker_dice_d100_mode').prop('checked', !!settings.diceD100Mode).on('change', function () {
+            settings.diceD100Mode = !!$(this).prop('checked');
+            autoSelectRngToolsFromMode(settings);
+            saveSettings();
+            registerDiceFunctionTool();
+            registerDiceSlashCommand();
+            scheduleAutoApply();
+            toastr['info'](settings.diceD100Mode ? '🎲 d100 Mode enabled.' : '🎲 d100 Mode disabled — reverted to d20.', 'RPG Tracker');
+        });
+
+        $('#rpg_rng_tool_d20').prop('checked', !!settings.rngToolD20).on('change', function () {
+            settings.rngToolD20 = !!$(this).prop('checked');
+            updateD100ToggleState(settings);
+            saveSettings();
+            registerDiceFunctionTool();
+            scheduleAutoApply();
+        });
+
+        $('#rpg_rng_tool_d100').prop('checked', !!settings.rngToolD100).on('change', function () {
+            settings.rngToolD100 = !!$(this).prop('checked');
+            updateD100ToggleState(settings);
+            saveSettings();
+            registerDiceFunctionTool();
+            scheduleAutoApply();
+        });
+
+        $('#rpg_rng_queue_d20').prop('checked', !!settings.rngQueueD20).on('change', function () {
+            settings.rngQueueD20 = !!$(this).prop('checked');
+            updateD100ToggleState(settings);
+            saveSettings();
+            scheduleAutoApply();
+        });
+
+        $('#rpg_rng_queue_d100').prop('checked', !!settings.rngQueueD100).on('change', function () {
+            settings.rngQueueD100 = !!$(this).prop('checked');
+            updateD100ToggleState(settings);
+            saveSettings();
+            scheduleAutoApply();
         });
 
         $('#rpg_tracker_dice_function_tool').prop('checked', settings.diceFunctionTool).on('change', function () {
@@ -11942,16 +11998,15 @@ RULES:
                 if (val === 'hybrid') {
                     fresh.rngEnabled = true;
                     fresh.diceFunctionTool = true;
-                    registerDiceFunctionTool();
                 } else if (val === 'legacy') {
                     fresh.rngEnabled = true;
                     fresh.diceFunctionTool = false;
-                    registerDiceFunctionTool();
                 } else {
                     fresh.rngEnabled = false;
                     fresh.diceFunctionTool = false;
-                    registerDiceFunctionTool();
                 }
+                autoSelectRngToolsFromMode(fresh);
+                registerDiceFunctionTool();
                 saveSettings();
                 scheduleAutoApply();
             });
@@ -12269,6 +12324,11 @@ RULES:
         $('#rpg_tracker_router_include_hidden').prop('checked', settings.routerIncludeHidden).on('change', function () {
             settings.routerIncludeHidden = $(this).prop('checked');
             $('#rt-agent-router-include-hidden').prop('checked', settings.routerIncludeHidden);
+            saveSettings();
+        });
+        $('#rpg_tracker_router_swipe_rollback').prop('checked', settings.routerSwipeRollback !== false).on('change', function () {
+            settings.routerSwipeRollback = $(this).prop('checked');
+            $('#rt-agent-router-swipe-rollback').prop('checked', settings.routerSwipeRollback);
             saveSettings();
         });
         // Lorebook Agent lookback mode — three-option radio group
@@ -13273,6 +13333,53 @@ RULES:
             toastr['success'](`Profile "${name}" deleted.`, 'RPG Tracker');
         });
 
+        function syncRngToolsUi(s) {
+            $('#rpg_rng_tool_d20').prop('checked', !!s.rngToolD20);
+            $('#rpg_rng_tool_d100').prop('checked', !!s.rngToolD100);
+            $('#rpg_rng_queue_d20').prop('checked', !!s.rngQueueD20);
+            $('#rpg_rng_queue_d100').prop('checked', !!s.rngQueueD100);
+        }
+
+        function updateD100ToggleState(s) {
+            const hasD100 = !!(s.rngToolD100 || s.rngQueueD100);
+            s.diceD100Mode = hasD100;
+            $('#rpg_tracker_dice_d100_mode').prop('checked', hasD100);
+        }
+
+        function autoSelectRngToolsFromMode(s) {
+            if (!s.rngEnabled) {
+                s.rngToolD20 = false;
+                s.rngToolD100 = false;
+                s.rngQueueD20 = false;
+                s.rngQueueD100 = false;
+            } else if (s.diceFunctionTool === false) {
+                if (s.diceD100Mode) {
+                    s.rngToolD20 = false;
+                    s.rngToolD100 = false;
+                    s.rngQueueD20 = false;
+                    s.rngQueueD100 = true;
+                } else {
+                    s.rngToolD20 = false;
+                    s.rngToolD100 = false;
+                    s.rngQueueD20 = true;
+                    s.rngQueueD100 = false;
+                }
+            } else {
+                if (s.diceD100Mode) {
+                    s.rngToolD20 = false;
+                    s.rngToolD100 = true;
+                    s.rngQueueD20 = false;
+                    s.rngQueueD100 = true;
+                } else {
+                    s.rngToolD20 = true;
+                    s.rngToolD100 = false;
+                    s.rngQueueD20 = true;
+                    s.rngQueueD100 = false;
+                }
+            }
+            syncRngToolsUi(s);
+        }
+
         function syncSettingsUi() {
             const s = getSettings();
 
@@ -13284,12 +13391,15 @@ RULES:
                 currentRngMode = 'legacy';
             }
             $(`input[name="rpg_sysprompt_rng_mode"][value="${currentRngMode}"]`).prop('checked', true);
+            syncRngToolsUi(s);
 
             // General toggles
             $('#rpg_tracker_enabled').prop('checked', !!s.enabled);
             $('#rpg_tracker_debug').prop('checked', !!s.debugMode);
             $('#rpg_tracker_daynight_cycle').prop('checked', !!s.dayNightCycleEnabled);
             $('#rpg_tracker_auto_reset_prompts').prop('checked', !!s.autoResetPromptsOnUpdate);
+            $('#rpg_tracker_legacy_dice').prop('checked', !!s.legacyDiceNaming);
+            $('#rpg_tracker_dice_d100_mode').prop('checked', !!s.diceD100Mode);
             $('#rpg_tracker_enable_portraits').prop('checked', s.enablePortraits !== false);
             $('#rpg_portrait_generator_source').val(s.portraitGeneratorSource || 'native');
             $('#rpg_tracker_pollinations_group').toggle((s.portraitGeneratorSource || 'native') === 'pollinations');
@@ -13320,6 +13430,8 @@ RULES:
             $('#rt-agent-router-native-kw').prop('checked', !!s.routerNativeKeywordActivation);
             $('#rpg_tracker_router_include_hidden').prop('checked', !!s.routerIncludeHidden);
             $('#rt-agent-router-include-hidden').prop('checked', !!s.routerIncludeHidden);
+            $('#rpg_tracker_router_swipe_rollback').prop('checked', s.routerSwipeRollback !== false);
+            $('#rt-agent-router-swipe-rollback').prop('checked', s.routerSwipeRollback !== false);
 
             $('#rpg_tracker_router_source').val(s.routerConnectionSource || 'default');
             updateRouterConnectionPanels();
