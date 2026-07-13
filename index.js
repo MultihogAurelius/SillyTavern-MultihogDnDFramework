@@ -41,7 +41,6 @@ let _prefixDeriveTimer = null; // Pending CHAT_CHANGED → prefix-derivation tim
 let _sessionBootstrapChatId = null;
 let _bootstrapSyncPromise = null;
 let _pillDeselectHandler = null;
-let _tabModeMenuDeselectHandler = null;
 let renderRouterUI = null;
 globalThis._rpgRenderRouterUI = () => { if (typeof renderRouterUI === 'function') renderRouterUI(); };
 /** Rebuilds CAMPAIGN RECORDS; assigned in createPanel when the agent panel is wired. */
@@ -3144,7 +3143,7 @@ Gear:
         });
     });
 
-    // ── Tab Mode: tab strip, overflow "More" menu, vitals-strip jump, swipe ──
+    // ── Tab Mode: tab strip, vitals-strip jump, swipe ──
     //
     // Deliberately NOT touching scrollTop anywhere here. Any programmatic scroll on tab
     // switch (even a "helpful" one) reads as a jarring auto-scroll/bounce, forcing the
@@ -3153,33 +3152,15 @@ Gear:
     // enough extra room below the content that the browser practically never needs to
     // clamp scrollTop when a shorter tab is selected — so whatever position the user
     // parked the viewport at stays exactly where it is across tab switches.
-    el.querySelectorAll('.rt-tab-btn[data-tag], .rt-tab-more-item[data-tag]').forEach(btn => {
+    el.querySelectorAll('.rt-tab-btn[data-tag]').forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
             const tag = btn.dataset.tag;
             if (!tag) return;
             saveActiveTab(tag);
-            el.querySelector('#rt-tab-more-menu')?.classList.remove('open');
             refresh();
         });
     });
-
-    const tabMoreToggle = el.querySelector('#rt-tab-more-toggle');
-    if (tabMoreToggle) {
-        tabMoreToggle.addEventListener('click', (e) => {
-            e.stopPropagation();
-            el.querySelector('#rt-tab-more-menu')?.classList.toggle('open');
-        });
-    }
-
-    if (!_tabModeMenuDeselectHandler) {
-        _tabModeMenuDeselectHandler = (e) => {
-            if (!e.target.closest('.rt-tab-more-wrap')) {
-                document.querySelectorAll('.rt-tab-more-menu.open').forEach(m => m.classList.remove('open'));
-            }
-        };
-        document.addEventListener('click', _tabModeMenuDeselectHandler);
-    }
 
     el.querySelectorAll('.rt-vitals-member[data-jump-tag]').forEach(btn => {
         btn.addEventListener('click', (e) => {

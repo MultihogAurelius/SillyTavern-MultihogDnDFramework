@@ -945,11 +945,11 @@
 }
 
 /* Tab strip: sticks to the top of the scroll area so it stays reachable even
-   when the pinned Character/Combat cards above it grow tall */
+   when the pinned Character/Combat cards above it grow tall. Tabs fill each row
+   and wrap to additional rows instead of collapsing into an overflow menu. */
 .rt-tab-strip {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
     gap: 4px;
     padding: 6px 2px;
     position: sticky;
@@ -965,6 +965,9 @@
 
 .rt-tab-btn {
     position: relative;
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
     background: rgba(255,255,255,0.04);
     border: 1px solid rgba(255,255,255,0.1);
     border-radius: 6px;
@@ -1161,62 +1164,6 @@
     to { opacity: 1; transform: translateY(0); }
 }
 
-.rt-tab-more-wrap {
-    position: relative;
-}
-
-.rt-tab-more-menu {
-    display: none;
-    position: absolute;
-    top: calc(100% + 4px);
-    right: 0;
-    flex-direction: column;
-    gap: 2px;
-    background: var(--rt-bg);
-    backdrop-filter: var(--rt-blur);
-    border: 1px solid rgba(255,255,255,0.15);
-    border-radius: 6px;
-    padding: 4px;
-    min-width: 150px;
-    z-index: 10;
-    box-shadow: 0 6px 18px rgba(0,0,0,0.35);
-}
-
-.rt-tab-more-menu.open {
-    display: flex;
-}
-
-.rt-tab-more-item {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    background: none;
-    border: none;
-    border-radius: 4px;
-    color: var(--rt-text-muted);
-    cursor: pointer;
-    padding: 6px 8px;
-    font-size: 0.88em;
-    text-align: left;
-    white-space: nowrap;
-}
-
-.rt-tab-more-item .rt-tab-badge {
-    position: static;
-    margin-left: auto;
-    padding: 1px 6px;
-    font-size: 0.85em;
-}
-
-.rt-tab-more-item:hover {
-    background: rgba(255,255,255,0.07);
-    color: var(--rt-text);
-}
-
-.rt-tab-more-item.active {
-    color: var(--rt-accent, #00ffaa);
-}
-
 .rt-tabmode-content {
     display: flex;
     flex-direction: column;
@@ -1243,11 +1190,6 @@
     .rt-tab-btn {
         padding: 9px 13px;
         font-size: 1.15em;
-    }
-
-    .rt-tab-more-item {
-        padding: 10px 10px;
-        font-size: 0.95em;
     }
 }
 

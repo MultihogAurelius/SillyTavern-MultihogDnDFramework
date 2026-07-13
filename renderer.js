@@ -2220,11 +2220,9 @@ function formatValueToCurrency(totalCp, detectedCurrency) {
 // unmodified detail — reusing renderSectionCard directly. Every other block
 // (Inventory, Abilities, Spells, XP, Time, Quests, Party, custom modules)
 // becomes a tab; only the active tab's card is rendered into the content pane.
-// A compact "party vitals" strip (portrait + HP) sits between the pinned area
-// and the tab strip so party HP stays glanceable without opening the Party tab.
+// The tab strip wraps to additional rows when space runs out.
 
 const TABMODE_PINNED_TAGS = ['CHARACTER', 'COMBAT'];
-const TABMODE_PIN_LIMIT = 6; // tabs shown as direct icons before collapsing into "More ▾"
 
 /**
  * Lightweight line scan for "Name: cur/max HP ..." entries in a PARTY block,
@@ -2372,8 +2370,7 @@ function renderBenchedPartyPanel(benchedContent, isPanelCollapsed, expandedNames
 
 /**
  * Renders the full Tab Mode view: pinned CHARACTER/COMBAT cards, the party
- * vitals strip, the tab strip (pinned icons + overflow "More ▾" menu), and a
- * single content pane for the active tab.
+ * vitals strip, a wrapping tab strip, and a single content pane for the active tab.
  * @param {string} memo
  * @param {object} sectionPages  mutable pagination state, keyed by tag
  * @param {{quests: object[], currentTime: string}|null} questsCtx  quest data, or null if the Quests module is off
@@ -2438,9 +2435,6 @@ export function renderTabModeView(memo, sectionPages, questsCtx = null) {
         return badges;
     };
 
-    const pinnedTabTags = tabTags.slice(0, TABMODE_PIN_LIMIT);
-    const overflowTabTags = tabTags.slice(TABMODE_PIN_LIMIT);
-
     const tabBtnHtml = (tag) => {
         const { icon, label } = tabMeta(tag);
         const isActive = tag === activeTag;
@@ -2449,24 +2443,7 @@ export function renderTabModeView(memo, sectionPages, questsCtx = null) {
         </button>`;
     };
 
-    let overflowHtml = '';
-    if (overflowTabTags.length > 0) {
-        const overflowActive = overflowTabTags.includes(activeTag);
-        const overflowItems = overflowTabTags.map(tag => {
-            const { icon, label } = tabMeta(tag);
-            return `<button class="rt-tab-more-item${tag === activeTag ? ' active' : ''}" data-tag="${tag}">
-                <span class="rt-tab-icon">${icon}</span> ${escapeHtml(label)}${tabBadge(tag)}
-            </button>`;
-        }).join('');
-        overflowHtml = `<div class="rt-tab-more-wrap">
-            <button class="rt-tab-btn rt-tab-more-btn${overflowActive ? ' active' : ''}" id="rt-tab-more-toggle" title="More modules">
-                <span class="rt-tab-icon">⋯</span>
-            </button>
-            <div class="rt-tab-more-menu" id="rt-tab-more-menu">${overflowItems}</div>
-        </div>`;
-    }
-
-    const tabStripHtml = `<div class="rt-tab-strip">${pinnedTabTags.map(tabBtnHtml).join('')}${overflowHtml}</div>`;
+    const tabStripHtml = `<div class="rt-tab-strip">${tabTags.map(tabBtnHtml).join('')}</div>`;
 
     const contentHtml = activeTag === 'QUESTS'
         ? renderQuestLog(questsCtx?.quests || [], questsCtx?.currentTime || '', collapsed, detached, 'QUESTS')
