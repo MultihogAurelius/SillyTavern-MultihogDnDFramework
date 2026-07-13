@@ -359,6 +359,58 @@
     white-space: nowrap;
 }
 
+#rt-daynight-badge-slot:empty {
+    display: none;
+}
+
+/* Day/night: center the sky badge between the status dot and header icons */
+.rpg-tracker-panel.rt-daynight-active #rt-daynight-badge-slot {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-width: 20px;
+    margin: 0 2px;
+}
+
+.rpg-tracker-panel.rt-daynight-active .rt-daynight-badge {
+    width: 22px;
+    height: 22px;
+}
+
+.rpg-tracker-panel.rt-daynight-active .rt-sky-disc {
+    width: 15px;
+    height: 15px;
+}
+
+.rpg-tracker-panel.rt-daynight-active .rt-sky-dawn .rt-sky-disc,
+.rpg-tracker-panel.rt-daynight-active .rt-sky-morning .rt-sky-disc,
+.rpg-tracker-panel.rt-daynight-active .rt-sky-midday .rt-sky-disc {
+    box-shadow: 0 0 8px 3px rgba(255, 215, 0, 0.55);
+}
+
+.rpg-tracker-panel.rt-daynight-active .rt-sky-afternoon .rt-sky-disc {
+    box-shadow: 0 0 7px 2px rgba(255, 204, 102, 0.55);
+}
+
+.rpg-tracker-panel.rt-daynight-active .rt-sky-sunset .rt-sky-disc {
+    box-shadow: 0 0 8px 3px rgba(230, 99, 61, 0.65);
+}
+
+.rpg-tracker-panel.rt-daynight-active .rt-sky-night .rt-sky-disc,
+.rpg-tracker-panel.rt-daynight-active .rt-sky-lateNight .rt-sky-disc {
+    box-shadow: 0 0 6px 2px rgba(153, 153, 238, 0.55);
+}
+
+.rpg-tracker-panel.rt-daynight-active .rt-sky-stars::before {
+    box-shadow:
+        -8px -5px 0 0 #fff,
+        5px -8px 0 0 #fff,
+        9px 2px 0 0 rgba(255, 255, 255, 0.8),
+        -4px 8px 0 0 rgba(255, 255, 255, 0.7),
+        -10px 4px 0 0 rgba(255, 255, 255, 0.6);
+}
+
 .rpg-tracker-header {
     padding: 8px 12px;
     background: var(--rt-header-bg);
@@ -373,6 +425,97 @@
     user-select: none;
     flex-shrink: 0;
     position: relative;
+    overflow: hidden;
+}
+
+.rpg-tracker-header > :not(.rt-header-starfield) {
+    z-index: 1;
+}
+
+/* Night header starfield — scattered across the full bar width */
+.rt-header-starfield {
+    display: none;
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+}
+
+.rpg-tracker-panel.rt-phase-night .rt-header-starfield,
+.rpg-tracker-panel.rt-phase-lateNight .rt-header-starfield {
+    display: block;
+}
+
+.rt-header-starfield::before,
+.rt-header-starfield::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+}
+
+.rt-header-starfield::before {
+    animation: rt-header-star-twinkle 4.2s ease-in-out infinite;
+    background-image:
+        radial-gradient(1px 1px at 3% 28%, rgba(255, 255, 255, 0.95), transparent),
+        radial-gradient(1px 1px at 8% 62%, rgba(255, 255, 255, 0.55), transparent),
+        radial-gradient(1.5px 1.5px at 12% 44%, rgba(255, 255, 255, 0.85), transparent),
+        radial-gradient(1px 1px at 17% 74%, rgba(255, 255, 255, 0.45), transparent),
+        radial-gradient(1px 1px at 21% 36%, rgba(255, 255, 255, 0.7), transparent),
+        radial-gradient(1px 1px at 26% 56%, rgba(255, 255, 255, 0.9), transparent),
+        radial-gradient(1px 1px at 31% 30%, rgba(255, 255, 255, 0.5), transparent),
+        radial-gradient(1.5px 1.5px at 35% 68%, rgba(255, 255, 255, 0.8), transparent),
+        radial-gradient(1px 1px at 40% 48%, rgba(255, 255, 255, 0.65), transparent),
+        radial-gradient(1px 1px at 44% 78%, rgba(255, 255, 255, 0.4), transparent),
+        radial-gradient(1px 1px at 49% 34%, rgba(255, 255, 255, 0.75), transparent),
+        radial-gradient(1px 1px at 53% 58%, rgba(255, 255, 255, 0.55), transparent),
+        radial-gradient(1.5px 1.5px at 58% 42%, rgba(255, 255, 255, 0.95), transparent),
+        radial-gradient(1px 1px at 62% 72%, rgba(255, 255, 255, 0.5), transparent),
+        radial-gradient(1px 1px at 67% 32%, rgba(255, 255, 255, 0.7), transparent),
+        radial-gradient(1px 1px at 71% 54%, rgba(255, 255, 255, 0.6), transparent),
+        radial-gradient(1px 1px at 76% 66%, rgba(255, 255, 255, 0.85), transparent),
+        radial-gradient(1px 1px at 80% 38%, rgba(255, 255, 255, 0.45), transparent),
+        radial-gradient(1.5px 1.5px at 84% 50%, rgba(255, 255, 255, 0.9), transparent),
+        radial-gradient(1px 1px at 88% 70%, rgba(255, 255, 255, 0.55), transparent),
+        radial-gradient(1px 1px at 92% 36%, rgba(255, 255, 255, 0.75), transparent),
+        radial-gradient(1px 1px at 96% 58%, rgba(255, 255, 255, 0.65), transparent);
+}
+
+.rt-header-starfield::after {
+    animation: rt-header-star-twinkle-alt 5.5s ease-in-out infinite;
+    background-image:
+        radial-gradient(1px 1px at 5% 50%, rgba(255, 255, 255, 0.6), transparent),
+        radial-gradient(1px 1px at 10% 34%, rgba(255, 255, 255, 0.4), transparent),
+        radial-gradient(1px 1px at 15% 64%, rgba(255, 255, 255, 0.8), transparent),
+        radial-gradient(1.5px 1.5px at 20% 46%, rgba(255, 255, 255, 0.55), transparent),
+        radial-gradient(1px 1px at 24% 76%, rgba(255, 255, 255, 0.35), transparent),
+        radial-gradient(1px 1px at 29% 40%, rgba(255, 255, 255, 0.7), transparent),
+        radial-gradient(1px 1px at 33% 60%, rgba(255, 255, 255, 0.5), transparent),
+        radial-gradient(1px 1px at 38% 28%, rgba(255, 255, 255, 0.85), transparent),
+        radial-gradient(1px 1px at 42% 66%, rgba(255, 255, 255, 0.45), transparent),
+        radial-gradient(1.5px 1.5px at 47% 42%, rgba(255, 255, 255, 0.9), transparent),
+        radial-gradient(1px 1px at 51% 80%, rgba(255, 255, 255, 0.5), transparent),
+        radial-gradient(1px 1px at 56% 34%, rgba(255, 255, 255, 0.65), transparent),
+        radial-gradient(1px 1px at 60% 56%, rgba(255, 255, 255, 0.4), transparent),
+        radial-gradient(1px 1px at 65% 72%, rgba(255, 255, 255, 0.75), transparent),
+        radial-gradient(1px 1px at 69% 44%, rgba(255, 255, 255, 0.55), transparent),
+        radial-gradient(1.5px 1.5px at 74% 62%, rgba(255, 255, 255, 0.85), transparent),
+        radial-gradient(1px 1px at 78% 30%, rgba(255, 255, 255, 0.5), transparent),
+        radial-gradient(1px 1px at 82% 54%, rgba(255, 255, 255, 0.7), transparent),
+        radial-gradient(1px 1px at 86% 74%, rgba(255, 255, 255, 0.4), transparent),
+        radial-gradient(1px 1px at 90% 46%, rgba(255, 255, 255, 0.8), transparent),
+        radial-gradient(1px 1px at 94% 32%, rgba(255, 255, 255, 0.55), transparent),
+        radial-gradient(1px 1px at 98% 64%, rgba(255, 255, 255, 0.65), transparent);
+}
+
+@keyframes rt-header-star-twinkle {
+    0%, 100% { opacity: 0.9; }
+    50% { opacity: 0.4; }
+}
+
+@keyframes rt-header-star-twinkle-alt {
+    0%, 100% { opacity: 0.5; }
+    35% { opacity: 1; }
+    70% { opacity: 0.35; }
 }
 
 .rpg-tracker-header-left {

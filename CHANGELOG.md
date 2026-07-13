@@ -2,6 +2,12 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [5.2.1] - 2026-07-13
+
+### Changed
+- **Day/Night header layout**: Status indicator moved to the left of the title; sun/moon badge is slightly larger and centered between the title area and header icons.
+- **Night header starfield**: Night and late-night phases now scatter twinkling stars across the full header bar instead of only around the moon badge.
+
 ## [5.2.0] - 2026-07-13
 
 ### Added

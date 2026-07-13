@@ -3637,10 +3637,11 @@ function createPanel() {
     panel.innerHTML = `
             <div class="rt-resizer-tr" id="rt-resizer-tr" title="Resize from top-right"></div>
             <div class="rpg-tracker-header" id="rpg-tracker-header">
+                <div class="rt-header-starfield" aria-hidden="true"></div>
                 <div class="rpg-tracker-header-left">
+                    <div class="rpg-tracker-status-indicator active" id="rpg-tracker-status"></div>
                     <span class="rt-header-title-desktop">Multihog D&D Framework</span>
                     <span class="rt-header-title-mobile" style="display: none;">Multihog D&D</span>
-                    <div class="rpg-tracker-status-indicator active" id="rpg-tracker-status"></div>
                     <div id="rt-daynight-badge-slot"></div>
                     <button class="rpg-tracker-stop-btn" id="rpg-tracker-stop-btn" title="Stop Generation" style="display:none;">■</button>
                     <button class="rpg-tracker-icon-btn" id="rpg-tracker-chat-link-btn" style="font-size:13px;" title="Chat Link ON">🔗</button>
