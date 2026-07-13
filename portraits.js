@@ -1,9 +1,16 @@
-import { getSettings, getEffectiveRouterCampaignPrefix } from './state-manager.js';
+import { getSettings, getActiveChatId } from './state-manager.js';
 import { saveSettings } from './index.js';
 import { sendStateRequest } from './llm-client.js';
 import { parseMemoBlocks } from './renderer.js';
 import { escapeHtml, memoForGmContext } from './memo-processor.js';
 import { getLorebookManifest } from './router.js';
+import {
+    persistPortraitSrc,
+    deletePortraitFile,
+    isManagedPortraitPath,
+    purgeAllPortraitData,
+    countPortraitPathRefs,
+} from './portrait-storage.js';
 
 // Read an image File as a full-resolution Base64 data URL
 export function fileToDataUrl(file) {
@@ -37,18 +44,25 @@ export function normalizeEntityName(name) {
     return name.replace(/\s*\(.*?\)/g, '').trim();
 }
 
-export function applyPortraitData(entityName, src) {
+export async function applyPortraitData(entityName, src) {
     const s = getSettings();
     if (!s.customPortraits) s.customPortraits = {};
     const normName = normalizeEntityName(entityName);
-    if (src) {
-        s.customPortraits[normName] = src;
-    } else {
+    const chatId = getActiveChatId();
+    const previous = s.customPortraits[normName];
+
+    if (!src) {
         delete s.customPortraits[normName];
+        if (previous && isManagedPortraitPath(previous) && countPortraitPathRefs(s, previous) === 0) {
+            await deletePortraitFile(previous);
+        }
+    } else {
+        const stored = await persistPortraitSrc(src, chatId, normName);
+        s.customPortraits[normName] = stored;
     }
     // Portrait sets are infrequent, deliberate actions (not rapid keystrokes like the memo
     // textarea) — force an immediate flush instead of risking the 2s debounce window.
-    saveSettings(true);
+    await saveSettings(true);
 }
 
 // ── Pollinations.ai model list (image-only, sorted cheapest → most expensive) ──
@@ -640,7 +654,7 @@ export async function generateWithPollinations(prompt, entityName, localApply, r
             try {
                 const dataUrl = await genPromise;
                 const finalUrl = dataUrl.startsWith('data:') ? await scaleImageTo512Square(dataUrl) : dataUrl;
-                localApply(finalUrl);
+                await localApply(finalUrl);
                 if (typeof refresh === 'function') refresh();
                 toastr['success'](`Portrait applied for ${entityName}!`, 'RPG Tracker');
             } catch (err) {
@@ -730,7 +744,7 @@ export async function generateWithNativeExtension(prompt, entityName, localApply
             try {
                 const imageUrl = await genPromise;
                 const finalUrl = imageUrl.startsWith('data:') ? await scaleImageTo512Square(imageUrl) : imageUrl;
-                localApply(finalUrl);
+                await localApply(finalUrl);
                 if (typeof refresh === 'function') refresh();
                 toastr['success'](`Portrait applied for ${entityName}!`, 'RPG Tracker');
             } catch (err) {
@@ -820,7 +834,7 @@ export async function autoGeneratePartyPortraits(refresh) {
             const prompt = await generatePortraitPrompt(name);
             const dataUrl = await generatePortraitDirect(prompt, name);
             const scaled = await scaleImageTo512Square(dataUrl);
-            applyPortraitData(name, scaled);
+            await applyPortraitData(name, scaled);
             successCount++;
             if (typeof refresh === 'function') refresh();
         } catch (err) {
@@ -861,7 +875,7 @@ export async function autoGenerateEnemyPortraits(refresh) {
             const prompt = await generatePortraitPrompt(name);
             const dataUrl = await generatePortraitDirect(prompt, name);
             const scaled = await scaleImageTo512Square(dataUrl);
-            applyPortraitData(name, scaled);
+            await applyPortraitData(name, scaled);
             successCount++;
             if (typeof refresh === 'function') refresh();
         } catch (err) {
@@ -878,11 +892,11 @@ export async function autoGenerateEnemyPortraits(refresh) {
  * Removes all custom portraits from the settings.
  * @param {function} refresh - callback to refresh the UI
  */
-export function removeAllPortraits(refresh) {
+export async function removeAllPortraits(refresh) {
     const s = getSettings();
-    s.customPortraits = {};
-    saveSettings(true);
-    toastr['success']('All custom portraits removed.', 'RPG Tracker');
+    await purgeAllPortraitData(s);
+    await saveSettings(true);
+    toastr['success']('All custom portraits removed (including saved chat copies).', 'RPG Tracker');
     if (typeof refresh === 'function') refresh();
 }
 
@@ -973,7 +987,7 @@ export function triggerBackgroundPortraitGeneration(name, refresh, npcContent = 
             console.log(`[RPG Tracker] Successfully received portrait dataUrl for "${name}". Scaling...`);
             const scaled = await scaleImageTo512Square(dataUrl);
             console.log(`[RPG Tracker] Applying portrait data for "${name}"...`);
-            applyPortraitData(name, scaled);
+            await applyPortraitData(name, scaled);
             toastr['success'](`Portrait auto-generated and applied for ${name}!`, 'RPG Tracker');
             if (typeof refresh === 'function') {
                 console.log(`[RPG Tracker] Triggering UI refresh callback...`);

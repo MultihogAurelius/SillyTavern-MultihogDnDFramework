@@ -2,6 +2,29 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [5.1.9] - 2026-07-13
+
+Release tag for portrait file-storage work (5.1.6–5.1.8).
+
+## [5.1.8] - 2026-07-13
+
+### Fixed
+- **Portrait migration race**: Block `loadChatState` / `saveChatState` while bulk migration runs so async uploads are not overwritten by chat-switch handlers mid-flight. Migrate chat partitions before live state, then re-sync live portraits from the active chat.
+
+## [5.1.7] - 2026-07-13
+
+### Fixed
+- **Portrait migration loop on refresh**: Migration now runs after chat state bootstrap, flushes settings synchronously to disk (instead of a debounced save that could be lost on F5), and only shows the success toast once all embedded portraits are actually gone from settings.
+
+## [5.1.6] - 2026-07-13
+
+### Fixed
+- **Portrait File Storage**: Custom portraits are no longer stored as base64 inside `settings.json`. New and migrated portraits are saved under `user/images/rpg_tracker_portraits/` with lightweight path references in settings — preventing settings bloat across many chats and auto-generated portraits.
+- **Automatic Portrait Migration**: On load, any legacy embedded base64 portraits (live state and all chat links) are migrated to disk in the background with content deduplication, then settings are re-saved without the image payloads.
+
+### Added
+- **Emergency: Purge All Portraits**: Settings button (and improved Remove All Portraits action) deletes managed portrait files on disk and clears portrait maps from the live state and every saved chat link — without touching memos or lorebooks.
+
 ## [5.1.5] - 2026-07-13
 
 ### Added

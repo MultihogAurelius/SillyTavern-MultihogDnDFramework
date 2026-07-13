@@ -542,6 +542,7 @@ function buildDefaultSettings() {
         rngEnabled: true,
         diceFunctionTool: true,
         enablePortraits: true,
+        portraitsFileStorageVersion: 1,
         portraitGeneratorSource: "native",
         portraitSkipPromptDialog: false,
         portraitAutoGenerateParty: false,
@@ -1847,6 +1848,9 @@ export function persistRouterLastRunTimestamp(epochMs = Date.now()) {
  */
 export function saveChatState(chatId) {
     if (!chatId) return;
+    if (typeof globalThis._rpgPortraitMigrationLocked === 'function' && globalThis._rpgPortraitMigrationLocked()) {
+        return;
+    }
     if (typeof globalThis._rpgFlushRawMemoChanges === 'function') {
         globalThis._rpgFlushRawMemoChanges();
     }

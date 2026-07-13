@@ -9,6 +9,7 @@ import { initializeDebugViewer, toggleDebugViewer } from './debug-viewer.js';
 import { runRouterPass, rollbackRouterPass, reapplyRouterPass, getLorebookManifest, deleteLorebookEntry, updateLorebookEntry, disableManagedEntries, isRouterRunning, stopRouterPass } from './router.js';
 import { getRequestHeaders } from '../../../../script.js';
 import { fileToDataUrl, scaleImageTo512Square, applyPortraitData, generatePortraitPrompt, generateNpcPortraitPrompt, showPortraitPromptPopup, generatePortraitDirect, autoGeneratePartyPortraits, removeAllPortraits, checkAndTriggerAutoGenerations, autoGenerateEnemyPortraits, forceCheckAutoGenerations, resetAutoGenerationTracking } from './portraits.js';
+import { migrateAllEmbeddedPortraits, countEmbeddedPortraitDataUrls, purgeAllPortraitData, resolvePortraitDisplaySrc, collectAllPortraitRefs, isManagedPortraitPath, isPortraitMigrationLocked, setPortraitMigrationLocked, PORTRAIT_STORAGE_FOLDER } from './portrait-storage.js';
 import { loadPanelGeometry, loadDeltaHeight, makeDraggable, makeResizableTR, makeResizableBR, makeResizableBL, setupResizeObserver, setupDeltaResize } from './ui-geometry.js';
 import { applyCustomTheme, openThemeWizard, refreshSavedThemesList, handleRecolor, undoThemeChange } from './theme-manager.js';
 import { showCharacterRollPanel, showPcImportPanel } from './character-creator.js';
@@ -422,26 +423,31 @@ let _saveSettingsTimer = null;
 /**
  * @param {boolean} force Skip the debounce and save immediately.
  * @param {number} delay Debounce delay in ms when not forcing (default 2000).
+ * @returns {Promise<void>|void}
  */
 export function saveSettings(force = false, delay = 2000) {
     // Keep UI synchronization immediate so toggle checkboxes and forms respond instantly
     syncOnboardingUI();
 
-    const doSave = () => {
+    const doSave = async () => {
         _saveSettingsTimer = null;
         const s = getSettings();
         const ctx = SillyTavern.getContext();
-        ctx.saveSettingsDebounced();
         const activeChatId = _currentChatId || ctx.chatId;
-        if (s.chatLinkEnabled && activeChatId) {
+        // Snapshot chat-linked state into extension settings before persisting to disk.
+        if (s.chatLinkEnabled && activeChatId && !isPortraitMigrationLocked()) {
             saveChatState(activeChatId);
+        }
+        if (force && typeof ctx.saveSettings === 'function') {
+            await ctx.saveSettings();
+        } else {
+            ctx.saveSettingsDebounced();
         }
     };
 
     if (force) {
         if (_saveSettingsTimer) clearTimeout(_saveSettingsTimer);
-        doSave();
-        return;
+        return doSave();
     }
 
     if (_saveSettingsTimer) clearTimeout(_saveSettingsTimer);
@@ -1036,6 +1042,9 @@ export function refreshQuestPrompt(s) {
  */
 function loadChatState(chatId) {
     if (!chatId) return false;
+    if (typeof globalThis._rpgPortraitMigrationLocked === 'function' && globalThis._rpgPortraitMigrationLocked()) {
+        return false;
+    }
     resetAutoGenerationTracking();
     const s = getSettings();
     const saved = s.chatStates?.[chatId];
@@ -2435,7 +2444,7 @@ async function showPortraitSettingsMenu(entityName, onRefresh, npcContent = null
     const refresh = onRefresh || refreshRenderedView;
     const s = getSettings();
     const normName = entityName.replace(/\s*\(.*?\)/g, '').trim();
-    const currentSrc = (s.customPortraits || {})[normName] || '';
+    const currentSrc = resolvePortraitDisplaySrc((s.customPortraits || {})[normName] || '');
     const previewHtml = currentSrc
         ? `<img src="${currentSrc}" style="max-width:128px;max-height:128px;border-radius:6px;display:block;margin:0 auto 10px;"/>`
         : `<div style="text-align:center;opacity:0.5;margin-bottom:10px;">No portrait set</div>`;
@@ -2466,8 +2475,8 @@ async function showPortraitSettingsMenu(entityName, onRefresh, npcContent = null
         popupOpts.customButtons.push({ text: '🗑 Clear Portrait', result: 2, classes: ['menu_button'] });
     }
 
-    const localApply = (src) => {
-        applyPortraitData(entityName, src);
+    const localApply = async (src) => {
+        await applyPortraitData(entityName, src);
         refresh();
         void refreshNpcManifest().catch(() => { });
     };
@@ -2532,7 +2541,7 @@ async function showPortraitSettingsMenu(entityName, onRefresh, npcContent = null
     document.removeEventListener('paste', popupPasteHandler);
 
     if (result === 2) {
-        localApply(null);
+        await localApply(null);
     } else if (result === 5) {
         try {
             const cropped = await ctx.callGenericPopup(
@@ -2543,7 +2552,7 @@ async function showPortraitSettingsMenu(entityName, onRefresh, npcContent = null
             );
             if (cropped) {
                 const scaled = await scaleImageTo512Square(cropped);
-                localApply(scaled);
+                await localApply(scaled);
             }
         } catch (err) {
             console.error(err);
@@ -2563,7 +2572,7 @@ async function showPortraitSettingsMenu(entityName, onRefresh, npcContent = null
                 toastr['info'](`Generating image for ${entityName}…`, 'RPG Tracker');
                 const dataUrl = await generatePortraitDirect(aiPrompt, entityName);
                 const scaled = await scaleImageTo512Square(dataUrl);
-                localApply(scaled);
+                await localApply(scaled);
                 toastr['success'](`Portrait auto-generated and applied for ${entityName}!`, 'RPG Tracker');
             } else {
                 toastr['info']('Generating portrait prompt…', 'RPG Tracker');
@@ -2591,14 +2600,14 @@ async function showPortraitSettingsMenu(entityName, onRefresh, npcContent = null
                 );
                 if (cropped) {
                     const scaled = await scaleImageTo512Square(cropped);
-                    localApply(scaled);
+                    await localApply(scaled);
                 }
             } catch (err) {
                 console.error(err);
                 toastr['warning']('Could not crop image.', 'RPG Tracker');
             }
         } else if (capturedUrl && (capturedUrl.startsWith('data:image/') || /^https?:\/\//i.test(capturedUrl))) {
-            localApply(capturedUrl);
+            await localApply(capturedUrl);
         } else if (capturedUrl) {
             toastr['warning']('Please enter a valid https:// URL or use the Browse button.', 'RPG Tracker');
         }
@@ -3261,8 +3270,8 @@ Gear:
         const entityName = container.closest('.rt-entity-container')?.dataset?.entityName || '';
         if (!entityName) return;
 
-        const localApply = (src) => {
-            applyPortraitData(entityName, src);
+        const localApply = async (src) => {
+            await applyPortraitData(entityName, src);
             refresh();
             void refreshNpcManifest().catch(() => { });
         };
@@ -5224,7 +5233,7 @@ function createPanel() {
                         const cleanBio = pc.bio.replace(/\[\/?CORE\]/gi, '');
                         desc = cleanBio.split('\n').map(l => l.trim()).filter(l => l && !/^\[ID:/i.test(l)).slice(0, 2).join(' ').substring(0, 260);
                     }
-                    const portraitSrc = s.customPortraits?.[pc.name] || '';
+                    const portraitSrc = resolvePortraitDisplaySrc(s.customPortraits?.[pc.name] || '');
 
                     const pcDiv = document.createElement('div');
                     pcDiv.className = 'rt-npc-card';
@@ -5269,7 +5278,7 @@ function createPanel() {
                     const openPcPopup = async (startInEditMode = false) => {
                         const ctx = SillyTavern.getContext();
                         if (!ctx.callGenericPopup) return;
-                        const popupPortraitSrc = s.customPortraits?.[pc.name] || '';
+                        const popupPortraitSrc = resolvePortraitDisplaySrc(s.customPortraits?.[pc.name] || '');
                         const hidePortrait = s.npcPortraits === false;
                         const popupPortraitEl = popupPortraitSrc
                             ? `<img src="${escapeHtml(popupPortraitSrc)}" style="width:100%;height:auto;aspect-ratio:1;object-fit:cover;border-radius:12px;border:2px solid rgba(120,80,220,0.5);box-shadow:0 4px 20px rgba(0,0,0,0.4);" alt="${escapeHtml(pc.name)}">`
@@ -5916,7 +5925,7 @@ function createPanel() {
                             `;
 
                                     const normLabel = item.label.replace(/\s*\(.*?\)/g, '').trim();
-                                    const portraitSrc = s.customPortraits?.[normLabel] || '';
+                                    const portraitSrc = resolvePortraitDisplaySrc(s.customPortraits?.[normLabel] || '');
                                     const hidePortrait = s.npcPortraits === false;
 
                                     // Full-size portrait (512px stored, display at native res), with the same
@@ -6052,7 +6061,7 @@ function createPanel() {
                                             e.stopPropagation();
                                             const refreshPopupPortrait = () => {
                                                 const norm = item.label.replace(/\s*\(.*?\)/g, '').trim();
-                                                const newSrc = getSettings().customPortraits?.[norm] || '';
+                                                const newSrc = resolvePortraitDisplaySrc(getSettings().customPortraits?.[norm] || '');
                                                 popupPortraitWrap.innerHTML = renderNpcPopupPortraitInner(newSrc);
                                                 if (typeof refreshManifest === 'function') refreshManifest();
                                                 if (typeof refreshRenderedView === 'function') refreshRenderedView();
@@ -6315,7 +6324,7 @@ function createPanel() {
                                     const rel = parseRelationship ? parseRelationship(item.id) : { friendship: 0, affection: 0 };
                                     const desc = getNpcDescription ? getNpcDescription(item.content) : '';
                                     const normLabel = item.label.replace(/\s*\(.*?\)/g, '').trim();
-                                    const portraitSrc = s.customPortraits?.[normLabel] || '';
+                                    const portraitSrc = resolvePortraitDisplaySrc(s.customPortraits?.[normLabel] || '');
                                     const isDirty = _dirtyEntries.has(item.id);
 
                                     const card = document.createElement('div');
@@ -6471,7 +6480,7 @@ function createPanel() {
                                             try {
                                                 const dataUrl = await fileToDataUrl(file);
                                                 const scaled = await scaleImageTo512Square(dataUrl);
-                                                applyPortraitData(item.label, scaled);
+                                                await applyPortraitData(item.label, scaled);
                                                 toastr['success'](`Portrait applied for ${item.label}`, 'NPC Portrait');
                                                 await refreshManifest();
                                                 refreshRenderedView();
@@ -7018,7 +7027,7 @@ function createPanel() {
             if (charCard.avatar) {
                 try {
                     const avatarUrl = `/characters/${encodeURIComponent(charCard.avatar)}`;
-                    applyPortraitData(name, avatarUrl);
+                    await applyPortraitData(name, avatarUrl);
                 } catch (err) {
                     console.warn('[RPG Tracker] Failed to embed character avatar as NPC portrait:', err);
                 }
@@ -8939,7 +8948,7 @@ Rules:
             await autoGeneratePartyPortraits(refreshRenderedView);
             if (typeof refreshManifest === 'function') void refreshManifest().catch(() => { });
         } else if (choice === 1002) {
-            removeAllPortraits(refreshRenderedView);
+            await removeAllPortraits(refreshRenderedView);
             if (typeof refreshManifest === 'function') void refreshManifest().catch(() => { });
         } else if (choice === 1003) {
             await autoGenerateEnemyPortraits(refreshRenderedView);
@@ -9559,6 +9568,60 @@ function tryBindConnectionProfileDropdown(selector, initialProfileId, onProfileI
     } catch (e) {
         console.warn(`[RPG Tracker] Could not bind connection profile dropdown ${selector}:`, e);
         return false;
+    }
+}
+
+let _portraitMigrationDone = false;
+
+/** One-time migration of legacy base64 portraits to disk. Runs after chat bootstrap. */
+async function runPortraitMigrationIfNeeded() {
+    if (_portraitMigrationDone) return;
+
+    const portraitSettings = getSettings();
+    const embeddedPortraitCount = countEmbeddedPortraitDataUrls(portraitSettings);
+    if (embeddedPortraitCount === 0) {
+        if (!portraitSettings.portraitsFileStorageVersion) {
+            portraitSettings.portraitsFileStorageVersion = 1;
+        }
+        _portraitMigrationDone = true;
+        return;
+    }
+
+    toastr['info'](
+        `Migrating ${embeddedPortraitCount} embedded portrait(s) to disk… This may take a minute.`,
+        'RPG Tracker',
+        { timeOut: 15000 },
+    );
+
+    setPortraitMigrationLocked(true);
+    try {
+        const stats = await migrateAllEmbeddedPortraits(portraitSettings);
+        await saveSettings(true);
+
+        const remaining = countEmbeddedPortraitDataUrls(getSettings());
+        if (remaining === 0) {
+            _portraitMigrationDone = true;
+            if (stats.migrated > 0) {
+                toastr['success'](
+                    `Migrated ${stats.migrated} portrait(s) to user/images/${PORTRAIT_STORAGE_FOLDER}/. Your settings file should be much smaller now.`,
+                    'RPG Tracker',
+                    { timeOut: 10000 },
+                );
+            }
+        } else {
+            console.warn(`[RPG Tracker] Portrait migration finished but ${remaining} embedded portrait(s) remain.`);
+            if (stats.failed > 0) {
+                toastr['warning'](
+                    `${stats.failed} portrait(s) could not be migrated. Use Emergency: Purge All Portraits if problems persist.`,
+                    'RPG Tracker',
+                );
+            }
+        }
+    } catch (err) {
+        console.error('[RPG Tracker] Portrait migration failed:', err);
+        toastr['error']('Portrait migration failed — see browser console.', 'RPG Tracker');
+    } finally {
+        setPortraitMigrationLocked(false);
     }
 }
 
@@ -10192,6 +10255,38 @@ function tryBindConnectionProfileDropdown(selector, initialProfileId, onProfileI
             }
         });
 
+        $('#rpg_tracker_purge_all_portraits').on('click', async function () {
+            const s = getSettings();
+            const embedded = countEmbeddedPortraitDataUrls(s);
+            const fileRefs = [...collectAllPortraitRefs(s)].filter(isManagedPortraitPath).length;
+            const totalMaps = Object.keys(s.customPortraits || {}).length
+                + Object.values(s.chatStates || {}).reduce((n, cs) => n + Object.keys(cs.customPortraits || {}).length, 0);
+            if (totalMaps === 0 && embedded === 0 && fileRefs === 0) {
+                return toastr['info']('No portraits to purge.', 'RPG Tracker');
+            }
+            const msg = [
+                'Purge ALL Multihog portraits?',
+                '',
+                `• ${totalMaps} portrait reference(s) across live state + chat links`,
+                embedded > 0 ? `• ${embedded} still embedded in settings (will be removed)` : null,
+                fileRefs > 0 ? `• ${fileRefs} file(s) under user/images/${PORTRAIT_STORAGE_FOLDER}/` : null,
+                '',
+                'Memos, lorebooks, and chat history are not affected.',
+                'This cannot be undone.',
+            ].filter(Boolean).join('\n');
+            if (!confirm(msg)) return;
+            try {
+                await purgeAllPortraitData(s);
+                s.portraitsFileStorageVersion = 1;
+                await saveSettings(true);
+                refreshRenderedView();
+                toastr['success']('All portraits purged. Restart SillyTavern if the UI still feels sluggish.', 'RPG Tracker');
+            } catch (err) {
+                console.error('[RPG Tracker] Portrait purge failed:', err);
+                toastr['error']('Portrait purge failed — see console.', 'RPG Tracker');
+            }
+        });
+
         // ─── Event Hooks ───
         eventSource.on(event_types.GENERATION_STARTED, onGenerationStarted);
         eventSource.on(event_types.GENERATION_ENDED, onGenerationEnded);
@@ -10211,6 +10306,10 @@ function tryBindConnectionProfileDropdown(selector, initialProfileId, onProfileI
         if (bootChatId && settings.chatLinkEnabled) {
             loadChatState(bootChatId);
         }
+
+        // Migrate legacy base64 portraits after chat state is loaded so loadChatState
+        // cannot overwrite freshly migrated paths before the synchronous disk flush.
+        await runPortraitMigrationIfNeeded();
 
         // ─── Flush-on-unload safety net ───
         // saveSettings() normally debounces its disk write by ~2s. If the page reloads or

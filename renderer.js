@@ -1,4 +1,5 @@
 import { getSettings, getBarBackground, getBarShowAsPercentage } from './state-manager.js';
+import { resolvePortraitDisplaySrc } from './portrait-storage.js';
 import { escapeHtml, highlightParens, highlightNumbers, parseInWorldTime, formatTimeDiff, isArchivedQuestStatus } from './memo-processor.js';
 import { BLOCK_ICONS, BLOCK_ORDER, PAGE_SIZE, NO_PAGINATE } from './constants.js';
 
@@ -1064,7 +1065,7 @@ export function renderDayNightBadge(str) {
 function renderPortraitHtml(entityName) {
     const s = getSettings();
     const normName = entityName.replace(/\s*\(.*?\)/g, '').trim();
-    const src = (s.customPortraits || {})[normName];
+    const src = resolvePortraitDisplaySrc((s.customPortraits || {})[normName]);
     if (src) {
         return `<img class="rt-entity-portrait" src="${escapeHtml(src)}" alt="${escapeHtml(entityName)}" />`;
     }
