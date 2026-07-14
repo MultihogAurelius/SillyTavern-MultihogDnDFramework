@@ -18,12 +18,14 @@
 
                         <!-- CORE -->
                         <small style="display: block; margin-bottom: 2px; font-weight: bold; opacity: 0.65; text-transform: uppercase; font-size: 0.7em; letter-spacing: 0.4px;">Core</small>
-                        <label class="checkbox_label">
+                        <small style="display: block; padding-left: 4px; font-size: 0.78em; opacity: 0.6; margin-bottom: 2px;">Chat Links</small>
+                        <label class="checkbox_label" style="padding-left: 4px;">
                             <input id="rpg_tracker_chat_link_enabled" type="checkbox" />
                             <span>Chat-Linked Mode</span>
                             <i class="fa-solid fa-circle-question interactable"
                                 title="When enabled, the tracker state (memo) is automatically saved and restored per chat ID. Switching chats will reload that specific campaign's state."></i>
                         </label>
+                        <button id="rpg_tracker_clear_chat_states" class="menu_button interactable" style="margin-top: 4px; margin-left: 4px; width: calc(100% - 4px); font-size: 0.9em;"><i class="fa-solid fa-trash-can"></i> Remove all chat links</button>
 
                         <!-- APPEARANCE -->
                         <small style="display: block; margin-top: 10px; margin-bottom: 2px; font-weight: bold; opacity: 0.65; text-transform: uppercase; font-size: 0.7em; letter-spacing: 0.4px;">Appearance</small>
@@ -230,33 +232,6 @@
                                 title="Deletes every Multihog portrait file on disk and clears portrait data from the live state and all saved chat links. Use if settings.json became huge or portraits are broken. Does not touch memos or lorebooks.">
                                 <i class="fa-solid fa-trash-can"></i> Emergency: Purge All Portraits
                             </button>
-                        </div>
-
-                        <!-- ADVANCED & DATA -->
-                        <small style="display: block; margin-top: 10px; margin-bottom: 2px; font-weight: bold; opacity: 0.65; text-transform: uppercase; font-size: 0.7em; letter-spacing: 0.4px;">Advanced &amp; Data</small>
-                        <div class="inline-drawer" style="margin-top: 2px;">
-                            <div class="inline-drawer-toggle inline-drawer-header" style="font-size: 0.88em;">
-                                <i class="fa-solid fa-sliders" style="margin-right: 6px; opacity: 0.6;"></i>
-                                <b>Combat Profile &amp; Chat Links</b>
-                                <div class="inline-drawer-icon fa-solid fa-circle-chevron-down"></div>
-                            </div>
-                            <div class="inline-drawer-content">
-                                <div id="rpg_combat_profile_config_block" class="flex-container flexFlowColumn gap-1">
-                                    <label class="checkbox_label">
-                                        <input id="rpg_tracker_combat_profile_auto_switch" type="checkbox" />
-                                        <span>Auto-Switch Main Profile During Combat</span>
-                                        <i class="fa-solid fa-circle-question interactable"
-                                            title="When [COMBAT] is active in the State Tracker, automatically switch SillyTavern's main Connection Profile to the one selected below. Restores your previous profile when combat ends ([COMBAT]END_COMBAT[/COMBAT] or block removed). Requires the Connection Manager extension."></i>
-                                    </label>
-                                    <div id="rpg_combat_profile_group" style="padding-left: 4px; display: none;">
-                                        <label style="font-size: 0.82em; opacity: 0.75; display: block; margin-bottom: 3px;">Combat Connection Profile</label>
-                                        <select id="rpg_combat_connection_profile" class="text_pole" style="font-size: 0.85em;"></select>
-                                        <label style="font-size: 0.82em; opacity: 0.75; display: block; margin-top: 6px; margin-bottom: 3px;">Combat Chat Completion Preset</label>
-                                        <select id="rpg_combat_completion_preset" class="text_pole" style="font-size: 0.85em;"></select>
-                                    </div>
-                                </div>
-                                <button id="rpg_tracker_clear_chat_states" class="menu_button interactable" style="margin-top: 8px; width: 100%;"><i class="fa-solid fa-trash-can"></i> Remove all chat links</button>
-                            </div>
                         </div>
 
                         <!-- DEVELOPER & RESET -->
@@ -550,6 +525,30 @@
                                 <label>Preset</label>
                                 <select id="rpg_tracker_completion_preset" class="text_pole"></select>
 
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="inline-drawer" style="margin-top: 4px;">
+                        <div class="inline-drawer-toggle inline-drawer-header">
+                            <b>Combat API Override</b>
+                            <div class="inline-drawer-icon fa-solid fa-circle-chevron-down"></div>
+                        </div>
+                        <div class="inline-drawer-content">
+                            <div id="rpg_combat_profile_config_block" class="flex-container flexFlowColumn gap-1">
+                                <small style="display: block; font-size: 0.72em; opacity: 0.55; line-height: 1.35; margin-bottom: 4px;">Overrides SillyTavern's <b>main</b> chat API during combat — not the State Extractor connection above.</small>
+                                <label class="checkbox_label">
+                                    <input id="rpg_tracker_combat_profile_auto_switch" type="checkbox" />
+                                    <span>Auto-Switch Main Profile During Combat</span>
+                                    <i class="fa-solid fa-circle-question interactable"
+                                        title="When [COMBAT] is active in the State Tracker, automatically switch SillyTavern's main Connection Profile to the one selected below. Restores your previous profile when combat ends ([COMBAT]END_COMBAT[/COMBAT] or block removed). Requires the Connection Manager extension."></i>
+                                </label>
+                                <div id="rpg_combat_profile_group" style="padding-left: 4px; display: none;">
+                                    <label style="font-size: 0.82em; opacity: 0.75; display: block; margin-bottom: 3px;">Combat Connection Profile</label>
+                                    <select id="rpg_combat_connection_profile" class="text_pole" style="font-size: 0.85em;"></select>
+                                    <label style="font-size: 0.82em; opacity: 0.75; display: block; margin-top: 6px; margin-bottom: 3px;">Combat Chat Completion Preset</label>
+                                    <select id="rpg_combat_completion_preset" class="text_pole" style="font-size: 0.85em;"></select>
+                                </div>
                             </div>
                         </div>
                     </div>
