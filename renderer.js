@@ -2402,8 +2402,14 @@ export function renderTabModeView(memo, sectionPages, questsCtx = null) {
     const pinnedHtml = pinnedTags.map(tag => renderSectionCard(tag, blocks, collapsed, detached, sectionPages, null)).join('');
     const vitalsHtml = renderPartyVitalsStrip(blocks);
 
-    const tabTags = sorted.filter(t => !TABMODE_PINNED_TAGS.includes(t));
-    if (questsCtx && questsCtx.quests) tabTags.push('QUESTS');
+    let tabTags = sorted.filter(t => !TABMODE_PINNED_TAGS.includes(t));
+    if (questsCtx && questsCtx.quests) {
+        if (!tabTags.includes('QUESTS')) {
+            tabTags.push('QUESTS');
+        }
+    } else {
+        tabTags = tabTags.filter(t => t !== 'QUESTS');
+    }
 
     if (tabTags.length === 0) {
         return `<div class="rt-tabmode-wrap">
