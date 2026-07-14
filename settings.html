@@ -77,16 +77,8 @@
                             </div>
                         </div>
 
-                        <!-- MODULE DISPLAY -->
-                        <small style="display: block; margin-top: 10px; margin-bottom: 2px; font-weight: bold; opacity: 0.65; text-transform: uppercase; font-size: 0.7em; letter-spacing: 0.4px;">Module Display</small>
-
-                        <div class="inline-drawer">
-                            <div class="inline-drawer-toggle inline-drawer-header" style="font-size: 0.88em;">
-                                <i class="fa-solid fa-user-circle" style="margin-right: 6px; opacity: 0.6;"></i>
-                                <b>Character Portraits</b>
-                                <div class="inline-drawer-icon fa-solid fa-circle-chevron-down"></div>
-                            </div>
-                            <div class="inline-drawer-content">
+                        <!-- CHARACTER PORTRAITS -->
+                        <small style="display: block; margin-top: 10px; margin-bottom: 2px; font-weight: bold; opacity: 0.65; text-transform: uppercase; font-size: 0.7em; letter-spacing: 0.4px;">Character Portraits</small>
                         <div id="rpg_portrait_config_block" class="flex-container flexFlowColumn gap-1">
                             <label class="checkbox_label">
                                 <input id="rpg_tracker_enable_portraits" type="checkbox" />
@@ -95,7 +87,15 @@
                                     title="Show portrait thumbnails on Character, Party, and Combat cards. Per-chat: each campaign retains its own portraits. Drag &amp; drop an image onto any portrait box, or click to paste a URL."></i>
                             </label>
 
-                            <div style="display: flex; align-items: center; gap: 8px; padding-left: 4px;">
+                            <small style="display: block; padding-left: 4px; font-size: 0.78em; opacity: 0.6; margin-top: 6px;">Lorebook Agent</small>
+                            <label class="checkbox_label" style="padding-left: 4px;">
+                                <input id="rpg_tracker_npc_portraits" type="checkbox" />
+                                <span>Show NPC Portraits</span>
+                                <i class="fa-solid fa-circle-question interactable"
+                                    title="When disabled, the Lorebook Agent NPCs section uses the compact list view (like Events/Locations) and NPC portrait auto-generation is turned off. The Add NPC to Story button remains available."></i>
+                            </label>
+
+                            <div style="display: flex; align-items: center; gap: 8px; padding-left: 4px; margin-top: 4px;">
                                 <label style="font-size: 0.82em; opacity: 0.75; white-space: nowrap;">Generator Source
                                     <i class="fa-solid fa-circle-question interactable"
                                         title="SillyTavern Image Generation Extension uses whatever backend (local WebUI/ComfyUI, Horde, or cloud API) is configured in SillyTavern's native Image Generation settings panel. Ensure it is enabled and configured there first."></i>
@@ -104,6 +104,17 @@
                                     <option value="native">ST Image Generation Extension</option>
                                     <option value="pollinations">Pollinations.ai</option>
                                 </select>
+                            </div>
+
+                            <div id="rpg_tracker_pollinations_group" style="display: none; margin-bottom: 6px; padding-left: 4px;">
+                                <label style="font-size: 0.82em; opacity: 0.75; display: block; margin-bottom: 3px;">Pollinations API Key
+                                    <i class="fa-solid fa-circle-question interactable"
+                                        title="Why Pollinations? Pollinations.ai offers image generation models (like Flux and ZImage) via API keys linked to a GitHub account. It operates on a pay-as-you-go / quest system. It only requires a GitHub account to get a permanent API key."></i>
+                                </label>
+                                <input id="rpg_tracker_pollinations_key" type="password" class="text_pole" placeholder="sk_… or pk_…" style="font-size: 0.85em;" />
+                                <div style="font-size: 0.72em; opacity: 0.5; margin-top: 2px;">
+                                    API key from <a href="https://enter.pollinations.ai/#keys" target="_blank" style="color: #7ec8e3;">enter.pollinations.ai</a>. Requires a GitHub account.
+                                </div>
                             </div>
 
                             <label class="checkbox_label" style="padding-left: 4px;">
@@ -133,28 +144,9 @@
                                     title="When enabled, portraits will be automatically generated in the background for new NPCs created or updated in the lorebook if they don't already have one."></i>
                             </label>
 
-                            <div class="inline-drawer" style="margin-top: 4px;">
-                                <div class="inline-drawer-toggle inline-drawer-header" style="font-size: 0.82em; padding: 3px 6px;">
-                                    <b>Advanced Portrait Setup</b>
-                                    <div class="inline-drawer-icon fa-solid fa-circle-chevron-down"></div>
-                                </div>
-                                <div class="inline-drawer-content" style="padding: 6px 4px 0 4px;">
-                                    <div class="flex-container flexFlowColumn gap-1">
-                            <div id="rpg_tracker_pollinations_group" style="margin-bottom: 6px;">
-                                <label style="font-size: 0.82em; opacity: 0.75; display: block; margin-bottom: 3px;">Pollinations API Key
-                                    <i class="fa-solid fa-circle-question interactable"
-                                        title="Why Pollinations? Pollinations.ai offers image generation models (like Flux and ZImage) via API keys linked to a GitHub account. It operates on a pay-as-you-go / quest system. It only requires a GitHub account to get a permanent API key."></i>
-                                </label>
-                                <input id="rpg_tracker_pollinations_key" type="password" class="text_pole" placeholder="sk_… or pk_…" style="font-size: 0.85em;" />
-                                <div style="font-size: 0.72em; opacity: 0.5; margin-top: 2px;">
-                                    API key from <a href="https://enter.pollinations.ai/#keys" target="_blank" style="color: #7ec8e3;">enter.pollinations.ai</a>. Requires a GitHub account.
-                                </div>
-                            </div>
-
-                            <!-- Portrait Prompt LLM Connection Settings -->
                             <div class="inline-drawer" style="margin-top: 6px; margin-bottom: 2px;">
                                 <div class="inline-drawer-toggle inline-drawer-header" style="font-size: 0.82em; padding: 3px 6px;">
-                                    <b>Prompt LLM Connection</b>
+                                    <b>Portraits LLM Connection</b>
                                     <div class="inline-drawer-icon fa-solid fa-circle-chevron-down"></div>
                                 </div>
                                 <div class="inline-drawer-content" style="padding: 6px 4px 0 4px;">
@@ -191,8 +183,7 @@
                                 </div>
                             </div>
 
-                            <!-- Portrait Prompt Templates -->
-                            <div class="inline-drawer" style="margin-top: 6px; margin-bottom: 2px;">
+                            <div class="inline-drawer" style="margin-top: 4px; margin-bottom: 2px;">
                                 <div class="inline-drawer-toggle inline-drawer-header" style="font-size: 0.82em; padding: 3px 6px;">
                                     <b>Portrait Prompt Templates</b>
                                     <div class="inline-drawer-icon fa-solid fa-circle-chevron-down"></div>
@@ -234,23 +225,19 @@
                                     </div>
                                 </div>
                             </div>
-                                    </div>
-                                </div>
-                            </div>
 
                             <button id="rpg_tracker_purge_all_portraits" class="menu_button interactable" style="margin-top: 8px; width: 100%; background: rgba(200, 60, 60, 0.15); border-color: #c0392b;"
                                 title="Deletes every Multihog portrait file on disk and clears portrait data from the live state and all saved chat links. Use if settings.json became huge or portraits are broken. Does not touch memos or lorebooks.">
                                 <i class="fa-solid fa-trash-can"></i> Emergency: Purge All Portraits
                             </button>
                         </div>
-                            </div>
-                        </div>
 
-                        <!-- ADVANCED -->
-                        <div class="inline-drawer" style="margin-top: 6px;">
+                        <!-- ADVANCED & DATA -->
+                        <small style="display: block; margin-top: 10px; margin-bottom: 2px; font-weight: bold; opacity: 0.65; text-transform: uppercase; font-size: 0.7em; letter-spacing: 0.4px;">Advanced &amp; Data</small>
+                        <div class="inline-drawer" style="margin-top: 2px;">
                             <div class="inline-drawer-toggle inline-drawer-header" style="font-size: 0.88em;">
                                 <i class="fa-solid fa-sliders" style="margin-right: 6px; opacity: 0.6;"></i>
-                                <b>Advanced &amp; Data</b>
+                                <b>Combat Profile &amp; Chat Links</b>
                                 <div class="inline-drawer-icon fa-solid fa-circle-chevron-down"></div>
                             </div>
                             <div class="inline-drawer-content">
@@ -272,11 +259,12 @@
                             </div>
                         </div>
 
-                        <!-- DEVELOPER -->
-                        <div class="inline-drawer" style="margin-top: 6px;">
+                        <!-- DEVELOPER & RESET -->
+                        <small style="display: block; margin-top: 10px; margin-bottom: 2px; font-weight: bold; opacity: 0.65; text-transform: uppercase; font-size: 0.7em; letter-spacing: 0.4px;">Developer &amp; Reset</small>
+                        <div class="inline-drawer" style="margin-top: 2px;">
                             <div class="inline-drawer-toggle inline-drawer-header" style="font-size: 0.88em;">
                                 <i class="fa-solid fa-code" style="margin-right: 6px; opacity: 0.6;"></i>
-                                <b>Developer &amp; Reset</b>
+                                <b>Debug &amp; Factory Reset</b>
                                 <div class="inline-drawer-icon fa-solid fa-circle-chevron-down"></div>
                             </div>
                             <div class="inline-drawer-content">
@@ -792,12 +780,6 @@
                                     <label style="font-size: 11px; opacity: 0.7;">Minor NPC Section Word Target</label>
                                     <input id="rpg_tracker_npc_minor_words" type="text" inputmode="numeric" pattern="[0-9]*" class="text_pole" value="15" title="Shopkeepers, guards, one-off encounters. Default: 15 words per section of [CORE]" />
 
-                                    <label class="checkbox_label">
-                                        <input id="rpg_tracker_npc_portraits" type="checkbox" />
-                                        <span>Show NPC Portraits</span>
-                                        <i class="fa-solid fa-circle-question interactable" style="font-size: 0.85em; opacity: 0.7; margin-left: 4px;" title="When disabled, the Lorebook Agent NPCs section uses the compact list view (like Events/Locations) and NPC portrait auto-generation is turned off. The Add NPC to Story button remains available."></i>
-                                    </label>
-                                    
                                     <label class="checkbox_label">
                                         <input id="rpg_tracker_npc_rel_bars" type="checkbox" />
                                          <span>Relationship System (BETA)</span>
