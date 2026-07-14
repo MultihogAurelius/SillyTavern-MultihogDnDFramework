@@ -9,7 +9,7 @@
  * Imported by: virtually everything — the root dependency.
  */
 
-import { DEFAULT_STOCK_PROMPTS, BLOCK_ORDER } from './constants.js';
+import { DEFAULT_STOCK_PROMPTS, BLOCK_ORDER, RT_PROMPTS } from './constants.js';
 
 export const DEFAULT_NPC_SECTIONS = [
     { id: 'sec_appearance', name: 'Appearance/Species', description: 'Species, build, age, features, usual attire — not current pose or activity.', icon: '👁️', color: '#d4a940' },
@@ -1019,9 +1019,49 @@ Rules:
         gameSystemWizardOpenaiKey: "",
         gameSystemWizardOpenaiModel: "",
         lastResetVersion: "",
+        lastSeenPromptDefaultsFingerprint: "",
         autoResetPromptsOnUpdate: false,
         userPromptSuffix: '## OUTPUT ONLY CHANGED SECTIONS:',
     };
+}
+
+/** Fast deterministic hash for comparing bundled default prompt content across releases. */
+function hashPromptBundle(str) {
+    let h = 5381;
+    for (let i = 0; i < str.length; i++) {
+        h = ((h << 5) + h) ^ str.charCodeAt(i);
+    }
+    return (h >>> 0).toString(16);
+}
+
+/**
+ * Fingerprint of all factory-shipped prompt defaults. Used to decide whether an
+ * extension update warrants the prompt-reset dialog (version bumps alone are not enough).
+ * @returns {string}
+ */
+export function computeBundledPromptsFingerprint() {
+    const defaults = buildDefaultSettings();
+    const bundle = {
+        sysprompt: [
+            RT_PROMPTS['sysprompt.txt'] || '',
+            RT_PROMPTS['sysprompt_legacy.txt'] || '',
+        ].join('\n---\n'),
+        tracker: [
+            defaults.systemPromptTemplate || '',
+            defaults.userPromptSuffix || '',
+            JSON.stringify(DEFAULT_STOCK_PROMPTS),
+        ].join('\n---\n'),
+        lorebook: [
+            defaults.routerSystemPromptTemplate || '',
+            defaults.routerModularPromptTemplate || '',
+            JSON.stringify(DEFAULT_MODULES),
+        ].join('\n---\n'),
+        world: [
+            defaults.worldProgressionSystemPrompt || '',
+            defaults.worldProgressionSkeletonSystemPrompt || '',
+        ].join('\n---\n'),
+    };
+    return hashPromptBundle(JSON.stringify(bundle));
 }
 
 /**

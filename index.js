@@ -1,5 +1,5 @@
 import { EXAMPLES, COLOR_EXAMPLES, DEFAULT_STOCK_PROMPTS, RT_PROMPTS, BLOCK_ICONS, BLOCK_ORDER, PAGE_SIZE, NO_PAGINATE, buildOnboardingXpHint, buildOnboardingTimeHint, resolveTimePromptKey, resolveTimePromptDisplayTag } from './constants.js';
-import { MODULE_NAME, DEFAULT_MODULES, getSettings, getBarBackground, migrateCustomFields, saveChatState, saveProfile, deleteProfile, getEffectiveRouterCampaignPrefix, sanitizeCampaignPrefixString, buildNpcInstruction, loadStockPromptsFromProfile, getNpcRelationshipMax, getNpcRelationshipMaxDefault, clampRelationshipValue, relationshipBarPct, getFriendshipTier, getAffectionTier, getRelTierBadgeStyle, getRelTierDetailedStyle, getRelTierDetailedLabelStyle, applyRelTierBadgeElement, sanitizeRouterState, rebuildAllModuleInstructions, adjustAllStoredTemplatesForTimeFormat, DEFAULT_NPC_SECTIONS, DEFAULT_PC_SECTIONS } from './state-manager.js';
+import { MODULE_NAME, DEFAULT_MODULES, getSettings, getBarBackground, migrateCustomFields, saveChatState, saveProfile, deleteProfile, getEffectiveRouterCampaignPrefix, sanitizeCampaignPrefixString, buildNpcInstruction, loadStockPromptsFromProfile, getNpcRelationshipMax, getNpcRelationshipMaxDefault, clampRelationshipValue, relationshipBarPct, getFriendshipTier, getAffectionTier, getRelTierBadgeStyle, getRelTierDetailedStyle, getRelTierDetailedLabelStyle, applyRelTierBadgeElement, sanitizeRouterState, rebuildAllModuleInstructions, adjustAllStoredTemplatesForTimeFormat, DEFAULT_NPC_SECTIONS, DEFAULT_PC_SECTIONS, computeBundledPromptsFingerprint } from './state-manager.js';
 import { sendStateRequest, fetchOllamaModels, fetchOpenAIModels, testOpenAIConnection, getConnectionProfiles, getCurrentCompletionPreset, setCompletionPreset, syncCombatProfile, resetCombatProfileOverride } from './llm-client.js';
 import { getDiceToolName, getDiceCommandName, getDiceCommandAliases, doDiceRoll, registerDiceFunctionTool, registerDiceSlashCommand, installInterceptor, getNarrativeBlocks, onGenerationStarted, onGenerationEnded, ensureRelTagRegex, resetRouterTick, getRouterTick, resetRouterAutoTick, getRouterSchedulerInternals, makeRngQueue, buildRngBlock, RNG_QUEUE_LEN, parseAndApplyNarrativeRelTags } from './narrative-hooks.js';
 import { deduplicateMemo, mergeMemo, computeDelta, escapeHtml, escapeRegex, highlightParens, cleanToolCallMessage, cleanMessageContent, getLastUserAction, buildLorebookContext, buildModulesInstructionText, buildModuleFormatInstruction, parseQuestsFromMemo, syncQuestsFromMemo, syncQuestsToMemo, writeQuestsToMemo, getQuestMood, extractCurrentTimeStr, stripArchivedQuestsFromMemo, stripCompletedQuestsFromMemo, applyQuestSyncAndStripMemo, isArchivedQuestStatus, removeArchivedQuest, parseInWorldTime, formatInWorldTime, sanitizeLorebookRecordContent, memoForTrackerContext, memoForGmContext } from './memo-processor.js';
@@ -9672,11 +9672,26 @@ async function runPortraitMigrationIfNeeded() {
                 console.warn('[RPG Tracker] Could not fetch manifest.json for version check', e);
             }
 
+            const currentFingerprint = computeBundledPromptsFingerprint();
+            const storedFingerprint = settings.lastSeenPromptDefaultsFingerprint || '';
+
             if (!settings.lastResetVersion) {
-                // Fresh install - set version silently
+                // Fresh install — record version and defaults fingerprint silently.
+                settings.lastResetVersion = currentVersion;
+                settings.lastSeenPromptDefaultsFingerprint = currentFingerprint;
+                saveSettings();
+            } else if (!storedFingerprint) {
+                // Existing install before fingerprint tracking — adopt current defaults without prompting.
+                settings.lastSeenPromptDefaultsFingerprint = currentFingerprint;
                 settings.lastResetVersion = currentVersion;
                 saveSettings();
-            } else if (settings.lastResetVersion !== currentVersion) {
+            } else if (storedFingerprint !== currentFingerprint) {
+                const acknowledgePromptDefaults = (fresh) => {
+                    fresh.lastResetVersion = currentVersion;
+                    fresh.lastSeenPromptDefaultsFingerprint = currentFingerprint;
+                    saveSettings();
+                };
+
                 if (settings.autoResetPromptsOnUpdate) {
                     // Silently reset everything automatically
                     (async () => {
@@ -9768,8 +9783,9 @@ async function runPortraitMigrationIfNeeded() {
                         }
 
                         fresh.lastResetVersion = currentVersion;
+                        fresh.lastSeenPromptDefaultsFingerprint = currentFingerprint;
                         saveSettings();
-                        toastr['info'](`Prompts auto-updated to version ${currentVersion} defaults.`, 'RPG Tracker');
+                        toastr['info'](`Prompts auto-updated to latest defaults (v${currentVersion}).`, 'RPG Tracker');
                         console.log(`[RPG Tracker] Automatically reset all prompts to defaults for version ${currentVersion}.`);
                     })();
                 } else {
@@ -9782,7 +9798,7 @@ async function runPortraitMigrationIfNeeded() {
 
                             const popupHtml = `
                                 <div style="display:flex; flex-direction:column; gap:12px; text-align:left; font-size:13px; line-height:1.4; width:100%; box-sizing:border-box;">
-                                    <div>A new version of <b>Multihog D&D Framework</b> has been installed (v<b>${escapeHtml(currentVersion)}</b>).</div>
+                                    <div>Shipped default prompts have changed in v<b>${escapeHtml(currentVersion)}</b>.</div>
                                     <div>Would you like to reset your custom prompts to the latest default versions? Select the prompts you wish to reset/update:</div>
                                     <div style="margin-left: 10px; display:flex; flex-direction:column; gap:8px; background: rgba(0,0,0,0.15); padding: 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05);">
                                         <label style="display:flex; align-items:center; gap:8px; cursor:pointer; user-select:none; margin: 0;">
@@ -9858,7 +9874,7 @@ async function runPortraitMigrationIfNeeded() {
                                 });
                             }, 150);
 
-                            const confirmResult = await Popup.show.confirm('✨ Multihog D&D Framework Update', popupHtml, {
+                            const confirmResult = await Popup.show.confirm('✨ Prompt Defaults Updated', popupHtml, {
                                 okButton: 'Yes (Reset Selected)',
                                 cancelButton: 'No (Keep Custom)'
                             });
@@ -9972,8 +9988,7 @@ async function runPortraitMigrationIfNeeded() {
                                     console.log('[RPG Tracker] World progression prompts reset to defaults.');
                                 }
 
-                                fresh.lastResetVersion = currentVersion;
-                                saveSettings();
+                                acknowledgePromptDefaults(fresh);
 
                                 if (resetCount > 0) {
                                     toastr['success'](`Successfully reset ${resetCount} prompt category/categories to defaults.`, 'RPG Tracker');
@@ -9981,13 +9996,18 @@ async function runPortraitMigrationIfNeeded() {
                                     toastr['info']('No prompts were selected for reset.', 'RPG Tracker');
                                 }
                             } else {
-                                fresh.lastResetVersion = currentVersion;
-                                saveSettings();
+                                acknowledgePromptDefaults(fresh);
                                 toastr['info']('Custom prompts kept intact.', 'RPG Tracker');
                             }
                         })();
+                    } else {
+                        acknowledgePromptDefaults(getSettings());
                     }
                 }
+            } else if (settings.lastResetVersion !== currentVersion) {
+                // Version-only bump — bundled defaults unchanged, no prompt dialog.
+                settings.lastResetVersion = currentVersion;
+                saveSettings();
             }
         }
 
