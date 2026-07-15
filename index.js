@@ -1120,6 +1120,7 @@ function loadChatState(chatId) {
     s.gameSystemWizardOpenaiUrl = saved.gameSystemWizardOpenaiUrl || "";
     s.gameSystemWizardOpenaiKey = saved.gameSystemWizardOpenaiKey || "";
     s.gameSystemWizardOpenaiModel = saved.gameSystemWizardOpenaiModel || "";
+    s.gameSystemWizardSystemPrompt = saved.gameSystemWizardSystemPrompt || "";
 
     applyChatTimeFormatSettings(saved);
     applyChatNpcRelMaxSettings(saved);
@@ -2213,6 +2214,7 @@ function loadProfile(name) {
     s.gameSystemWizardOpenaiUrl = p.gameSystemWizardOpenaiUrl || "";
     s.gameSystemWizardOpenaiKey = p.gameSystemWizardOpenaiKey || "";
     s.gameSystemWizardOpenaiModel = p.gameSystemWizardOpenaiModel || "";
+    s.gameSystemWizardSystemPrompt = p.gameSystemWizardSystemPrompt || "";
 
     // Update settings UI inputs if rendered
     $('#rpg_world_progression_randomize_npcs').prop('checked', !!s.worldProgressionRandomizeNPCs);

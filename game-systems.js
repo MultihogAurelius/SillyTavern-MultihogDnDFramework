@@ -64,6 +64,88 @@ function restoreControlRoomSettings(settings, snapshot) {
 const GS_POPUP_LARGE = { wide: true, large: true, allowVerticalScrolling: true };
 const GS_TEXTAREA_TALL_STYLE = 'width:100%; font-size:11px; font-family:monospace; resize:vertical; min-height:280px;';
 const GS_TEXTAREA_EXPORT_STYLE = 'width:100%; font-size:11px; font-family:monospace; resize:vertical; min-height:360px;';
+const GS_WIZARD_PROMPT_TEXTAREA_STYLE = 'width:100%; font-size:11px; font-family:monospace; resize:vertical; min-height:180px; max-height:min(40vh, 420px);';
+
+/** @returns {string} Factory default Game System Wizard system prompt. */
+export function buildDefaultWizardSystemPrompt() {
+    return buildWizardSystemPrompt();
+}
+
+/** @param {object} settings @param {string} [overrideText] */
+export function getEffectiveWizardSystemPrompt(settings, overrideText) {
+    const custom = (overrideText ?? settings?.gameSystemWizardSystemPrompt ?? '').trim();
+    return custom || buildWizardSystemPrompt();
+}
+
+/** @param {object} settings @param {string} text */
+function persistWizardSystemPrompt(settings, text) {
+    const trimmed = (text || '').trim();
+    const defaultPrompt = buildWizardSystemPrompt();
+    settings.gameSystemWizardSystemPrompt = (trimmed && trimmed !== defaultPrompt) ? trimmed : '';
+    saveSettings();
+}
+
+/** @param {string} textareaId @param {string} promptText */
+function buildWizardPromptEditorHtml(textareaId, promptText) {
+    return `
+        <details style="border:1px solid rgba(255,255,255,0.1); border-radius:6px; padding:8px 10px; background:rgba(0,0,0,0.12);">
+            <summary style="cursor:pointer; font-size:11px; font-weight:bold; opacity:0.9;">Wizard system prompt <span style="font-weight:normal; opacity:0.65;">(view / edit / copy for Gemini &amp; other bots)</span></summary>
+            <div style="font-size:10px; opacity:0.6; line-height:1.35; margin:8px 0 6px;">
+                Base architect instructions (no example block). During Generate / Regenerate / Iterate, a Sustenance example matching the current <b>Effect owner</b> choice is appended automatically. Copy this text for external bots — add the example half that matches your effect-owner mode if you want a full reference.
+            </div>
+            <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:6px;">
+                <button type="button" class="menu_button interactable rt-gs-copy-wizard-prompt" data-target="${textareaId}" style="font-size:11px; padding:3px 10px;">
+                    <i class="fa-solid fa-copy"></i> Copy prompt
+                </button>
+                <button type="button" class="menu_button interactable rt-gs-reset-wizard-prompt" data-target="${textareaId}" style="font-size:11px; padding:3px 10px;">
+                    <i class="fa-solid fa-rotate-left"></i> Reset to default
+                </button>
+            </div>
+            <textarea id="${textareaId}" class="text_pole" rows="12" style="${GS_WIZARD_PROMPT_TEXTAREA_STYLE}">${escapeHtml(promptText)}</textarea>
+        </details>`;
+}
+
+/** @param {object} settings @param {string} textareaId */
+function bindWizardPromptEditor(settings, textareaId) {
+    document.querySelector(`.rt-gs-copy-wizard-prompt[data-target="${textareaId}"]`)?.addEventListener('click', async () => {
+        const ta = document.getElementById(textareaId);
+        if (!ta) return;
+        try {
+            await navigator.clipboard.writeText(ta.value);
+            toastr['success']('Wizard system prompt copied.', 'Game System Wizard');
+        } catch {
+            ta.focus();
+            ta.select();
+            document.execCommand('copy');
+            toastr['success']('Wizard system prompt copied.', 'Game System Wizard');
+        }
+    });
+    document.querySelector(`.rt-gs-reset-wizard-prompt[data-target="${textareaId}"]`)?.addEventListener('click', () => {
+        const ta = document.getElementById(textareaId);
+        if (!ta) return;
+        ta.value = buildWizardSystemPrompt();
+        persistWizardSystemPrompt(settings, '');
+        toastr['info']('Wizard system prompt reset to default.', 'Game System Wizard');
+    });
+    const ta = document.getElementById(textareaId);
+    ta?.addEventListener('change', () => persistWizardSystemPrompt(settings, ta.value));
+    ta?.addEventListener('input', () => persistWizardSystemPrompt(settings, ta.value));
+}
+
+/** @param {object} settings @param {string} [overrideText] */
+function readWizardSystemPromptFromUi(settings, textareaId) {
+    const ta = document.getElementById(textareaId);
+    const text = ta?.value?.trim() || '';
+    persistWizardSystemPrompt(settings, text);
+    return getEffectiveWizardSystemPrompt(settings, text);
+}
+
+/** @param {string} basePrompt @param {'tracker'|'gm'} [effectOwner] */
+function composeWizardArchitectPrompt(basePrompt, effectOwner = 'tracker') {
+    const base = (basePrompt || '').trim();
+    const example = buildWizardOutputExample(effectOwner);
+    return example ? `${base}\n\n${example}` : base;
+}
 
 /** Connection overlay for Game Systems wizard / AI builder LLM calls (separate from main tracker). */
 function getGameSystemWizardConnectionSettings(baseSettings) {
@@ -950,6 +1032,93 @@ RULES:
 14. Double-check that all magnitude guides and examples use a range of scaled offsets (e.g., Minor, Moderate, Major) rather than a single flat number (like +300) for all actions.`;
 }
 
+/** Shared Sustenance tracker_module body (recovery magnitudes + output); effect-owner split is in gm_section + meta. */
+function buildWizardSustenanceTrackerModuleBody() {
+    return `You maintain Hunger and Thirst as two independent values, 0-1000 each.
+
+Decay: each turn, calculate the delta in minutes between the current [TIME] and the [TIME] in the PRIOR MEMO. Hunger drops 1 unit per minute of that delta; Thirst drops 2 units per minute. Clamp both 0-1000.
+
+Recovery — scan the latest narrative output for {{user}} eating or drinking, and apply the matching offset on top of the decayed value:
+- Minor (snack/jerky/bread crust, or a sip/mouthful/gulp): +75
+- Moderate (stew/bread+cheese/rations, or a tankard/waterskin/flask): +200
+- Major (feast/banquet/whole fowl, or a stream/cask/long tavern session): +400
+
+Hunger tiers: 800-1000 Satiated, 500-799 Fed, 200-499 Peckish, 1-199 Famished, 0 Starving.
+Thirst tiers: 800-1000 Hydrated, 500-799 Quenched, 200-499 Thirsty, 1-199 Parched, 0 Dehydrated.`;
+}
+
+/** @returns {string} Sustenance example with effect_owner="tracker". */
+function buildWizardSustenanceExampleTracker() {
+    return `<meta name="Sustenance" icon="🍖" needs_tracker="true" driver_time="true" driver_gm_annotation="false" driver_stated_fact="false" effect_owner="tracker"/>
+<gm_section tag="sustenance">
+You read {{user}}'s current Hunger and Thirst tier directly from the STATE MEMO's [SUSTENANCE] block each turn — that reported tier is absolute law; you never recompute or second-guess it, only react to it one turn behind if needed.
+
+A background system silently ticks both meters down with elapsed time. You do NOT narrate, hint at, or invent the numeric drain yourself — no "{{user}}'s stomach loses 15 hunger" lines. Only narrate condition based on whichever tier the STATE MEMO currently shows.
+
+Eating/drinking triggers offsets scaled by portion (the tracker applies the exact value; you just describe naturally):
+</gm_section>
+<tracker_module tag="SUSTENANCE" label="Sustenance" icon="🍖">
+${buildWizardSustenanceTrackerModuleBody()}
+(Tiers 500+ have no mechanical effect; 200-499 is minor discomfort; 1-199 imposes disadvantage on physical checks/CON saves; 0 is critical, exhaustion accrues.)
+
+Output every turn:
+[SUSTENANCE]
+- Hunger: ((BARYELLOW)) 650/1000 (Fed)
+- Thirst: ((BARBLUE)) 350/1000 (Thirsty)
+Status: ((PILLS)) Fed, ((WARNING)) Thirsty
+[/SUSTENANCE]
+</tracker_module>`;
+}
+
+/** @returns {string} Sustenance example with effect_owner="gm". */
+function buildWizardSustenanceExampleGm() {
+    return `<meta name="Sustenance" icon="🍖" needs_tracker="true" driver_time="true" driver_gm_annotation="false" driver_stated_fact="false" effect_owner="gm"/>
+<gm_section tag="sustenance">
+You read {{user}}'s current Hunger and Thirst values from the STATE MEMO's [SUSTENANCE] block each turn. You own the threshold table and mechanical consequences below — when the reported values place {{user}} in a tier with a mechanical effect, narrate that consequence in the same turn; do not wait for a future memo update.
+
+Threshold table (you enforce these; the tracker only reports numbers and tier labels):
+Hunger: 800-1000 Satiated, 500-799 Fed, 200-499 Peckish, 1-199 Famished, 0 Starving.
+Thirst: 800-1000 Hydrated, 500-799 Quenched, 200-499 Thirsty, 1-199 Parched, 0 Dehydrated.
+Mechanical effects you apply same-turn when {{user}} is in the tier:
+- 500+: no mechanical effect beyond flavor.
+- 200-499 (Peckish/Thirsty): subtle discomfort in narration.
+- 1-199 (Famished/Parched): {{user}} has disadvantage on physical checks and CON saves until recovered.
+- 0 (Starving/Dehydrated): {{user}} is barely functional; exhaustion accrues until fed/hydrated.
+
+A background system silently ticks both meters down with elapsed time. You do NOT narrate, hint at, or invent the numeric drain yourself — no "{{user}}'s stomach loses 15 hunger" lines.
+
+Eating/drinking triggers offsets scaled by portion (the tracker applies the exact value; you just describe naturally):
+</gm_section>
+<tracker_module tag="SUSTENANCE" label="Sustenance" icon="🍖">
+${buildWizardSustenanceTrackerModuleBody()}
+Resolve tier labels from the current values for display only — do NOT state mechanical effects here; the gm_section owns same-turn threshold consequences.
+
+Output every turn:
+[SUSTENANCE]
+- Hunger: ((BARYELLOW)) 650/1000 (Fed)
+- Thirst: ((BARBLUE)) 350/1000 (Thirsty)
+[/SUSTENANCE]
+</tracker_module>`;
+}
+
+/**
+ * Illustrative Sustenance output appended at generation time based on effect_owner.
+ * @param {'tracker'|'gm'} [effectOwner]
+ */
+function buildWizardOutputExample(effectOwner = 'tracker') {
+    const mode = effectOwner === 'gm' ? 'gm' : 'tracker';
+    const body = mode === 'gm' ? buildWizardSustenanceExampleGm() : buildWizardSustenanceExampleTracker();
+    const modeLabel = mode === 'gm'
+        ? 'effect_owner="gm" (GM section owns threshold effects; tracker owns numbers/bars only)'
+        : 'effect_owner="tracker" (tracker owns threshold effects in the state memo)';
+    return `═══════════════════════════════════════════════════════════════════════════
+FULL OUTPUT EXAMPLE (illustrative reference only — NOT a default answer)
+═══════════════════════════════════════════════════════════════════════════
+This example uses ${modeLabel}. Match that effect-owner split in your output. Study structure, second-person voice, driver split, scaled magnitudes, compound sub-meters, and sample-block hygiene. Do NOT return this example verbatim unless the user's request is literally hunger/thirst sustenance — for any other mechanic, invent fresh tags and content following the same patterns.
+
+${body}`;
+}
+
 /**
  * Normalizes an object's driver_* / legacy valueAuthority fields into a
  * guaranteed-non-empty { time, gmAnnotation, statedFact } trio. Accepts both
@@ -1009,10 +1178,10 @@ export function parseWizardResponse(raw) {
 }
 
 /** One combined AI call that drafts both halves of a new game system. */
-async function generateGameSystemDraft(settings, description) {
-    const systemPrompt = buildWizardSystemPrompt();
+async function generateGameSystemDraft(settings, description, systemPrompt, effectOwner = 'tracker') {
+    const sp = composeWizardArchitectPrompt(systemPrompt || getEffectiveWizardSystemPrompt(settings), effectOwner);
     const userPrompt = `${buildExistingTagsContext(settings)}\n\nDescribe the mechanic:\n${description}`;
-    const raw = await sendStateRequest(getGameSystemWizardConnectionSettings(settings), systemPrompt, userPrompt);
+    const raw = await sendStateRequest(getGameSystemWizardConnectionSettings(settings), sp, userPrompt);
     if (!raw) throw new Error('No response from AI');
     return parseWizardResponse(raw);
 }
@@ -1061,10 +1230,11 @@ function buildDriverGuidance(drivers, gmTag, trackerTag, effectOwner = 'tracker'
 
 
 /** Focused regeneration of just the GM half, keeping the tracker half's current text as context. */
-async function regenerateGmSection(settings, description, gmTag, drivers, trackerTag = '', effectOwner = 'tracker') {
-    const systemPrompt = `You are a game-system architect for a D&D-style tabletop RPG framework. Rewrite ONLY the GM-facing section for the mechanic described below. Return ONLY:\n<gm_section tag="${gmTag}">\n...instructions...\n</gm_section>\nNo explanation, no markdown fences, no other text. Reference {{user}} for the player. Be comprehensive but concise (10-30 lines).\n\nCRITICAL: Inner content must be SECOND PERSON (you/your) — direct instructions to the Narrator. Never write "The GM must" or any third-person reference to the narrator.\n\nCRITICAL: gm_section must NEVER track totals, restate current scores, or duplicate tracker accounting.\n\n${buildDriverGuidance(drivers, gmTag, trackerTag, effectOwner)}`;
+async function regenerateGmSection(settings, description, gmTag, drivers, trackerTag = '', effectOwner = 'tracker', systemPrompt) {
+    const base = composeWizardArchitectPrompt(systemPrompt || getEffectiveWizardSystemPrompt(settings), effectOwner);
+    const systemPromptFull = `${base}\n\n---\n\nCURRENT TASK: Rewrite ONLY the GM-facing section for the mechanic described below. Return ONLY:\n<gm_section tag="${gmTag}">\n...instructions...\n</gm_section>\nNo explanation, no markdown fences, no other text. Reference {{user}} for the player. Be comprehensive but concise (10-30 lines).\n\nCRITICAL: Inner content must be SECOND PERSON (you/your) — direct instructions to the Narrator. Never write "The GM must" or any third-person reference to the narrator.\n\nCRITICAL: gm_section must NEVER track totals, restate current scores, or duplicate tracker accounting.\n\n${buildDriverGuidance(drivers, gmTag, trackerTag, effectOwner)}`;
     const userPrompt = `${buildExistingTagsContext(settings)}\n\nMechanic description:\n${description}`;
-    const raw = await sendStateRequest(getGameSystemWizardConnectionSettings(settings), systemPrompt, userPrompt);
+    const raw = await sendStateRequest(getGameSystemWizardConnectionSettings(settings), systemPromptFull, userPrompt);
     if (!raw) throw new Error('No response from AI');
     const block = extractTagBlock(raw, 'gm_section');
     if (!block) throw new Error('AI did not return a valid gm_section block');
@@ -1072,11 +1242,12 @@ async function regenerateGmSection(settings, description, gmTag, drivers, tracke
 }
 
 /** Focused regeneration of just the tracker half. */
-async function regenerateTrackerModule(settings, description, trackerTag, drivers, effectOwner = 'tracker') {
+async function regenerateTrackerModule(settings, description, trackerTag, drivers, effectOwner = 'tracker', systemPrompt) {
     const renderingHints = RENDERING_TAGS_LIBRARY.join('\n  - ');
-    const systemPrompt = `You are a game-system architect for a D&D-style tabletop RPG framework. Rewrite ONLY the tracker module instructions for the mechanic described below. Return ONLY:\n<tracker_module tag="${trackerTag}" label="Display Label" icon="emoji">\n...instructions, including a sample [${trackerTag}] ... [/${trackerTag}] format block using rendering markers like:\n  - ${renderingHints}\n</tracker_module>\nNo explanation, no markdown fences, no other text.\n\nCRITICAL: Inner content must be SECOND PERSON (you/your) — direct instructions to the State Tracker. Never write "The tracker maintains…", "The State Tracker must…", or any third-person reference to the tracker as an external entity.\n\nCRITICAL: This module EXCLUSIVELY owns running totals, bars, threshold tables, and tier labels — the gm_section must never duplicate this. When scanning for inline annotations, say "narrative output" / "the latest narrative output" — NEVER "GM's output" or "GM's narration".\n\n${buildDriverGuidance(drivers, '', trackerTag, effectOwner)}`;
+    const base = composeWizardArchitectPrompt(systemPrompt || getEffectiveWizardSystemPrompt(settings), effectOwner);
+    const systemPromptFull = `${base}\n\n---\n\nCURRENT TASK: Rewrite ONLY the tracker module instructions for the mechanic described below. Return ONLY:\n<tracker_module tag="${trackerTag}" label="Display Label" icon="emoji">\n...instructions, including a sample [${trackerTag}] ... [/${trackerTag}] format block using rendering markers like:\n  - ${renderingHints}\n</tracker_module>\nNo explanation, no markdown fences, no other text.\n\nCRITICAL: Inner content must be SECOND PERSON (you/your) — direct instructions to the State Tracker. Never write "The tracker maintains…", "The State Tracker must…", or any third-person reference to the tracker as an external entity.\n\nCRITICAL: This module EXCLUSIVELY owns running totals, bars, threshold tables, and tier labels — the gm_section must never duplicate this. When scanning for inline annotations, say "narrative output" / "the latest narrative output" — NEVER "GM's output" or "GM's narration".\n\n${buildDriverGuidance(drivers, '', trackerTag, effectOwner)}`;
     const userPrompt = `${buildExistingTagsContext(settings)}\n\nMechanic description:\n${description}`;
-    const raw = await sendStateRequest(getGameSystemWizardConnectionSettings(settings), systemPrompt, userPrompt);
+    const raw = await sendStateRequest(getGameSystemWizardConnectionSettings(settings), systemPromptFull, userPrompt);
     if (!raw) throw new Error('No response from AI');
     const block = extractTagBlock(raw, 'tracker_module');
     if (!block) throw new Error('AI did not return a valid tracker_module block');
@@ -1090,11 +1261,12 @@ async function regenerateTrackerModule(settings, description, trackerTag, driver
  * since regenerating only one half independently can leave the pair in a
  * mismatched state (e.g. one half still written for the old effect owner).
  */
-async function regenerateBothHalves(settings, description, gmTag, trackerTag, drivers, effectOwner = 'tracker') {
+async function regenerateBothHalves(settings, description, gmTag, trackerTag, drivers, effectOwner = 'tracker', systemPrompt) {
     const renderingHints = RENDERING_TAGS_LIBRARY.join('\n  - ');
-    const systemPrompt = `You are a game-system architect for a D&D-style tabletop RPG framework. Rewrite BOTH halves of the mechanic described below so they are fully coherent with each other. Return ONLY:\n<gm_section tag="${gmTag}">\n...instructions...\n</gm_section>\n<tracker_module tag="${trackerTag}" label="Display Label" icon="emoji">\n...instructions, including a sample [${trackerTag}] ... [/${trackerTag}] format block using rendering markers like:\n  - ${renderingHints}\n</tracker_module>\nNo explanation, no markdown fences, no other text. Reference {{user}} for the player. Be comprehensive but concise (10-30 lines each).\n\nCRITICAL: gm_section inner content must be SECOND PERSON (you/your) — never "The GM must". CRITICAL: tracker_module inner content must ALSO be SECOND PERSON (you/your) addressing the State Tracker directly — never "The tracker maintains…". CRITICAL: gm_section must NEVER track totals, restate current scores, or duplicate tracker accounting — the tracker_module EXCLUSIVELY owns totals, bars, thresholds, and tier labels.\n\n${buildDriverGuidance(drivers, gmTag, trackerTag, effectOwner)}\n\nSince both halves are generated together in this one call, any numbers shared between them (e.g. an items/actions magnitude guide required by the "time" driver, or a threshold table required by effect_owner="gm") MUST be identical in both halves — word for word.`;
+    const base = composeWizardArchitectPrompt(systemPrompt || getEffectiveWizardSystemPrompt(settings), effectOwner);
+    const systemPromptFull = `${base}\n\n---\n\nCURRENT TASK: Rewrite BOTH halves of the mechanic described below so they are fully coherent with each other. Return ONLY:\n<gm_section tag="${gmTag}">\n...instructions...\n</gm_section>\n<tracker_module tag="${trackerTag}" label="Display Label" icon="emoji">\n...instructions, including a sample [${trackerTag}] ... [/${trackerTag}] format block using rendering markers like:\n  - ${renderingHints}\n</tracker_module>\nNo explanation, no markdown fences, no other text. Reference {{user}} for the player. Be comprehensive but concise (10-30 lines each).\n\nCRITICAL: gm_section inner content must be SECOND PERSON (you/your) — never "The GM must". CRITICAL: tracker_module inner content must ALSO be SECOND PERSON (you/your) addressing the State Tracker directly — never "The tracker maintains…". CRITICAL: gm_section must NEVER track totals, restate current scores, or duplicate tracker accounting — the tracker_module EXCLUSIVELY owns totals, bars, thresholds, and tier labels.\n\n${buildDriverGuidance(drivers, gmTag, trackerTag, effectOwner)}\n\nSince both halves are generated together in this one call, any numbers shared between them (e.g. an items/actions magnitude guide required by the "time" driver, or a threshold table required by effect_owner="gm") MUST be identical in both halves — word for word.`;
     const userPrompt = `${buildExistingTagsContext(settings)}\n\nMechanic description:\n${description}`;
-    const raw = await sendStateRequest(getGameSystemWizardConnectionSettings(settings), systemPrompt, userPrompt);
+    const raw = await sendStateRequest(getGameSystemWizardConnectionSettings(settings), systemPromptFull, userPrompt);
     if (!raw) throw new Error('No response from AI');
     const gm = extractTagBlock(raw, 'gm_section');
     const tracker = extractTagBlock(raw, 'tracker_module');
@@ -1122,6 +1294,7 @@ async function iterateGameSystemDraft(settings, {
     trackerLabel = '',
     drivers,
     effectOwner = 'tracker',
+    systemPrompt,
 }) {
     const renderingHints = RENDERING_TAGS_LIBRARY.join('\n  - ');
     const tag = sanitizeUpperTag(trackerTag);
@@ -1132,7 +1305,8 @@ async function iterateGameSystemDraft(settings, {
         outputFormat += `\n<tracker_module tag="${tag}" label="Display Label" icon="emoji">\n...revised instructions, including a sample [${tag}] ... [/${tag}] format block using rendering markers like:\n  - ${renderingHints}\n</tracker_module>`;
     }
 
-    const systemPrompt = `You are a game-system architect for a D&D-style tabletop RPG framework. The user already has a draft game system and wants specific revisions — NOT a from-scratch rewrite. ${outputFormat}\nNo explanation, no markdown fences, no other text. Reference {{user}} for the player. Be comprehensive but concise (10-30 lines per half).\n\nCRITICAL: gm_section inner content must be SECOND PERSON (you/your) — never "The GM must". CRITICAL: tracker_module inner content must ALSO be SECOND PERSON (you/your) addressing the State Tracker directly — never "The tracker maintains…". CRITICAL: gm_section must NEVER track totals, restate current scores, or duplicate tracker accounting.\n\n${buildDriverGuidance(drivers, snakeTag, tag, effectOwner)}\n\nITERATION RULES:\n- Preserve everything in the current draft that the user did NOT ask to change.\n- Apply the user's feedback precisely. If a change affects shared numbers (item guides, thresholds, annotation formats), update BOTH halves so they stay identical where required.\n- Do not rename tags unless the user explicitly asks to.\n- Never output the literal placeholder text "YOUR_TAG" or a bare standalone "TAG" — use the actual tracker tag (${tag}).`;
+    const base = composeWizardArchitectPrompt(systemPrompt || getEffectiveWizardSystemPrompt(settings), effectOwner);
+    const systemPromptFull = `${base}\n\n---\n\nREVISION MODE: The user already has a draft game system and wants specific revisions — NOT a from-scratch rewrite. ${outputFormat}\nNo explanation, no markdown fences, no other text. Reference {{user}} for the player. Be comprehensive but concise (10-30 lines per half).\n\nCRITICAL: gm_section inner content must be SECOND PERSON (you/your) — never "The GM must". CRITICAL: tracker_module inner content must ALSO be SECOND PERSON (you/your) addressing the State Tracker directly — never "The tracker maintains…". CRITICAL: gm_section must NEVER track totals, restate current scores, or duplicate tracker accounting.\n\n${buildDriverGuidance(drivers, snakeTag, tag, effectOwner)}\n\nITERATION RULES:\n- Preserve everything in the current draft that the user did NOT ask to change.\n- Apply the user's feedback precisely. If a change affects shared numbers (item guides, thresholds, annotation formats), update BOTH halves so they stay identical where required.\n- Do not rename tags unless the user explicitly asks to.\n- Never output the literal placeholder text "YOUR_TAG" or a bare standalone "TAG" — use the actual tracker tag (${tag}).`;
 
     let currentDraft = `<gm_section tag="${snakeTag}">\n${gmContent}\n</gm_section>`;
     if (includeTracker && trackerContent.trim()) {
@@ -1150,7 +1324,7 @@ ${currentDraft}
 User's iteration feedback (apply these changes):
 ${iterationFeedback}`;
 
-    const raw = await sendStateRequest(getGameSystemWizardConnectionSettings(settings), systemPrompt, userPrompt);
+    const raw = await sendStateRequest(getGameSystemWizardConnectionSettings(settings), systemPromptFull, userPrompt);
     if (!raw) throw new Error('No response from AI');
 
     const gm = extractTagBlock(raw, 'gm_section');
@@ -1281,6 +1455,7 @@ async function showGameSystemPreview(parsed, { description = '', isEdit = false,
                         <input type="radio" name="rt_gs_effect_owner" value="gm" ${state.effectOwner === 'gm' ? 'checked' : ''}> GM section (effects in main sysprompt)
                     </label>
                 </div>
+                <div style="font-size:10px; opacity:0.55; line-height:1.3;">Changing effect owner rewrites which half owns threshold consequences. Use <b>Regenerate Both</b> after switching — the appended Sustenance example updates to match.</div>
             </div>
 
             <div id="rt-gs-regen-both-row" style="display:${state.includeTracker ? 'flex' : 'none'}; align-items:center; justify-content:space-between; gap:10px; padding:8px 10px; background:rgba(255,180,60,0.08); border:1px solid rgba(255,180,60,0.3); border-radius:6px;">
@@ -1296,6 +1471,8 @@ async function showGameSystemPreview(parsed, { description = '', isEdit = false,
                     <i class="fa-solid fa-wand-magic-sparkles"></i> Iterate with AI
                 </button>
             </div>
+
+            ${buildWizardPromptEditorHtml('rt-gs-wizard-system-prompt', getEffectiveWizardSystemPrompt(settings))}
 
             <div style="border:1px solid rgba(255,255,255,0.1); border-radius:6px; padding:10px; background:rgba(0,0,0,0.15);">
                 <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
@@ -1335,6 +1512,8 @@ async function showGameSystemPreview(parsed, { description = '', isEdit = false,
 
     setTimeout(() => {
         const $id = (id) => document.getElementById(id);
+        bindWizardPromptEditor(settings, 'rt-gs-wizard-system-prompt');
+        const getWizardSystemPrompt = () => readWizardSystemPromptFromUi(settings, 'rt-gs-wizard-system-prompt');
         $id('rt-gs-icon')?.addEventListener('input', e => { state.icon = e.target.value; });
         $id('rt-gs-name')?.addEventListener('input', e => { state.name = e.target.value; });
         $id('rt-gs-gmtag')?.addEventListener('input', e => { state.gmTag = e.target.value; const lbl = $id('rt-gs-gmtag-label'); if (lbl) lbl.textContent = e.target.value; });
@@ -1409,7 +1588,7 @@ async function showGameSystemPreview(parsed, { description = '', isEdit = false,
                 regenGmBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
                 try {
                     const drivers = { time: state.driverTime, gmAnnotation: state.driverGmAnnotation, statedFact: state.driverStatedFact };
-                    const content = await regenerateGmSection(settings, description || state.name, sanitizeSnakeTag(state.gmTag), drivers, sanitizeUpperTag(state.trackerTag), state.effectOwner);
+                    const content = await regenerateGmSection(settings, description || state.name, sanitizeSnakeTag(state.gmTag), drivers, sanitizeUpperTag(state.trackerTag), state.effectOwner, getWizardSystemPrompt());
                     state.gmContent = content;
                     const ta = $id('rt-gs-gmcontent');
                     if (ta) ta.value = content;
@@ -1428,7 +1607,7 @@ async function showGameSystemPreview(parsed, { description = '', isEdit = false,
                 regenTrkBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
                 try {
                     const drivers = { time: state.driverTime, gmAnnotation: state.driverGmAnnotation, statedFact: state.driverStatedFact };
-                    const block = await regenerateTrackerModule(settings, description || state.name, sanitizeUpperTag(state.trackerTag), drivers, state.effectOwner);
+                    const block = await regenerateTrackerModule(settings, description || state.name, sanitizeUpperTag(state.trackerTag), drivers, state.effectOwner, getWizardSystemPrompt());
                     state.trackerContent = block.content;
                     if (block.attrs.label) state.trackerLabel = block.attrs.label;
                     if (block.attrs.icon) state.trackerIcon = block.attrs.icon;
@@ -1453,7 +1632,7 @@ async function showGameSystemPreview(parsed, { description = '', isEdit = false,
                 regenBothBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Regenerating…';
                 try {
                     const drivers = { time: state.driverTime, gmAnnotation: state.driverGmAnnotation, statedFact: state.driverStatedFact };
-                    const both = await regenerateBothHalves(settings, description || state.name, sanitizeSnakeTag(state.gmTag), sanitizeUpperTag(state.trackerTag), drivers, state.effectOwner);
+                    const both = await regenerateBothHalves(settings, description || state.name, sanitizeSnakeTag(state.gmTag), sanitizeUpperTag(state.trackerTag), drivers, state.effectOwner, getWizardSystemPrompt());
                     applyDraftToPreview(both);
                     toastr['success']('Both halves regenerated together!', 'Game System Wizard');
                 } catch (err) {
@@ -1489,6 +1668,7 @@ async function showGameSystemPreview(parsed, { description = '', isEdit = false,
                         trackerLabel: state.trackerLabel,
                         drivers,
                         effectOwner: state.effectOwner,
+                        systemPrompt: getWizardSystemPrompt(),
                     });
                     applyDraftToPreview(draft);
                     toastr['success']('Draft updated from your feedback!', 'Game System Wizard');
@@ -1664,10 +1844,12 @@ function saveGameSystemFromPreview(result, existingSystemId = null) {
     return true;
 }
 
-/** @returns {Promise<string|null>} User's mechanic description, or null if cancelled. */
+/** @returns {Promise<{description: string, systemPrompt: string}|null>} User's mechanic description + wizard system prompt, or null if cancelled. */
 async function promptGameSystemWizardDescription(initialDescription = '') {
     const { Popup } = SillyTavern.getContext();
+    const settings = getSettings();
     let description = initialDescription;
+    let systemPrompt = getEffectiveWizardSystemPrompt(settings);
 
     const inputHtml = `
         <div style="display:flex; flex-direction:column; gap:10px; width:100%; box-sizing:border-box; text-align:left;">
@@ -1678,24 +1860,42 @@ async function promptGameSystemWizardDescription(initialDescription = '') {
             <textarea id="rt_gs_wizard_desc" rows="4" class="text_pole"
                 style="font-size:12px; resize:vertical; width:100%;"
                 placeholder="Example: Irradiated zones where the player accumulates RADS the longer they stay, with escalating debuffs at higher exposure.">${escapeHtml(initialDescription)}</textarea>
+            ${buildWizardPromptEditorHtml('rt_gs_wizard_system_prompt', getEffectiveWizardSystemPrompt(settings))}
         </div>
     `;
 
     setTimeout(() => {
+        bindWizardPromptEditor(settings, 'rt_gs_wizard_system_prompt');
         const ta = document.getElementById('rt_gs_wizard_desc');
+        const promptTa = document.getElementById('rt_gs_wizard_system_prompt');
         if (ta) {
             if (!description) description = ta.value.trim();
             ta.addEventListener('input', () => { description = ta.value.trim(); });
         }
+        const syncPrompt = () => {
+            systemPrompt = getEffectiveWizardSystemPrompt(settings, promptTa?.value || '');
+        };
+        syncPrompt();
+        promptTa?.addEventListener('input', syncPrompt);
+        promptTa?.addEventListener('change', syncPrompt);
     }, 100);
 
-    const inputResult = await Popup.show.confirm('🧙 Game System Wizard', inputHtml, { okButton: 'Generate', cancelButton: 'Cancel' });
+    const inputResult = await Popup.show.confirm('🧙 Game System Wizard', inputHtml, { okButton: 'Generate', cancelButton: 'Cancel', ...GS_POPUP_LARGE });
     if (!inputResult) return null;
+    const promptTa = document.getElementById('rt_gs_wizard_system_prompt');
+    if (promptTa) {
+        persistWizardSystemPrompt(settings, promptTa.value);
+        systemPrompt = getEffectiveWizardSystemPrompt(settings, promptTa.value);
+    }
+    if (!description) {
+        const ta = document.getElementById('rt_gs_wizard_desc');
+        description = ta?.value?.trim() || '';
+    }
     if (!description) {
         toastr['warning']('Please describe the mechanic/system you want.', 'Game System Wizard');
         return null;
     }
-    return description;
+    return { description, systemPrompt };
 }
 
 /**
@@ -1742,9 +1942,10 @@ export async function openGameSystemWizard(existingSystem = null) {
     // New system: describe → generate → preview loop (Back returns to describe with text preserved).
     let description = '';
     while (true) {
-        const nextDescription = await promptGameSystemWizardDescription(description);
-        if (!nextDescription) return;
-        description = nextDescription;
+        const wizardInput = await promptGameSystemWizardDescription(description);
+        if (!wizardInput) return;
+        description = wizardInput.description;
+        const wizardSystemPrompt = wizardInput.systemPrompt;
 
         toastr['info']('Designing your game system with AI...', 'Game System Wizard', { timeOut: 3000 });
         const $btn = $('#rpg_tracker_btn_game_system_wizard');
@@ -1753,7 +1954,7 @@ export async function openGameSystemWizard(existingSystem = null) {
 
         let parsed;
         try {
-            parsed = await generateGameSystemDraft(settings, description);
+            parsed = await generateGameSystemDraft(settings, description, wizardSystemPrompt);
         } catch (err) {
             console.error('[RPG Tracker] Game System Wizard error:', err);
             toastr['error'](`Failed to generate game system: ${err.message}`, 'Game System Wizard');

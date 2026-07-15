@@ -2,6 +2,20 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [5.4.6] - 2026-07-15
+
+### Changed
+- **Game System Wizard effect-owner examples**: Sustenance reference output is injected at generation time — tracker-owned vs GM-owned threshold effects — matching the current Effect owner selection on Regenerate / Iterate.
+
+## [5.4.5] - 2026-07-15
+
+### Added
+- **Game System Wizard prompt editor**: View, edit, copy, and reset the architect system prompt on the initial description screen and the review/iteration screen. Edits apply to in-app Generate, Regenerate, and Iterate; copy the prompt to run the wizard externally (e.g. Gemini).
+
+### Changed
+- **Game System Wizard architect prompt**: Appends a full Sustenance (hunger/thirst) output example, clearly marked as illustrative reference only — not a default answer to copy verbatim.
+- **Game System Wizard examples**: Sustenance example is no longer baked into the base prompt; it is injected at generation time and switches between `effect_owner="tracker"` and `effect_owner="gm"` variants to match the current Effect owner selection.
+
 ## [5.4.4] - 2026-07-15
 
 ### Changed

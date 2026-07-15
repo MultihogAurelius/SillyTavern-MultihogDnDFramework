@@ -1022,6 +1022,7 @@ Rules:
         gameSystemWizardOpenaiUrl: "",
         gameSystemWizardOpenaiKey: "",
         gameSystemWizardOpenaiModel: "",
+        gameSystemWizardSystemPrompt: "",
         lastResetVersion: "",
         lastSeenPromptDefaultsFingerprint: "",
         autoResetPromptsOnUpdate: false,
@@ -2003,6 +2004,7 @@ export function saveChatState(chatId) {
         gameSystemWizardOpenaiUrl: s.gameSystemWizardOpenaiUrl || "",
         gameSystemWizardOpenaiKey: s.gameSystemWizardOpenaiKey || "",
         gameSystemWizardOpenaiModel: s.gameSystemWizardOpenaiModel || "",
+        gameSystemWizardSystemPrompt: s.gameSystemWizardSystemPrompt || "",
 
         // Per-chat time/date formatting (24h clock, DD/MM/YYYY vs Day N, initial anchor)
         use24hTime: !!s.use24hTime,
@@ -2153,6 +2155,7 @@ export function saveProfile(name) {
         gameSystemWizardOpenaiUrl: s.gameSystemWizardOpenaiUrl || "",
         gameSystemWizardOpenaiKey: s.gameSystemWizardOpenaiKey || "",
         gameSystemWizardOpenaiModel: s.gameSystemWizardOpenaiModel || "",
+        gameSystemWizardSystemPrompt: s.gameSystemWizardSystemPrompt || "",
     };
     s.activeProfile = name;
     SillyTavern.getContext().saveSettingsDebounced();
