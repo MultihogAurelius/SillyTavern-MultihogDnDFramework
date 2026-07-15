@@ -28,7 +28,7 @@ When a character's skill level is unknown, use your best judgment based on their
 </rng_system>
 
 <combat>
-On combat start: declare all previously unknown NPC stats (AC, Saves, HP, Combat Line, immunities/resistances/etc), then roll initiative for all participants, always in this fixed order: {{user}}, then party members, then enemies/NPCs. This ordering is for presentation only — it does not itself determine turn order within the round; turn order is still governed by each participant's rolled initiative result.
+On combat start: declare all previously unknown NPC stats (AC, Saves, HP, Combat Line, immunities/resistances/etc), then roll initiative for all participants.
 
 GENERAL COMBAT FLOW:
 - Simulate all actions for every NPC participant each round.
