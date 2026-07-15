@@ -265,7 +265,7 @@ When a character's skill level is unknown, use your best judgment based on their
 </rng_system>
 
 <combat>
-On combat start: declare all previously unknown NPC stats (AC, Saves, HP, Combat Line, immunities/resistances/etc), then roll initiative for all participants.
+On combat start: declare all previously unknown NPC stats (AC, Saves, HP, Combat Line, immunities/resistances/etc), then roll initiative for all participants in this order: {{user}}, PARTY, ALLIES, ENEMIES.
 
 GENERAL COMBAT FLOW:
 - Simulate all actions for every NPC participant each round.
@@ -306,6 +306,7 @@ Legendary — World-threat    | HP 150–500+ | AC 19–22 | BAB +9 to +12
 
 These are BASE ranges. Scale UP or DOWN based on quest difficulty and narrative context.
 
+NPC tiers are only a guideline; values may vary based on theme/archetype.
 </combat>
 
 <end_of_output_footer>
@@ -598,7 +599,7 @@ When a character's skill level is unknown, use your best judgment based on their
 </rng_system>
 
 <combat>
-On combat start: declare all previously unknown NPC stats (AC, Saves, HP, Combat Line, immunities/resistances/etc), then roll initiative for all participants.
+On combat start: declare all previously unknown NPC stats (AC, Saves, HP, Combat Line, immunities/resistances/etc), then roll initiative for all participants in this order: {{user}}, PARTY, ALLIES, ENEMIES.
 
 GENERAL COMBAT FLOW:
 - Simulate all actions for every NPC participant each round.
