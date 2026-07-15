@@ -2,6 +2,12 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [5.3.8] - 2026-07-15
+
+### Fixed
+- **Persona character generation**: Persona button now reads the active avatar's description instead of a stale global cache, so new chats no longer resurrect the first persona ever used when you don't re-click the persona.
+- **Chat-Linked Mode**: Settings checkbox now correctly shows on by default on fresh install.
+
 ## [5.3.7] - 2026-07-15
 
 ### Added
