@@ -1444,6 +1444,9 @@ function onChatChanged(newChatId) {
     // Only clear keyword-activated lore when actually switching to a different chat.
     // Same-chat reloads (swipe, regenerate) must preserve the keyword pool.
     const isActualChange = oldChatId !== newChatId;
+    if (isActualChange) {
+        void syncActivePersonaDescriptionFromAvatar();
+    }
     resetRouterTick(isActualChange);
 
     if (isActualChange) {
@@ -1982,6 +1985,41 @@ function handleLevelUp() {
 }
 
 
+
+/**
+ * Resolve the active SillyTavern persona from user_avatar, not the global
+ * power_user.persona_description cache (which can stay stale when the avatar
+ * is already selected but selectCurrentPersona was never re-run).
+ * @returns {Promise<{ name: string, description: string }|null>}
+ */
+async function resolveActivePersonaDescription() {
+    try {
+        const [{ user_avatar }, { power_user }] = await Promise.all([
+            import('../../../personas.js'),
+            import('../../../power-user.js'),
+        ]);
+        if (!user_avatar) return null;
+
+        const descriptor = power_user.persona_descriptions?.[user_avatar];
+        const description = (descriptor?.description ?? power_user.persona_description ?? '').trim();
+        const name = (power_user.personas?.[user_avatar] ?? '').trim();
+        if (!description) return null;
+
+        if (descriptor && power_user.persona_description !== descriptor.description) {
+            power_user.persona_description = descriptor.description ?? '';
+        }
+
+        return { name, description };
+    } catch (e) {
+        console.warn('[RPG Tracker] Could not resolve active persona:', e);
+        return null;
+    }
+}
+
+/** Re-sync global persona_description from the currently selected avatar. */
+async function syncActivePersonaDescriptionFromAvatar() {
+    await resolveActivePersonaDescription();
+}
 
 /**
  * Send a direct instruction to the State Model bypassing the narrative pipeline.
@@ -2811,18 +2849,21 @@ Gear:
 
             // ── Persona archetype: derive character from the active SillyTavern persona ──
             if (archetype === 'persona') {
-                const { substituteParams } = SillyTavern.getContext();
-                const resolvedPersona = substituteParams ? substituteParams('{{persona}}').trim() : '';
-                if (!resolvedPersona || resolvedPersona === '{{persona}}') {
+                const persona = await resolveActivePersonaDescription();
+                if (!persona) {
                     toastr['warning'](
                         'No persona is set. Set a persona in SillyTavern (User Settings → Personas) and try again.',
                         'RPG Tracker'
                     );
                     return;
                 }
+                const { name: personaName, description: resolvedPersona } = persona;
                 el.querySelectorAll('.rt-random-char-btn').forEach(b => b.disabled = true);
                 btn.textContent = labels.persona;
-                let personaPrompt = `${levelPrefix} Using the following persona description as the basis for the player character, create a Level ${level} character that faithfully embodies this persona. Translate the personality, background, and traits into appropriate stats, class, race, and equipment. Output ${_blockListStr} blocks${_hasSpells ? " (and [SPELLS] if the class is a spellcaster, using 'Cantrips:' for level 0 spells)" : ''}. All attributes and gear should be consistent with Level ${level}.${CHARACTER_FORMAT_HINT}${xpHint}${TIME_FORMAT_HINT}\n\nPersona:\n${resolvedPersona}`;
+                const nameClause = personaName
+                    ? ` The character's name MUST be "${personaName}" (the active persona name).`
+                    : '';
+                let personaPrompt = `${levelPrefix} Using the following persona description as the basis for the player character, create a Level ${level} character that faithfully embodies this persona.${nameClause} Translate the personality, background, and traits into appropriate stats, class, race, and equipment. Output ${_blockListStr} blocks${_hasSpells ? " (and [SPELLS] if the class is a spellcaster, using 'Cantrips:' for level 0 spells)" : ''}. All attributes and gear should be consistent with Level ${level}.${CHARACTER_FORMAT_HINT}${xpHint}${TIME_FORMAT_HINT}\n\nPersona${personaName ? ` — ${personaName}` : ''}:\n${resolvedPersona}`;
                 if (customInstructions) {
                     personaPrompt += `\n\nAdditional setting/instruction constraints: ${customInstructions}. Adapt the name, attributes, description, gear, and spells (if any) to match this setting/instruction perfectly.`;
                 }
