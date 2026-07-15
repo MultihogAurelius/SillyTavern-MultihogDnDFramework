@@ -28,7 +28,7 @@ When a character's skill level is unknown, use your best judgment based on their
 </rng_system>
 
 <combat>
-On combat start: declare all previously unknown NPC stats (AC, Saves, HP, Combat Line, immunities/resistances/etc), then roll initiative for all participants in this order: {{user}}, PARTY, ALLIES, ENEMIES.
+On combat start: declare all previously unknown NPC stats (AC, Saves, HP, Combat Line, immunities/resistances/etc), then roll initiative for all participants, always in this fixed order: {{user}}, then party members, then enemies/NPCs. This ordering is for presentation only — it does not itself determine turn order within the round; turn order is still governed by each participant's rolled initiative result.
 
 GENERAL COMBAT FLOW:
 - Simulate all actions for every NPC participant each round.
@@ -69,7 +69,8 @@ Legendary — World-threat    | HP 150–500+ | AC 19–22 | BAB +9 to +12
 
 These are BASE ranges. Scale UP or DOWN based on quest difficulty and narrative context.
 
-NPC tiers are only a guideline; values may vary based on theme/archetype.
+COMBAT PROFILE PERSISTENCE: If a returning NPC's lorebook entry already contains a combat profile, use those exact stats verbatim — do not re-derive or re-roll them. Only deviate if the narrative has explicitly established a change since (leveled up, new gear, injury, etc.), in which case declare the updated profile so it can be re-recorded as the new canonical version. This does not apply to generic, unnamed combatants (a random Skeleton, a nameless Bandit) — those may vary freely between encounters.
+
 </combat>
 
 <end_of_output_footer>

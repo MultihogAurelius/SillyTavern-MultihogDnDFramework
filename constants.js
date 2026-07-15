@@ -265,7 +265,7 @@ When a character's skill level is unknown, use your best judgment based on their
 </rng_system>
 
 <combat>
-On combat start: declare all previously unknown NPC stats (AC, Saves, HP, Combat Line, immunities/resistances/etc), then roll initiative for all participants in this order: {{user}}, PARTY, ALLIES, ENEMIES.
+On combat start: declare all previously unknown NPC stats (AC, Saves, HP, Combat Line, immunities/resistances/etc), then roll initiative for all participants.
 
 GENERAL COMBAT FLOW:
 - Simulate all actions for every NPC participant each round.
@@ -306,7 +306,6 @@ Legendary — World-threat    | HP 150–500+ | AC 19–22 | BAB +9 to +12
 
 These are BASE ranges. Scale UP or DOWN based on quest difficulty and narrative context.
 
-NPC tiers are only a guideline; values may vary based on theme/archetype.
 </combat>
 
 <end_of_output_footer>
@@ -635,7 +634,7 @@ BASE NPC TIERS (guidelines, scale with context):
 Minion — Rabble, untrained | HP 8–15   | AC 10–12 | BAB +0 to +1
 Soldier — Trained          | HP 18–30  | AC 13–15 | BAB +2 to +3
 Elite — Veteran/specialist | HP 35–60  | AC 15–17 | BAB +4 to +5
-Boss — Powerful individual  | HP 60–120 | AC 17–19 | BAB +6 to +8
+Boss — Powerful individual  | HP 60–120 | BAB +6 to +8
 Legendary — World-threat    | HP 150–500+ | AC 19–22 | BAB +9 to +12
 
 These are BASE ranges. Scale UP or DOWN based on quest difficulty and narrative context.
