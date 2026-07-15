@@ -2,7 +2,7 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
-## [5.3.10] - 2026-07-15
+## [5.4.0] - 2026-07-15
 
 ### Fixed
 - **Mobile Lorebook Agent layout**: Detached agent panel fills the viewport; campaign records scroll internally instead of leaving unused space at the bottom. Panel resize is desktop-only.
