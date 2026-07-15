@@ -92,7 +92,7 @@ One command per line inside the block:
 
 Infer benching/reunion from the narrative — no GM annotation exists for either. Bias toward under-triggering on bench: brief scene absence is NOT a bench. Wrong bench is worse than a missed one (missed benches self-heal on a later turn).
 
-Permanent removal uses *(Left the party: Name — reason)* from the [PARTY] module, not these commands.
+Permanent removal uses *(Left the party: Name — reason)* from the [PARTY] module, not these commands. NEVER REMOVE A CHARACTER FROM [PARTY] WITHOUT THIS STRING; if someone (or {{user}}) leaves, use [BENCH], not removal of [PARTY] members.
 
 Example (bench only — no [PARTY] output):
 [BENCHED PARTY]

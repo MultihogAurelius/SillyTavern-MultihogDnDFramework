@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [5.4.1] - 2026-07-15
+
+### Changed
+- **BENCHED PARTY prompt**: Clarify that permanent [PARTY] removal requires the exact *(Left the party: Name — reason)* string; temporary separations (including {{user}} leaving the scene) use [BENCH], not roster deletion.
+
 ## [5.4.0] - 2026-07-15
 
 ### Fixed
