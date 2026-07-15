@@ -59,6 +59,15 @@ export async function applyPortraitData(entityName, src) {
     } else {
         const stored = await persistPortraitSrc(src, chatId, normName);
         s.customPortraits[normName] = stored;
+
+        // Keep the active chat partition in sync so saveChatState cannot resurrect the old path.
+        if (s.chatLinkEnabled && chatId && s.chatStates?.[chatId]?.customPortraits) {
+            s.chatStates[chatId].customPortraits[normName] = stored;
+        }
+
+        if (previous && previous !== stored && isManagedPortraitPath(previous) && countPortraitPathRefs(s, previous) === 0) {
+            await deletePortraitFile(previous);
+        }
     }
     // Portrait sets are infrequent, deliberate actions (not rapid keystrokes like the memo
     // textarea) — force an immediate flush instead of risking the 2s debounce window.

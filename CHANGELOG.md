@@ -2,6 +2,19 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [5.3.10] - 2026-07-15
+
+### Fixed
+- **Mobile Lorebook Agent layout**: Detached agent panel fills the viewport; campaign records scroll internally instead of leaving unused space at the bottom. Panel resize is desktop-only.
+- **Add NPC to Story dialog (mobile)**: Full-screen modal positioning; prevents off-screen spawn and duplicate overlays while the character list is loading.
+- **System Prompt Control Room (mobile)**: Two-line section rows so long tag names and controls no longer overlap; desktop layout unchanged.
+- **Mobile settings performance**: Inline drawers use instant show/hide instead of slide animations; collapsed sections skip paint via `content-visibility`.
+
+## [5.3.9] - 2026-07-15
+
+### Fixed
+- **Portrait regeneration showed stale image**: Replacing an existing portrait now saves to a new timestamped file so the browser URL changes and the new image displays. Orphaned old files are deleted when no other chat link references them.
+
 ## [5.3.8] - 2026-07-15
 
 ### Fixed

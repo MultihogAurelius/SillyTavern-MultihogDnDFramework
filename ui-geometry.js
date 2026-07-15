@@ -1,6 +1,34 @@
 const GEOMETRY_KEY = 'rpg_tracker_geometry';
 const DELTA_HEIGHT_KEY = 'rpg_tracker_delta_height';
 
+/** Mobile layout breakpoint — matches panel + settings optimizations. */
+export function isMobileLayout() {
+    return typeof window !== 'undefined' && window.matchMedia('(max-width: 800px)').matches;
+}
+
+/** Panel resize is desktop-only (max-width 800px = mobile layout). */
+export function canResizePanels() {
+    return !isMobileLayout();
+}
+
+/**
+ * jQuery show/hide with slide animation on desktop; instant toggle on mobile.
+ * @param {JQuery} $el
+ * @param {boolean | undefined} show
+ */
+export function jqueryToggleSlide($el, show) {
+    if (!$el?.length) return;
+    $el.stop(true, true);
+    if (isMobileLayout()) {
+        if (show === undefined) $el.toggle();
+        else $el.toggle(!!show);
+        return;
+    }
+    if (show === undefined) $el.slideToggle(200);
+    else if (show) $el.slideDown(200);
+    else $el.slideUp(200);
+}
+
 /**
  * @param {HTMLElement} panel
  */
@@ -138,7 +166,7 @@ export function makeResizableTR(panel, handle) {
     let startX, startY, startWidth, startHeight, startTop, startLeft;
 
     handle.addEventListener('pointerdown', (e) => {
-        if (e.button !== 0) return;
+        if (e.button !== 0 || !canResizePanels()) return;
         handle.setPointerCapture(e.pointerId);
         const rect = panel.getBoundingClientRect();
         startX = e.clientX;
@@ -193,7 +221,7 @@ export function makeResizableBR(panel, handle) {
     let startX, startY, startWidth, startHeight, startTop, startLeft;
 
     handle.addEventListener('pointerdown', (e) => {
-        if (e.button !== 0) return;
+        if (e.button !== 0 || !canResizePanels()) return;
         handle.setPointerCapture(e.pointerId);
         const rect = panel.getBoundingClientRect();
         startX = e.clientX;
@@ -242,7 +270,7 @@ export function makeResizableBL(panel, handle) {
     let startX, startY, startWidth, startHeight, startTop, startLeft;
 
     handle.addEventListener('pointerdown', (e) => {
-        if (e.button !== 0) return;
+        if (e.button !== 0 || !canResizePanels()) return;
         handle.setPointerCapture(e.pointerId);
         const rect = panel.getBoundingClientRect();
         startX = e.clientX;
@@ -305,9 +333,11 @@ export function setupResizeObserver(panel) {
 export function setupDeltaResize(panel) {
     const handle = /** @type {HTMLElement} */ (panel.querySelector('#rpg-tracker-delta-handle'));
     const deltaEl = /** @type {HTMLElement} */ (panel.querySelector('#rpg-tracker-delta'));
+    if (!handle || !deltaEl || !canResizePanels()) return;
     let startY, startH;
 
     handle.addEventListener('pointerdown', (e) => {
+        if (!canResizePanels()) return;
         startY = e.clientY;
         startH = deltaEl.offsetHeight;
         handle.setPointerCapture(e.pointerId);

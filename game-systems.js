@@ -2170,18 +2170,22 @@ function controlRoomRowActions(row) {
 
 function renderControlRoomRow(row) {
     return `
-        <div class="rt-cr-row" data-key="${escapeHtml(row.key)}" style="display:flex; align-items:center; gap:8px; border:1px solid rgba(255,255,255,0.1); border-radius:6px; background:rgba(0,0,0,0.2); padding:8px 10px; opacity:${row.enabled ? '1' : '0.55'}; cursor:grab;">
-            <i class="fa-solid fa-grip-vertical" style="opacity:0.35; width:14px; text-align:center; pointer-events:none;" aria-hidden="true"></i>
-            ${controlRoomRowIcon(row)}
-            <div style="flex:1; min-width:0;">
-                <div style="font-family:monospace; font-size:12px; font-weight:bold;">${escapeHtml(row.label)}${controlRoomRowBadge(row)}</div>
-                ${row.description ? `<div style="font-size:10px; opacity:0.65; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${escapeHtml(row.description)}">${escapeHtml(row.description)}</div>` : ''}
+        <div class="rt-cr-row" data-key="${escapeHtml(row.key)}" style="opacity:${row.enabled ? '1' : '0.55'};">
+            <div class="rt-cr-row-main">
+                <i class="fa-solid fa-grip-vertical rt-cr-row-grip" aria-hidden="true"></i>
+                <span class="rt-cr-row-icon">${controlRoomRowIcon(row)}</span>
+                <div class="rt-cr-row-body">
+                    <div class="rt-cr-row-label">${escapeHtml(row.label)}${controlRoomRowBadge(row)}</div>
+                    ${row.description ? `<div class="rt-cr-row-desc" title="${escapeHtml(row.description)}">${escapeHtml(row.description)}</div>` : ''}
+                </div>
             </div>
-            <label class="checkbox_label" style="margin:0; font-size:11px; white-space:nowrap;">
-                <input type="checkbox" class="rt-cr-enable" data-key="${escapeHtml(row.key)}" ${row.enabled ? 'checked' : ''}>
-                <span>Enabled</span>
-            </label>
-            ${controlRoomRowActions(row)}
+            <div class="rt-cr-row-controls">
+                <label class="checkbox_label rt-cr-row-enable">
+                    <input type="checkbox" class="rt-cr-enable" data-key="${escapeHtml(row.key)}" ${row.enabled ? 'checked' : ''}>
+                    <span>Enabled</span>
+                </label>
+                <div class="rt-cr-row-actions">${controlRoomRowActions(row)}</div>
+            </div>
         </div>
     `;
 }
@@ -2234,17 +2238,17 @@ export async function openSystemPromptControlRoom() {
                     </small>
                 </div>
             </details>
-            <div style="display:flex; gap:6px; flex-wrap:wrap;">
-                <button id="rt_cr_btn_ai_add" class="menu_button interactable" style="flex:1; background:rgba(180,100,255,0.15); border-color:rgba(180,100,255,0.4); font-size:11px; padding:4px 8px;">
+            <div class="rt-cr-toolbar">
+                <button id="rt_cr_btn_ai_add" class="menu_button interactable rt-cr-toolbar-btn" style="flex:1; background:rgba(180,100,255,0.15); border-color:rgba(180,100,255,0.4); font-size:11px; padding:4px 8px;">
                     <i class="fa-solid fa-wand-magic-sparkles"></i> AI Builder
                 </button>
-                <button id="rt_cr_btn_manual_add" class="menu_button interactable" style="flex:1; background:rgba(80,180,120,0.15); border-color:rgba(80,180,120,0.4); font-size:11px; padding:4px 8px;">
+                <button id="rt_cr_btn_manual_add" class="menu_button interactable rt-cr-toolbar-btn" style="flex:1; background:rgba(80,180,120,0.15); border-color:rgba(80,180,120,0.4); font-size:11px; padding:4px 8px;">
                     <i class="fa-solid fa-plus"></i> Add Manually
                 </button>
-                <button id="rt_cr_btn_reset" class="menu_button interactable" style="width:auto; padding:4px 12px; background:rgba(255,100,100,0.15); border-color:rgba(255,100,100,0.4); font-size:11px;" title="Remove all AI/manually-added sections and reset the order to defaults">
+                <button id="rt_cr_btn_reset" class="menu_button interactable rt-cr-toolbar-icon-btn" style="width:auto; padding:4px 12px; background:rgba(255,100,100,0.15); border-color:rgba(255,100,100,0.4); font-size:11px;" title="Remove all AI/manually-added sections and reset the order to defaults">
                     <i class="fa-solid fa-rotate-left"></i>
                 </button>
-                <button id="rt_cr_btn_cartridges" class="menu_button interactable" style="width:auto; padding:4px 12px; background:rgba(100,220,150,0.15); border-color:rgba(100,220,150,0.4); font-size:11px;" title="Save, load, export, or import your entire configuration as a Game Cartridge">
+                <button id="rt_cr_btn_cartridges" class="menu_button interactable rt-cr-toolbar-icon-btn" style="width:auto; padding:4px 12px; background:rgba(100,220,150,0.15); border-color:rgba(100,220,150,0.4); font-size:11px;" title="Save, load, export, or import your entire configuration as a Game Cartridge">
                     <i class="fa-solid fa-compact-disc"></i>
                 </button>
             </div>

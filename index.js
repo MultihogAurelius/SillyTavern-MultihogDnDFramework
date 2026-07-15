@@ -11,7 +11,7 @@ import { runRouterPass, rollbackRouterPass, reapplyRouterPass, getLorebookManife
 import { getRequestHeaders } from '../../../../script.js';
 import { fileToDataUrl, scaleImageTo512Square, applyPortraitData, generatePortraitPrompt, generateNpcPortraitPrompt, showPortraitPromptPopup, generatePortraitDirect, autoGeneratePartyPortraits, removeAllPortraits, checkAndTriggerAutoGenerations, autoGenerateEnemyPortraits, forceCheckAutoGenerations, resetAutoGenerationTracking } from './portraits.js';
 import { migrateAllEmbeddedPortraits, countEmbeddedPortraitDataUrls, purgeAllPortraitData, resolvePortraitDisplaySrc, collectAllPortraitRefs, isManagedPortraitPath, isPortraitMigrationLocked, setPortraitMigrationLocked, PORTRAIT_STORAGE_FOLDER } from './portrait-storage.js';
-import { loadPanelGeometry, loadDeltaHeight, makeDraggable, makeResizableTR, makeResizableBR, makeResizableBL, setupResizeObserver, setupDeltaResize } from './ui-geometry.js';
+import { loadPanelGeometry, loadDeltaHeight, makeDraggable, makeResizableTR, makeResizableBR, makeResizableBL, setupResizeObserver, setupDeltaResize, canResizePanels, jqueryToggleSlide } from './ui-geometry.js';
 import { applyCustomTheme, openThemeWizard, refreshSavedThemesList, handleRecolor, undoThemeChange } from './theme-manager.js';
 import { showCharacterRollPanel, showPcImportPanel } from './character-creator.js';
 import { handleCategorySettings, openCustomFieldEditor, openPromptEditor, refreshOrderList, exportModules, importModulesFromJson, openNpcSectionEditor, openPcSectionEditor } from './ui-editors.js';
@@ -3529,7 +3529,7 @@ function createDetachedPanel(tag) {
 
     // Wire up the BR resizer (bottom-right: drag right/down)
     const resizerBR = /** @type {HTMLElement} */ (panel.querySelector('.rt-detached-resizer-br'));
-    if (resizerBR) {
+    if (resizerBR && canResizePanels()) {
         let startX, startY, startW, startH, startTop, startLeft;
         resizerBR.addEventListener('pointerdown', (e) => {
             if (e.button !== 0) return;
@@ -3559,7 +3559,7 @@ function createDetachedPanel(tag) {
 
     // Wire up the BL resizer (bottom-left: drag left expands width, down expands height)
     const resizerBL = /** @type {HTMLElement} */ (panel.querySelector('.rt-detached-resizer-bl'));
-    if (resizerBL) {
+    if (resizerBL && canResizePanels()) {
         let startX, startY, startW, startH, startTop, startLeft;
         resizerBL.addEventListener('pointerdown', (e) => {
             if (e.button !== 0) return;
@@ -3723,7 +3723,7 @@ function createPanel() {
                         <button class="rpg-tracker-icon-btn" id="rpg-tracker-agent-close" title="Close">✕</button>
                     </div>
                 </div>
-                <div class="rpg-tracker-content" style="flex: 1; overflow-y: auto; resize: none; padding: 10px; color: var(--rt-text); display: flex; flex-direction: column;">
+                <div class="rpg-tracker-content" style="flex: 1; min-height: 0; resize: none; padding: 10px; color: var(--rt-text); display: flex; flex-direction: column;">
                     <!-- Quick Settings Collapsible Header -->
                     <div id="rt-agent-settings-header" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; cursor: pointer; padding-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.08); user-select: none; flex-shrink: 0;">
                         <div style="font-weight: bold; font-size: 0.846em; display: flex; align-items: center; gap: 6px; color: var(--rt-text-muted);">
@@ -3897,7 +3897,7 @@ function createPanel() {
                     <div id="rt-agent-router-active-keys" style="margin-bottom: 10px; display: flex; flex-wrap: wrap; gap: 4px; min-height: 24px; flex-shrink: 0;">
                     </div>
 
-                    <div style="margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px; display: flex; flex-direction: column; flex: 1; min-height: 200px;">
+                    <div id="rt-agent-campaign-section" style="margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px; display: flex; flex-direction: column; flex: 1; min-height: 0;">
                         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; flex-shrink: 0;">
                             <div style="font-weight: bold; opacity: 0.8; font-size: 0.846em;">CAMPAIGN RECORDS</div>
                             <div style="display: flex; align-items: center; gap: 6px;">
@@ -3905,7 +3905,7 @@ function createPanel() {
                                 <button class="rpg-tracker-icon-btn" id="rt-agent-manifest-refresh" title="Refresh Manifest" style="font-size: 0.769em; opacity: 0.5;"><i class="fa-solid fa-arrows-rotate"></i></button>
                             </div>
                         </div>
-                        <div id="rt-agent-manifest-list" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 6px;">
+                        <div id="rt-agent-manifest-list" style="flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 6px;">
                             <div style="text-align: center; opacity: 0.5; font-size: 0.769em; padding: 10px;">Click refresh to load lore...</div>
                         </div>
                     </div>
@@ -3983,7 +3983,7 @@ function createPanel() {
     setupResizeObserver(/** @type {HTMLElement} */(panel));
 
     const resizerTR = panel.querySelector('#rt-resizer-tr');
-    if (resizerTR instanceof HTMLElement) {
+    if (canResizePanels() && resizerTR instanceof HTMLElement) {
         makeResizableTR(/** @type {HTMLElement} */(panel), resizerTR);
     }
 
@@ -3993,7 +3993,9 @@ function createPanel() {
     resizerBR.className = 'rt-resizer-br';
     resizerBR.title = 'Resize from bottom-right';
     panel.appendChild(resizerBR);
-    makeResizableBR(/** @type {HTMLElement} */(panel), resizerBR);
+    if (canResizePanels()) {
+        makeResizableBR(/** @type {HTMLElement} */(panel), resizerBR);
+    }
 
     // State tracker bottom-left resizer
     const resizerBL = document.createElement('div');
@@ -4001,18 +4003,20 @@ function createPanel() {
     resizerBL.className = 'rt-resizer-bl';
     resizerBL.title = 'Resize from bottom-left';
     panel.appendChild(resizerBL);
-    makeResizableBL(/** @type {HTMLElement} */(panel), resizerBL);
+    if (canResizePanels()) {
+        makeResizableBL(/** @type {HTMLElement} */(panel), resizerBL);
+    }
 
     // Agent panel bottom-right resizer
     const agentPanelEl = /** @type {HTMLElement} */(panel.querySelector('#rpg-tracker-agent'));
     const agentResizerBR = panel.querySelector('#rt-agent-resizer-br');
-    if (agentResizerBR instanceof HTMLElement && agentPanelEl) {
+    if (canResizePanels() && agentResizerBR instanceof HTMLElement && agentPanelEl) {
         makeResizableBR(agentPanelEl, agentResizerBR);
     }
 
     // Agent panel bottom-left resizer
     const agentResizerBL = panel.querySelector('#rt-agent-resizer-bl');
-    if (agentResizerBL instanceof HTMLElement && agentPanelEl) {
+    if (canResizePanels() && agentResizerBL instanceof HTMLElement && agentPanelEl) {
         makeResizableBL(agentPanelEl, agentResizerBL);
     }
 
@@ -7397,7 +7401,23 @@ Rules:
                 return null;
             }
         };
+        const NPC_CREATOR_OVERLAY_ID = 'rt-npc-creator-overlay';
+
+        const closeNpcCreatorOverlay = () => {
+            document.getElementById(NPC_CREATOR_OVERLAY_ID)?.remove();
+            delete document.body.dataset.rtNpcCreatorLoading;
+        };
+
         const openNpcCreatorDialog = async (bookName, prefix) => {
+            const existingOverlay = document.getElementById(NPC_CREATOR_OVERLAY_ID);
+            if (existingOverlay || document.body.dataset.rtNpcCreatorLoading) {
+                existingOverlay?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+                return;
+            }
+            document.body.dataset.rtNpcCreatorLoading = '1';
+            let overlayAttached = false;
+
+            try {
             const ctx = SillyTavern.getContext();
 
             // Load target book once to check for existing entries
@@ -7447,12 +7467,15 @@ Rules:
             }
 
             // ── Build dialog shell ──────────────────────────────────────────
+            document.getElementById(NPC_CREATOR_OVERLAY_ID)?.remove();
             const overlay = document.createElement('div');
+            overlay.id = NPC_CREATOR_OVERLAY_ID;
             overlay.className = 'rt-charpicker-overlay';
 
             const popup = document.createElement('div');
             popup.className = 'rt-charpicker-popup';
-            popup.style.width = '490px';
+
+            const dismissOverlay = () => closeNpcCreatorOverlay();
 
             // Header
             const header = document.createElement('div');
@@ -7461,7 +7484,7 @@ Rules:
             const closeBtn = document.createElement('button');
             closeBtn.className = 'rt-charpicker-close';
             closeBtn.textContent = '✕';
-            closeBtn.addEventListener('click', () => overlay.remove());
+            closeBtn.addEventListener('click', dismissOverlay);
             header.appendChild(closeBtn);
 
             // Tab bar
@@ -7501,7 +7524,7 @@ Rules:
             popup.appendChild(tabBar);
             for (const { id } of tabDefs) popup.appendChild(tabPanels[id]);
             overlay.appendChild(popup);
-            overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+            overlay.addEventListener('click', (e) => { if (e.target === overlay) dismissOverlay(); });
 
             // ── Helper: AI preview + add flow ──────────────────────────────
             const showNpcPreviewAndAdd = async (generatedTag, defaultName, toastLabel, originalAvatar = null) => {
@@ -7565,7 +7588,7 @@ Rules:
                     const ok = await createNpcFromCharCard(fakeCard, bookName, finalContent);
                     if (ok) {
                         toastr['success'](`Added "${finalName}" as NPC.`, toastLabel);
-                        overlay.remove();
+                        dismissOverlay();
                         await refreshManifest();
                     }
                 }
@@ -7656,7 +7679,7 @@ Rules:
                                     const ok = await createNpcFromCharCard(char, bookName);
                                     if (ok) {
                                         toastr['success'](`Added "${char.name}" as NPC.`, 'NPC Creator');
-                                        overlay.remove();
+                                        dismissOverlay();
                                         await refreshManifest();
                                     }
                                 }
@@ -7883,6 +7906,11 @@ Rules:
 
             // Add to DOM
             document.body.appendChild(overlay);
+            overlayAttached = true;
+            delete document.body.dataset.rtNpcCreatorLoading;
+            } finally {
+                if (!overlayAttached) delete document.body.dataset.rtNpcCreatorLoading;
+            }
         };
 
         const refreshBtn = agentPanel.querySelector('#rt-agent-manifest-refresh');
@@ -8506,6 +8534,17 @@ Rules:
             const DETACHED_AGENT_KEY = 'rpg_tracker_agent_detached';
             const GEO_KEY = 'rpg_tracker_geometry_lorebook_agent';
             const isDetached = () => localStorage.getItem(DETACHED_AGENT_KEY) === 'true';
+            const isMobileLayout = () => window.matchMedia('(max-width: 800px)').matches;
+            const MOBILE_AGENT_HEIGHT = 'calc(100dvh - 44px - 8px - env(safe-area-inset-bottom, 0px))';
+
+            const applyMobileAgentGeometry = () => {
+                agentPanel.style.top = '44px';
+                agentPanel.style.left = '3vw';
+                agentPanel.style.width = '94vw';
+                agentPanel.style.height = MOBILE_AGENT_HEIGHT;
+                agentPanel.style.maxHeight = MOBILE_AGENT_HEIGHT;
+                agentPanel.style.right = 'auto';
+            };
 
             /** @type {(() => void) | null} */
             let destroyAgentDraggable = null;
@@ -8531,41 +8570,47 @@ Rules:
                     agentPanel.style.boxShadow = '';
                     agentPanel.style.border = '';
 
-                    // Restore geometry with off-screen protection
-                    try {
-                        const savedStr = localStorage.getItem(GEO_KEY);
-                        const saved = savedStr ? JSON.parse(savedStr) : null;
+                    if (isMobileLayout()) {
+                        // Mobile: fill viewport; resize is desktop-only
+                        applyMobileAgentGeometry();
+                    } else {
+                        // Restore geometry with off-screen protection
+                        try {
+                            const savedStr = localStorage.getItem(GEO_KEY);
+                            const saved = savedStr ? JSON.parse(savedStr) : null;
 
-                        let left = 100;
-                        let top = 100;
-                        let width = 300;
-                        let height = 400;
+                            let left = 100;
+                            let top = 100;
+                            let width = 300;
+                            let height = 400;
 
-                        if (saved && typeof saved.left === 'number') {
-                            const isOffScreen = (
-                                saved.left + 50 > window.innerWidth ||
-                                saved.top + 50 > window.innerHeight ||
-                                saved.left < -250 ||
-                                saved.top < -50
-                            );
+                            if (saved && typeof saved.left === 'number') {
+                                const isOffScreen = (
+                                    saved.left + 50 > window.innerWidth ||
+                                    saved.top + 50 > window.innerHeight ||
+                                    saved.left < -250 ||
+                                    saved.top < -50
+                                );
 
-                            if (!isOffScreen) {
-                                left = saved.left;
-                                top = saved.top;
-                                if (saved.width) width = saved.width;
-                                if (saved.height) height = saved.height;
+                                if (!isOffScreen) {
+                                    left = saved.left;
+                                    top = saved.top;
+                                    if (saved.width) width = saved.width;
+                                    if (saved.height) height = saved.height;
+                                }
                             }
-                        }
 
-                        agentPanel.style.left = left + 'px';
-                        agentPanel.style.top = top + 'px';
-                        agentPanel.style.width = width + 'px';
-                        if (height) agentPanel.style.height = height + 'px';
-                        agentPanel.style.right = 'auto';
-                    } catch (e) {
-                        agentPanel.style.left = '100px';
-                        agentPanel.style.top = '100px';
-                        agentPanel.style.width = '300px';
+                            agentPanel.style.left = left + 'px';
+                            agentPanel.style.top = top + 'px';
+                            agentPanel.style.width = width + 'px';
+                            if (height) agentPanel.style.height = height + 'px';
+                            agentPanel.style.maxHeight = '';
+                            agentPanel.style.right = 'auto';
+                        } catch (e) {
+                            agentPanel.style.left = '100px';
+                            agentPanel.style.top = '100px';
+                            agentPanel.style.width = '300px';
+                        }
                     }
 
                     // Restore main panel view since agent is now detached
@@ -8584,6 +8629,7 @@ Rules:
                     agentPanel.style.right = '0';
                     agentPanel.style.width = '100%';
                     agentPanel.style.height = 'calc(100% - 30px)';
+                    agentPanel.style.maxHeight = 'calc(100% - 30px)';
                     agentPanel.style.position = 'absolute';
                     agentPanel.style.boxShadow = 'none';
                     agentPanel.style.border = 'none';
@@ -8626,6 +8672,12 @@ Rules:
                 agentPanel.style.boxShadow = 'none';
                 agentPanel.style.border = 'none';
             }
+
+            window.addEventListener('resize', () => {
+                if (isDetached() && isMobileLayout()) {
+                    applyMobileAgentGeometry();
+                }
+            });
         }
 
 
@@ -9785,7 +9837,7 @@ async function runPortraitMigrationIfNeeded() {
             const drawer = $(this).closest('.inline-drawer');
             const content = drawer.find('> .inline-drawer-content');
             drawer.toggleClass('open');
-            content.stop(true, true).slideToggle(200);
+            jqueryToggleSlide(content, drawer.hasClass('open'));
             $(this).find('.inline-drawer-icon').toggleClass('down');
         });
 
@@ -12677,12 +12729,7 @@ RULES:
 
         function updateDefaultPositionFieldsVisibility() {
             const posVal = parseInt(String(defPosSelect.val() || '4'));
-            const depthInpContainer = $('#rpg_tracker_router_default_depth_container');
-            if (posVal === 4) {
-                depthInpContainer.slideDown(200);
-            } else {
-                depthInpContainer.slideUp(200);
-            }
+            jqueryToggleSlide($('#rpg_tracker_router_default_depth_container'), posVal === 4);
         }
         updateDefaultPositionFieldsVisibility();
 
@@ -12717,12 +12764,7 @@ RULES:
 
         function updateLorePositionFieldsVisibility() {
             const posVal = parseInt(String(lorePosSelect.val() || '4'));
-            const depthInpContainer = $('#rpg_tracker_lore_injection_depth_container');
-            if (posVal === 4) {
-                depthInpContainer.slideDown(200);
-            } else {
-                depthInpContainer.slideUp(200);
-            }
+            jqueryToggleSlide($('#rpg_tracker_lore_injection_depth_container'), posVal === 4);
         }
         updateLorePositionFieldsVisibility();
 
@@ -13013,11 +13055,7 @@ RULES:
 
         function updateWpPositionFieldsVisibility() {
             const posVal = parseInt(String($wpInjectionPosition.val() || '4'));
-            if (posVal === 4) {
-                $wpInjectionDepthContainer.slideDown(200);
-            } else {
-                $wpInjectionDepthContainer.slideUp(200);
-            }
+            jqueryToggleSlide($wpInjectionDepthContainer, posVal === 4);
         }
         updateWpPositionFieldsVisibility();
 

@@ -83,18 +83,21 @@ function fingerprintDataUrl(dataUrl) {
  * @param {string|null|undefined} chatId
  * @param {string} entityName
  * @param {Map<string, string>} [dedupeCache]
+ * @param {boolean} [unique] When true, append a timestamp so replacements get a new URL (avoids browser cache).
  * @returns {Promise<string>}
  */
-export async function uploadPortraitDataUrl(dataUrl, chatId, entityName, dedupeCache) {
+export async function uploadPortraitDataUrl(dataUrl, chatId, entityName, dedupeCache, unique = false) {
     const fingerprint = fingerprintDataUrl(dataUrl);
-    if (dedupeCache?.has(fingerprint)) {
+    if (!unique && dedupeCache?.has(fingerprint)) {
         return dedupeCache.get(fingerprint);
     }
 
     const { format, base64 } = dataUrlToUploadPayload(dataUrl);
     const chatSegment = sanitizeStorageSegment(chatId || '_global', '_global');
     const entitySegment = sanitizeStorageSegment(normalizeEntityName(entityName) || 'portrait', 'portrait');
-    const fileName = `${chatSegment}__${entitySegment}`;
+    const fileName = unique
+        ? `${chatSegment}__${entitySegment}__${Date.now()}`
+        : `${chatSegment}__${entitySegment}`;
 
     const response = await fetch('/api/images/upload', {
         method: 'POST',
@@ -114,7 +117,7 @@ export async function uploadPortraitDataUrl(dataUrl, chatId, entityName, dedupeC
 
     const { path } = await response.json();
     const storedPath = normalizeStoredPortraitPath(path);
-    dedupeCache?.set(fingerprint, storedPath);
+    if (!unique) dedupeCache?.set(fingerprint, storedPath);
     return storedPath;
 }
 
@@ -125,10 +128,10 @@ export async function uploadPortraitDataUrl(dataUrl, chatId, entityName, dedupeC
  * @param {string} entityName
  * @returns {Promise<string>}
  */
-export async function persistPortraitSrc(src, chatId, entityName) {
+export async function persistPortraitSrc(src, chatId, entityName, unique = true) {
     if (!src) return '';
     if (isPortraitDataUrl(src)) {
-        return uploadPortraitDataUrl(src, chatId, entityName);
+        return uploadPortraitDataUrl(src, chatId, entityName, undefined, unique);
     }
     return src;
 }

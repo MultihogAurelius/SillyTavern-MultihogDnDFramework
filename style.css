@@ -2253,10 +2253,28 @@
         resize: none !important;
     }
 
-    .rt-detached-panel {
-        /* Allow detached panels to be smaller and repositionable even on mobile */
+    .rt-detached-panel:not(#rpg-tracker-agent) {
+        /* Allow detached section panels to be smaller and repositionable on mobile */
         max-width: 90vw;
         max-height: 40vh;
+    }
+
+    /* Resize is desktop-only — hide handles on mobile/touch */
+    .rpg-tracker-panel .rt-resizer-tr,
+    .rpg-tracker-panel .rt-resizer-br,
+    .rpg-tracker-panel .rt-resizer-bl {
+        display: none !important;
+        pointer-events: none !important;
+    }
+
+    /* Detached Lorebook Agent: fill the viewport (user cannot resize on mobile) */
+    #rpg-tracker-agent.rt-detached-panel {
+        top: 44px !important;
+        left: 3vw !important;
+        width: 94vw !important;
+        max-width: 94vw !important;
+        height: calc(100dvh - 44px - 8px - env(safe-area-inset-bottom, 0px)) !important;
+        max-height: calc(100dvh - 44px - 8px - env(safe-area-inset-bottom, 0px)) !important;
     }
 
     .rpg-tracker-footer {
@@ -2491,8 +2509,83 @@
 
 .rt-cr-row {
     display: flex;
-    gap: 7px;
+    align-items: center;
+    gap: 8px;
     width: 100%;
+    box-sizing: border-box;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    background: rgba(0, 0, 0, 0.2);
+    padding: 8px 10px;
+    cursor: grab;
+}
+
+.rt-cr-row-main {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+}
+
+.rt-cr-row-grip {
+    opacity: 0.35;
+    width: 14px;
+    text-align: center;
+    pointer-events: none;
+    flex-shrink: 0;
+}
+
+.rt-cr-row-icon {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+}
+
+.rt-cr-row-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.rt-cr-row-label {
+    font-family: monospace;
+    font-size: 12px;
+    font-weight: bold;
+    line-height: 1.3;
+}
+
+.rt-cr-row-desc {
+    font-size: 10px;
+    opacity: 0.65;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.rt-cr-row-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.rt-cr-row-enable {
+    margin: 0;
+    font-size: 11px;
+    white-space: nowrap;
+}
+
+.rt-cr-row-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.rt-cr-toolbar {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
 }
 
 /* System Prompt Control Room — one scroll region (section list only) */
@@ -2518,6 +2611,76 @@
     min-height: 0;
     overflow-y: auto;
     padding-right: 10px;
+}
+
+@media screen and (max-width: 800px) {
+    /* Control Room popup: use full mobile width; desktop wide_dialogue_popup min-width is too large */
+    .popup.wide_dialogue_popup.large_dialogue_popup:has(.rt-cr-popup-container) {
+        width: calc(100vw - 16px) !important;
+        min-width: 0 !important;
+        max-width: calc(100vw - 16px) !important;
+        margin: 8px auto !important;
+    }
+
+    .rt-cr-popup-container {
+        max-height: calc(100dvh - 7rem);
+    }
+
+    .rt-cr-list-wrap {
+        padding-right: 4px;
+    }
+
+    /* Stack each section row: tag on top, controls on a second line */
+    .rt-cr-row {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+    }
+
+    .rt-cr-row-main {
+        width: 100%;
+        align-items: flex-start;
+    }
+
+    .rt-cr-row-label {
+        font-size: 11px;
+        white-space: normal;
+        word-break: break-word;
+        overflow-wrap: anywhere;
+    }
+
+    .rt-cr-row-desc {
+        white-space: normal;
+        overflow: visible;
+        text-overflow: unset;
+        line-height: 1.35;
+        margin-top: 2px;
+    }
+
+    .rt-cr-row-controls {
+        width: 100%;
+        justify-content: space-between;
+        padding-top: 8px;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .rt-cr-row-enable {
+        flex-shrink: 0;
+    }
+
+    .rt-cr-row-actions {
+        flex-wrap: wrap;
+        justify-content: flex-end;
+    }
+
+    .rt-cr-toolbar .rt-cr-toolbar-btn {
+        flex: 1 1 calc(50% - 6px);
+        min-width: 0;
+    }
+
+    .rt-cr-toolbar .rt-cr-toolbar-icon-btn {
+        flex: 0 0 auto;
+    }
 }
 
 .rt-cr-field {
@@ -2785,22 +2948,52 @@ textarea.rt-cr-input {
         overflow-y: auto;
     }
 
-    /* Reduce campaign records list height so it doesn't crowd the bottom */
+    /* Campaign records should absorb remaining panel height and scroll internally */
+    #rt-agent-campaign-section {
+        flex: 1 1 auto !important;
+        min-height: 0 !important;
+    }
+
     #rt-agent-manifest-list {
-        max-height: 220px !important;
-        padding-bottom: 12px !important; /* ensure last row isn't clipped mid-height */
+        flex: 1 1 auto !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        overflow-y: auto !important;
+        padding-bottom: 8px !important;
     }
 
 }
 
 
-/* ── Lorebook Agent panel: block flow in scroll area (all viewports; detached + desktop).
+/* ── Lorebook Agent panel: flex column; scroll inside campaign records, not the whole body.
    .rpg-tracker-content defaults to flex column — as a flex item that breaks wrapped chip layout. */
+#rpg-tracker-agent {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+}
+
 #rpg-tracker-agent .rpg-tracker-content {
     display: flex !important;
     flex-direction: column !important;
+    flex: 1 1 auto !important;
     min-height: 0 !important;
-    padding-bottom: 20px !important;
+    overflow: hidden !important;
+    padding-bottom: 0 !important;
+}
+
+#rt-agent-campaign-section {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+#rt-agent-manifest-list {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
 }
 
 /* ── Connection Settings Panels ── */
@@ -3284,6 +3477,22 @@ textarea.rt-cr-input {
 
 .rpg-tracker-settings .inline-drawer-icon.down {
     transform: rotate(-180deg);
+}
+
+/* Mobile settings: skip drawer animations/transitions; skip painting collapsed subtrees */
+@media screen and (max-width: 800px) {
+    .rpg-tracker-settings .inline-drawer-icon,
+    .rpg-tracker-settings .inline-drawer .inline-drawer .inline-drawer-header {
+        transition: none !important;
+    }
+
+    .rpg-tracker-settings .inline-drawer:not(.open) > .inline-drawer-content {
+        content-visibility: hidden;
+    }
+
+    .rpg-tracker-settings .inline-drawer.open > .inline-drawer-content {
+        content-visibility: visible;
+    }
 }
 
 /* ── Panel Collapsed State (Immersion Mode) ─────────────────────────────────── */
@@ -3841,11 +4050,14 @@ textarea.rt-cr-input {
     position: fixed;
     inset: 0;
     background: rgba(0, 0, 0, 0.6);
-    z-index: 10000;
+    z-index: 25000;
     display: flex;
     align-items: center;
     justify-content: center;
     backdrop-filter: blur(4px);
+    overflow: hidden;
+    box-sizing: border-box;
+    padding: 16px;
 }
 .rt-charpicker-popup {
     background: var(--rt-bg, rgba(20, 20, 20, 0.96));
@@ -3853,13 +4065,16 @@ textarea.rt-cr-input {
     border-radius: 10px;
     box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6), 0 0 20px rgba(212, 169, 64, 0.08);
     width: 460px;
-    max-width: 92vw;
-    max-height: 80vh;
+    max-width: calc(100vw - 32px);
+    max-height: min(80vh, 80dvh);
     display: flex;
     flex-direction: column;
     overflow: hidden;
     color: var(--rt-text, #eee);
     font-family: var(--rt-font, system-ui, sans-serif);
+    flex-shrink: 1;
+    min-height: 0;
+    margin: 0;
 }
 .rt-charpicker-header {
     padding: 12px 16px;
@@ -4074,6 +4289,51 @@ textarea.rt-cr-input {
 .rt-npc-creator-panel.hidden {
     display: none;
 }
+
+@media screen and (max-width: 800px) {
+    /* Full-viewport modal — absolute fill avoids flex stretch / margin:auto scroll bugs */
+    .rt-charpicker-overlay {
+        display: block;
+        padding: 0;
+        overflow: hidden;
+        width: 100vw;
+        height: 100vh;
+        height: 100dvh;
+    }
+
+    .rt-charpicker-popup {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        width: auto;
+        height: auto;
+        max-width: none;
+        max-height: none;
+        border-radius: 0;
+        border-left: none;
+        border-right: none;
+        padding-top: env(safe-area-inset-top, 0px);
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+        box-sizing: border-box;
+    }
+
+    .rt-charpicker-item {
+        flex-wrap: wrap;
+    }
+
+    .rt-charpicker-btns {
+        width: 100%;
+        flex-direction: column;
+    }
+
+    .rt-charpicker-add-btn {
+        width: 100%;
+        text-align: center;
+    }
+}
+
 /* Freeform / general form inputs */
 .rt-npc-form-label {
     font-size: 10px;
