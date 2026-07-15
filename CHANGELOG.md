@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [5.4.7] - 2026-07-15
+
+### Changed
+- **Game System Wizard recovery split**: Magnitude guidance for eating/drinking (and similar restorative actions) is GM-only as a rough common-sense ballpark. Tracker recovery applies the stated change, or common sense if no number is given — no duplicated Minor/Moderate/Major lookup table.
+
 ## [5.4.6] - 2026-07-15
 
 ### Changed
