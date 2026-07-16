@@ -2545,6 +2545,9 @@ function refreshProfileDropdown() {
         names.map(n => `<option value="${escapeHtml(n)}"${n === s.activeProfile ? ' selected' : ''}>${escapeHtml(n)}</option>`).join('');
 }
 
+/** Shared Popup options for long help/docs dialogs (scrollable on mobile). */
+const RT_HELP_POPUP_OPTS = { okButton: 'Got it', cancelButton: false, allowVerticalScrolling: true };
+
 async function showRngExplanation() {
     const { Popup } = SillyTavern.getContext();
     const card = (icon, title, body) => `
@@ -2573,7 +2576,7 @@ async function showRngExplanation() {
                     </ul>`
     )}
             </div>`;
-    await Popup.show.confirm('🎲 RNG Systems Explained', popupBody, { okButton: 'Got it', cancelButton: false });
+    await Popup.show.confirm('🎲 RNG Systems Explained', popupBody, RT_HELP_POPUP_OPTS);
 }
 
 /**
@@ -2596,7 +2599,7 @@ async function showQuestsHardcoreExplanation() {
         `The model assigns an explicit difficulty rating to each quest (e.g. Easy / Hard / Deadly) rather than leaving it vague. Useful for planning and for AI consistency when calculating rewards or consequences.`
     )}
             </div>`;
-    await Popup.show.confirm('📋 Quest Mechanics Explained', popupBody, { okButton: 'Got it', cancelButton: false });
+    await Popup.show.confirm('📋 Quest Mechanics Explained', popupBody, RT_HELP_POPUP_OPTS);
 }
 
 async function showComponentsExplanation() {
@@ -2627,7 +2630,7 @@ async function showComponentsExplanation() {
         `Tracks friendship, affection, or general reputation deltas between the user and NPCs. Automatically calculates shifts from the chat tone/actions, and visualizes them using custom tracking bars.`
     )}
             </div>`;
-    await Popup.show.confirm('🧩 Components Explained', popupBody, { okButton: 'Got it', cancelButton: false });
+    await Popup.show.confirm('🧩 Components Explained', popupBody, RT_HELP_POPUP_OPTS);
 }
 
 /**
@@ -2639,7 +2642,7 @@ async function showSettingsHelpPopup(message, title = 'ℹ️ Help') {
     if (!text) return;
     const { Popup } = SillyTavern.getContext();
     const popupBody = `<div style="font-size: 0.92em; line-height: 1.55; max-width: 480px; text-align: left;">${escapeHtml(text).replace(/\n/g, '<br>')}</div>`;
-    await Popup.show.confirm(title, popupBody, { okButton: 'Got it', cancelButton: false });
+    await Popup.show.confirm(title, popupBody, RT_HELP_POPUP_OPTS);
 }
 
 /** Wire tap/click on settings ? icons; prevents accidental checkbox toggles inside labels. */
@@ -2691,7 +2694,7 @@ function bindSettingsHelpIcons() {
 async function showLorebookAgentDocumentation() {
     const { Popup } = SillyTavern.getContext();
     const content = `
-                        <div style="text-align: left; font-size: 13px; line-height: 1.5; max-height: 65vh; overflow-y: auto; padding-right: 8px;">
+                        <div style="text-align: left; font-size: 13px; line-height: 1.5; padding-right: 8px;">
                             <h3 style="margin-top: 0; color: var(--rt-custom-accent, #3498db);">The Lorebook Agent</h3>
                             <p>An autonomous narrative librarian. It scans your recent chat, decides what has changed, and writes new or updated entries directly into your SillyTavern lorebooks — no manual data entry needed.</p>
 
@@ -2758,7 +2761,7 @@ async function showLorebookAgentDocumentation() {
                             </ul>
                         </div>
                     `;
-    await Popup.show.confirm('📖 Lorebook Agent Documentation', content, { okButton: 'Got it', cancelButton: false });
+    await Popup.show.confirm('📖 Lorebook Agent Documentation', content, RT_HELP_POPUP_OPTS);
 }
 
 function refreshPortraitPromptPresetsList() {

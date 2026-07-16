@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [5.5.5a] - 2026-07-16
+
+### Fixed
+- **Help popups on mobile**: RNG Systems Explained, Quest/Components help, settings `?` help, and Lorebook Agent docs now use scrollable SillyTavern popups (`allowVerticalScrolling`) so long content is readable on small screens.
+
 ## [5.5.5] - 2026-07-16
 
 ### Changed
