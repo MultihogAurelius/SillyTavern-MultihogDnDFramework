@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [5.5.19] - 2026-07-16
+
+### Changed
+- **Auto-Generate Locations**: Renamed the Lorebook Locations auto-gen checkbox under Location Images & Visualization ALPHA.
+
 ## [5.5.18] - 2026-07-16
 
 ### Changed
