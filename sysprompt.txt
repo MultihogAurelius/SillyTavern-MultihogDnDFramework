@@ -99,7 +99,10 @@ If a character or NPC possesses a non-standard, custom, or homebrew class (e.g.,
 <weapon_proficiencies>
 If a character attacks with a weapon not covered by their listed "Proficiencies:" categories (judged via your common sense, e.g. "Pistols" covers a Glock but not a sniper rifle), apply disadvantage on the attack roll and omit their attribute modifier from the damage calculation.
 If a character lacks a "Proficiencies:" line entirely, infer proficiency from their class archetype.
-Note: High-quality or magical weapons may have an inherent accuracy/damage modifier (e.g., a "+1 Longsword"). This bonus applies to both the attack roll and damage roll.
+Melee Total Formula: Melee Total = BAB + STR modifier + Weapon enhancement bonus
+Ranged Total Formula: Ranged Total = BAB + DEX modifier + Weapon enhancement bonus
+The Melee and Ranged values on the Combat line must equal these totals.
+Note: High-quality or magical weapons may have an inherent accuracy/damage modifier (e.g., a "Longsword +1" or "Vampire's Blade +2"). This bonus applies to both the attack roll and damage roll.
 </weapon_proficiencies>
 
 <saving_throws>
@@ -238,6 +241,7 @@ When a character JOINS the party, explicitly state (Name joins the party) and de
 [PARTY]
 Name (Class): current/max HP
 Combat: BAB: +X | Ranged: +X | Melee: +X | Base AC: X | Total AC: Z
+(Melee Total = BAB + STR modifier + Weapon enhancement bonus; Ranged Total = BAB + DEX modifier + Weapon enhancement bonus)
 Gear: Primary_Weapon (Damage_Die + Mod / Damage_Type) | Armor_Name (+Y AC)
 Proficiencies: Category1, Category2
 Attr: STR X (mod), DEX X (mod), CON X (mod), INT X (mod), WIS X (mod), CHA X (mod)

@@ -26,6 +26,11 @@ export const COLOR_EXAMPLES = `<font color=#ff5555>Red Text</font>
 
 // ── Default module prompts ─────────────────────────────────────────────────────
 
+/** How Combat-line Melee/Ranged totals are derived (used in stock prompts + sysprompt). */
+export const ATTACK_TOTAL_FORMULA_HINT = `ATTACK TOTALS: Melee Total Formula: Melee Total = BAB + STR modifier + Weapon enhancement bonus. Ranged Total Formula: Ranged Total = BAB + DEX modifier + Weapon enhancement bonus. The Melee and Ranged values on the Combat line are these totals (weapon enhancement = +1/+2/+3 from the equipped weapon; 0 if mundane).`;
+
+export const NPC_ATTACK_BONUS_HINT = `NPC Att/def attack bonus (+X): melee = BAB + STR modifier + weapon enhancement bonus; ranged = BAB + DEX modifier + weapon enhancement bonus.`;
+
 export const DEFAULT_STOCK_PROMPTS = {
   character: `Main character's core stats. Use this format:
 [CHARACTER]
@@ -42,6 +47,7 @@ Status: Effect (duration Xh Xm)
 [/CHARACTER]
 
 AC CALCULATION: Calculate Total AC as Base AC (usually 10 + DEX modifier) plus the sum of AC bonuses from all equipped items (items under [INVENTORY] tagged with '[E]', e.g. Shield (+2 AC) or Plate Armor (+8 AC)).
+${ATTACK_TOTAL_FORMULA_HINT}
 Upon LEVEL UP, incorporate attribute changes.`,
   party: `Companion/Party members. Use this format for each member:
 Name (Class): current/max HP
@@ -57,6 +63,8 @@ Spells: Cantrips: Spell1, Spell2
 Spells: Level N (avail/max): Spell1, Spell2
 HD: dX (current/max)
 Status: Effect (duration Xh Xm)
+
+${ATTACK_TOTAL_FORMULA_HINT}
 
 For spells: output ONE \`Spells:\` line per spell level. Do NOT merge multiple levels onto one line with pipes.
 
@@ -113,6 +121,7 @@ ETA [BENCH] example: Status: Benched (08:08 AM, Day 1, separated to investigate 
 COMBAT ROUND X
 Name: current/max HP
 Att/def: Weapon (+X / damage) | Armor (AC: Z)
+${NPC_ATTACK_BONUS_HINT}
 Saves: Fort +X, Ref +X, Will +X
 Abilities: Ability1 (effect), Ability2 (effect)
 Other: Trait1 (description), Trait2 (description)
@@ -128,6 +137,7 @@ Organize into two sections using plain-text headers:
 MANDATORY FORMAT FOR EVERY ITEM:
 - Every item MUST have a rarity classification tag: [Common], [Uncommon], [Rare], [Epic], [Legendary], or [Artifact]
 - Every item MUST have a thematic emoji prefix before the rarity tag
+- Magical weapons/armor MUST use D&D suffix naming: "Weapon Name +1/+2/+3" (e.g. Shadow Longsword +1, Vampire's Blade +2) — NEVER "+1 Weapon Name"
 - Gear with combat stats MUST include them in parentheses before the worth: e.g. (1d8+1 Slashing) or (AC +2)
 - Every item MUST have an estimated worth at the end: (~X currency) where currency fits the world setting (GP, SP, CP, Dollars, Caps, etc.)
 - Bare currency (e.g. "💰 1,200 GP" or "💵 $500") goes under Other Items — no rarity tag needed. Use "💵" for modern/paper currency (like Dollars) and "💰" for gold/coins.
@@ -138,7 +148,7 @@ EQUIPPED ITEMS: Tag any actively worn or held item with [E] immediately after th
 Example:
 [INVENTORY]
 Gear:
-- 🗡️ [Rare] [E] Flame Dagger (1d6+2 Fire, +1 to hit) (~350 GP)
+- 🗡️ [Rare] [E] Flame Dagger +1 (1d6+2 Fire, +1 to hit) (~350 GP)
 - 🛡️ [Common] Iron Buckler (AC +2) (~15 GP)
 Other Items:
 - 🧪 [Uncommon] Healing Potion (Restores 2d4+2 HP) (~50 GP)
@@ -345,7 +355,10 @@ If a character or NPC possesses a non-standard, custom, or homebrew class (e.g.,
 <weapon_proficiencies>
 If a character attacks with a weapon not covered by their listed "Proficiencies:" categories (judged via your common sense, e.g. "Pistols" covers a Glock but not a sniper rifle), apply disadvantage on the attack roll and omit their attribute modifier from the damage calculation.
 If a character lacks a "Proficiencies:" line entirely, infer proficiency from their class archetype.
-Note: High-quality or magical weapons may have an inherent accuracy/damage modifier (e.g., a "+1 Longsword"). This bonus applies to both the attack roll and damage roll.
+Melee Total Formula: Melee Total = BAB + STR modifier + Weapon enhancement bonus
+Ranged Total Formula: Ranged Total = BAB + DEX modifier + Weapon enhancement bonus
+The Melee and Ranged values on the Combat line must equal these totals.
+Note: High-quality or magical weapons may have an inherent accuracy/damage modifier (e.g., a "Longsword +1" or "Vampire's Blade +2"). This bonus applies to both the attack roll and damage roll.
 </weapon_proficiencies>
 
 <saving_throws>
@@ -484,6 +497,7 @@ When a character JOINS the party, explicitly state (Name joins the party) and de
 [PARTY]
 Name (Class): current/max HP
 Combat: BAB: +X | Ranged: +X | Melee: +X | Base AC: X | Total AC: Z
+(Melee Total = BAB + STR modifier + Weapon enhancement bonus; Ranged Total = BAB + DEX modifier + Weapon enhancement bonus)
 Gear: Primary_Weapon (Damage_Die + Mod / Damage_Type) | Armor_Name (+Y AC)
 Proficiencies: Category1, Category2
 Attr: STR X (mod), DEX X (mod), CON X (mod), INT X (mod), WIS X (mod), CHA X (mod)
@@ -695,7 +709,10 @@ If a character or NPC possesses a non-standard, custom, or homebrew class (e.g.,
 <weapon_proficiencies>
 If a character attacks with a weapon not covered by their listed "Proficiencies:" categories (judged via your common sense, e.g. "Pistols" covers a Glock but not a sniper rifle), apply disadvantage on the attack roll and omit their attribute modifier from the damage calculation.
 If a character lacks a "Proficiencies:" line entirely, infer proficiency from their class archetype.
-Note: High-quality or magical weapons may have an inherent accuracy/damage modifier (e.g., a "+1 Longsword"). This bonus applies to both the attack roll and damage roll.
+Melee Total Formula: Melee Total = BAB + STR modifier + Weapon enhancement bonus
+Ranged Total Formula: Ranged Total = BAB + DEX modifier + Weapon enhancement bonus
+The Melee and Ranged values on the Combat line must equal these totals.
+Note: High-quality or magical weapons may have an inherent accuracy/damage modifier (e.g., a "Longsword +1" or "Vampire's Blade +2"). This bonus applies to both the attack roll and damage roll.
 </weapon_proficiencies>
 
 <saving_throws>
@@ -837,6 +854,7 @@ When a character JOINS the party, explicitly state (Name joins the party) and de
 [PARTY]
 Name (Class): current/max HP
 Combat: BAB: +X | Ranged: +X | Melee: +X | Base AC: X | Total AC: Z
+(Melee Total = BAB + STR modifier + Weapon enhancement bonus; Ranged Total = BAB + DEX modifier + Weapon enhancement bonus)
 Gear: Primary_Weapon (Damage_Die + Mod / Damage_Type) | Armor_Name (+Y AC)
 Proficiencies: Category1, Category2
 Attr: STR X (mod), DEX X (mod), CON X (mod), INT X (mod), WIS X (mod), CHA X (mod)
@@ -996,6 +1014,25 @@ Current Time: 08:00 AM, ${startDateVal}
 [/TIME]
 
 Last Rest must be N/A — this is a brand-new character who has not taken a Long Rest yet.`;
+}
+
+/** REQUIREMENTS bullet for D&D magic weapon/armor tier by level (fantasy + inventory only). */
+export function buildMagicGearLevelHint(level, genre, hasInventory) {
+    if (genre !== 'fantasy' || !hasInventory) return '';
+    const lvl = Math.max(1, Math.min(20, parseInt(String(level), 10) || 1));
+    let guidance;
+    if (lvl <= 2) {
+        guidance = 'Default to mundane gear; a single +1 item is exceptional.';
+    } else if (lvl <= 4) {
+        guidance = 'Mostly mundane gear; a single uncommon/+1 weapon or armor piece is possible.';
+    } else if (lvl <= 10) {
+        guidance = 'Include at least one +1 weapon or armor; +2 possible for a standout signature item.';
+    } else if (lvl <= 16) {
+        guidance = 'Mix of +1 and +2 gear; include at least one +2 primary weapon or armor.';
+    } else {
+        guidance = '+2 and +3 magical weapons/armor appropriate; rare+ items fit tier-4 heroes.';
+    }
+    return `\n• MAGIC GEAR (D&D): ${guidance} CRITICAL NAMING: magical weapons/armor use the D&D suffix format — "Weapon Name +1", "Shadow Longsword +2", "Vampire's Blade +1" — NEVER put the bonus before the name (wrong: "+1 Shadow Longsword"). Emoji and [Rarity] tags come first, then the name with +N at the end, then stats in parentheses (e.g. 🗡️ [Rare] [E] Shadow Longsword +1 (1d8+1 Slashing, +1 to hit)). Match rarity tags to bonus tier.`;
 }
 
 // ── Renderer / block layout constants ─────────────────────────────────────────

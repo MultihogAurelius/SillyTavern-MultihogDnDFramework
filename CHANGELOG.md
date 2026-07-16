@@ -2,6 +2,13 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [5.6.2] - 2026-07-17
+
+### Changed
+- **Character Creator**: Level-appropriate magic gear guidance (+1/+2/+3 by tier) for fantasy characters when inventory is enabled.
+- **Inventory naming**: Magical weapons use D&D suffix format (`Shadow Longsword +1`, not `+1 Shadow Longsword`).
+- **Combat totals**: Melee/Ranged formulas documented in tracker prompts — `BAB + STR/DEX modifier + weapon enhancement bonus` — for [CHARACTER], [PARTY], [COMBAT], and sysprompt weapon-proficiency sections.
+
 ## [5.6.1] - 2026-07-17
 
 ### Changed

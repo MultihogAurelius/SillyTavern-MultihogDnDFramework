@@ -1,6 +1,6 @@
 import { getSettings, saveChatState, DEFAULT_PC_SECTIONS } from './state-manager.js';
 import { sendStateRequest } from './llm-client.js';
-import { buildOnboardingXpHint, buildOnboardingTimeHint } from './constants.js';
+import { buildOnboardingXpHint, buildOnboardingTimeHint, buildMagicGearLevelHint } from './constants.js';
 import { escapeHtml } from './memo-processor.js';
 import { getRequestHeaders } from '../../../../script.js';
 import { saveSettings, sendDirectPrompt, refreshAgentManifestNow, refreshRenderedView, syncTimeFormatSettingsUi } from './index.js';
@@ -474,6 +474,7 @@ async function handleCharRollGenerate(el, panel) {
 
     const xpHint = hasXp ? buildOnboardingXpHint(level) : '';
     const TIME_FORMAT_HINT = hasTime ? buildOnboardingTimeHint(startDateVal) : '';
+    const magicGearHint = buildMagicGearLevelHint(level, genre, hasInventory);
 
     // Build the dynamic block list for the closing-tag rule (only active blocks)
     const activeBlocks = ['CHARACTER', ...(hasInventory ? ['INVENTORY'] : []), ...(hasAbilities ? ['ABILITIES'] : []), ...(hasSpells ? ['SPELLS'] : []), ...(hasXp ? ['XP'] : []), ...(hasTime ? ['TIME'] : [])];
@@ -520,7 +521,7 @@ ${cardSnippet ? `\n--- CHARACTER CARD CONTEXT ---${cardSnippet}` : ''}
 • Do NOT output a [PARTY] block under any circumstances unless explicitly instructed.
 • ${isOther || isStoryFitting ? 'Invent the most fitting class for the setting and context.' : `Use the chosen class "${classRaw}" exactly as given — do not rename or substitute it.`}
 • If the setting is non-fantasy and no class was specified, create a class that feels natural to the world — not a fantasy D&D class name.
-• All stats, gear, and saves${hasXp ? ', and XP' : ''} must be consistent with Level ${level}.
+• All stats, gear, and saves${hasXp ? ', and XP' : ''} must be consistent with Level ${level}.${magicGearHint}
 ${CHARACTER_FORMAT_HINT}${xpHint}${TIME_FORMAT_HINT}${settingHint}`;
 
     const onboardingEl = resolveOnboardingEl(el) || el;
