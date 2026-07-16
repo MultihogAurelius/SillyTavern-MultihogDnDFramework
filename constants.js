@@ -232,15 +232,15 @@ export function getResolvedTimePrompt(settings) {
 }
 
 
-export const QUESTS_NARRATOR = `When the player unambiguously accepts a quest from an NPC, describe it clearly in the narrative and conclude with *(Quest Accepted—Quest Name Here)*. State who gave the quest, where they are located, what the task entails, how many objectives there are, the difficulty (Very Easy to Very Hard), any time pressure, and what rewards were promised. Do NOT do this for something the {{user}} has not yet agreed to.
+export const QUESTS_NARRATOR = `- When the player unambiguously accepts a quest from an NPC, describe it clearly in the narrative and conclude with *(Quest Accepted: Quest Name Here)*.
+- State who gave the quest, where they are located, what the task entails, how many objectives there are, the difficulty (Very Easy to Very Hard), any time pressure, and what rewards were promised. Do NOT do this for something the {{user}} has not yet agreed to.
+- When an objective is completed, mention it naturally in the narrative. When a quest concludes (success or failure), narrate the outcome.
+- When giving quests, focus on obtainable and achievable objectives rather than vague/long-term goals.
 
-When an objective is completed, mention it naturally in the narrative. When a quest concludes (success or failure), narrate the outcome.
-
-EMERGENT QUESTS: When the player pursues a clear, sustained goal through action (investigating a mystery, hunting a target, exploring a location, helping a stranger, etc.), treat it as an emergent quest. Output *(Emergent Quest Active—Quest Name Here)* and the details of the quest, like above.
-
-When a new quest is accepted or becomes emergent, assign FRUSTRATION_COEFF based on the quest giver's personality—or, for self-imposed goals, the implied urgency: 0.4 = very patient, 1.0 = normal, 3.0 = volatile.
-
-The MOOD field on each active quest with a deadline in the STATE MEMO is calculated by the engine from time pressure and FRUSTRATION_COEFF. Use it to guide how the questgiver NPC speaks and acts.`;
+EMERGENT QUESTS:
+- When the player pursues a clear, sustained goal through action (investigating a mystery, hunting a target, exploring a location, helping a stranger, etc.), treat it as an emergent quest. Output *(Emergent Quest Active: Quest Name Here)* and the details of the quest, like above.
+- When a new quest is accepted or becomes emergent, assign FRUSTRATION_COEFF based on the quest giver's personality—or, for self-imposed goals, the implied urgency: 0.4 = very patient, 1.0 = normal, 3.0 = volatile.
+- The MOOD field on each active quest with a deadline in the STATE MEMO is calculated by the engine from time pressure and FRUSTRATION_COEFF. Use it to guide how the questgiver NPC speaks and acts.`;
 
 // ── Embedded sysprompts — mobile/Termux fallback (fetch preferred, this is the safety net) ──
 
@@ -405,11 +405,15 @@ Level 10 — 64,000 XP
 </xp_system>
 
 <quests>
-When the player unambiguously accepts a quest from an NPC, describe it clearly in the narrative and conclude with *(Quest Accepted—Quest Name Here)*. State who gave the quest, where they are located, what the task entails, how many objectives there are, the difficulty (Very Easy to Very Hard), any time pressure, and what rewards were promised. Do NOT do this for something the {{user}} has not yet agreed to.
+- When the player unambiguously accepts a quest from an NPC, describe it clearly in the narrative and conclude with *(Quest Accepted: Quest Name Here)*.
+- State who gave the quest, where they are located, what the task entails, how many objectives there are, the difficulty (Very Easy to Very Hard), any time pressure, and what rewards were promised. Do NOT do this for something the {{user}} has not yet agreed to.
+- When an objective is completed, mention it naturally in the narrative. When a quest concludes (success or failure), narrate the outcome.
+- When giving quests, focus on obtainable and achievable objectives rather than vague/long-term goals.
 
-When an objective is completed, mention it naturally in the narrative. When a quest concludes (success or failure), narrate the outcome.
-
-EMERGENT QUESTS: When the player pursues a clear, sustained goal through action (investigating a mystery, hunting a target, exploring a location, helping a stranger, etc.), treat it as an emergent quest. Output *(Emergent Quest Active—Quest Name Here)* and the details of the quest, like above.
+EMERGENT QUESTS:
+- When the player pursues a clear, sustained goal through action (investigating a mystery, hunting a target, exploring a location, helping a stranger, etc.), treat it as an emergent quest. Output *(Emergent Quest Active: Quest Name Here)* and the details of the quest, like above.
+- When a new quest is accepted or becomes emergent, assign FRUSTRATION_COEFF based on the quest giver's personality—or, for self-imposed goals, the implied urgency: 0.4 = very patient, 1.0 = normal, 3.0 = volatile.
+- The MOOD field on each active quest with a deadline in the STATE MEMO is calculated by the engine from time pressure and FRUSTRATION_COEFF. Use it to guide how the questgiver NPC speaks and acts.
 </quests>
 
 <level_up_protocol>
@@ -750,11 +754,15 @@ Level 10 — 64,000 XP
 </xp_system>
 
 <quests>
-When the player unambiguously accepts a quest from an NPC, describe it clearly in the narrative and conclude with *(Quest Accepted—Quest Name Here)*. State who gave the quest, where they are located, what the task entails, how many objectives there are, the difficulty (Very Easy to Very Hard), any time pressure, and what rewards were promised. Do NOT do this for something the {{user}} has not yet agreed to.
+- When the player unambiguously accepts a quest from an NPC, describe it clearly in the narrative and conclude with *(Quest Accepted: Quest Name Here)*.
+- State who gave the quest, where they are located, what the task entails, how many objectives there are, the difficulty (Very Easy to Very Hard), any time pressure, and what rewards were promised. Do NOT do this for something the {{user}} has not yet agreed to.
+- When an objective is completed, mention it naturally in the narrative. When a quest concludes (success or failure), narrate the outcome.
+- When giving quests, focus on obtainable and achievable objectives rather than vague/long-term goals.
 
-When an objective is completed, mention it naturally in the narrative. When a quest concludes (success or failure), narrate the outcome.
-
-EMERGENT QUESTS: When the player pursues a clear, sustained goal through action (investigating a mystery, hunting a target, exploring a location, helping a stranger, etc.), treat it as an emergent quest. Output *(Emergent Quest Active—Quest Name Here)* and the details of the quest, like above.
+EMERGENT QUESTS:
+- When the player pursues a clear, sustained goal through action (investigating a mystery, hunting a target, exploring a location, helping a stranger, etc.), treat it as an emergent quest. Output *(Emergent Quest Active: Quest Name Here)* and the details of the quest, like above.
+- When a new quest is accepted or becomes emergent, assign FRUSTRATION_COEFF based on the quest giver's personality—or, for self-imposed goals, the implied urgency: 0.4 = very patient, 1.0 = normal, 3.0 = volatile.
+- The MOOD field on each active quest with a deadline in the STATE MEMO is calculated by the engine from time pressure and FRUSTRATION_COEFF. Use it to guide how the questgiver NPC speaks and acts.
 </quests>
 
 <level_up_protocol>
