@@ -1,4 +1,4 @@
-import { getSettings, getEffectiveRouterCampaignPrefix, persistWorldProgressionTimer, persistRouterLastRunWatermark, persistRouterLastRunTimestamp, getNpcRelationshipMax, clampRelationshipValue, buildRouterRelationshipInstruction, sanitizeRouterState, adjustPromptTimestamps, DEFAULT_NPC_SECTIONS } from './state-manager.js';
+import { getSettings, getEffectiveRouterCampaignPrefix, persistWorldProgressionTimer, persistRouterLastRunWatermark, persistRouterLastRunTimestamp, getNpcRelationshipMax, clampRelationshipValue, buildRouterRelationshipInstruction, sanitizeRouterState, adjustPromptTimestamps, DEFAULT_NPC_SECTIONS, saveChatState } from './state-manager.js';
 import { sendStateRequest, sendAgentTurn } from './llm-client.js';
 import { getRequestHeaders } from '../../../../script.js';
 import { extractCurrentTimeStr, cleanMessageContent, parseInWorldTime, formatInWorldTime, findNthUserMessageStartIdx, formatAgentChatLogFromIndex, sanitizeLorebookRecordContent } from './memo-processor.js';
@@ -3190,6 +3190,99 @@ function countRedundantPairs(content, threshold = 0.6) {
 
 
 // -- World Progression ---------------------------------------------------------------
+
+/**
+ * Removes all entries from a lorebook while preserving book-level metadata.
+ * @param {string} bookName
+ * @returns {Promise<{ existed: boolean, cleared: number }>}
+ */
+async function clearWorldInfoBookEntries(bookName) {
+    const ctx = SillyTavern.getContext();
+    let book = null;
+    try {
+        book = await ctx.loadWorldInfo(bookName);
+    } catch (_) { /* book may not exist yet */ }
+
+    const cleared = book?.entries ? Object.keys(book.entries).length : 0;
+    if (!book && cleared === 0) {
+        return { existed: false, cleared: 0 };
+    }
+
+    const emptyBook = {
+        entries: {},
+        name: bookName,
+        scan_depth: book?.scan_depth ?? 4,
+        token_budget: book?.token_budget ?? 400,
+        recursive: book?.recursive ?? false,
+        extensions: book?.extensions ?? {},
+    };
+
+    await fetch('/api/worldinfo/edit', {
+        method: 'POST',
+        headers: getRequestHeaders(),
+        body: JSON.stringify({ name: bookName, data: emptyBook }),
+    });
+    if (typeof ctx.saveWorldInfo === 'function') {
+        try { await ctx.saveWorldInfo(bookName, emptyBook); } catch (_) { /* non-fatal */ }
+    }
+    if (typeof ctx.updateWorldInfoList === 'function') {
+        try { await ctx.updateWorldInfoList(); } catch (_) { /* non-fatal */ }
+    }
+
+    return { existed: true, cleared };
+}
+
+/**
+ * Wipes World Progression lore + timer state for the active chat's campaign prefix.
+ * Clears all reports ({prefix}_World) and skeleton seed data ({prefix}_Skeleton), resets
+ * the per-chat timer, and drops active world report keys so prior chats cannot leak in.
+ * @param {{ includeSkeleton?: boolean }} [opts]
+ * @returns {Promise<{ prefix: string, worldBookName: string, skeletonBookName: string, worldCleared: number, skeletonCleared: number }>}
+ */
+export async function purgeWorldHistoryForChat(opts = {}) {
+    const includeSkeleton = opts.includeSkeleton !== false;
+    const settings = getSettings();
+    const ctx = SillyTavern.getContext();
+    const chatId = ctx.chatId || '';
+    const prefix = getLivePrefix();
+    const worldBookName = prefix ? `${prefix}_World` : 'World';
+    const skeletonBookName = prefix ? `${prefix}_Skeleton` : 'World_Skeleton';
+
+    const worldResult = await clearWorldInfoBookEntries(worldBookName);
+    let skeletonResult = { cleared: 0, existed: false };
+    if (includeSkeleton) {
+        skeletonResult = await clearWorldInfoBookEntries(skeletonBookName);
+    }
+
+    settings.activeWorldKeys = [];
+    settings.worldProgressionLastFiredAtMinutes = -1;
+    settings.worldProgressionLastFiredPeriodLabel = '';
+    settings.worldProgressionSkeletonAtmosphereSummary = '';
+
+    if (settings.chatStates && chatId && settings.chatStates[chatId]) {
+        const cs = settings.chatStates[chatId];
+        cs.activeWorldKeys = [];
+        cs.worldProgressionLastFiredAtMinutes = -1;
+        cs.worldProgressionLastFiredPeriodLabel = '';
+        cs.worldProgressionSkeletonAtmosphereSummary = '';
+    }
+
+    persistWorldProgressionTimer();
+    SillyTavern.getContext().saveSettingsDebounced();
+    if (settings.chatLinkEnabled && chatId) {
+        saveChatState(chatId);
+    }
+
+    document.dispatchEvent(new CustomEvent('rt_lore_agent_updated'));
+
+    return {
+        prefix: prefix || '(none)',
+        worldBookName,
+        skeletonBookName,
+        worldCleared: worldResult.cleared,
+        skeletonCleared: skeletonResult.cleared,
+    };
+}
 
 /**
  * Parses an in-world time string (e.g. "11:52 AM, Day 3") into total minutes

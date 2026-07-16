@@ -7,7 +7,7 @@ import { renderSubFieldByRule, tryRenderMarker, renderCustomBlockLine, stripMemo
 import { unregisterLogQuestTool, checkQuestDeadlines, renderQuestsAsPlainText } from './quests.js';
 import { initializeDebugViewer, toggleDebugViewer } from './debug-viewer.js';
 import { installSwipeSchedulerDebug } from './swipe-scheduler-debug.js';
-import { runRouterPass, rollbackRouterPass, reapplyRouterPass, getLorebookManifest, deleteLorebookEntry, updateLorebookEntry, disableManagedEntries, isRouterRunning, stopRouterPass } from './router.js';
+import { runRouterPass, rollbackRouterPass, reapplyRouterPass, getLorebookManifest, deleteLorebookEntry, updateLorebookEntry, disableManagedEntries, isRouterRunning, stopRouterPass, purgeWorldHistoryForChat } from './router.js';
 import { getRequestHeaders } from '../../../../script.js';
 import { fileToDataUrl, scaleImageTo512Square, scaleImageToLandscape, applyPortraitData, applyLocationImageData, generatePortraitPrompt, generateNpcPortraitPrompt, generateLocationImagePrompt, showPortraitPromptPopup, generatePortraitDirect, autoGeneratePartyPortraits, removeAllPortraits, checkAndTriggerAutoGenerations, autoGenerateEnemyPortraits, forceCheckAutoGenerations, resetAutoGenerationTracking, resolveLocationImageWithMeta, normalizeLocationPath, buildLocationPath, getLinkedPlayerCharacter } from './portraits.js';
 import { buildImmersionSceneState, renderImmersionViewHtml, getCurrentLocationText, loadLocationEntryByPath, loadNpcEntryByKey, maybeAutoGenerateImmersionSceneArt, resetImmersionSceneArtTracking, hydrateImmersionSceneArtPath } from './immersion.js';
@@ -107,6 +107,42 @@ export async function refreshAgentManifestNow() {
 
 let updateAgentWorldStatusRef = null;
 let updateWorldProgressionLastFiredDisplayRef = null;
+
+/** Confirms then wipes World/Skeleton lorebooks + per-chat WP timer state for the active prefix. */
+async function confirmAndPurgeWorldHistory() {
+    const ctx = SillyTavern.getContext();
+    const prefix = getEffectiveRouterCampaignPrefix(ctx.chatId || '');
+    const worldBook = prefix ? `${prefix}_World` : 'World';
+    const skeletonBook = prefix ? `${prefix}_Skeleton` : 'World_Skeleton';
+    const { Popup } = SillyTavern.getContext();
+    const body = `
+        <div style="text-align:left; font-size:13px; line-height:1.5;">
+            <p>This permanently deletes World Progression data tied to the <b>current campaign prefix</b> (<code>${escapeHtml(prefix || 'none')}</code>):</p>
+            <ul style="margin:8px 0; padding-left:20px;">
+                <li>All reports in <code>${escapeHtml(worldBook)}</code></li>
+                <li>All skeleton entities in <code>${escapeHtml(skeletonBook)}</code> (removes stale DESIGNATED ENTITIES from prior stories)</li>
+                <li>Per-chat timer state and active world report keys for this chat</li>
+                <li>Saved atmosphere summary for this chat</li>
+            </ul>
+            <p style="opacity:0.85;"><b>Note:</b> Lorebooks are stored per campaign prefix, not per chat file. If another chat shares this prefix, it will also lose this World/Skeleton data.</p>
+        </div>`;
+    const choice = await Popup.show.confirm('Purge World History for this Chat?', body, { okButton: 'Purge', cancelButton: 'Cancel' });
+    if (choice !== 1) return;
+    try {
+        const result = await purgeWorldHistoryForChat({ includeSkeleton: true });
+        if (typeof updateWorldProgressionLastFiredDisplayRef === 'function') {
+            updateWorldProgressionLastFiredDisplayRef();
+        }
+        if (typeof updateAgentWorldStatusRef === 'function') updateAgentWorldStatusRef();
+        if (typeof globalThis._rpgUpdateSkeletonStatus === 'function') {
+            await globalThis._rpgUpdateSkeletonStatus().catch(() => { });
+        }
+        scheduleAgentManifestRefresh(true);
+        toastr['success'](`Purged ${result.worldCleared} report(s) and ${result.skeletonCleared} skeleton entries.`, 'World Progression');
+    } catch (e) {
+        toastr['error'](`Purge failed: ${e.message}`, 'World Progression');
+    }
+}
 
 /** Last lorebook /world sync diagnostics (JSON-serializable). */
 let _loreActivationDebugLast = /** @type {Record<string, any>|null} */ (null);
@@ -1741,6 +1777,8 @@ function onChatChanged(newChatId) {
         if (isActualChange) {
             s.worldProgressionLastFiredAtMinutes = -1;
             s.worldProgressionLastFiredPeriodLabel = '';
+            s.worldProgressionSkeletonAtmosphereSummary = '';
+            s.activeWorldKeys = [];
             s.quests = [];
             refreshRenderedView();
         }
@@ -1761,6 +1799,7 @@ function onChatChanged(newChatId) {
         s.routerLog = [];
         s.worldProgressionLastFiredAtMinutes = -1;
         s.worldProgressionLastFiredPeriodLabel = '';
+        s.worldProgressionSkeletonAtmosphereSummary = '';
         s.agentImmersionMode = false;
         resetImmersionSceneArtTracking();
 
@@ -4316,6 +4355,9 @@ function createPanel() {
                         <button id="rt-agent-world-reset-timeline" title="Clears the last-fired timestamp so World Progression starts fresh from now" style="width:100%; background:rgba(234,67,53,0.1); border:1px solid rgba(234,67,53,0.25); color:rgba(234,67,53,0.75); border-radius:4px; padding:4px; font-size:0.692em; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:5px; margin-top:5px;">
                             <i class="fa-solid fa-clock-rotate-left"></i> Reset Timeline
                         </button>
+                        <button id="rt-agent-world-purge-history" title="Deletes all World Progression reports and skeleton data for this campaign prefix and resets timer state for this chat" style="width:100%; background:rgba(234,67,53,0.14); border:1px solid rgba(234,67,53,0.35); color:rgba(234,67,53,0.9); border-radius:4px; padding:4px; font-size:0.692em; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:5px; margin-top:5px;">
+                            <i class="fa-solid fa-trash-can"></i> Purge World History for this Chat
+                        </button>
                     </div>
 
                     <div id="rt-agent-keys-toggle" style="display: flex; align-items: center; gap: 6px; margin-bottom: 5px; flex-shrink: 0; cursor: pointer; user-select: none;">
@@ -5154,6 +5196,11 @@ function createPanel() {
                 if (typeof updateWorldProgressionLastFiredDisplayRef === 'function') updateWorldProgressionLastFiredDisplayRef();
                 toastr['info']('World Progression timeline reset. Next report will start from the current time.', 'World Progression');
             });
+        }
+
+        const worldPurgeBtn = agentPanel.querySelector('#rt-agent-world-purge-history');
+        if (worldPurgeBtn) {
+            worldPurgeBtn.addEventListener('click', () => { void confirmAndPurgeWorldHistory(); });
         }
 
         // ── Agent enable button (header ⏻) ──
@@ -14124,6 +14171,8 @@ RULES:
             if (typeof updateAgentWorldStatusRef === 'function') updateAgentWorldStatusRef();
             toastr['info']('World Progression timeline reset. Next report will start from the current time.', 'World Progression');
         });
+
+        $('#rpg_world_progression_purge_history').on('click', () => { void confirmAndPurgeWorldHistory(); });
 
         const $wpConsolidateCount = $('#rpg_world_progression_consolidate_count');
         const $wpConsolidateNow = $('#rpg_world_progression_btn_consolidate_now');

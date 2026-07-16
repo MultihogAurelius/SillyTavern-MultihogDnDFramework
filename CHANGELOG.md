@@ -10,6 +10,7 @@ All notable changes to the **Multihog D&D Framework** will be documented in this
 
 ### Fixed
 - **Real-Time Visualization Mode**: Suppress location image generation toasts; show an in-panel loading spinner on the Visualization Mode hero while scene art generates.
+- **World Progression cross-chat leakage**: **Purge World History for this Chat** clears `{prefix}_World` reports and `{prefix}_Skeleton` seed data, resets per-chat timer/active world keys, and clears atmosphere summary; new chats no longer inherit atmosphere or active world keys from prior scenarios.
 
 ## [5.5.31] - 2026-07-16
 
