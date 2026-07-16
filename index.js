@@ -2591,6 +2591,82 @@ async function showComponentsExplanation() {
     await Popup.show.confirm('🧩 Components Explained', popupBody, { okButton: 'Got it', cancelButton: false });
 }
 
+/**
+ * Renders and shows the Lorebook Agent documentation popup.
+ */
+async function showLorebookAgentDocumentation() {
+    const { Popup } = SillyTavern.getContext();
+    const content = `
+                        <div style="text-align: left; font-size: 13px; line-height: 1.5; max-height: 65vh; overflow-y: auto; padding-right: 8px;">
+                            <h3 style="margin-top: 0; color: var(--rt-custom-accent, #3498db);">The Lorebook Agent</h3>
+                            <p>An autonomous narrative librarian. It scans your recent chat, decides what has changed, and writes new or updated entries directly into your SillyTavern lorebooks — no manual data entry needed.</p>
+
+                            <h4 style="margin-bottom: 5px;">⏱️ How Often to Run Lorebook Agent?</h4>
+                            <p>By default, the Agent runs every 3 messages, but there are tradeoffs to consider:</p>
+                            <ul style="padding-left: 20px; margin-top: 0;">
+                                <li><b>Pros of running less often:</b> It can make more coherent entries without excess granularity (though the cleanup tool can retroactively fix this).</li>
+                                <li><b>Cons of running less often:</b> Activations will rely more on keywords and might not be quite as pinpoint.</li>
+                            </ul>
+                            <p style="margin-top:4px;">The recommended range is every <b>1-3</b> messages.</p>
+
+                            <h4 style="margin-bottom: 5px;">🤖 Operating Modes</h4>
+                            <ul style="padding-left: 20px; margin-top: 0;">
+                                <li><b>Basic Mode (Tags)</b> — The model outputs structured tags the Agent parses directly:<br>
+                                    <code style="font-size:11px;">[[NPC: Name | Description | keyword1, keyword2]]</code><br>
+                                    Supported types: <code>NPC</code>, <code>LOC</code>, <code>FAC</code>, <code>QUEST</code>, <code>EVENT</code>, plus <code>[[ACTIVATE: name]]</code>, <code>[[DEACTIVATE: name]]</code>, <code>[[DELETE: name]]</code>.<br>
+                                    Ideal for smaller/local models (Mistral Small, Gemma, Qwen, etc.).</li>
+                                <li style="margin-top:8px;"><b>Advanced Mode (Tools)</b> — Multi-turn ReAct loop: the model reasons (<i>Thought</i>), calls a tool (<i>Action</i>), receives a result (<i>Observation</i>), and repeats until it calls <code>finish</code> or hits Max Turns. Tools include <code>record</code>, <code>update</code>, <code>activate</code>, <code>deactivate</code>, <code>delete</code>, and <code>search</code>. Gemini 3.1 Flash Lite is highly recommended as it is 100% reliable and very low cost. GPT-5x Mini or even Nano can also be good.</li>
+                            </ul>
+
+                            <h4 style="margin-bottom: 5px;">🧠 Attention-Based Memory</h4>
+                            <p>The Agent sees two tiers of lorebook content:</p>
+                            <ul style="padding-left: 20px; margin-top: 0;">
+                                <li><b>Active entries</b> — full content is visible in the Agent's context. Keyword-triggered by SillyTavern and managed via <b>Active Lore Keys</b>.</li>
+                                <li><b>Inactive entries</b> — listed only by name and keywords (no content). The Agent must activate them first to read or update their body.</li>
+                            </ul>
+                            <p style="margin-top:4px;"><b>Max Active</b> caps how many entries can be active simultaneously (FIFO pruning keeps token cost predictable).</p>
+
+                            <h4 style="margin-bottom: 5px;">📂 Campaign Records</h4>
+                            <p>The Agent writes directly into SillyTavern's native Lorebook system, creating namespaced campaign books for the current story (e.g. <i>Eldoria_NPCs</i>, <i>Eldoria_Locations</i>, <i>Eldoria_Factions</i>). All books for the active campaign are shown here, grouped by type. Click any folder to expand it; click any entry to read its full content. Books are automatically activated and deactivated based on the current chat — no manual action needed. This includes the <b>World Section</b> (<code>{prefix}_World</code>) created by the World Progression engine, which houses off-screen progression reports.</p>
+                            <p style="margin-top:4px;">When <b>Show Location Images</b> is enabled (see below), the panel header switches between <b>Campaign Records</b> and <b>Visualization Mode</b>. With Location Images off, only the standard Campaign Records tree is shown.</p>
+
+                            <h4 style="margin-bottom: 5px;">🗺️ Location Images &amp; Visualization Mode (ALPHA)</h4>
+                            <p>Location scene art and Visualization Mode are <b>opt-in</b> and <b>off by default</b>. Enable them from <b>Extension Settings → Portraits → Location Images &amp; Visualization ALPHA</b>.</p>
+                            <ul style="padding-left: 20px; margin-top: 0;">
+                                <li><b>Show Location Images</b> — Master toggle. When on, the Locations book gains hierarchical scene art: thumbnails on the location tree, wide 16:9 images in detail view, drag-and-drop upload, and the <b>Campaign Records / Visualization Mode</b> switch in this panel. Also turns on automatically if you enable Real-Time Visualization Mode or Auto-Generate Locations.</li>
+                                <li><b>Auto-Generate Locations</b> — Background scene art for new location lorebook entries that do not already have an image. Mutually exclusive with Real-Time Visualization Mode.</li>
+                                <li><b>Include Present NPCs in Location Scene Prompts</b> — Injects active Lorebook Agent NPC keys (and the linked Player Character) into location image prompts. Locked on while Real-Time Visualization Mode is active.</li>
+                                <li><b>Real-Time Visualization Mode</b> — Generates location images only when you <b>arrive</b> at a place in Visualization Mode, using current chat context and characters present. Each arrival produces a fresh image (including revisits after you have left and returned). Enables Show Location Images and present-NPC prompts as a locked bundle; disables Auto-Generate Locations. Can be turned on without Show Location Images already being enabled first.</li>
+                            </ul>
+                            <p style="margin-top:8px;"><b>Visualization Mode</b> (agent panel) shows a scene layout driven by your current location from the state memo: a wide location hero image, breadcrumb path, and tiles for characters present (active Lorebook NPCs plus the linked Player Character). Click the hero or a tile to open the full location or character card. Scene art is generated according to your Location Images settings — either on lorebook entry creation (Auto-Generate Locations) or on arrival (Real-Time Visualization Mode).</p>
+                            <p style="margin-top:4px;"><i>Tip: With Real-Time Visualization Mode on, use Visualization Mode in the Lorebook Agent to see arrival-based scene art as you move through the story.</i></p>
+
+                            <h4 style="margin-bottom: 5px;">🧹 Cleanup & Compression</h4>
+                            <p>To keep context sizes optimized, the framework uses a two-fold cleanup system:</p>
+                            <ul style="padding-left: 20px; margin-top: 0;">
+                                <li><b>Active Key Pruning:</b> When the active entry count exceeds the configured limit, the oldest activated entries are automatically deactivated (pruned) to make room for new ones.</li>
+                                <li><b>Archivist Compression:</b> You can trigger a cleanup pass globally (via the broom button in the agent header) or on a targeted entry. The <b>Lorebook Archivist</b> will compress bloated entries and consolidate duplicates to save tokens while keeping unique facts and timelines intact.</li>
+                            </ul>
+                            <p style="margin-top:4px;"><i>Note: Standard Agent passes and standard cleanup/pruning do not process the World book reports. Those are managed independently via World Progression settings.</i></p>
+
+                            <h4 style="margin-bottom: 5px;">↩ History Navigation</h4>
+                            <p>The <b>← [ LIVE ] →</b> bar at the bottom lets you step back through lorebook snapshots and redo steps you've undone — just like the State Tracker's memo history. Each agent pass is snapshotted before it runs (up to 5 saved). A new pass clears the redo stack.</p>
+
+                            <h4 style="margin-bottom: 5px;">🛠️ Modular Repertoire</h4>
+                            <p>Toggle which entity types the Agent tracks (NPCs, Locations, Factions, Quests, Events) and add <b>Custom Tags</b> for anything world-specific. Every module's system prompt snippet is editable so you control exactly how the AI records data.</p>
+
+                            <h4 style="margin-bottom: 5px;">🕹️ Controls Reference</h4>
+                            <ul style="padding-left: 20px; margin-top: 0;">
+                                <li><b>Main Lookback</b>: Messages the Agent scans during automatic post-generation runs.</li>
+                                <li><b>Max Turns</b>: Maximum ReAct loop iterations before the Agent is forced to finish (Advanced Mode).</li>
+                                <li><b>Max Active</b>: Maximum simultaneously active lore entries.</li>
+                                <li><b>Direct Command</b>: Runs a one-off agent pass with a custom instruction and its own lookback window — useful for targeted research or corrections.</li>
+                            </ul>
+                        </div>
+                    `;
+    await Popup.show.confirm('📖 Lorebook Agent Documentation', content, { okButton: 'Got it', cancelButton: false });
+}
+
 function refreshPortraitPromptPresetsList() {
     const settings = getSettings();
     const container = document.getElementById('rpg_portrait_prompt_presets_container');
@@ -3253,6 +3329,14 @@ Gear:
         icon.addEventListener('click', (e) => {
             e.stopPropagation();
             showRngExplanation();
+        });
+    });
+
+    // Lorebook Agent Documentation (settings + onboarding)
+    el.querySelectorAll('.rt-lorebook-agent-docs-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            showLorebookAgentDocumentation();
         });
     });
 
@@ -4753,64 +4837,7 @@ function createPanel() {
         const helpBtn = agentPanel.querySelector('#rt-agent-help-btn');
         if (helpBtn) {
             helpBtn.addEventListener('click', () => {
-                const content = `
-                        <div style="text-align: left; font-size: 13px; line-height: 1.5; max-height: 65vh; overflow-y: auto; padding-right: 8px;">
-                            <h3 style="margin-top: 0; color: var(--rt-custom-accent, #3498db);">The Lorebook Agent</h3>
-                            <p>An autonomous narrative librarian. It scans your recent chat, decides what has changed, and writes new or updated entries directly into your SillyTavern lorebooks — no manual data entry needed.</p>
-
-                            <h4 style="margin-bottom: 5px;">⏱️ How Often to Run Lorebook Agent?</h4>
-                            <p>By default, the Agent runs every 3 messages, but there are tradeoffs to consider:</p>
-                            <ul style="padding-left: 20px; margin-top: 0;">
-                                <li><b>Pros of running less often:</b> It can make more coherent entries without excess granularity (though the cleanup tool can retroactively fix this).</li>
-                                <li><b>Cons of running less often:</b> Activations will rely more on keywords and might not be quite as pinpoint.</li>
-                            </ul>
-                            <p style="margin-top:4px;">The recommended range is every <b>1-3</b> messages.</p>
-
-                            <h4 style="margin-bottom: 5px;">🤖 Operating Modes</h4>
-                            <ul style="padding-left: 20px; margin-top: 0;">
-                                <li><b>Basic Mode (Tags)</b> — The model outputs structured tags the Agent parses directly:<br>
-                                    <code style="font-size:11px;">[[NPC: Name | Description | keyword1, keyword2]]</code><br>
-                                    Supported types: <code>NPC</code>, <code>LOC</code>, <code>FAC</code>, <code>QUEST</code>, <code>EVENT</code>, plus <code>[[ACTIVATE: name]]</code>, <code>[[DEACTIVATE: name]]</code>, <code>[[DELETE: name]]</code>.<br>
-                                    Ideal for smaller/local models (Mistral Small, Gemma, Qwen, etc.).</li>
-                                <li style="margin-top:8px;"><b>Advanced Mode (Tools)</b> — Multi-turn ReAct loop: the model reasons (<i>Thought</i>), calls a tool (<i>Action</i>), receives a result (<i>Observation</i>), and repeats until it calls <code>finish</code> or hits Max Turns. Tools include <code>record</code>, <code>update</code>, <code>activate</code>, <code>deactivate</code>, <code>delete</code>, and <code>search</code>. Gemini 3.1 Flash Lite is highly recommended as it is 100% reliable and very low cost. GPT-5x Mini or even Nano can also be good.</li>
-                            </ul>
-
-                            <h4 style="margin-bottom: 5px;">🧠 Attention-Based Memory</h4>
-                            <p>The Agent sees two tiers of lorebook content:</p>
-                            <ul style="padding-left: 20px; margin-top: 0;">
-                                <li><b>Active entries</b> — full content is visible in the Agent's context. Keyword-triggered by SillyTavern and managed via <b>Active Lore Keys</b>.</li>
-                                <li><b>Inactive entries</b> — listed only by name and keywords (no content). The Agent must activate them first to read or update their body.</li>
-                            </ul>
-                            <p style="margin-top:4px;"><b>Max Active</b> caps how many entries can be active simultaneously (FIFO pruning keeps token cost predictable).</p>
-
-                            <h4 style="margin-bottom: 5px;">📂 Campaign Records</h4>
-                            <p>The Agent writes directly into SillyTavern's native Lorebook system, creating namespaced campaign books for the current story (e.g. <i>Eldoria_NPCs</i>, <i>Eldoria_Locations</i>, <i>Eldoria_Factions</i>). All books for the active campaign are shown here, grouped by type. Click any folder to expand it; click any entry to read its full content. Books are automatically activated and deactivated based on the current chat — no manual action needed. This includes the <b>World Section</b> (<code>{prefix}_World</code>) created by the World Progression engine, which houses off-screen progression reports.</p>
-
-                            <h4 style="margin-bottom: 5px;">🧹 Cleanup & Compression</h4>
-                            <p>To keep context sizes optimized, the framework uses a two-fold cleanup system:</p>
-                            <ul style="padding-left: 20px; margin-top: 0;">
-                                <li><b>Active Key Pruning:</b> When the active entry count exceeds the configured limit, the oldest activated entries are automatically deactivated (pruned) to make room for new ones.</li>
-                                <li><b>Archivist Compression:</b> You can trigger a cleanup pass globally (via the broom button in the agent header) or on a targeted entry. The <b>Lorebook Archivist</b> will compress bloated entries and consolidate duplicates to save tokens while keeping unique facts and timelines intact.</li>
-                            </ul>
-                            <p style="margin-top:4px;"><i>Note: Standard Agent passes and standard cleanup/pruning do not process the World book reports. Those are managed independently via World Progression settings.</i></p>
-
-                            <h4 style="margin-bottom: 5px;">↩ History Navigation</h4>
-                            <p>The <b>← [ LIVE ] →</b> bar at the bottom lets you step back through lorebook snapshots and redo steps you've undone — just like the State Tracker's memo history. Each agent pass is snapshotted before it runs (up to 5 saved). A new pass clears the redo stack.</p>
-
-                            <h4 style="margin-bottom: 5px;">🛠️ Modular Repertoire</h4>
-                            <p>Toggle which entity types the Agent tracks (NPCs, Locations, Factions, Quests, Events) and add <b>Custom Tags</b> for anything world-specific. Every module's system prompt snippet is editable so you control exactly how the AI records data.</p>
-
-                            <h4 style="margin-bottom: 5px;">🕹️ Controls Reference</h4>
-                            <ul style="padding-left: 20px; margin-top: 0;">
-                                <li><b>Main Lookback</b>: Messages the Agent scans during automatic post-generation runs.</li>
-                                <li><b>Max Turns</b>: Maximum ReAct loop iterations before the Agent is forced to finish (Advanced Mode).</li>
-                                <li><b>Max Active</b>: Maximum simultaneously active lore entries.</li>
-                                <li><b>Direct Command</b>: Runs a one-off agent pass with a custom instruction and its own lookback window — useful for targeted research or corrections.</li>
-                            </ul>
-                        </div>
-                    `;
-                const { Popup } = SillyTavern.getContext();
-                Popup.show.confirm('📖 Lorebook Agent Documentation', content, { okButton: 'Got it', cancelButton: false });
+                showLorebookAgentDocumentation();
             });
         }
 
@@ -11246,6 +11273,11 @@ async function runPortraitMigrationIfNeeded() {
         $('.rt-rng-help-icon').on('click', (e) => {
             e.stopPropagation();
             showRngExplanation();
+        });
+
+        $('#rpg_tracker_router_docs_btn').on('click', (e) => {
+            e.stopPropagation();
+            showLorebookAgentDocumentation();
         });
 
         $('#rpg_tracker_legacy_dice').prop('checked', settings.legacyDiceNaming).on('change', function () {

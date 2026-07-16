@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [5.5.31] - 2026-07-16
+
+### Changed
+- **Lorebook Agent Documentation**: Expanded help popup with Visualization Mode, Location Images ALPHA gating, and Real-Time Visualization Mode. Shared via `showLorebookAgentDocumentation()` from the agent panel **?** button and a new **Lorebook Agent Documentation** button at the top of Lorebook Agent settings.
+
 ## [5.5.20] - 2026-07-16
 
 ### Changed
