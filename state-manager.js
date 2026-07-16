@@ -1156,6 +1156,31 @@ Rules:
     };
 }
 
+/** Latest settings migration version — factory reset skips legacy upgrade paths at or below this. */
+export const FACTORY_SETTINGS_VERSION = '5.5.12';
+
+/** Remove extension UI keys from localStorage so a factory reset does not rehydrate stale panel state. */
+export function clearExtensionLocalStorageUiState() {
+    const keys = [];
+    for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key?.startsWith('rpg_tracker_')) keys.push(key);
+    }
+    for (const key of keys) localStorage.removeItem(key);
+}
+
+/**
+ * Replace live extension settings with a pristine factory-default object.
+ * @param {Record<string, unknown>} extensionSettings SillyTavern extensionSettings map
+ */
+export function applyFactoryReset(extensionSettings) {
+    const s = JSON.parse(JSON.stringify(buildDefaultSettings()));
+    s.settingsVersion = FACTORY_SETTINGS_VERSION;
+    s.customPortraits = {};
+    s.customLocationImages = {};
+    extensionSettings[MODULE_NAME] = s;
+}
+
 /** Fast deterministic hash for comparing bundled default prompt content across releases. */
 function hashPromptBundle(str) {
     let h = 5381;
