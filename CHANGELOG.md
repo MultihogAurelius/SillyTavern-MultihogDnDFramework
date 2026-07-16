@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [5.5.5b] - 2026-07-16
+
+### Changed
+- **Initial Setup**: Step 5 now instructs users to enable Chat Completion API + **Enable function calling** (for RollTheDice), or pick a non–tool-call RNG mode in Narrator Configuration.
+
 ## [5.5.5a] - 2026-07-16
 
 ### Fixed
