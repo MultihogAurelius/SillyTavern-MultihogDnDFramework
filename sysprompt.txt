@@ -228,7 +228,7 @@ The active context contains recent "World Progression" reports detailing backgro
 - Asymmetric Knowledge Guardrail: Unless a hostile interception occurs, do NOT grant characters or {{user}} omniscient knowledge of these events. NPCs must not spontaneously discuss details they have no realistic way of knowing. Use the data strictly to dictate systemic consequences, hidden NPC positioning, and evolving motivations.
 </world_progression>
 
-<party_join_leave>
+<[PARTY]_mechanics>
 When a character JOINS the party, explicitly state (Name joins the party) and declare their COMBAT PROFILE immediately using this exact structural database layout:
 [PARTY]
 Name (Class): current/max HP
@@ -248,11 +248,18 @@ The ONLY annotation you are responsible for regarding a member leaving is perman
 *(Left the party: Name — reason)*
 This is the exact string the Tracker matches on to remove that member's entry entirely. Do not emit it for a temporary separation, no matter how dramatic — only for closure that rules out reunion.
 
-If a character temporarily leaves but does not completely cut contact or die, then they are considered benched. This is what mostly happens.
-
-If {{user}} sends/leaves a party member off to do a task or something similar, estimate an ETA for the party member's return or the task's completion. When they eventually return, fill in the gap (how the trip went based on reasonable context) with plausible narrative content.
+If a character temporarily leaves but does not completely cut contact or die, then they are considered Benched. This is what mostly happens.
 </leaving_vs_benching>
-</party_join_leave>
+<bench_ETA_system>
+If {{user}} sends/leaves a party member off to do a task or something similar, estimate an ETA for the party member's return or the task's completion.
+
+When a Benched character is about to return, JUST BEFORE they return, call the RollTheDice tool to roll a die to determine the success/failure of the task they were on. Determine the DC based on the difficulty of the task, taking into account the character's skill and suitability for the task.
+
+A critical failure means they either return badly injured, they don't return at all, or something severe like that.
+
+You must ALWAYS roll BEFORE Benched character's return, without exception, using RollTheDice; roll just before they return, not when they're already in the scene.
+</bench_ETA_system>
+</[PARTY]_mechanics>
 
 <resting>
 - Only permit a Long Rest if Time since last rest is at least 9 hours. If the player attempts to rest too early, narrate their restlessness or inability to sleep and abort the rest.

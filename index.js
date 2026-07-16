@@ -2631,6 +2631,61 @@ async function showComponentsExplanation() {
 }
 
 /**
+ * Shows a settings help icon's title text in a popup (mobile-friendly tap/click).
+ * Desktop hover still uses the native title tooltip.
+ */
+async function showSettingsHelpPopup(message, title = 'ℹ️ Help') {
+    const text = String(message || '').trim();
+    if (!text) return;
+    const { Popup } = SillyTavern.getContext();
+    const popupBody = `<div style="font-size: 0.92em; line-height: 1.55; max-width: 480px; text-align: left;">${escapeHtml(text).replace(/\n/g, '<br>')}</div>`;
+    await Popup.show.confirm(title, popupBody, { okButton: 'Got it', cancelButton: false });
+}
+
+/** Wire tap/click on settings ? icons; prevents accidental checkbox toggles inside labels. */
+function bindSettingsHelpIcons() {
+    const container = document.querySelector('.rpg-tracker-settings');
+    if (!container || container.dataset.rtSettingsHelpBound === '1') return;
+    container.dataset.rtSettingsHelpBound = '1';
+
+    const selector = '.fa-circle-question[title]';
+    container.querySelectorAll(selector).forEach(icon => {
+        icon.setAttribute('role', 'button');
+        icon.setAttribute('tabindex', '0');
+        icon.setAttribute('aria-label', 'Show help');
+    });
+
+    const openHelp = (icon) => {
+        const msg = icon.getAttribute('title');
+        if (msg) void showSettingsHelpPopup(msg);
+    };
+
+    container.addEventListener('pointerdown', (e) => {
+        const icon = e.target.closest(selector);
+        if (!icon) return;
+        e.preventDefault();
+        e.stopPropagation();
+    }, true);
+
+    container.addEventListener('click', (e) => {
+        const icon = e.target.closest(selector);
+        if (!icon) return;
+        e.preventDefault();
+        e.stopPropagation();
+        openHelp(icon);
+    }, true);
+
+    container.addEventListener('keydown', (e) => {
+        const icon = e.target.closest(selector);
+        if (!icon) return;
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        e.preventDefault();
+        e.stopPropagation();
+        openHelp(icon);
+    }, true);
+}
+
+/**
  * Renders and shows the Lorebook Agent documentation popup.
  */
 async function showLorebookAgentDocumentation() {
@@ -11154,6 +11209,8 @@ async function runPortraitMigrationIfNeeded() {
         $('#rpg_tracker_enabled').prop('checked', settings.enabled).on('change', function () {
             void handleTrackerEnabledChange(settings, !!$(this).prop('checked'));
         });
+
+        bindSettingsHelpIcons();
 
         $('#rpg_tracker_debug').prop('checked', settings.debugMode).on('change', function () {
             settings.debugMode = !!$(this).prop('checked');

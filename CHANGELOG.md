@@ -2,6 +2,15 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [5.5.5] - 2026-07-16
+
+### Changed
+- **Party mechanics sysprompt**: Renamed `<party_join_leave>` to `<[PARTY]_mechanics>`; split bench ETA rules into `<bench_ETA_system>` (RollTheDice pre-return task roll in normal mode; RNG Queue d20 pop in legacy).
+- **Settings help icons**: `?` tooltips in settings now open on tap/click (mobile-friendly popup) in addition to desktop hover; taps inside checkbox labels no longer toggle the checkbox.
+
+### Fixed
+- **Sysprompt section parser**: Top-level tags with bracket prefixes (e.g. `[PARTY]_mechanics`) are parsed correctly; saved `party_join_leave` section-order keys migrate automatically.
+
 ## [5.5.4] - 2026-07-16
 
 ### Changed

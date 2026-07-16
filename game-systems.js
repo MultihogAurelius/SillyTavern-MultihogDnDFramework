@@ -221,10 +221,13 @@ function normalizeGmContent(tag, content) {
     return `<${tag}>\n${trimmed}\n</${tag}>`;
 }
 
+/** Matches sysprompt section tag names, including bracket-prefixed tags like [PARTY]_mechanics. */
+const SYSPROMPT_TAG_NAME = '(?:\\[[^\\]]+\\][\\w_-]*|\\w[\\w_-]*)';
+
 /** Extracts the top-level (non-nested) <tag>...</tag> sections from a raw sysprompt text. */
 export function extractTopLevelSections(rawText) {
     const sections = [];
-    const re = /<(\w[\w_-]*)>([\s\S]*?)<\/\1>/g;
+    const re = new RegExp(`<(${SYSPROMPT_TAG_NAME})>([\\s\\S]*?)<\\/\\1>`, 'g');
     let m;
     while ((m = re.exec(rawText || ''))) {
         sections.push({ tag: m[1], content: m[2].trim() });
@@ -284,7 +287,7 @@ function buildExistingTagsContext(settings) {
 export function isBlankSectionContent(content) {
     const trimmed = (content || '').trim();
     if (!trimmed) return true;
-    return /^<(\w+[\w_-]*)>\s*<\/\1>$/.test(trimmed);
+    return new RegExp(`^<(${SYSPROMPT_TAG_NAME})>\\s*<\\/\\1>$`).test(trimmed);
 }
 
 /** Narrator Configuration tags whose enabled-state doubles as a base sysprompt toggle. */
@@ -401,12 +404,13 @@ export function transformBaseSectionContent(tag, innerContent, settings) {
         return result;
     }
 
-    if (tag === 'party_join_leave') {
+    if (tag === '[PARTY]_mechanics') {
         let content = innerContent.trim();
         if (mods.party_bench === false) {
             content = content.replace(/\s*<leaving_vs_benching>[\s\S]*?<\/leaving_vs_benching>/i, '').trim();
+            content = content.replace(/\s*<bench_ETA_system>[\s\S]*?<\/bench_ETA_system>/i, '').trim();
         }
-        return `<party_join_leave>\n${content}\n</party_join_leave>`;
+        return `<[PARTY]_mechanics>\n${content}\n</[PARTY]_mechanics>`;
     }
 
     if (tag === 'party_bench') {
@@ -457,6 +461,12 @@ export function transformBaseSectionContent(tag, innerContent, settings) {
  */
 export function normalizeSectionOrder(settings, baseSections) {
     if (!Array.isArray(settings.syspromptSectionOrder)) settings.syspromptSectionOrder = [];
+    settings.syspromptSectionOrder = settings.syspromptSectionOrder.map(key =>
+        key === 'base:party_join_leave' ? 'base:[PARTY]_mechanics' : key,
+    );
+    (settings.customSyspromptLibrary || []).forEach(p => {
+        if (p.baseTag === 'party_join_leave') p.baseTag = '[PARTY]_mechanics';
+    });
     const library = settings.customSyspromptLibrary || [];
     const orderableLibKeys = new Set(library.filter(p => p.origin !== 'unlocked_base').map(p => `lib:${p.id}`));
     const baseKeys = baseSections.map(s => `base:${s.tag}`);
