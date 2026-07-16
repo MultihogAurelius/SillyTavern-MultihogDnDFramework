@@ -2948,28 +2948,27 @@ textarea.rt-cr-input {
         overflow-y: auto;
     }
 
-    /* Campaign records should absorb remaining panel height and scroll internally */
+    /* Campaign records flow with the panel body — one shared scrollbar */
     #rt-agent-campaign-section {
-        flex: 1 1 auto !important;
-        min-height: 140px !important;
+        flex: 0 0 auto !important;
+        min-height: 0 !important;
     }
 
-    #rt-agent-manifest-list {
-        flex: 1 1 auto !important;
+    #rt-agent-manifest-list,
+    #rt-agent-immersion-view {
+        flex: 0 0 auto !important;
         min-height: 0 !important;
         max-height: none !important;
-        overflow-y: auto !important;
+        overflow: visible !important;
         padding-bottom: 8px !important;
     }
 
 }
 
 
-/* ── Lorebook Agent panel: flex column.
-   Campaign Records scrolls internally when there is leftover height.
-   When Quick Settings / Console / World Progression / etc. expand past the
-   panel, the content body itself must also scroll — otherwise those drawers
-   are clipped with no scrollbar (only the manifesto list was scrollable). */
+/* ── Lorebook Agent panel: single scroll region on .rpg-tracker-content.
+   Upper drawers and Campaign Records all use natural height so one scrollbar
+   reaches the true bottom (no nested flex trap at the campaign header). */
 #rpg-tracker-agent {
     display: flex;
     flex-direction: column;
@@ -2984,23 +2983,22 @@ textarea.rt-cr-input {
     min-height: 0 !important;
     overflow-x: hidden !important;
     overflow-y: auto !important;
-    padding-bottom: 0 !important;
+    padding-bottom: 8px !important;
     scrollbar-width: thin;
 }
 
 #rt-agent-campaign-section {
     display: flex;
     flex-direction: column;
-    flex: 1 1 auto;
-    /* Keep a usable manifesto area even when upper drawers are fully expanded;
-       outer .rpg-tracker-content scroll then reaches the rest of the drawers. */
-    min-height: 140px;
+    flex: 0 0 auto;
+    flex-shrink: 0;
 }
 
-#rt-agent-manifest-list {
-    flex: 1 1 auto;
-    min-height: 0;
-    overflow-y: auto;
+#rt-agent-manifest-list,
+#rt-agent-immersion-view {
+    flex: 0 0 auto;
+    flex-shrink: 0;
+    overflow: visible;
 }
 
 /* ── Lorebook Agent view mode switch (Campaign Records / Visualization Mode) ── */

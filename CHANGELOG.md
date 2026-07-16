@@ -2,6 +2,16 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [5.5.17] - 2026-07-16
+
+### Changed
+- **Lorebook Locations ALPHA drawer**: Location image settings (Show Location Images, Lorebook Locations auto-gen, Real-Time Visualization Mode, and related options) are grouped in a collapsible drawer instead of scattered across the portraits section.
+- **Lorebook Locations auto-gen**: Enabling Lorebook Locations auto-generation now also turns on Show Location Images and no longer requires the master toggle first.
+
+### Fixed
+- **Lorebook Agent panel scroll**: One unified scrollbar for the whole agent body — expanding upper drawers no longer stops scroll at the Campaign Records header.
+- **Visualization Mode gating**: Campaign Records / Visualization Mode switch is hidden entirely when Show Location Images is off; the agent panel shows a plain CAMPAIGN RECORDS header like pre-5.5.0.
+
 ## [5.5.15] - 2026-07-16
 
 ### Fixed

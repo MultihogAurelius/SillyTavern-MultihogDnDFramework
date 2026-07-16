@@ -470,6 +470,7 @@ function applyLocationImageSetting(settings, enabled) {
         settings.portraitAutoGenerateLocations = false;
         settings.portraitAutoGenerateSceneView = false;
         settings.portraitRegenerateVisitedLocations = false;
+        settings.agentImmersionMode = false;
     }
     syncLocationImageDependentUi(settings);
 }
@@ -503,6 +504,7 @@ function applyLocationImageAutoMode(settings, { realTimeMode, lorebookLocations 
     if (lorebookLocations !== undefined) {
         settings.portraitAutoGenerateLocations = !!lorebookLocations;
         if (settings.portraitAutoGenerateLocations) {
+            settings.locationImages = true;
             settings.portraitAutoGenerateSceneView = false;
             settings.portraitRegenerateVisitedLocations = false;
         }
@@ -537,6 +539,10 @@ export function syncLocationImageDependentUi(settings) {
         applyRealTimeModeBundle(settings);
     } else {
         settings.portraitRegenerateVisitedLocations = false;
+        // Lorebook Locations auto-gen implies Lorebook Locations master toggle (same as Real-Time Mode).
+        if (settings.portraitAutoGenerateLocations) {
+            settings.locationImages = true;
+        }
     }
 
     const imagesEnabled = !!settings.locationImages;
@@ -548,7 +554,7 @@ export function syncLocationImageDependentUi(settings) {
         settings.portraitAutoGenerateLocations = false;
     }
 
-    const lorebookAutoOn = imagesEnabled && !!settings.portraitAutoGenerateLocations;
+    const lorebookAutoOn = !!settings.portraitAutoGenerateLocations;
 
     const syncCheckbox = (id, checked, disabled) => {
         const el = document.getElementById(id);
@@ -561,11 +567,16 @@ export function syncLocationImageDependentUi(settings) {
         $el.prop('checked', !!checked);
     };
 
+    // Clickable whenever Real-Time Mode is off — turning it on also enables Lorebook Locations.
     syncCheckbox('rpg_tracker_portrait_auto_locations', lorebookAutoOn, !imagesEnabled || realTimeOn);
-    syncCheckbox('rpg_tracker_portrait_auto_scene_view', realTimeOn, false);
-    syncCheckbox('rpg_portrait_regenerate_visited_locations', realTimeOn, !realTimeOn);
+    syncCheckbox('rpg_tracker_portrait_auto_scene_view', realTimeOn, !imagesEnabled);
+    syncCheckbox('rpg_portrait_regenerate_visited_locations', realTimeOn, !imagesEnabled || !realTimeOn);
     syncCheckbox('rpg_tracker_location_images', imagesEnabled, realTimeOn);
-    syncCheckbox('rpg_portrait_location_include_present_npcs', realTimeOn || !!settings.portraitLocationIncludePresentNpcs, realTimeOn);
+    syncCheckbox('rpg_portrait_location_include_present_npcs', realTimeOn || !!settings.portraitLocationIncludePresentNpcs, !imagesEnabled || realTimeOn);
+
+    if (typeof globalThis._rpgSyncAgentImmersionUi === 'function') {
+        globalThis._rpgSyncAgentImmersionUi();
+    }
 }
 
 /** Push the Location Scene Prompt textarea to match settings (if present in DOM). */
@@ -4222,9 +4233,10 @@ function createPanel() {
                     <div id="rt-agent-router-active-keys" style="margin-bottom: 10px; display: flex; flex-wrap: wrap; gap: 4px; min-height: 24px; flex-shrink: 0;">
                     </div>
 
-                    <div id="rt-agent-campaign-section" style="margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px; display: flex; flex-direction: column; flex: 1; min-height: 0;">
+                    <div id="rt-agent-campaign-section" style="margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px; display: flex; flex-direction: column; flex-shrink: 0;">
                         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; flex-shrink: 0; gap: 8px;">
-                            <div class="rt-agent-view-mode-switch" id="rt-agent-view-mode-switch" role="tablist" aria-label="Lorebook view mode">
+                            <div id="rt-agent-campaign-header-title" style="font-weight: bold; opacity: 0.8; font-size: 0.846em; flex: 1; min-width: 0;${settings.locationImages ? ' display: none;' : ''}">CAMPAIGN RECORDS</div>
+                            <div class="rt-agent-view-mode-switch" id="rt-agent-view-mode-switch" role="tablist" aria-label="Lorebook view mode"${settings.locationImages ? '' : ' style="display: none;"'}>
                                 <button type="button" class="rt-agent-view-mode-btn${settings.agentImmersionMode ? '' : ' rt-agent-view-mode-btn-active'}" id="rt-agent-view-mode-records" role="tab" aria-selected="${settings.agentImmersionMode ? 'false' : 'true'}">Campaign Records</button>
                                 <button type="button" class="rt-agent-view-mode-btn rt-agent-view-mode-btn-visualization${settings.agentImmersionMode ? ' rt-agent-view-mode-btn-active' : ''}" id="rt-agent-view-mode-visualization" role="tab" aria-selected="${settings.agentImmersionMode ? 'true' : 'false'}">
                                     <span class="rt-agent-view-mode-glow" aria-hidden="true"></span>
@@ -4236,8 +4248,8 @@ function createPanel() {
                                 <button class="rpg-tracker-icon-btn" id="rt-agent-manifest-refresh" title="Refresh Manifest" style="font-size: 0.769em; opacity: 0.5;"><i class="fa-solid fa-arrows-rotate"></i></button>
                             </div>
                         </div>
-                        <div id="rt-agent-immersion-view" style="display: ${settings.agentImmersionMode ? 'flex' : 'none'}; flex: 1; min-height: 0; overflow-y: auto; flex-direction: column;"></div>
-                        <div id="rt-agent-manifest-list" style="display: ${settings.agentImmersionMode ? 'none' : 'flex'}; flex: 1; min-height: 0; overflow-y: auto; flex-direction: column; gap: 6px;">
+                        <div id="rt-agent-immersion-view" style="display: ${settings.agentImmersionMode ? 'flex' : 'none'}; flex-direction: column; flex-shrink: 0;"></div>
+                        <div id="rt-agent-manifest-list" style="display: ${settings.agentImmersionMode ? 'none' : 'flex'}; flex-direction: column; gap: 6px; flex-shrink: 0;">
                             <div style="text-align: center; opacity: 0.5; font-size: 0.769em; padding: 10px;">Click refresh to load lore...</div>
                         </div>
                     </div>
@@ -5525,7 +5537,23 @@ function createPanel() {
             const manifestEl = agentPanel.querySelector('#rt-agent-manifest-list');
             const recordsBtn = agentPanel.querySelector('#rt-agent-view-mode-records');
             const vizBtn = agentPanel.querySelector('#rt-agent-view-mode-visualization');
-            const immersion = !!s.agentImmersionMode;
+            const viewModeSwitch = agentPanel.querySelector('#rt-agent-view-mode-switch');
+            const campaignTitle = agentPanel.querySelector('#rt-agent-campaign-header-title');
+            const locationsOn = !!s.locationImages;
+            let immersion = !!s.agentImmersionMode;
+
+            if (!locationsOn) {
+                if (immersion) {
+                    s.agentImmersionMode = false;
+                    immersion = false;
+                }
+                if (viewModeSwitch) viewModeSwitch.style.display = 'none';
+                if (campaignTitle) campaignTitle.style.display = 'block';
+            } else {
+                if (viewModeSwitch) viewModeSwitch.style.display = '';
+                if (campaignTitle) campaignTitle.style.display = 'none';
+            }
+
             if (immersionEl) immersionEl.style.display = immersion ? 'flex' : 'none';
             if (manifestEl) manifestEl.style.display = immersion ? 'none' : 'flex';
             if (recordsBtn) {
@@ -8649,6 +8677,7 @@ Rules:
                 if (!btn || btn.classList.contains('rt-agent-view-mode-btn-active')) return;
                 e.stopPropagation();
                 const s = getSettings();
+                if (btn.id === 'rt-agent-view-mode-visualization' && !s.locationImages) return;
                 s.agentImmersionMode = btn.id === 'rt-agent-view-mode-visualization';
                 saveSettings(true);
                 await refreshLorebookAgentViewsNow({ forceLayoutRefresh: true });
@@ -11108,7 +11137,7 @@ async function runPortraitMigrationIfNeeded() {
         });
 
         $('#rpg_tracker_portrait_auto_locations').prop('checked', !!settings.portraitAutoGenerateLocations).on('change', function () {
-            if (!settings.locationImages || settings.portraitAutoGenerateSceneView) return;
+            if (settings.portraitAutoGenerateSceneView) return;
             applyLocationImageAutoMode(settings, { lorebookLocations: !!$(this).prop('checked') });
             saveSettings();
             if (settings.portraitAutoGenerateLocations) {
