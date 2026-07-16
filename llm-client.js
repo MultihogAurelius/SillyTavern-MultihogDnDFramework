@@ -10,6 +10,33 @@
 import { getSettings } from './state-manager.js';
 import { logTransaction } from './debug-viewer.js';
 
+/** Placeholder that survives SillyTavern substituteParams() in generateRaw. */
+export const RT_USER_MACRO_SENTINEL = '__RT_USER_MACRO__';
+
+/** Prevents {{user}} from being resolved to the active persona name before an LLM call. */
+export function shieldUserMacro(text) {
+    if (!text) return text;
+    return String(text).replace(/\{\{user\}\}/gi, RT_USER_MACRO_SENTINEL);
+}
+
+/**
+ * Restores {{user}} after an LLM call and rewrites any leaked persona/player names.
+ * @param {string} text
+ * @param {string[]} [names] Persona or player names to replace with {{user}}
+ */
+export function restoreUserMacro(text, names = []) {
+    if (!text) return text;
+    let out = String(text).split(RT_USER_MACRO_SENTINEL).join('{{user}}');
+    const unique = [...new Set((names || []).map(n => String(n).trim()).filter(n => n.length >= 2))];
+    unique.sort((a, b) => b.length - a.length);
+    for (const name of unique) {
+        const esc = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        out = out.replace(new RegExp(`\\b${esc}'s\\b`, 'gi'), "{{user}}'s");
+        out = out.replace(new RegExp(`\\b${esc}\\b`, 'g'), '{{user}}');
+    }
+    return out;
+}
+
 // ── Connection Profile Helpers ─────────────────────────────────────────────────
 
 export async function checkConnectionProfilesActive() {
@@ -481,9 +508,21 @@ export async function testOpenAIConnection(url, apiKey, model) {
  * @param {ReturnType<import('./state-manager.js').getSettings>} settings
  * @param {string} systemPrompt
  * @param {string} userPrompt
+ * @param {AbortSignal|null} [signal]
+ * @param {{ preserveUserMacro?: boolean, userMacroNames?: string[] }} [options]
  * @returns {Promise<string>}
  */
-export async function sendStateRequest(settings, systemPrompt, userPrompt, signal = null) {
+export async function sendStateRequest(settings, systemPrompt, userPrompt, signal = null, options = {}) {
+    const preserveUserMacro = !!options.preserveUserMacro;
+    const userMacroNames = options.userMacroNames || [];
+    const finalize = (text) => (preserveUserMacro && typeof text === 'string')
+        ? restoreUserMacro(text, userMacroNames)
+        : text;
+    if (preserveUserMacro) {
+        systemPrompt = shieldUserMacro(systemPrompt);
+        userPrompt = shieldUserMacro(userPrompt);
+    }
+
     const context = SillyTavern.getContext();
 
     console.log(`[RPG Tracker] sendStateRequest — source: "${settings.connectionSource}", profileId: "${settings.connectionProfileId}", preset: "${settings.completionPresetId}"`);
@@ -563,9 +602,9 @@ export async function sendStateRequest(settings, systemPrompt, userPrompt, signa
                         ?? parsed.choices?.[0]?.text
                         ?? raw;
                     logTransaction('Tracker', [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }], text);
-                    return text;
+                    return finalize(text);
                 }
-                return raw;
+                return finalize(raw);
             }
             const r = /** @type {any} */ (raw);
             let text = r?.content
@@ -583,7 +622,7 @@ export async function sendStateRequest(settings, systemPrompt, userPrompt, signa
 
             if (typeof text === 'string') {
                 logTransaction('Tracker', [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }], text);
-                return text;
+                return finalize(text);
             }
             throw new Error(`[RPG Tracker] Profile request returned unexpected type: ${JSON.stringify(raw).substring(0, 200)}`);
         }
@@ -610,13 +649,13 @@ export async function sendStateRequest(settings, systemPrompt, userPrompt, signa
     // ── Ollama Mode ──
     if (settings.connectionSource === 'ollama') {
         if (settings.debugMode) console.log(`[RPG Tracker] Sending via Ollama: ${settings.ollamaModel}`);
-        return await sendViaOllama(settings.ollamaUrl, settings.ollamaModel, systemPrompt, userPrompt, settings.maxTokens, presetSettings, signal);
+        return finalize(await sendViaOllama(settings.ollamaUrl, settings.ollamaModel, systemPrompt, userPrompt, settings.maxTokens, presetSettings, signal));
     }
 
     // ── OpenAI Compatible Mode ──
     if (settings.connectionSource === 'openai') {
         if (settings.debugMode) console.log(`[RPG Tracker] Sending via OpenAI Compatible: ${settings.openaiModel}`);
-        return await sendViaOpenAI(settings.openaiUrl, settings.openaiKey, settings.openaiModel, systemPrompt, userPrompt, settings.maxTokens, presetSettings, signal);
+        return finalize(await sendViaOpenAI(settings.openaiUrl, settings.openaiKey, settings.openaiModel, systemPrompt, userPrompt, settings.maxTokens, presetSettings, signal));
     }
 
     // ── Default mode: generateRaw through the active connection ──
@@ -669,7 +708,7 @@ export async function sendStateRequest(settings, systemPrompt, userPrompt, signa
         }
 
         logTransaction('Tracker', [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }], text);
-        return text;
+        return finalize(text);
 
     } catch (err) {
         console.error('[RPG Tracker] Request failed:', err);

@@ -13,7 +13,7 @@
 // ─────────────────────────────────────────────────────────────────────────
 
 import { getSettings, getNpcRelationshipMax, buildRelationshipTrackingSysprompt } from './state-manager.js';
-import { sendStateRequest } from './llm-client.js';
+import { sendStateRequest, restoreUserMacro } from './llm-client.js';
 import { escapeHtml } from './memo-processor.js';
 import { refreshOrderList } from './ui-editors.js';
 import { QUESTS_NARRATOR, DEFAULT_STOCK_PROMPTS, resolveTimePromptKey } from './constants.js';
@@ -162,6 +162,41 @@ function getGameSystemWizardConnectionSettings(baseSettings) {
         maxTokens: s.maxTokens,
         debugMode: s.debugMode,
     };
+}
+
+/** Persona / player names that must not be baked into wizard output (use {{user}} instead). */
+async function getPlayerMacroReplacementNames() {
+    const names = new Set();
+    try {
+        const script = await import('../../../../script.js');
+        if (script.name1?.trim()) names.add(script.name1.trim());
+    } catch (_) { /* optional */ }
+    try {
+        const [{ user_avatar }, { power_user }] = await Promise.all([
+            import('../../../personas.js'),
+            import('../../../power-user.js'),
+        ]);
+        const personaName = user_avatar ? (power_user.personas?.[user_avatar] ?? '').trim() : '';
+        if (personaName) names.add(personaName);
+    } catch (_) { /* optional */ }
+    return [...names];
+}
+
+function sanitizeWizardMacroContent(content, names = []) {
+    return restoreUserMacro(content, names);
+}
+
+/** Wizard LLM call — shields {{user}} from ST macro substitution, then restores it in output. */
+async function sendWizardStateRequest(settings, systemPrompt, userPrompt, signal = null) {
+    const names = await getPlayerMacroReplacementNames();
+    const raw = await sendStateRequest(
+        getGameSystemWizardConnectionSettings(settings),
+        systemPrompt,
+        userPrompt,
+        signal,
+        { preserveUserMacro: true, userMacroNames: names },
+    );
+    return { raw, names };
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -794,13 +829,13 @@ export async function runAiSectionBuilder(options = {}) {
         `You are a D&D system prompt architect. The user wants a new section added to their existing system prompt.\n\nTheir description: "${desc}"\n\nThe user's current system prompt is provided below for reference so you can seamlessly integrate the new mechanic without duplicating existing rules:\n<current_prompt>\n${document.getElementById('main_prompt_quick_edit_textarea')?.value || settings.systemPromptTemplate || ''}\n</current_prompt>\n\nCreate a new XML-tagged section. Your response MUST:\n1. Start with <tag_name> and end with </tag_name>\n2. Use a unique, descriptive tag name in snake_case (e.g. <reputation_system>, <corruption>, <weather_mechanics>)\n3. Be written in SECOND PERSON (you/your) — direct instructions to the Narrator. Never "The GM must" or third-person references.\n4. Be comprehensive but concise (10-30 lines)\n5. Include specific mechanical rules, not just flavor text\n6. Reference {{user}} for the player character\n\nReturn ONLY the XML section. No explanation, no other text.`;
 
     const generateSection = async (desc) => {
-        const result = await sendStateRequest(getGameSystemWizardConnectionSettings(settings), 'You are a D&D system prompt section generator. Return ONLY the XML section.', buildAiPrompt(desc));
+        const { raw: result, names } = await sendWizardStateRequest(settings, 'You are a D&D system prompt section generator. Return ONLY the XML section.', buildAiPrompt(desc));
         if (!result) throw new Error('No response from AI');
         let section = result.trim();
         const fenceMatch = section.match(/```(?:xml)?\s*([\s\S]*?)```/);
         if (fenceMatch) section = fenceMatch[1].trim();
         if (!section.match(/^<\w+[\w_-]*>/)) throw new Error('AI did not return a valid XML section');
-        return section;
+        return sanitizeWizardMacroContent(section, names);
     };
 
     // Step 1: get description
@@ -1036,7 +1071,8 @@ RULES:
 11. If driver_time="true", double-check the formula is exactly ONE rate × minutes-elapsed, with at most a plain-language conditional override — never two or more named sub-rates combined in one algebraic expression (see "ONE SINGLE RATE" warning above).
 12. Double-check <tracker_module> inner content is second person (you/your) addressing the tracker directly — never third person ("The tracker maintains…", "The State Tracker must…").
 13. If the requested mechanic contains multiple distinct concepts (e.g., hunger and thirst), double-check that you have tracked them as separate bars/fields (e.g., Hunger and Thirst) within the single module block rather than combining them into a single muddy meter. Provide separate decay rates and tiers for each.
-14. Double-check magnitude guidance for restorative actions lives ONLY in <gm_section> as a rough common-sense guide — NEVER duplicate a Minor/Moderate/Major offset table inside <tracker_module>. Tracker recovery = apply stated change, else common sense.`;
+14. Double-check magnitude guidance for restorative actions lives ONLY in <gm_section> as a rough common-sense guide — NEVER duplicate a Minor/Moderate/Major offset table inside <tracker_module>. Tracker recovery = apply stated change, else common sense.
+15. CRITICAL {{user}} MACRO RULE: {{user}} is a SillyTavern runtime macro — it resolves to whoever the player is when the chat runs. NEVER hardcode the current player's persona name or any example proper name (e.g. "Adam", "Dave") in gm_section or tracker_module output. Always write the literal token {{user}} and {{user}}'s for possessives. Hardcoded names break when the player switches personas.`;
 }
 
 /** Shared Sustenance tracker_module body (decay + soft recovery + tiers); effect-owner split is in gm_section + meta. */
@@ -1150,7 +1186,7 @@ function normalizeDrivers(obj) {
 }
 
 /** Parses one AI (or exported) response into a normalized draft object. */
-export function parseWizardResponse(raw) {
+export function parseWizardResponse(raw, macroNames = []) {
     const metaAttrs = extractSelfClosingTag(raw, 'meta') || {};
     const gm = extractTagBlock(raw, 'gm_section');
     const tracker = extractTagBlock(raw, 'tracker_module');
@@ -1182,11 +1218,11 @@ export function parseWizardResponse(raw) {
         effectOwner: metaAttrs.effect_owner === 'gm' ? 'gm' : 'tracker',
         includeGm: !!gm,
         gmTag,
-        gmContent: gm ? normalizeGmContent(gmTag, gm.content) : '',
+        gmContent: gm ? sanitizeWizardMacroContent(normalizeGmContent(gmTag, gm.content), macroNames) : '',
         trackerTag,
         trackerLabel: tracker?.attrs?.label || name,
         trackerIcon: tracker?.attrs?.icon || metaAttrs.icon || '📄',
-        trackerContent: tracker ? tracker.content : '',
+        trackerContent: tracker ? sanitizeWizardMacroContent(tracker.content, macroNames) : '',
     };
 }
 
@@ -1194,9 +1230,9 @@ export function parseWizardResponse(raw) {
 async function generateGameSystemDraft(settings, description, systemPrompt, effectOwner = 'tracker') {
     const sp = composeWizardArchitectPrompt(systemPrompt || getEffectiveWizardSystemPrompt(settings), effectOwner);
     const userPrompt = `${buildExistingTagsContext(settings)}\n\nDescribe the mechanic:\n${description}`;
-    const raw = await sendStateRequest(getGameSystemWizardConnectionSettings(settings), sp, userPrompt);
+    const { raw, names } = await sendWizardStateRequest(settings, sp, userPrompt);
     if (!raw) throw new Error('No response from AI');
-    return parseWizardResponse(raw);
+    return parseWizardResponse(raw, names);
 }
 
 function buildGmAccountingProhibitions(trackerTag) {
@@ -1247,11 +1283,11 @@ async function regenerateGmSection(settings, description, gmTag, drivers, tracke
     const base = composeWizardArchitectPrompt(systemPrompt || getEffectiveWizardSystemPrompt(settings), effectOwner);
     const systemPromptFull = `${base}\n\n---\n\nCURRENT TASK: Rewrite ONLY the GM-facing section for the mechanic described below. Return ONLY:\n<gm_section tag="${gmTag}">\n...instructions...\n</gm_section>\nNo explanation, no markdown fences, no other text. Reference {{user}} for the player. Be comprehensive but concise (10-30 lines).\n\nCRITICAL: Inner content must be SECOND PERSON (you/your) — direct instructions to the Narrator. Never write "The GM must" or any third-person reference to the narrator.\n\nCRITICAL: gm_section must NEVER track totals, restate current scores, or duplicate tracker accounting.\n\n${buildDriverGuidance(drivers, gmTag, trackerTag, effectOwner)}`;
     const userPrompt = `${buildExistingTagsContext(settings)}\n\nMechanic description:\n${description}`;
-    const raw = await sendStateRequest(getGameSystemWizardConnectionSettings(settings), systemPromptFull, userPrompt);
+    const { raw, names } = await sendWizardStateRequest(settings, systemPromptFull, userPrompt);
     if (!raw) throw new Error('No response from AI');
     const block = extractTagBlock(raw, 'gm_section');
     if (!block) throw new Error('AI did not return a valid gm_section block');
-    return normalizeGmContent(sanitizeSnakeTag(block.attrs.tag || gmTag), block.content);
+    return sanitizeWizardMacroContent(normalizeGmContent(sanitizeSnakeTag(block.attrs.tag || gmTag), block.content), names);
 }
 
 /** Focused regeneration of just the tracker half. */
@@ -1260,10 +1296,11 @@ async function regenerateTrackerModule(settings, description, trackerTag, driver
     const base = composeWizardArchitectPrompt(systemPrompt || getEffectiveWizardSystemPrompt(settings), effectOwner);
     const systemPromptFull = `${base}\n\n---\n\nCURRENT TASK: Rewrite ONLY the tracker module instructions for the mechanic described below. Return ONLY:\n<tracker_module tag="${trackerTag}" label="Display Label" icon="emoji">\n...instructions, including a sample [${trackerTag}] ... [/${trackerTag}] format block using rendering markers like:\n  - ${renderingHints}\n</tracker_module>\nNo explanation, no markdown fences, no other text.\n\nCRITICAL: Inner content must be SECOND PERSON (you/your) — direct instructions to the State Tracker. Never write "The tracker maintains…", "The State Tracker must…", or any third-person reference to the tracker as an external entity.\n\nCRITICAL: This module EXCLUSIVELY owns running totals, bars, threshold tables, and tier labels — the gm_section must never duplicate this. When scanning for inline annotations, say "narrative output" / "the latest narrative output" — NEVER "GM's output" or "GM's narration".\n\n${buildDriverGuidance(drivers, '', trackerTag, effectOwner)}`;
     const userPrompt = `${buildExistingTagsContext(settings)}\n\nMechanic description:\n${description}`;
-    const raw = await sendStateRequest(getGameSystemWizardConnectionSettings(settings), systemPromptFull, userPrompt);
+    const { raw, names } = await sendWizardStateRequest(settings, systemPromptFull, userPrompt);
     if (!raw) throw new Error('No response from AI');
     const block = extractTagBlock(raw, 'tracker_module');
     if (!block) throw new Error('AI did not return a valid tracker_module block');
+    block.content = sanitizeWizardMacroContent(block.content, names);
     return block;
 }
 
@@ -1279,14 +1316,14 @@ async function regenerateBothHalves(settings, description, gmTag, trackerTag, dr
     const base = composeWizardArchitectPrompt(systemPrompt || getEffectiveWizardSystemPrompt(settings), effectOwner);
     const systemPromptFull = `${base}\n\n---\n\nCURRENT TASK: Rewrite BOTH halves of the mechanic described below so they are fully coherent with each other. Return ONLY:\n<gm_section tag="${gmTag}">\n...instructions...\n</gm_section>\n<tracker_module tag="${trackerTag}" label="Display Label" icon="emoji">\n...instructions, including a sample [${trackerTag}] ... [/${trackerTag}] format block using rendering markers like:\n  - ${renderingHints}\n</tracker_module>\nNo explanation, no markdown fences, no other text. Reference {{user}} for the player. Be comprehensive but concise (10-30 lines each).\n\nCRITICAL: gm_section inner content must be SECOND PERSON (you/your) — never "The GM must". CRITICAL: tracker_module inner content must ALSO be SECOND PERSON (you/your) addressing the State Tracker directly — never "The tracker maintains…". CRITICAL: gm_section must NEVER track totals, restate current scores, or duplicate tracker accounting — the tracker_module EXCLUSIVELY owns totals, bars, thresholds, and tier labels.\n\n${buildDriverGuidance(drivers, gmTag, trackerTag, effectOwner)}\n\nSince both halves are generated together: magnitude/recovery guidance for restorative actions belongs ONLY in gm_section (rough common-sense guide). Tracker recovery must be "apply stated change, else common sense" — NEVER a duplicated Minor/Moderate/Major table. If effect_owner="gm", threshold numbers live in gm_section; the tracker still reports values/labels without restating mechanical effect prose.`;
     const userPrompt = `${buildExistingTagsContext(settings)}\n\nMechanic description:\n${description}`;
-    const raw = await sendStateRequest(getGameSystemWizardConnectionSettings(settings), systemPromptFull, userPrompt);
+    const { raw, names } = await sendWizardStateRequest(settings, systemPromptFull, userPrompt);
     if (!raw) throw new Error('No response from AI');
     const gm = extractTagBlock(raw, 'gm_section');
     const tracker = extractTagBlock(raw, 'tracker_module');
     if (!gm || !tracker) throw new Error('AI did not return both a gm_section and a tracker_module block');
     return {
-        gmContent: normalizeGmContent(sanitizeSnakeTag(gm.attrs.tag || gmTag), gm.content),
-        trackerContent: tracker.content,
+        gmContent: sanitizeWizardMacroContent(normalizeGmContent(sanitizeSnakeTag(gm.attrs.tag || gmTag), gm.content), names),
+        trackerContent: sanitizeWizardMacroContent(tracker.content, names),
         trackerLabel: tracker.attrs.label || '',
         trackerIcon: tracker.attrs.icon || '',
     };
@@ -1337,14 +1374,14 @@ ${currentDraft}
 User's iteration feedback (apply these changes):
 ${iterationFeedback}`;
 
-    const raw = await sendStateRequest(getGameSystemWizardConnectionSettings(settings), systemPromptFull, userPrompt);
+    const { raw, names } = await sendWizardStateRequest(settings, systemPromptFull, userPrompt);
     if (!raw) throw new Error('No response from AI');
 
     const gm = extractTagBlock(raw, 'gm_section');
     if (!gm) throw new Error('AI did not return a valid gm_section block');
 
     const result = {
-        gmContent: normalizeGmContent(sanitizeSnakeTag(gm.attrs.tag || snakeTag), gm.content),
+        gmContent: sanitizeWizardMacroContent(normalizeGmContent(sanitizeSnakeTag(gm.attrs.tag || snakeTag), gm.content), names),
         trackerContent: '',
         trackerLabel: '',
         trackerIcon: '',
@@ -1353,7 +1390,7 @@ ${iterationFeedback}`;
     if (includeTracker) {
         const tracker = extractTagBlock(raw, 'tracker_module');
         if (!tracker) throw new Error('AI did not return a valid tracker_module block');
-        result.trackerContent = tracker.content;
+        result.trackerContent = sanitizeWizardMacroContent(tracker.content, names);
         result.trackerLabel = tracker.attrs.label || '';
         result.trackerIcon = tracker.attrs.icon || '';
     }
@@ -2054,7 +2091,8 @@ export async function importGameSystem() {
     if (!text) return;
     let parsed;
     try {
-        parsed = parseWizardResponse(text);
+        const names = await getPlayerMacroReplacementNames();
+        parsed = parseWizardResponse(text, names);
     } catch (err) {
         toastr['error'](`Could not parse import text: ${err.message}`, 'Game Systems');
         return;
@@ -2291,14 +2329,14 @@ export async function editUnlockedSection(tag, options = {}) {
     if (!item) return;
 
     const generateSection = async (desc) => {
-        const systemPrompt = `You are an expert D&D system-prompt editor. Revise the section below based on the user's requested changes. Return ONLY the updated <${tag}>...</${tag}> block — no explanation, no markdown fences.`;
+        const systemPrompt = `You are an expert D&D system-prompt editor. Revise the section below based on the user's requested changes. Return ONLY the updated <${tag}>...</${tag}> block — no explanation, no markdown fences. Reference {{user}} for the player character; never hardcode the current persona name.`;
         const userPrompt = `CURRENT CONTENT:\n${item.content}\n\nREQUESTED CHANGES:\n${desc}`;
-        const raw = await sendStateRequest(getGameSystemWizardConnectionSettings(settings), systemPrompt, userPrompt);
+        const { raw, names } = await sendWizardStateRequest(settings, systemPrompt, userPrompt);
         if (!raw) throw new Error('No response from AI');
         let section = raw.trim();
         const fenceMatch = section.match(/```(?:xml)?\s*([\s\S]*?)```/);
         if (fenceMatch) section = fenceMatch[1].trim();
-        return normalizeGmContent(tag, section);
+        return sanitizeWizardMacroContent(normalizeGmContent(tag, section), names);
     };
 
     const result = await showSectionEditor({

@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [5.5.65] - 2026-07-16
+
+### Fixed
+- **Game System Wizard {{user}} macro**: Wizard LLM calls now shield `{{user}}` from SillyTavern `substituteParams()` (which was resolving it to the active persona name before the model saw the prompt). Generated GM/tracker instructions keep the literal `{{user}}` token so they remain valid after persona switches; leaked persona names in output are rewritten on save.
+
 ## [5.5.6] - 2026-07-16
 
 ### Changed
