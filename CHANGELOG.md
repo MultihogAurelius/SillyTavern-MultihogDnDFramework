@@ -2,6 +2,15 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [5.5.4] - 2026-07-16
+
+### Changed
+- **BENCHED PARTY prompt**: Bench ETA guidance on `[BENCH]` lines; `[UNBENCH]` only on physical reunion, not when an ETA date passes.
+- **Party join/leave sysprompts**: `leaving_vs_benching` task/ETA narrative guidance in normal and legacy prompts; legacy `party_join_leave` aligned with the standard JOINS wording and full leaving-vs-benching block.
+
+### Fixed
+- **Real-Time Visualization Mode**: Suppress location image generation toasts; show an in-panel loading spinner on the Visualization Mode hero while scene art generates.
+
 ## [5.5.31] - 2026-07-16
 
 ### Changed

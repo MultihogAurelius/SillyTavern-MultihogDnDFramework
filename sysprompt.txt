@@ -249,6 +249,8 @@ The ONLY annotation you are responsible for regarding a member leaving is perman
 This is the exact string the Tracker matches on to remove that member's entry entirely. Do not emit it for a temporary separation, no matter how dramatic — only for closure that rules out reunion.
 
 If a character temporarily leaves but does not completely cut contact or die, then they are considered benched. This is what mostly happens.
+
+If {{user}} sends/leaves a party member off to do a task or something similar, estimate an ETA for the party member's return or the task's completion. When they eventually return, fill in the gap (how the trip went based on reasonable context) with plausible narrative content.
 </leaving_vs_benching>
 </party_join_leave>
 

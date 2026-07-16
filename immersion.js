@@ -1,6 +1,6 @@
 import { getSettings, getEffectiveRouterCampaignPrefix, saveChatState } from './state-manager.js';
 import { escapeHtml } from './memo-processor.js';
-import { normalizeLocationPath, resolveLocationImageWithMeta, triggerBackgroundLocationGeneration, hasLocationImage, getLinkedPlayerCharacter } from './portraits.js';
+import { normalizeLocationPath, resolveLocationImageWithMeta, triggerBackgroundLocationGeneration, hasLocationImage, getLinkedPlayerCharacter, isLocationImageGenerating } from './portraits.js';
 import { resolvePortraitDisplaySrc } from './portrait-storage.js';
 import { resolveCurrentLocationPath, formatLocationBreadcrumb } from './location-resolver.js';
 
@@ -263,6 +263,7 @@ export async function buildImmersionSceneState(memo, settings) {
         npcs,
         locationImagesEnabled: !!s.locationImages,
         npcPortraitsEnabled: s.npcPortraits !== false,
+        isLocationGenerating: storagePath ? isLocationImageGenerating(storagePath) : false,
     };
 }
 
@@ -280,11 +281,19 @@ export function renderImmersionViewHtml(scene) {
         npcs,
         locationImagesEnabled,
         npcPortraitsEnabled,
+        isLocationGenerating,
     } = scene;
 
     const heroInner = locationImage
         ? `<img src="${escapeHtml(locationImage)}" alt="${escapeHtml(locationLeaf || 'Location')}">`
         : `<div class="rt-immersion-hero-placeholder">🗺️</div>`;
+
+    const generatingOverlay = isLocationGenerating
+        ? `<div class="rt-immersion-hero-loading" aria-live="polite">
+            <i class="fa-solid fa-spinner fa-spin rt-immersion-hero-spinner" aria-hidden="true"></i>
+            <span>Generating scene…</span>
+        </div>`
+        : '';
 
     const locTitle = resolvedPath
         ? escapeHtml(locationLeaf || resolvedPath)
@@ -318,8 +327,9 @@ export function renderImmersionViewHtml(scene) {
 
     return `<div class="rt-immersion-root">
         ${locationImagesEnabled ? `
-        <div class="rt-immersion-hero-wrap" ${locDataAttrs} role="button" tabindex="0" title="${locationImage ? 'View location' : 'Set location image'}">
+        <div class="rt-immersion-hero-wrap${isLocationGenerating ? ' rt-immersion-hero-generating' : ''}" ${locDataAttrs} role="button" tabindex="0" title="${isLocationGenerating ? 'Generating scene art…' : (locationImage ? 'View location' : 'Set location image')}">
             ${heroInner}
+            ${generatingOverlay}
             <div class="rt-immersion-hero-overlay">
                 <div class="rt-immersion-hero-title">${locTitle}</div>
                 ${breadcrumbHtml}

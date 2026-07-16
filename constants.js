@@ -88,7 +88,7 @@ Output [BENCHED PARTY] only when a bench or unbench occurs this turn; otherwise 
 
 One command per line inside the block:
 - [BENCH] Name — reason   — member separates. Name may be first name only (e.g. Robin) or full header (Robin (Class)). Reason required; derive from narrative.
-- [UNBENCH] Name          — member reunites with {{user}} on-screen.
+- [UNBENCH] Name— member reunites with {{user}} on-screen.
 
 Infer benching/reunion from the narrative — no GM annotation exists for either. Bias toward under-triggering on bench: brief scene absence is NOT a bench. Wrong bench is worse than a missed one (missed benches self-heal on a later turn).
 
@@ -102,7 +102,13 @@ Example (bench only — no [PARTY] output):
 Example (reunite only):
 [BENCHED PARTY]
 [UNBENCH] Gareth
-[/BENCHED PARTY]`,
+[/BENCHED PARTY]
+
+Bench ETAs: If it is clearly implied in the narrative when a character may return, incorporate an ETA in the [BENCH] line itself, appended after the reason, using the format [BENCH] Name — reason — ETA: [when]. Only include the ETA segment when the narrative gives a real signal (a stated day, a duration, or an explicit "back by X"); do not fabricate a timeframe if the story is vague. Omit the ETA segment entirely rather than guessing — an absent ETA is always safer than a wrong one, consistent with the existing bias toward under-triggering.
+
+The ETA must always be an explicit timestamp, e.g. "Day 1, HH:MM", or "17/10/2002, HH:MM." Only [UNBENCH] when the character physically reunites with {{user}}, not simply when the ETA date has been met.
+
+ETA [BENCH] example: Status: Benched (08:08 AM, Day 1, separated to investigate the docks and meet back at Day 1, 12:10 AM)`,
   combat: `Active enemies/NPCs in combat. Track the current COMBAT ROUND starting from 1. Decrement buff/debuff durations by 1 each round. Format each combatant as:
 COMBAT ROUND X
 Name: current/max HP
@@ -488,6 +494,8 @@ The ONLY annotation you are responsible for regarding a member leaving is perman
 This is the exact string the Tracker matches on to remove that member's entry entirely. Do not emit it for a temporary separation, no matter how dramatic — only for closure that rules out reunion.
 
 If a character temporarily leaves but does not completely cut contact or die, then they are considered benched. This is what mostly happens.
+
+If {{user}} sends/leaves a party member off to do a task or something similar, estimate an ETA for the party member's return or the task's completion. When they eventually return, fill in the gap (how the trip went based on reasonable context) with plausible narrative content.
 </leaving_vs_benching>
 </party_join_leave>
 
@@ -807,8 +815,7 @@ The active context contains recent "World Progression" reports detailing backgro
 </world_progression>
 
 <party_join_leave>
-When a character joins/leaves, explicitly state (Name joins/leaves the party).
-Declare their COMBAT PROFILE immediately using this exact structural database layout:
+When a character JOINS the party, explicitly state (Name joins the party) and declare their COMBAT PROFILE immediately using this exact structural database layout:
 [PARTY]
 Name (Class): current/max HP
 Combat: BAB: +X | Ranged: +X | Melee: +X | Base AC: X | Total AC: Z
@@ -822,6 +829,15 @@ Spells: Cantrips, spell slots by level (if applicable).
 HD: dX (current/max)
 Status: Condition
 [/PARTY]
+<leaving_vs_benching>
+The ONLY annotation you are responsible for regarding a member leaving is permanent departure. When a party member's departure is truly final — death, explicit permanent farewell, defection, or any closure that forecloses reunion — narrate it and immediately follow it with:
+*(Left the party: Name — reason)*
+This is the exact string the Tracker matches on to remove that member's entry entirely. Do not emit it for a temporary separation, no matter how dramatic — only for closure that rules out reunion.
+
+If a character temporarily leaves but does not completely cut contact or die, then they are considered benched. This is what mostly happens.
+
+If {{user}} sends/leaves a party member off to do a task or something similar, estimate an ETA for the party member's return or the task's completion. When they eventually return, fill in the gap (how the trip went based on reasonable context) with plausible narrative content.
+</leaving_vs_benching>
 </party_join_leave>
 
 <resting>

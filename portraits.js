@@ -1611,6 +1611,12 @@ export async function generateLocationImagePrompt(locationPath, locContent) {
 
 const activeLocationGenerations = new Set();
 
+/** @param {string} locationPath */
+export function isLocationImageGenerating(locationPath) {
+    const normPath = normalizeLocationPath(locationPath);
+    return normPath ? activeLocationGenerations.has(normPath) : false;
+}
+
 /**
  * @param {string} locationPath
  * @param {function} refresh
@@ -1630,24 +1636,35 @@ export function triggerBackgroundLocationGeneration(locationPath, refresh, locCo
 
     activeLocationGenerations.add(normPath);
     const leaf = normPath.split(' :: ').pop() || normPath;
-    toastr['info'](`${forceReplace ? 'Regenerating' : 'Auto-generating'} location image for ${leaf} in background...`, 'RPG Tracker');
+    const isRealtimeArrival = !!opts.realtimeArrival;
+    if (!isRealtimeArrival) {
+        toastr['info'](`${forceReplace ? 'Regenerating' : 'Auto-generating'} location image for ${leaf} in background...`, 'RPG Tracker');
+    } else if (typeof refresh === 'function') {
+        refresh();
+    }
 
     (async () => {
         try {
             const prompt = await generateLocationImagePrompt(normPath, locContent);
             if (!prompt) {
                 activeLocationGenerations.delete(normPath);
+                if (isRealtimeArrival && typeof refresh === 'function') refresh();
                 return;
             }
             const dataUrl = await generatePortraitDirect(prompt, normPath);
             const scaled = await scaleImageToLandscape(dataUrl);
             await applyLocationImageData(normPath, scaled);
-            toastr['success'](`${forceReplace ? 'Location image regenerated' : 'Location image auto-generated'} for ${leaf}!`, 'RPG Tracker');
+            if (!isRealtimeArrival) {
+                toastr['success'](`${forceReplace ? 'Location image regenerated' : 'Location image auto-generated'} for ${leaf}!`, 'RPG Tracker');
+            }
             if (typeof refresh === 'function') refresh();
         } catch (err) {
             console.error(`[RPG Tracker] Background location image generation failed for ${normPath}:`, err);
             const errMsg = String(err.message || err);
-            toastr['error'](`Location image generation failed for "${leaf}": ${errMsg.substring(0, 120)}`, 'RPG Tracker');
+            if (!isRealtimeArrival) {
+                toastr['error'](`Location image generation failed for "${leaf}": ${errMsg.substring(0, 120)}`, 'RPG Tracker');
+            }
+            if (isRealtimeArrival && typeof refresh === 'function') refresh();
         } finally {
             activeLocationGenerations.delete(normPath);
         }

@@ -4366,6 +4366,35 @@ textarea.rt-cr-input {
     font-size: 48px;
     opacity: 0.35;
 }
+.rt-immersion-hero-wrap.rt-immersion-hero-generating {
+    cursor: wait;
+    pointer-events: none;
+}
+.rt-immersion-hero-wrap.rt-immersion-hero-generating img,
+.rt-immersion-hero-wrap.rt-immersion-hero-generating .rt-immersion-hero-placeholder {
+    opacity: 0.35;
+    filter: blur(1px);
+}
+.rt-immersion-hero-loading {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    background: rgba(0, 0, 0, 0.45);
+    color: rgba(255, 255, 255, 0.92);
+    font-size: 0.82em;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+}
+.rt-immersion-hero-spinner {
+    font-size: 1.75em;
+    color: var(--rt-accent, #5eb8d4);
+}
 .rt-immersion-hero-overlay {
     position: absolute;
     inset: 0;
