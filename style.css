@@ -3506,6 +3506,9 @@ textarea.rt-cr-input {
         align-items: center;
         justify-content: center;
         flex-shrink: 0;
+        width: 36px;
+        min-width: 36px;
+        box-sizing: border-box;
         background: none;
         border: none;
         color: var(--rt-text-muted);
@@ -3514,9 +3517,15 @@ textarea.rt-cr-input {
         font-size: 0.9em;
     }
 
-    /* Balance centering spacer no longer needed without toggle */
+    /* Balance centering: chevron on the left needs an equal-width spacer on the right */
     .rt-mobile-top-row::after {
-        display: none;
+        display: block;
+        content: '';
+        flex-shrink: 0;
+        width: 36px;
+        min-width: 36px;
+        pointer-events: none;
+        visibility: hidden;
     }
 
     .rt-mobile-top-row .rpg-tracker-nav {
