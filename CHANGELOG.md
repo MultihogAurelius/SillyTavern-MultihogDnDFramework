@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [5.5.1] - 2026-07-16
+
+### Fixed
+- **Benched party commands**: `[BENCH]`/`[UNBENCH]` parsing now tolerates leading list bullets (e.g. `- [BENCH] Name — reason`) so bench commands are applied instead of overwriting the roster with literal command text.
+
 ## [5.5.0] - 2026-07-16
 
 ### Added

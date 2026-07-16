@@ -534,8 +534,17 @@ export const stripCompletedQuestsFromMemo = stripArchivedQuestsFromMemo;
 // [BENCHED PARTY]. Full stat sheets live in the persisted memo; LLM context only
 // needs name + benching reason while a member stays benched.
 
+// Tracker output sometimes wraps [BENCH]/[UNBENCH] commands in a list bullet
+// (e.g. "- [BENCH] Name — reason") even though the stock prompt doesn't show one.
+// Strip any leading bullet before matching so formatting drift doesn't cause the
+// command to be missed entirely and fall through to literal-block persistence.
+const LEADING_BULLET_RX = /^\s*[-*+•–—]\s*(?=\[)/;
 const BENCH_CMD_RX = /^\[BENCH\]\s*(.+?)(?:\s*[—–-]\s*(.+))?$/i;
 const UNBENCH_CMD_RX = /^\[UNBENCH\]\s*(.+)$/i;
+
+function stripLeadingBullet(line) {
+    return line.replace(LEADING_BULLET_RX, '');
+}
 
 function benchCommandsEnabled() {
     const settings = getSettings();
@@ -547,7 +556,7 @@ export function extractBenchCommands(aiOutput) {
     const benches = [];
     const unbenches = [];
     for (const line of (aiOutput || '').split('\n')) {
-        const trimmed = line.trim();
+        const trimmed = stripLeadingBullet(line.trim());
         const bench = trimmed.match(BENCH_CMD_RX);
         if (bench) {
             benches.push({ name: bench[1].trim(), reason: (bench[2] || '').trim() });
@@ -561,7 +570,7 @@ export function extractBenchCommands(aiOutput) {
 
 function isBenchCommandOnlyContent(content) {
     if (!content || /^(?:REMOVED|EXPIRED|CLEARED|NONE)$/i.test(content.trim())) return false;
-    const lines = content.trim().split('\n').map(l => l.trim()).filter(Boolean);
+    const lines = content.trim().split('\n').map(l => stripLeadingBullet(l.trim())).filter(Boolean);
     if (!lines.length) return false;
     return lines.every(l => /^\[(?:BENCH|UNBENCH)\]/i.test(l));
 }
