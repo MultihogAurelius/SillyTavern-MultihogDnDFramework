@@ -3037,15 +3037,34 @@ function isNpcBookName(bookName) {
 }
 
 /**
- * Most recent assistant-side narrative only (no lookback window).
- * Mirrors getNarrativeBlocks(chat, -1) without importing narrative-hooks (circular).
+ * NPC entry IDs newly recorded (not updated) on the latest Lorebook Agent pass.
+ * Used to tighten Present-Now matching so agent-created entries need a full-name hit.
+ * @param {object} [settings]
+ * @returns {Set<string>}
+ */
+function getRecentlyRecordedNpcIds(settings) {
+    const log = (settings || getSettings()).routerLog?.[0];
+    if (!log?.record?.length) return new Set();
+    const ids = new Set();
+    for (const item of log.record) {
+        const raw = String(item || '').trim();
+        if (!raw || /\(updated\)/i.test(raw)) continue;
+        const id = raw.replace(/\s*\(.*\)\s*$/g, '').trim();
+        if (!id.includes('::')) continue;
+        const bookName = id.split('::')[0];
+        if (isNpcBookName(bookName)) ids.add(id);
+    }
+    return ids;
+}
+
+/**
+ * Most recent single assistant/narrator message only (not the whole multi-message turn block).
  * @param {boolean} [includeHidden]
  * @returns {string}
  */
 function getMostRecentNarrativeText(includeHidden = false) {
     const { chat } = SillyTavern.getContext();
     if (!chat?.length) return '';
-    const parts = [];
     for (let i = chat.length - 1; i >= 0; i--) {
         const msg = chat[i];
         if (msg.is_user) break;
@@ -3055,16 +3074,17 @@ function getMostRecentNarrativeText(includeHidden = false) {
         const mes = cleanMessageContent(msg);
         if (!mes) continue;
         if (mes.startsWith('[Summary') || mes.startsWith('(Summary') || mes.includes('Summary of past events:')) continue;
-        parts.unshift(mes);
+        return mes;
     }
-    return parts.join('\n\n');
+    return '';
 }
 
 /**
  * Present-Now name scanner — separate from the Lorebook Agent keyword scanner.
- * Scans ONLY the most recent narrator output for NPC names (entry comment/label).
- * First name or last name is enough; lorebook key[] arrays are intentionally ignored
- * (too broad for Present Now). Does NOT mutate activeRouterKeys / keywordActivatedKeys.
+ * Scans ONLY the latest single narrator message for NPC names (entry comment/label).
+ * First/last name tokens are enough for established NPCs; NPCs the agent just
+ * recorded this pass require a full-name match so loose tokens/keys do not
+ * instantly populate Present Now. Lorebook key[] arrays are never scanned.
  *
  * Call immediately before location scene image generation (and when building Present Now UI).
  *
@@ -3096,6 +3116,8 @@ export async function scanRecentOutputForPresentNpcs(narrativeText) {
     }
     if (!booksToScan.length) return [];
 
+    const recentlyRecordedNpcIds = getRecentlyRecordedNpcIds(settings);
+
     /** @type {Array<{ id: string, label: string, content: string }>} */
     const matched = [];
     const seenLabels = new Set();
@@ -3110,10 +3132,13 @@ export async function scanRecentOutputForPresentNpcs(narrativeText) {
         if (!book?.entries) continue;
 
         for (const [uid, entry] of Object.entries(book.entries)) {
+            const fullId = `${bookName}::${uid}`;
             // Name-only: use the entry label (comment), never lorebook key[] keywords.
             const label = (entry.comment || '').replace(/^\[.*?\]\s*/i, '').trim();
             if (!label) continue;
-            if (!narrativeMentionsNpcName(text, label)) continue;
+
+            const requireFullName = recentlyRecordedNpcIds.has(fullId);
+            if (!narrativeMentionsNpcName(text, label, { requireFullName })) continue;
 
             const labelKey = label.replace(/\s*\(.*?\)/g, '').trim().toLowerCase();
             if (seenLabels.has(labelKey)) continue;
@@ -3138,9 +3163,10 @@ export async function scanRecentOutputForPresentNpcs(narrativeText) {
  * Case-sensitive word-boundary match; ignores parenthetical suffixes and very short tokens.
  * @param {string} narrativeText
  * @param {string} npcLabel
+ * @param {{ requireFullName?: boolean }} [opts] When true, only a full-name match counts (no first/last token).
  * @returns {boolean}
  */
-function narrativeMentionsNpcName(narrativeText, npcLabel) {
+function narrativeMentionsNpcName(narrativeText, npcLabel, opts = {}) {
     const text = String(narrativeText || '');
     const cleaned = String(npcLabel || '')
         .replace(/\s*\(.*?\)/g, '')
@@ -3159,6 +3185,8 @@ function narrativeMentionsNpcName(narrativeText, npcLabel) {
         const fullPattern = escapeRe(cleaned).replace(/\s+/g, '\\s+');
         if (wordBoundaryRe(fullPattern).test(text)) return true;
     }
+
+    if (opts.requireFullName) return false;
 
     const tokens = cleaned.split(/\s+/).filter(t => t.length >= 2);
     for (const token of tokens) {

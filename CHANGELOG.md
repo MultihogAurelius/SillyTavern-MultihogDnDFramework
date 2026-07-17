@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [5.6.70] - 2026-07-17
+
+### Fixed
+- **Present Now false positives**: Agent-created NPCs no longer appear in Visualization Mode from loose first/last-name token matches; newly recorded entries require a full-name hit in the latest narrator message. Scanner uses that single reply only (not the whole turn block).
+
 ## [5.6.65] - 2026-07-17
 
 ### Added
