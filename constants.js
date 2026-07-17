@@ -1128,6 +1128,53 @@ function getAutoGearGuidanceByLevel(lvl, genre) {
     return 'High-end specialist or elite equipment appropriate to a veteran at this level.';
 }
 
+/** @param {'mundane'|'low'|'standard'|'well_equipped'|'heroic'} tier @param {number} lvl */
+function getFantasyGearTierGuidance(tier, lvl) {
+    const early = lvl <= 3;
+    const mid = lvl >= 4 && lvl <= 6;
+    const high = lvl >= 7 && lvl <= 10;
+    const epic = lvl >= 11;
+
+    if (tier === 'mundane') {
+        return 'Mundane only. All weapons and armor are non-magical [Common] gear — no +N suffixes, no [Rare]/[Uncommon] tags, no "+1 to hit" on equipment. Use plain stat lines (e.g. Rapier (1d8 Piercing), Leather Armor (AC +2)).';
+    }
+    if (tier === 'low') {
+        return 'Low tier = mundane starter kit. ALL equipped weapons and armor must be non-magical [Common] with normal stats — no +N items, no [Rare]/[Uncommon] tags, no "+1 to hit" on gear. A simple proper name on a mundane item is fine (e.g. "Campaign Rapier") but stats stay ordinary. WRONG: Heart-Piercer Rapier +1 [Rare]. RIGHT: 🗡️ [Common] [E] Rapier (1d8 Piercing).';
+    }
+    if (tier === 'standard') {
+        if (early) {
+            return `Standard kit for Level ${lvl}: practical [Common] weapons and armor. At most ONE [Uncommon] +1 item total (only if level 2+); everything else mundane. NO [Rare] items. Proper names are optional — generic "Rapier +1" or "Shortsword" is preferred over flashy names. Do NOT hand out rare, named, or heroic gear at this tier.`;
+        }
+        if (mid) {
+            return `Standard kit for Level ${lvl}: mostly [Common] gear with ONE clear [Uncommon] +1 weapon OR +1 armor piece. Other slots mundane. [Rare] not allowed. Named items optional; keep names modest if used.`;
+        }
+        if (high) {
+            return `Standard kit for Level ${lvl}: at least one [Uncommon] +1 primary; other slots mix of mundane and +1. At most ONE [Rare] +1 signature item. +2 only on a single optional flair piece.`;
+        }
+        return `Standard kit for Level ${lvl}: level-appropriate mix of +1/+2 gear per auto scaling — no full heroic loadouts.`;
+    }
+    if (tier === 'well_equipped') {
+        if (early) {
+            return `Well-equipped for Level ${lvl} — MUST be visibly richer than Standard. Requirements: (1) [Uncommon] +1 primary weapon with correct damage die (rapier = 1d8); (2) backup sidearm; (3) best armor for class — Studded Leather, Chain Shirt, or better (NOT just basic Leather unless class demands it); (4) at least 4 Gear lines; (5) Other Items with adventuring supplies (rope, rations, healer's kit, class kit, etc.) AND ${lvl <= 2 ? '75–150' : '100–200'} GP. WRONG: sparse 3-item list, 50 GP, only Leather + one +1 weapon.`;
+        }
+        if (mid) {
+            return `Well-equipped for Level ${lvl}: full adventurer loadout — [Uncommon] +1 primary, quality backup weapon, +1 armor OR second useful +1 item, specialist tools, 4–6 Gear lines, stocked Other Items, ${150 + lvl * 25}–${300 + lvl * 50} GP. Clearly above Standard — not a bare minimum kit.`;
+        }
+        if (high) {
+            return `Well-equipped for Level ${lvl}: strong kit — +1/+2 primary, +1 armor, backup weapons, utility/adventuring gear, 4–6 Gear lines, rich Other Items, ${300 + lvl * 40}–${600 + lvl * 60} GP. Include at least one [Rare] signature item if level 9+.`;
+        }
+        return `Well-equipped for Level ${lvl}: elite field kit — multiple +1/+2 items, stocked consumables and tools, generous GP, 5+ Gear lines. Should feel like a prepared veteran, not a bare starter.`;
+    }
+    // heroic
+    if (early) {
+        return `Heroic kit for Level ${lvl}: standout named gear — one [Uncommon] or [Rare] +1 signature weapon with a proper name, best armor for level, full kit, 150–300 GP, rich Other Items. Still bounded for low level — no +3.`;
+    }
+    if (mid) {
+        return `Heroic kit for Level ${lvl}: distinctive named +1/+2 gear, quality armor, full adventuring loadout, 300–600 GP, memorable signature items.`;
+    }
+    return `Heroic kit for Level ${lvl}: top-of-band named magical gear (+2/+3 where level allows), elite armor, stocked inventory, high GP — reads as a notable hero.`;
+}
+
 /**
  * Prompt fragment for starting gear quality, thematic named items, and (fantasy) magic naming.
  * @param {number|string} level
@@ -1144,30 +1191,43 @@ export function buildStartingGearHint(level, genre, hasInventory, gearTier = 'au
     /** @type {Record<string, string>} */
     const tierGuidance = {
         mundane: isFantasy
-            ? 'No magical gear. Practical mundane weapons, armor, and kit only — no +N items.'
+            ? getFantasyGearTierGuidance('mundane', lvl)
             : 'Basic or street-level gear only — nothing professional-grade, rare, or exotic.',
         low: isFantasy
-            ? 'Mostly mundane gear; at most ONE minor magical or masterwork item (+1 at most).'
-            : 'Mostly basic gear; one quality or slightly upgraded signature piece at most.',
-        standard: getAutoGearGuidanceByLevel(lvl, g),
+            ? getFantasyGearTierGuidance('low', lvl)
+            : 'Mostly basic, worn gear — one slightly nicer mundane piece at most. No elite, rare, or exotic equipment.',
+        standard: isFantasy
+            ? getFantasyGearTierGuidance('standard', lvl)
+            : getAutoGearGuidanceByLevel(lvl, g),
         well_equipped: isFantasy
-            ? 'Above-average kit for this level — multiple useful items and at least one clear +1 signature piece (up to +2 if level 7+).'
-            : 'Above-average kit — quality armor, tools, or weapons suited to a seasoned professional.',
+            ? getFantasyGearTierGuidance('well_equipped', lvl)
+            : 'Above-average kit — quality armor, tools, or weapons suited to a seasoned professional, with backup gear, supplies, and meaningful cash.',
         heroic: isFantasy
-            ? `Standout heroic kit for Level ${lvl} — include distinctive named magical gear near the top of the level band (+2/+3 where level allows).`
+            ? getFantasyGearTierGuidance('heroic', lvl)
             : `Elite signature kit for Level ${lvl} — custom, rare, or top-tier named equipment befitting a standout hero.`,
     };
 
     let guidance = tier === 'auto' ? getAutoGearGuidanceByLevel(lvl, g) : (tierGuidance[tier] || getAutoGearGuidanceByLevel(lvl, g));
 
-    const thematic = 'THEMATIC NAMED GEAR: When appropriate for the character and tier, include 1–2 evocative proper names (e.g. "Whisperfang", "Bulwark of the Fallen", "Dead Man\'s Revolver") — not only generic labels like "Longsword +1" or "Leather Armor". Names should tie to backstory, class, or setting. Mundane/low tiers may use memorable non-magical signature pieces; higher tiers should favor distinctive named gear.';
+    const isMundaneTier = tier === 'mundane' || tier === 'low';
+    const isWellEquippedOrHeroic = tier === 'well_equipped' || tier === 'heroic';
+    const thematic = isMundaneTier
+        ? 'Do NOT invent magical or rare equipment at this tier — keep every item realistically mundane.'
+        : tier === 'standard'
+            ? 'Named gear is OPTIONAL at Standard — generic item names are preferred. Do not default to flashy proper names or [Rare] tags.'
+            : 'THEMATIC NAMED GEAR: Include 1–2 evocative proper names where tier allows (e.g. "Whisperfang", "Bulwark of the Fallen"). Names should tie to backstory or class. Well-equipped+ should have at least one memorable signature piece.';
 
     let magicNaming = '';
-    if (isFantasy && tier !== 'mundane') {
-        magicNaming = ' CRITICAL NAMING: magical weapons/armor use the D&D suffix format — "Weapon Name +1", "Shadow Longsword +2", "Vampire\'s Blade +1" — NEVER put the bonus before the name (wrong: "+1 Shadow Longsword"). Emoji and [Rarity] tags come first, then the name with +N at the end, then stats in parentheses (e.g. 🗡️ [Rare] [E] Shadow Longsword +1 (1d8+1 Slashing, +1 to hit)). Match rarity tags to bonus tier.';
+    if (isFantasy && !isMundaneTier) {
+        const rarityCap = lvl <= 3 ? '[Uncommon] max for +1; NO [Rare].' : lvl <= 6 ? '[Rare] at most one item, +1 only unless level 5+.' : 'Match rarity to bonus tier.';
+        magicNaming = ` CRITICAL NAMING: magical gear uses suffix format — "Rapier +1" not "+1 Rapier". Emoji and [Rarity] come first, then name +N, then stats. Use correct weapon dice (rapier = 1d8). ${rarityCap}`;
     }
 
-    const invNote = hasInventory ? '' : ' List key equipped items on the CHARACTER Gear: line.';
+    const invNote = hasInventory
+        ? (isWellEquippedOrHeroic
+            ? ' [INVENTORY] must be generously populated — sparse 3-line lists fail Well-equipped/Heroic tiers.'
+            : '')
+        : ' List key equipped items on the CHARACTER Gear: line.';
 
     return `\n• STARTING GEAR: ${guidance} ${thematic}${magicNaming}${invNote}`;
 }
