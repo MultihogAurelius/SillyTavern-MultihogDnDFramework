@@ -237,49 +237,64 @@
                                     title="When enabled, portraits will be automatically generated in the background for new NPCs created or updated in the lorebook if they don't already have one."></i>
                             </label>
 
-                            <div class="inline-drawer" style="margin-top: 6px; margin-bottom: 2px;">
-                                <div class="inline-drawer-toggle inline-drawer-header" style="font-size: 0.82em; padding: 3px 6px;">
-                                    <b>Location Images &amp; Visualization ALPHA</b>
-                                    <div class="inline-drawer-icon fa-solid fa-circle-chevron-down"></div>
+                            <small style="display: block; padding-left: 4px; font-size: 0.78em; opacity: 0.6; margin-top: 10px;">Location Images &amp; Visualization</small>
+                            <div id="rpg_loc_images_settings_block" class="rt-loc-settings-block flex-container flexFlowColumn gap-1" style="padding-left: 4px;">
+                                <div class="rt-loc-settings-intro">
+                                    Scene art in the Lorebook Agent — location tree thumbnails, wide detail images, and Visualization Mode. Off by default.
                                 </div>
-                                <div class="inline-drawer-content" style="padding: 6px 4px 0 4px;">
-                                    <div class="flex-container flexFlowColumn gap-1">
-                                        <div style="font-size: 0.72em; opacity: 0.55; line-height: 1.35; margin-bottom: 4px;">
-                                            Alpha location scene art in the Lorebook Agent — hierarchical location tree, wide scene images, and Visualization Mode. Off by default.
-                                        </div>
-                                        <div id="rpg_loc_images_standard_group" class="rt-loc-settings-section">
-                                            <div id="rpg_loc_images_standard_core">
-                                                <label class="checkbox_label" style="padding-left: 4px;">
-                                                    <input id="rpg_tracker_location_images" type="checkbox" />
-                                                    <span>Show Location Images</span>
-                                                    <i class="fa-solid fa-circle-question interactable"
-                                                        title="Master toggle for location scene art in the Lorebook Agent — thumbnails on the Locations tree, detail view with wide scene art, drag &amp; drop upload, and Visualization Mode in the agent panel. Also enabled automatically with Real-Time Visualization Mode or Auto-Generate Locations."></i>
-                                                </label>
-                                                <label class="checkbox_label" style="padding-left: 4px;">
-                                                    <input id="rpg_tracker_portrait_auto_locations" type="checkbox" />
-                                                    <span>Auto-Generate Locations</span>
-                                                    <i class="fa-solid fa-circle-question interactable"
-                                                        title="When enabled (and Real-Time Visualization Mode is off), scene images are auto-generated in the background for new location entries that do not already have an image. Also turns on Show Location Images. Disabled while Real-Time Visualization Mode is on — arrival-based art replaces this path."></i>
-                                                </label>
-                                                <label class="checkbox_label" style="padding-left: 4px;">
-                                                    <input id="rpg_portrait_location_include_present_npcs" type="checkbox" />
-                                                    <span>Include Present NPCs in Location Scene Prompts</span>
-                                                    <i class="fa-solid fa-circle-question interactable"
-                                                        title="When enabled, NPCs whose names appear in the most recent narrator output (Present-Now name scanner — first/last name only, not Lorebook Agent keys) are injected into location image prompts. The linked Player Character is always included. The Location Scene Prompt also instructs the model to include minor characters from recent narrator output even when they are not in that block. Locked on while Real-Time Visualization Mode is active."></i>
-                                                </label>
+                                <div id="rpg_loc_images_standard_group" class="rt-loc-settings-section">
+                                    <div id="rpg_loc_images_standard_core">
+                                        <label class="checkbox_label">
+                                            <input id="rpg_tracker_location_images" type="checkbox" />
+                                            <span>Show Location Images</span>
+                                            <i class="fa-solid fa-circle-question interactable"
+                                                title="Master toggle for location scene art in the Lorebook Agent — thumbnails on the Locations tree, detail view with wide scene art, drag &amp; drop upload, and Visualization Mode in the agent panel. Also enabled automatically with Real-Time Visualization Mode or Auto-Generate Locations."></i>
+                                        </label>
+                                        <label class="checkbox_label">
+                                            <input id="rpg_tracker_portrait_auto_locations" type="checkbox" />
+                                            <span>Auto-Generate Locations</span>
+                                            <i class="fa-solid fa-circle-question interactable"
+                                                title="When enabled (and Real-Time Visualization Mode is off), scene images are auto-generated in the background for new location entries that do not already have an image. Also turns on Show Location Images. Disabled while Real-Time Visualization Mode is on."></i>
+                                        </label>
+                                        <label class="checkbox_label">
+                                            <input id="rpg_portrait_location_include_present_npcs" type="checkbox" />
+                                            <span>Include Present NPCs in Location Scene Prompts</span>
+                                            <i class="fa-solid fa-circle-question interactable"
+                                                title="When enabled, NPCs whose names appear in the most recent narrator output (Present-Now name scanner — first/last name only, not Lorebook Agent keys) are injected into location image prompts. The linked Player Character is always included. The Location Scene Prompt also instructs the model to include minor characters from recent narrator output even when they are not in that block. Locked on while Real-Time Visualization Mode is active."></i>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div id="rpg_loc_images_realtime_group" class="rt-loc-settings-section rt-loc-realtime-feature">
+                                    <div class="rt-loc-realtime-feature-header">
+                                        <div class="rt-loc-realtime-feature-icon" aria-hidden="true">✨</div>
+                                        <div class="rt-loc-realtime-feature-titles">
+                                            <div class="rt-loc-realtime-feature-title-row">
+                                                <span class="rt-loc-realtime-feature-title">Real-Time Visualization Mode</span>
+                                                <span id="rpg_loc_realtime_badge" class="rt-loc-realtime-badge" style="display: none;">LIVE</span>
                                             </div>
+                                            <div class="rt-loc-realtime-feature-tagline">Dynamic scene art that follows your story as you play</div>
                                         </div>
-                                        <div id="rpg_loc_images_realtime_group" class="rt-loc-settings-section rt-loc-realtime-section">
-                                            <div class="rt-loc-settings-subheader">Real-Time Visualization Mode</div>
-                                            <div id="rpg_loc_realtime_active_note" class="rt-loc-realtime-active-note" style="display: none;">
-                                                Arrival-based generation is active — standard location options above are bypassed. Use Visualization Mode in the Lorebook Agent to view scene art on arrival.
-                                            </div>
-                                            <label class="checkbox_label" style="padding-left: 4px;">
-                                                <input id="rpg_tracker_portrait_auto_scene_view" type="checkbox" />
-                                                <span>Enable Real-Time Visualization Mode</span>
-                                                <i class="fa-solid fa-circle-question interactable"
-                                                    title="When on, location images are created only when you arrive at a place in Scene View — using current chat context and characters present. Each arrival generates a fresh image (including revisits). Also turns on Show Location Images (locked on until this is off). Auto-Generate Locations is disabled."></i>
-                                            </label>
+                                    </div>
+                                    <div id="rpg_loc_realtime_active_note" class="rt-loc-realtime-active-note" style="display: none;"></div>
+                                    <label class="checkbox_label rt-loc-realtime-enable-label">
+                                        <input id="rpg_tracker_portrait_auto_scene_view" type="checkbox" />
+                                        <span>Enable Real-Time Visualization Mode</span>
+                                        <i class="fa-solid fa-circle-question interactable"
+                                            title="When on, location scene art is generated from Visualization Mode using current chat context and characters present. Choose a trigger below: on location enter, on location change, or every N outputs (still regenerates on location change). Also turns on Show Location Images (locked on until this is off). Auto-Generate Locations is disabled."></i>
+                                    </label>
+                                    <div id="rpg_loc_realtime_trigger_group" class="rt-loc-realtime-trigger-group" style="display: none;">
+                                        <label class="rt-loc-realtime-trigger-label">Generate scene art</label>
+                                        <select id="rpg_tracker_portrait_realtime_trigger" class="text_pole rt-loc-realtime-trigger-select">
+                                            <option value="location_enter">On location enter (once per place)</option>
+                                            <option value="location_change">On location change (including revisits)</option>
+                                            <option value="every_n_outputs">Every N outputs (+ on location change)</option>
+                                        </select>
+                                        <div id="rpg_loc_realtime_every_n_wrap" class="rt-loc-realtime-every-n flex-container gap-1" style="display: none;">
+                                            <span>Every</span>
+                                            <input id="rpg_tracker_portrait_realtime_every_n" type="number" class="text_pole" min="1" step="1" value="1" />
+                                            <span>chat output(s)</span>
+                                            <i class="fa-solid fa-circle-question interactable"
+                                                title="While this mode is on, scene art still regenerates whenever the location changes. Separately, a fresh image is also generated every N assistant/chat outputs — set to 1 to regenerate after every output."></i>
                                         </div>
                                     </div>
                                 </div>

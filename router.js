@@ -3135,28 +3135,34 @@ export async function scanRecentOutputForPresentNpcs(narrativeText) {
 
 /**
  * True if narrative text mentions the NPC's full name, or any first/last name token.
- * Word-boundary match; ignores parenthetical suffixes and very short tokens.
+ * Case-sensitive word-boundary match; ignores parenthetical suffixes and very short tokens.
  * @param {string} narrativeText
  * @param {string} npcLabel
  * @returns {boolean}
  */
 function narrativeMentionsNpcName(narrativeText, npcLabel) {
+    const text = String(narrativeText || '');
     const cleaned = String(npcLabel || '')
         .replace(/\s*\(.*?\)/g, '')
         .replace(/[^\p{L}\p{N}\s'-]/gu, ' ')
         .replace(/\s+/g, ' ')
         .trim();
-    if (!cleaned) return false;
+    if (!cleaned || text.length === 0) return false;
 
-    const lowerText = String(narrativeText || '').toLowerCase();
-    const lowerFull = cleaned.toLowerCase();
-    if (lowerFull.length >= 2 && lowerText.includes(lowerFull)) return true;
+    const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const wordBoundaryRe = (phrase) => new RegExp(
+        `(?:^|[^\\p{L}\\p{N}])${phrase}(?:[^\\p{L}\\p{N}]|$)`,
+        'u',
+    );
+
+    if (cleaned.length >= 2) {
+        const fullPattern = escapeRe(cleaned).replace(/\s+/g, '\\s+');
+        if (wordBoundaryRe(fullPattern).test(text)) return true;
+    }
 
     const tokens = cleaned.split(/\s+/).filter(t => t.length >= 2);
     for (const token of tokens) {
-        const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const re = new RegExp(`(?:^|[^\\p{L}\\p{N}])${escaped}(?:[^\\p{L}\\p{N}]|$)`, 'iu');
-        if (re.test(narrativeText)) return true;
+        if (wordBoundaryRe(escapeRe(token)).test(text)) return true;
     }
     return false;
 }

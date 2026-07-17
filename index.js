@@ -10,7 +10,7 @@ import { installSwipeSchedulerDebug } from './swipe-scheduler-debug.js';
 import { runRouterPass, rollbackRouterPass, reapplyRouterPass, getLorebookManifest, deleteLorebookEntry, updateLorebookEntry, disableManagedEntries, isRouterRunning, stopRouterPass, purgeWorldHistoryForChat } from './router.js';
 import { getRequestHeaders } from '../../../../script.js';
 import { fileToDataUrl, scaleImageTo512Square, scaleImageToLandscape, applyPortraitData, applyLocationImageData, generatePortraitPrompt, generateNpcPortraitPrompt, generateLocationImagePrompt, showPortraitPromptPopup, generatePortraitDirect, autoGeneratePartyPortraits, removeAllPortraits, checkAndTriggerAutoGenerations, autoGenerateEnemyPortraits, forceCheckAutoGenerations, resetAutoGenerationTracking, resolveLocationImageWithMeta, normalizeLocationPath, buildLocationPath, getLinkedPlayerCharacter, resolvePortraitSrcForPlayerCharacter } from './portraits.js';
-import { buildImmersionSceneState, renderImmersionViewHtml, getCurrentLocationText, loadLocationEntryByPath, loadNpcEntryByKey, maybeAutoGenerateImmersionSceneArt, resetImmersionSceneArtTracking, hydrateImmersionSceneArtPath } from './immersion.js';
+import { buildImmersionSceneState, renderImmersionViewHtml, getCurrentLocationText, loadLocationEntryByPath, loadNpcEntryByKey, maybeAutoGenerateImmersionSceneArt, runRealtimeSceneArtCheck, resetImmersionSceneArtTracking, hydrateImmersionSceneArtPath } from './immersion.js';
 import { migrateAllEmbeddedPortraits, countEmbeddedPortraitDataUrls, purgeAllPortraitData, resolvePortraitDisplaySrc, lookupCustomPortraitSrc, collectAllPortraitRefs, isManagedPortraitPath, isPortraitMigrationLocked, setPortraitMigrationLocked, PORTRAIT_STORAGE_FOLDER } from './portrait-storage.js';
 import { loadPanelGeometry, loadDeltaHeight, makeDraggable, makeResizableTR, makeResizableBR, makeResizableBL, setupResizeObserver, setupDeltaResize, canResizePanels, jqueryToggleSlide } from './ui-geometry.js';
 import { applyCustomTheme, openThemeWizard, refreshSavedThemesList, handleRecolor, undoThemeChange } from './theme-manager.js';
@@ -47,6 +47,8 @@ globalThis._rpgRenderRouterUI = () => { if (typeof renderRouterUI === 'function'
 /** Rebuilds CAMPAIGN RECORDS; assigned in createPanel when the agent panel is wired. */
 let refreshAgentManifest = async () => { };
 let refreshImmersionView = async () => { };
+globalThis._rpgRefreshImmersionView = () => { void refreshImmersionView(); };
+globalThis._rpgCheckRealtimeSceneArt = () => { void runRealtimeSceneArtCheck().catch(() => {}); };
 globalThis._rpgRefreshAgentManifest = async () => { if (typeof refreshAgentManifest === 'function') await refreshAgentManifest(); };
 /** Refreshes the NPC card grid; assigned in createPanel so module-level code can call it. */
 let refreshNpcManifest = async () => { };
@@ -618,11 +620,37 @@ export function syncLocationImageDependentUi(settings) {
     syncCheckbox('rpg_tracker_location_images', imagesEnabled, realTimeOn);
     syncCheckbox('rpg_portrait_location_include_present_npcs', realTimeOn || !!settings.portraitLocationIncludePresentNpcs, !imagesEnabled || realTimeOn);
 
+    const triggerMode = settings.portraitRealtimeTriggerMode || 'location_change';
+    const everyN = Math.max(1, Number(settings.portraitRealtimeEveryNOutputs) || 1);
+    const triggerSelect = document.getElementById('rpg_tracker_portrait_realtime_trigger');
+    if (triggerSelect) triggerSelect.value = triggerMode;
+    $('#rpg_tracker_portrait_realtime_trigger').val(triggerMode);
+    const everyNInput = document.getElementById('rpg_tracker_portrait_realtime_every_n');
+    if (everyNInput) everyNInput.value = String(everyN);
+    $('#rpg_tracker_portrait_realtime_every_n').val(String(everyN));
+
+    const triggerGroup = document.getElementById('rpg_loc_realtime_trigger_group');
+    const everyNWrap = document.getElementById('rpg_loc_realtime_every_n_wrap');
+    if (triggerGroup) triggerGroup.style.display = realTimeOn ? '' : 'none';
+    if (everyNWrap) everyNWrap.style.display = realTimeOn && triggerMode === 'every_n_outputs' ? 'flex' : 'none';
+
     const standardCore = document.getElementById('rpg_loc_images_standard_core');
     const realtimeGroup = document.getElementById('rpg_loc_images_realtime_group');
     const realtimeNote = document.getElementById('rpg_loc_realtime_active_note');
+    const realtimeBadge = document.getElementById('rpg_loc_realtime_badge');
     if (standardCore) standardCore.style.display = realTimeOn ? 'none' : '';
-    if (realtimeNote) realtimeNote.style.display = realTimeOn ? 'block' : 'none';
+    if (realtimeBadge) realtimeBadge.style.display = realTimeOn ? 'inline-flex' : 'none';
+    if (realtimeNote) {
+        realtimeNote.style.display = realTimeOn ? 'block' : 'none';
+        if (realTimeOn) {
+            const notes = {
+                location_enter: 'Generate once when entering a place that has no scene image yet. Open Visualization Mode in the Lorebook Agent to view scene art.',
+                location_change: 'Regenerate whenever the location changes (including revisits). Open Visualization Mode in the Lorebook Agent to view scene art.',
+                every_n_outputs: `Regenerate on location change, and also every ${everyN} chat output${everyN === 1 ? '' : 's'}. Open Visualization Mode in the Lorebook Agent to view scene art.`,
+            };
+            realtimeNote.textContent = notes[triggerMode] || notes.location_change;
+        }
+    }
     if (realtimeGroup) realtimeGroup.classList.toggle('rt-loc-realtime-active', realTimeOn);
 
     if (typeof globalThis._rpgSyncAgentImmersionUi === 'function') {
@@ -1291,6 +1319,10 @@ function loadChatState(chatId) {
     s.portraitAutoGenerateNpcs = saved.portraitAutoGenerateNpcs ?? false;
     s.portraitAutoGenerateLocations = saved.portraitAutoGenerateLocations ?? false;
     s.portraitAutoGenerateSceneView = saved.portraitAutoGenerateSceneView ?? false;
+    s.portraitRealtimeTriggerMode = ['location_enter', 'location_change', 'every_n_outputs'].includes(saved.portraitRealtimeTriggerMode)
+        ? saved.portraitRealtimeTriggerMode
+        : 'location_change';
+    s.portraitRealtimeEveryNOutputs = Math.max(1, Number(saved.portraitRealtimeEveryNOutputs) || 1);
     s.locationImages = !!saved.locationImages;
     s.portraitLocationIncludePresentNpcs = saved.portraitLocationIncludePresentNpcs ?? false;
     if (s.portraitAutoGenerateSceneView) {
@@ -2416,6 +2448,10 @@ function loadProfile(name) {
     s.portraitAutoGenerateNpcs = p.portraitAutoGenerateNpcs ?? false;
     s.portraitAutoGenerateLocations = p.portraitAutoGenerateLocations ?? false;
     s.portraitAutoGenerateSceneView = p.portraitAutoGenerateSceneView ?? false;
+    s.portraitRealtimeTriggerMode = ['location_enter', 'location_change', 'every_n_outputs'].includes(p.portraitRealtimeTriggerMode)
+        ? p.portraitRealtimeTriggerMode
+        : 'location_change';
+    s.portraitRealtimeEveryNOutputs = Math.max(1, Number(p.portraitRealtimeEveryNOutputs) || 1);
     s.portraitRegenerateVisitedLocations = !!s.portraitAutoGenerateSceneView;
     s.locationImages = !!p.locationImages;
     s.portraitConnectionSource = p.portraitConnectionSource ?? "default";
@@ -2729,16 +2765,16 @@ async function showLorebookAgentDocumentation() {
                             <p>The Agent writes directly into SillyTavern's native Lorebook system, creating namespaced campaign books for the current story (e.g. <i>Eldoria_NPCs</i>, <i>Eldoria_Locations</i>, <i>Eldoria_Factions</i>). All books for the active campaign are shown here, grouped by type. Click any folder to expand it; click any entry to read its full content. Books are automatically activated and deactivated based on the current chat — no manual action needed. This includes the <b>World Section</b> (<code>{prefix}_World</code>) created by the World Progression engine, which houses off-screen progression reports.</p>
                             <p style="margin-top:4px;">When <b>Show Location Images</b> is enabled (see below), the panel header switches between <b>Campaign Records</b> and <b>Visualization Mode</b>. With Location Images off, only the standard Campaign Records tree is shown.</p>
 
-                            <h4 style="margin-bottom: 5px;">🗺️ Location Images &amp; Visualization Mode (ALPHA)</h4>
-                            <p>Location scene art and Visualization Mode are <b>opt-in</b> and <b>off by default</b>. Enable them from <b>Extension Settings → Portraits → Location Images &amp; Visualization ALPHA</b>.</p>
+                            <h4 style="margin-bottom: 5px;">🗺️ Location Images &amp; Visualization Mode</h4>
+                            <p>Location scene art and Visualization Mode are <b>opt-in</b> and <b>off by default</b>. Enable them from <b>Extension Settings → Portraits → Location Images &amp; Visualization</b>.</p>
                             <ul style="padding-left: 20px; margin-top: 0;">
                                 <li><b>Show Location Images</b> — Master toggle. When on, the Locations book gains hierarchical scene art: thumbnails on the location tree, wide 16:9 images in detail view, drag-and-drop upload, and the <b>Campaign Records / Visualization Mode</b> switch in this panel. Also turns on automatically if you enable Real-Time Visualization Mode or Auto-Generate Locations.</li>
                                 <li><b>Auto-Generate Locations</b> — Background scene art for new location lorebook entries that do not already have an image. Mutually exclusive with Real-Time Visualization Mode.</li>
                                 <li><b>Include Present NPCs in Location Scene Prompts</b> — Injects NPCs named in the latest narrator output (Present-Now name scanner: first/last name only, not Lorebook Agent keys) plus the linked Player Character into location image prompts. Locked on while Real-Time Visualization Mode is active.</li>
-                                <li><b>Real-Time Visualization Mode</b> — Generates location images only when you <b>arrive</b> at a place in Visualization Mode, using current chat context and characters present. Each arrival produces a fresh image (including revisits after you have left and returned). Enables Show Location Images and present-NPC prompts as a locked bundle; disables Auto-Generate Locations. Can be turned on without Show Location Images already being enabled first.</li>
+                                                <li><b>Real-Time Visualization Mode</b> — Generates location images in Visualization Mode from current chat context and characters present. Choose a trigger: <b>On location enter</b> (once per place with no image), <b>On location change</b> (fresh image on each path change including revisits), or <b>Every N outputs</b> (still regenerates on location change, plus every N chat outputs — set N to 1 for every output). Enables Show Location Images and present-NPC prompts as a locked bundle; disables Auto-Generate Locations. Can be turned on without Show Location Images already being enabled first.</li>
                             </ul>
                             <p style="margin-top:8px;"><b>Visualization Mode</b> (agent panel) shows a scene layout driven by your current location from the state memo: a wide location hero image, breadcrumb path, and tiles for characters present (active Lorebook NPCs plus the linked Player Character). Click the hero or a tile to open the full location or character card. Scene art is generated according to your Location Images settings — either on lorebook entry creation (Auto-Generate Locations) or on arrival (Real-Time Visualization Mode).</p>
-                            <p style="margin-top:4px;"><i>Tip: With Real-Time Visualization Mode on, use Visualization Mode in the Lorebook Agent to see arrival-based scene art as you move through the story.</i></p>
+                            <p style="margin-top:4px;"><i>Tip: With Real-Time Visualization Mode on, use Visualization Mode in the Lorebook Agent to see scene art as you move through the story (trigger depends on your Real-Time settings).</i></p>
 
                             <h4 style="margin-bottom: 5px;">🧹 Cleanup & Compression</h4>
                             <p>To keep context sizes optimized, the framework uses a two-fold cleanup system:</p>
@@ -5677,21 +5713,25 @@ function createPanel() {
 
         refreshImmersionView = async () => {
             const s = getSettings();
-            if (!s.agentImmersionMode) return;
-            const container = agentPanel.querySelector('#rt-agent-immersion-view');
-            if (!container || agentPanel.style.display === 'none') return;
-
             try {
                 const scene = await buildImmersionSceneState(s.currentMemo, s);
+                maybeAutoGenerateImmersionSceneArt(scene, () => { void refreshImmersionView(); });
+
+                if (!s.agentImmersionMode) return;
+                const container = agentPanel.querySelector('#rt-agent-immersion-view');
+                if (!container || agentPanel.style.display === 'none') return;
                 container.innerHTML = renderImmersionViewHtml(scene);
                 bindImmersionViewEvents();
-                maybeAutoGenerateImmersionSceneArt(scene, () => { void refreshImmersionView(); });
             } catch (err) {
                 console.error('[RPG Tracker] refreshImmersionView failed:', err);
-                container.innerHTML = '<div style="text-align:center;opacity:0.5;font-size:0.769em;padding:10px;">Failed to load scene view.</div>';
+                const container = agentPanel.querySelector('#rt-agent-immersion-view');
+                if (container) {
+                    container.innerHTML = '<div style="text-align:center;opacity:0.5;font-size:0.769em;padding:10px;">Failed to load scene view.</div>';
+                }
             }
         };
         globalThis._rpgRefreshImmersionView = refreshImmersionView;
+        globalThis._rpgCheckRealtimeSceneArt = runRealtimeSceneArtCheck;
 
         const syncAgentImmersionUi = () => {
             const s = getSettings();
@@ -6657,7 +6697,7 @@ function createPanel() {
                                     const portraitSrc = lookupCustomPortraitSrc(s, item.label);
                                     const hidePortrait = s.npcPortraits === false;
 
-                                    // Full-size portrait (512px stored, display at native res), with the same
+                                    // Full-size portrait at native stored resolution, with the same
                                     // click-to-generate/manage overlay used on the small NPC card thumbnails.
                                     const renderNpcPopupPortraitInner = (src) => {
                                         const imgOrPlaceholder = src
@@ -11748,6 +11788,22 @@ async function runPortraitMigrationIfNeeded() {
             applyLocationImageAutoMode(settings, { realTimeMode: !!$(this).prop('checked') });
             saveSettings();
             void refreshLorebookAgentViewsNow({ forceLayoutRefresh: true });
+        });
+
+        $('#rpg_tracker_portrait_realtime_trigger').val(settings.portraitRealtimeTriggerMode || 'location_change').on('change', function () {
+            const mode = String($(this).val() || 'location_change');
+            settings.portraitRealtimeTriggerMode = ['location_enter', 'location_change', 'every_n_outputs'].includes(mode)
+                ? mode
+                : 'location_change';
+            syncLocationImageDependentUi(settings);
+            saveSettings();
+        });
+
+        $('#rpg_tracker_portrait_realtime_every_n').val(Math.max(1, Number(settings.portraitRealtimeEveryNOutputs) || 1)).on('change input', function () {
+            settings.portraitRealtimeEveryNOutputs = Math.max(1, Math.floor(Number($(this).val()) || 1));
+            $(this).val(String(settings.portraitRealtimeEveryNOutputs));
+            syncLocationImageDependentUi(settings);
+            saveSettings();
         });
 
         syncLocationImageDependentUi(settings);

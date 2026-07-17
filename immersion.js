@@ -308,17 +308,30 @@ export function renderImmersionViewHtml(scene) {
 }
 
 /**
- * Real-Time Mode: auto-generate a hero image when arriving at the current scene location.
+ * Real-Time Mode: auto-generate scene art based on the configured trigger mode.
  * Skipped when Real-Time Mode (portraitAutoGenerateSceneView) is off.
  * @param {object} scene From buildImmersionSceneState
  * @param {() => void} [refresh]
  */
 let _lastImmersionSceneArtPath = null;
+let _lastImmersionSceneArtChatLen = null;
 
 const _lastLocSessionKey = (chatId) => `rpg_rt_last_loc_${chatId || 'default'}`;
+const _lastChatLenSessionKey = (chatId) => `rpg_rt_last_loc_chatlen_${chatId || 'default'}`;
 
 function getActiveChatId() {
     return typeof globalThis._rpgCurrentChatId === 'function' ? globalThis._rpgCurrentChatId() : null;
+}
+
+function getChatMessageCount() {
+    try {
+        const chat = SillyTavern.getContext()?.chat;
+        if (!Array.isArray(chat)) return 0;
+        // Count narrator/assistant outputs only — matches "every N outputs".
+        return chat.filter((m) => m && !m.is_user && !m.is_system).length;
+    } catch {
+        return 0;
+    }
 }
 
 function readPersistedImmersionSceneArtPath(chatId) {
@@ -327,6 +340,20 @@ function readPersistedImmersionSceneArtPath(chatId) {
     if (fromChat) return fromChat;
     try {
         return sessionStorage.getItem(_lastLocSessionKey(chatId));
+    } catch {
+        return null;
+    }
+}
+
+function readPersistedImmersionSceneArtChatLen(chatId) {
+    if (!chatId) return null;
+    const fromChat = getSettings().chatStates?.[chatId]?.lastImmersionSceneArtChatLen;
+    if (fromChat != null && Number.isFinite(Number(fromChat))) return Number(fromChat);
+    try {
+        const raw = sessionStorage.getItem(_lastChatLenSessionKey(chatId));
+        if (raw == null || raw === '') return null;
+        const n = Number(raw);
+        return Number.isFinite(n) ? n : null;
     } catch {
         return null;
     }
@@ -349,9 +376,34 @@ function persistImmersionSceneArtPath(chatId, path) {
     if (s.chatLinkEnabled) saveChatState(chatId);
 }
 
+function persistImmersionSceneArtChatLen(chatId, chatLen) {
+    if (!chatId) return;
+    const s = getSettings();
+    if (!s.chatStates) s.chatStates = {};
+    if (!s.chatStates[chatId]) s.chatStates[chatId] = {};
+    if (chatLen != null && Number.isFinite(Number(chatLen))) {
+        s.chatStates[chatId].lastImmersionSceneArtChatLen = Number(chatLen);
+    } else {
+        delete s.chatStates[chatId].lastImmersionSceneArtChatLen;
+    }
+    try {
+        if (chatLen != null && Number.isFinite(Number(chatLen))) {
+            sessionStorage.setItem(_lastChatLenSessionKey(chatId), String(chatLen));
+        } else {
+            sessionStorage.removeItem(_lastChatLenSessionKey(chatId));
+        }
+    } catch { /* ignore */ }
+    if (s.chatLinkEnabled) saveChatState(chatId);
+}
+
 function getLastImmersionSceneArtPath() {
     if (_lastImmersionSceneArtPath) return _lastImmersionSceneArtPath;
     return readPersistedImmersionSceneArtPath(getActiveChatId());
+}
+
+function getLastImmersionSceneArtChatLen() {
+    if (_lastImmersionSceneArtChatLen != null) return _lastImmersionSceneArtChatLen;
+    return readPersistedImmersionSceneArtChatLen(getActiveChatId());
 }
 
 function rememberImmersionSceneArtPath(storagePath) {
@@ -360,14 +412,53 @@ function rememberImmersionSceneArtPath(storagePath) {
     persistImmersionSceneArtPath(getActiveChatId(), storagePath);
 }
 
+function rememberImmersionSceneArtChatLen(chatLen) {
+    if (chatLen == null || !Number.isFinite(Number(chatLen))) return;
+    const n = Number(chatLen);
+    if (_lastImmersionSceneArtChatLen === n) return;
+    _lastImmersionSceneArtChatLen = n;
+    persistImmersionSceneArtChatLen(getActiveChatId(), n);
+}
+
 /** Restore visit tracking after F5 / loadChatState (avoids treating reload as a new arrival). */
 export function hydrateImmersionSceneArtPath(chatId) {
     _lastImmersionSceneArtPath = readPersistedImmersionSceneArtPath(chatId) || null;
+    const persistedLen = readPersistedImmersionSceneArtChatLen(chatId);
+    // Seed to current chat length when unset so reload / chat switch does not fire every-N immediately.
+    _lastImmersionSceneArtChatLen = persistedLen != null ? persistedLen : getChatMessageCount();
 }
 
 /** Clear visit tracking when switching to a chat with no saved state. */
 export function resetImmersionSceneArtTracking() {
     _lastImmersionSceneArtPath = null;
+    _lastImmersionSceneArtChatLen = null;
+}
+
+/**
+ * @returns {'location_change'|'every_n_outputs'}
+ */
+function getRealtimeTriggerMode(s) {
+    return s.portraitRealtimeTriggerMode === 'every_n_outputs' ? 'every_n_outputs' : 'location_change';
+}
+
+/**
+ * Run Real-Time scene-art generation check (safe to call on every generation end).
+ * Does not require Visualization Mode to be open.
+ */
+export async function runRealtimeSceneArtCheck() {
+    const s = getSettings();
+    if (!s.portraitAutoGenerateSceneView) return;
+    if (!s.locationImages || s.enablePortraits === false) return;
+    try {
+        const scene = await buildImmersionSceneState(s.currentMemo, s);
+        maybeAutoGenerateImmersionSceneArt(scene, () => {
+            if (typeof globalThis._rpgRefreshImmersionView === 'function') {
+                void globalThis._rpgRefreshImmersionView();
+            }
+        });
+    } catch (err) {
+        console.error('[RPG Tracker] runRealtimeSceneArtCheck failed:', err);
+    }
 }
 
 export function maybeAutoGenerateImmersionSceneArt(scene, refresh) {
@@ -378,18 +469,38 @@ export function maybeAutoGenerateImmersionSceneArt(scene, refresh) {
     const storagePath = scene?.storagePath;
     if (!storagePath) return;
 
+    const mode = getRealtimeTriggerMode(s);
+    const everyN = Math.max(1, Math.floor(Number(s.portraitRealtimeEveryNOutputs) || 1));
     const lastPath = getLastImmersionSceneArtPath();
     const locationChanged = storagePath !== lastPath;
     const hasImage = !!(scene.locationImage || hasLocationImage(storagePath));
+    const chatLen = getChatMessageCount();
+    const lastChatLen = getLastImmersionSceneArtChatLen();
 
-    // Real-Time Mode always regenerates on arrival (including revisits to the same path).
-    if (!locationChanged && hasImage) {
+    let dueToLocation = false;
+    let dueToOutputs = false;
+
+    if (!hasImage || locationChanged) {
+        dueToLocation = true;
+    }
+
+    if (mode === 'every_n_outputs' && lastChatLen != null && chatLen - lastChatLen >= everyN) {
+        dueToOutputs = true;
+    }
+
+    // Track the current place even when skipping generation (so revisits don't re-fire forever).
+    if (!dueToLocation && !dueToOutputs) {
+        if (locationChanged) rememberImmersionSceneArtPath(storagePath);
+        if (mode === 'every_n_outputs' && lastChatLen == null) {
+            rememberImmersionSceneArtChatLen(chatLen);
+        }
         return;
     }
 
     rememberImmersionSceneArtPath(storagePath);
+    rememberImmersionSceneArtChatLen(chatLen);
     triggerBackgroundLocationGeneration(storagePath, refresh, scene.locationContent || '', {
         realtimeArrival: true,
-        forceReplace: hasLocationImage(storagePath),
+        forceReplace: hasLocationImage(storagePath) || dueToOutputs,
     });
 }

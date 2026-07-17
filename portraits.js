@@ -26,20 +26,14 @@ export function fileToDataUrl(file) {
     });
 }
 
-// Compress and scale a cropped image to a 512x512 square JPEG Base64 data URL
+/**
+ * Preserve portrait image at native resolution (no forced downscale).
+ * Name kept for call-site compatibility; previously forced 512×512 JPEG.
+ * @param {string} dataUrl
+ * @returns {Promise<string>}
+ */
 export function scaleImageTo512Square(dataUrl) {
-    return new Promise((resolve, reject) => {
-        const img = new Image();
-        img.onload = () => {
-            const canvas = document.createElement('canvas');
-            canvas.width  = 512;
-            canvas.height = 512;
-            canvas.getContext('2d').drawImage(img, 0, 0, 512, 512);
-            resolve(canvas.toDataURL('image/jpeg', 0.85));
-        };
-        img.onerror = reject;
-        img.src = dataUrl;
-    });
+    return Promise.resolve(dataUrl);
 }
 
 // Re-export portrait key helpers (single source of truth in portrait-storage.js)
@@ -442,7 +436,8 @@ export async function generatePortraitDirect(prompt, entityName) {
         const currentModel = s.pollinationsModel || 'flux';
  
         const doRequest = async (modelName) => {
-            const url = `https://gen.pollinations.ai/image/${encodeURIComponent(prompt)}?key=${apiKey}&model=${modelName}&width=512&height=512`;
+            // Do not pass width/height — keep the model's native output resolution.
+            const url = `https://gen.pollinations.ai/image/${encodeURIComponent(prompt)}?key=${apiKey}&model=${modelName}`;
             
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 20000); // 20-second timeout
@@ -1400,41 +1395,14 @@ export async function applyLocationImageData(locationPath, src) {
     await saveSettings(true);
 }
 
-/** Center-crop to 16:9 landscape; output keeps the cropped pixel resolution (no fixed downscale). */
+/**
+ * Pass through location images at native resolution (no forced downscale or re-encode).
+ * Name kept for call-site compatibility; previously center-cropped to 16:9 JPEG.
+ * @param {string} dataUrl
+ * @returns {Promise<string>}
+ */
 export function scaleImageToLandscape(dataUrl) {
-    const LANDSCAPE_ASPECT = 16 / 9;
-
-    return new Promise((resolve, reject) => {
-        const img = new Image();
-        img.onload = () => {
-            const srcAspect = img.width / img.height;
-            let sx = 0;
-            let sy = 0;
-            let sw = img.width;
-            let sh = img.height;
-            if (srcAspect > LANDSCAPE_ASPECT) {
-                sh = img.height;
-                sw = sh * LANDSCAPE_ASPECT;
-                sx = (img.width - sw) / 2;
-            } else {
-                sw = img.width;
-                sh = sw / LANDSCAPE_ASPECT;
-                sy = (img.height - sh) / 2;
-            }
-
-            const outW = Math.max(1, Math.round(sw));
-            const outH = Math.max(1, Math.round(sh));
-
-            const canvas = document.createElement('canvas');
-            canvas.width = outW;
-            canvas.height = outH;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(img, sx, sy, sw, sh, 0, 0, outW, outH);
-            resolve(canvas.toDataURL('image/jpeg', 0.85));
-        };
-        img.onerror = reject;
-        img.src = dataUrl;
-    });
+    return Promise.resolve(dataUrl);
 }
 
 /**

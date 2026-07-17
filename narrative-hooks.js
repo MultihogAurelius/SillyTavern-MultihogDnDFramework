@@ -1794,6 +1794,14 @@ export async function onGenerationEnded() {
         return;
     }
 
+    // Real-Time Visualization: scene art every-N / location-change (independent of router throttle).
+    // Defer one tick so the new assistant message is in chat before we count outputs.
+    setTimeout(() => {
+        if (typeof globalThis._rpgCheckRealtimeSceneArt === 'function') {
+            void globalThis._rpgCheckRealtimeSceneArt();
+        }
+    }, 0);
+
     if (settings.debugMode) console.log("[RPG Tracker] Assistant generation ended. Running keyword scanner...");
 
     // Step 1: Scan assistant output for entry keywords and activate matches immediately.
@@ -1850,6 +1858,11 @@ export async function onGenerationEnded() {
             await syncCombatProfile(getSettings().currentMemo, settings);
         } catch (e) {
             console.warn('[RPG Tracker] Combat profile sync failed:', e);
+        }
+
+        // Re-check scene art after State Tracker may have updated location in memo.
+        if (typeof globalThis._rpgCheckRealtimeSceneArt === 'function') {
+            void globalThis._rpgCheckRealtimeSceneArt();
         }
     }
 

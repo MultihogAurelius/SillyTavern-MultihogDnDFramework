@@ -689,6 +689,15 @@ function buildDefaultSettings() {
         portraitAutoGenerateLocations: false,
         /** Real-Time Mode: generate location images only on Scene View arrival (mutually exclusive with portraitAutoGenerateLocations). */
         portraitAutoGenerateSceneView: false,
+        /**
+         * Real-Time scene-art trigger:
+         * - location_enter: generate once when arriving at a place with no image
+         * - location_change: regenerate whenever the location path changes (incl. revisits)
+         * - every_n_outputs: location_change + also regenerate every N chat outputs
+         */
+        portraitRealtimeTriggerMode: 'location_change',
+        /** Used when portraitRealtimeTriggerMode === 'every_n_outputs' (min 1). */
+        portraitRealtimeEveryNOutputs: 1,
         portraitRegenerateVisitedLocations: false,
         portraitLocationIncludePresentNpcs: false,
         pollinationsApiKey: "",
@@ -1174,7 +1183,7 @@ Rules:
 }
 
 /** Latest settings migration version — factory reset skips legacy upgrade paths at or below this. */
-export const FACTORY_SETTINGS_VERSION = '5.5.12';
+export const FACTORY_SETTINGS_VERSION = '5.5.13';
 
 /** Remove extension UI keys from localStorage so a factory reset does not rehydrate stale panel state. */
 export function clearExtensionLocalStorageUiState() {
@@ -1951,6 +1960,18 @@ function getSettingsInternal(extensionSettings) {
         s.settingsVersion = '5.5.12';
     }
 
+    // 5.5.13: Real-Time Visualization trigger modes (enter / change / every N outputs).
+    if (isOlderThan(s.settingsVersion, '5.5.13')) {
+        if (!s.portraitRealtimeTriggerMode) {
+            // Preserve prior Real-Time behavior: regenerate on each location change/revisit.
+            s.portraitRealtimeTriggerMode = 'location_change';
+        }
+        if (s.portraitRealtimeEveryNOutputs == null || Number(s.portraitRealtimeEveryNOutputs) < 1) {
+            s.portraitRealtimeEveryNOutputs = 1;
+        }
+        s.settingsVersion = '5.5.13';
+    }
+
     // ── MIGRATION: Auto-fix legacy corrupted PC Core Section colors ────────────────
     if (s.pcCoreSections && Array.isArray(s.pcCoreSections) && s.pcCoreSections.length === 6) {
         // We check by ID rather than name, because the legacy version might have had "Appearance" instead of "Appearance/Species"
@@ -2226,6 +2247,8 @@ export function saveChatState(chatId) {
         portraitAutoGenerateNpcs: s.portraitAutoGenerateNpcs ?? false,
         portraitAutoGenerateLocations: s.portraitAutoGenerateLocations ?? false,
         portraitAutoGenerateSceneView: s.portraitAutoGenerateSceneView ?? false,
+        portraitRealtimeTriggerMode: s.portraitRealtimeTriggerMode || 'location_change',
+        portraitRealtimeEveryNOutputs: Math.max(1, Number(s.portraitRealtimeEveryNOutputs) || 1),
         portraitRegenerateVisitedLocations: s.portraitRegenerateVisitedLocations ?? false,
         locationImages: !!s.locationImages,
         worldConnectionSource: s.worldConnectionSource ?? "default",
@@ -2259,6 +2282,8 @@ export function saveChatState(chatId) {
 
         // Real-Time Mode: last scene location we generated art for (survives F5)
         lastImmersionSceneArtPath: existing.lastImmersionSceneArtPath || null,
+        // Chat length at last Real-Time scene-art generation (for every-N-outputs mode)
+        lastImmersionSceneArtChatLen: existing.lastImmersionSceneArtChatLen ?? null,
 
         // Preserve Player Character pseudo-persona which is injected into the chat state
         playerCharacter: existing.playerCharacter,
@@ -2379,6 +2404,8 @@ export function saveProfile(name) {
         portraitAutoGenerateNpcs: s.portraitAutoGenerateNpcs ?? false,
         portraitAutoGenerateLocations: s.portraitAutoGenerateLocations ?? false,
         portraitAutoGenerateSceneView: s.portraitAutoGenerateSceneView ?? false,
+        portraitRealtimeTriggerMode: s.portraitRealtimeTriggerMode || 'location_change',
+        portraitRealtimeEveryNOutputs: Math.max(1, Number(s.portraitRealtimeEveryNOutputs) || 1),
         portraitRegenerateVisitedLocations: s.portraitRegenerateVisitedLocations ?? false,
         locationImages: !!s.locationImages,
         portraitConnectionSource: s.portraitConnectionSource ?? "default",

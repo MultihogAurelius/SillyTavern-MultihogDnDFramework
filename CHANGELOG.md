@@ -2,6 +2,16 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [5.6.65] - 2026-07-17
+
+### Added
+- **Real-Time Visualization triggers**: Choose scene art on location change or every N outputs (set N to 1 for every narrator reply). Runs on generation end, not only when Visualization Mode is open.
+
+### Changed
+- **Location Images settings**: Moved out of the ALPHA drawer into the main Portraits section; Real-Time Visualization Mode is a featured settings card.
+- **Portrait and location image resolution**: Uploads and generation no longer force 512×512 downscale or Pollinations size caps.
+- **Present Now name scanner**: Case-sensitive matching so tokens like "Big" do not match unrelated words like "big".
+
 ## [5.6.60] - 2026-07-17
 
 ### Changed
