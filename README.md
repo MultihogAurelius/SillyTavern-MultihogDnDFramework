@@ -102,7 +102,7 @@ For the State Tracker and Lorebook Agent, use Gemini 3.1 Flash. It's good enough
 ---
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/bf22e852-f31f-42d4-8ca9-fc63e8625c60" width="100%" alt="Combat in progress" />
+  <img src="https://github.com/user-attachments/assets/cdfc169e-a14a-41bc-8fa0-7cf6f61d12ad" width="100%" alt="Combat in progress" />
   <br>
   <em>Some combat in progress</em>
 </p>
