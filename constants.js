@@ -118,18 +118,33 @@ Bench ETAs: If it is clearly implied in the narrative when a character may retur
 The ETA must always be an explicit timestamp, e.g. "Day 1, HH:MM", or "17/10/2002, HH:MM." Only [UNBENCH] when the character physically reunites with {{user}}, not simply when the ETA date has been met.
 
 ETA [BENCH] example: Status: Benched (08:08 AM, Day 1, separated to investigate the docks and meet back at Day 1, 12:10 AM)`,
-  combat: `Active enemies/NPCs in combat. Track the current COMBAT ROUND starting from 1. Decrement buff/debuff durations by 1 each round. Format each combatant as:
+  combat: `Active enemies/NPCs in combat. Track the current COMBAT ROUND starting from 1. Decrement buff/debuff durations by 1 each round.
+
+Shared header for every combatant:
 COMBAT ROUND X
 Name: current/max HP
-Att/def: Weapon (N attacks, +X / damage) | Armor (AC: Z)
 Saves: Fort +X, Ref +X, Will +X
 Abilities: Ability1 (effect), Ability2 (effect)
-Spells: Spell1 (avail/max), Spell2 (avail/max)
 Other: Trait1 (description), Trait2 (description)
 Status: Effect (duration)
 
-Pre-calculate attack bonuses on Att/def when the enemy is first declared — e.g. Pickaxe (1 attacks, +3 / 1d6+1 P) or Longsword (2 attacks, +12/+7 / 1d8+3). Use those listed values directly; do not recalculate mid-fight.
-Caster enemies: keep Att/def as a weapon or attack cantrip. List known/prepared spells with remaining uses on the Spells line — e.g. Spells: Ray of Sickness (2/2), Fire Bolt (at will). Omit Spells: for non-casters.
+Then use ONE of these two Att/def patterns (never mix styles on the same enemy):
+
+MARTIAL (fighters, beasts, thugs — no Spells line):
+Att/def: Weapon (N attacks, +X / damage) | Armor (AC: Z)
+Example: Att/def: Longsword (2 attacks, +12/+7 / 1d8+3 S) | Scale Mail (AC: 15)
+
+CASTER (mages, priests, warlocks — must include Spells:):
+Att/def: Spell Atk +X | Spell DC Y | Backup Weapon (1 attacks, +Z / damage) | Armor (AC: Z)
+Spells: Spell1 (avail/max), Spell2 (at will)
+Example: Att/def: Spell Atk +5 | Spell DC 14 | Dagger (1 attacks, +2 / 1d4 P) | Mage Armor (AC: 13)
+Spells: Fire Bolt (at will), Shocking Grasp (at will), Magic Missile (2/2), Shield (1/2)
+
+Rules:
+- Pre-calculate all attack bonuses when the enemy is first declared; use listed values directly — do not invent or re-derive mid-fight.
+- Martial: weapon Attack is the primary threat. Omit Spells: entirely.
+- Caster: Spell Atk is used for spell attack rolls; Spell DC for saving-throw spells. Backup weapon Attack should be weaker than Spell Atk. Always output Spells: with remaining uses.
+- Hybrid gishes (spell + serious weapon): use the CASTER Att/def line, but the backup weapon may match martial Attack of the same tier.
 
 You MUST output \`[COMBAT]END_COMBAT[/COMBAT]\` when the narrative ends combat. Do not put members of [PARTY] into [COMBAT].`,
   inventory: `Items, loot, equipment, and wealth. You MAY create this section if loot is found and it doesn't currently exist.
@@ -309,7 +324,7 @@ Declare all previously unknown NPC stats (AC, Saves, HP, Combat Line, immunities
 
 <combat_flow>
 - Simulate all actions for every NPC participant each round.
-- For [CHARACTER], [PARTY], and [COMBAT], use pre-calculated attack totals from the STATE MEMO — do not re-derive bonuses from BAB and ability modifiers during combat. On [CHARACTER]/[PARTY] use the Combat line (\`Ranged (N attacks): +X\` or \`+C/+D\` | \`Melee (N attacks): +X\` or \`+A/+B\`). On [COMBAT] use Att/def weapon bonuses (\`N attacks, +X\` or \`+A/+B\`). Slash-separated bonuses mean one roll per listed value.
+- For [CHARACTER], [PARTY], and [COMBAT], use pre-calculated attack totals from the STATE MEMO — do not re-derive or invent bonuses mid-fight. On [CHARACTER]/[PARTY] use the Combat line (\`Ranged (N attacks): +X\` or \`+C/+D\` | \`Melee (N attacks): +X\` or \`+A/+B\`). On [COMBAT] martials use Att/def weapon bonuses; casters use listed \`Spell Atk +X\` for spell attacks and \`Spell DC Y\` for save spells (never improvise these). Slash-separated weapon bonuses mean one roll per listed value.
 - State remaining HP after every damage or healing event.
 - Expire buffs/debuffs after appropriate duration. Explicitly state initial duration in turns. Examples: Mage Armor (+3 AC, 8h 0m) or Heroism (+5 Temp HP, 10 turns) or Exhaustion (Disadvantage on Ability Checks, until Long Rest)
 </combat_flow>
@@ -351,7 +366,7 @@ Legendary — World-threat    | HP 150–500+ | AC 19–22 | Attack +16 to +20+ 
 
 These are BASE ranges. Scale UP or DOWN based on quest difficulty and narrative context.
 
-SPELLCASTER ENEMIES: Use lower weapon Attack than a martial of the same tier — their threat is spells. Spell attack bonus ≈ that tier's Attack range. Spell save DCs follow the DC SCALE by tier (Minion/Soldier ≈ Easy–Moderate, Elite ≈ Hard, Boss ≈ Severe, Legendary ≈ Near-impossible/expert). Cap spell level and slots to the tier; do not hand a hedge witch Legendary magic.
+SPELLCASTER ENEMIES: Use the CASTER Att/def pattern (Spell Atk + Spell DC + weak backup weapon), not the martial weapon line. Spell Atk ≈ that tier's Attack range; weapon Attack stays lower. Spell DC follows the DC SCALE by tier (Minion/Soldier ≈ Easy–Moderate, Elite ≈ Hard, Boss ≈ Severe, Legendary ≈ Near-impossible/expert). Cap spell level and slots to the tier; do not hand a hedge witch Legendary magic. Do not hoard slots — caster NPCs should cast freely when it fits the fight; a spell unused before they drop is a wasted threat.
 </npc_stat_scaling>
 
 <npc_profile_persistence>
@@ -690,7 +705,7 @@ Declare all previously unknown NPC stats (AC, Saves, HP, Combat Line, immunities
 
 <combat_flow>
 - Simulate all actions for every NPC participant each round.
-- For [CHARACTER], [PARTY], and [COMBAT], use pre-calculated attack totals from the STATE MEMO — do not re-derive bonuses from BAB and ability modifiers during combat. On [CHARACTER]/[PARTY] use the Combat line (\`Ranged (N attacks): +X\` or \`+C/+D\` | \`Melee (N attacks): +X\` or \`+A/+B\`). On [COMBAT] use Att/def weapon bonuses (\`N attacks, +X\` or \`+A/+B\`). Slash-separated bonuses mean one roll per listed value.
+- For [CHARACTER], [PARTY], and [COMBAT], use pre-calculated attack totals from the STATE MEMO — do not re-derive or invent bonuses mid-fight. On [CHARACTER]/[PARTY] use the Combat line (\`Ranged (N attacks): +X\` or \`+C/+D\` | \`Melee (N attacks): +X\` or \`+A/+B\`). On [COMBAT] martials use Att/def weapon bonuses; casters use listed \`Spell Atk +X\` for spell attacks and \`Spell DC Y\` for save spells (never improvise these). Slash-separated weapon bonuses mean one roll per listed value.
 - State remaining HP after every damage or healing event.
 - Expire buffs/debuffs after appropriate duration. Explicitly state initial duration in turns. Examples: Mage Armor (+3 AC, 8h 0m) or Heroism (+5 Temp HP, 10 turns) or Exhaustion (Disadvantage on Ability Checks, until Long Rest)
 </combat_flow>
@@ -732,7 +747,7 @@ Legendary — World-threat    | HP 150–500+ | AC 19–22 | Attack +16 to +20+ 
 
 These are BASE ranges. Scale UP or DOWN based on quest difficulty and narrative context.
 
-SPELLCASTER ENEMIES: Use lower weapon Attack than a martial of the same tier — their threat is spells. Spell attack bonus ≈ that tier's Attack range. Spell save DCs follow the DC SCALE by tier (Minion/Soldier ≈ Easy–Moderate, Elite ≈ Hard, Boss ≈ Severe, Legendary ≈ Near-impossible/expert). Cap spell level and slots to the tier; do not hand a hedge witch Legendary magic.
+SPELLCASTER ENEMIES: Use the CASTER Att/def pattern (Spell Atk + Spell DC + weak backup weapon), not the martial weapon line. Spell Atk ≈ that tier's Attack range; weapon Attack stays lower. Spell DC follows the DC SCALE by tier (Minion/Soldier ≈ Easy–Moderate, Elite ≈ Hard, Boss ≈ Severe, Legendary ≈ Near-impossible/expert). Cap spell level and slots to the tier; do not hand a hedge witch Legendary magic. Do not hoard slots — caster NPCs should cast freely when it fits the fight; a spell unused before they drop is a wasted threat.
 </npc_stat_scaling>
 
 <npc_profile_persistence>

@@ -10813,8 +10813,8 @@ const RENDER_HINTS = {
     },
     COMBAT: {
         label: 'Entity Rows — HP Bars (Enemies)',
-        description: 'Same entity-row format as Characters. Optionally starts with a "COMBAT ROUND N" header line. Each enemy: "Name (Type): cur/max HP". Sub-lines: Att/def (N attacks, +bonus / damage), Saves, Abilities, Spells, Status.',
-        example: 'COMBAT ROUND 1\nShadow Acolyte Vael (Soldier Tier Spellcaster): 22/22 HP\nAtt/def: Dagger (1 attacks, +3 / 1d4+1 P) | Mage Armor (AC: 13)\nSaves: Fort +2, Ref +3, Will +5\nAbilities: Spellcasting\nSpells: Ray of Sickness (2/2), Fire Bolt (at will)\nOther: Soldier Tier Spellcaster\nStatus: Healthy\n\nCaptain Bruga (Goblin Boss): 42/42 HP\nAtt/def: Notched Longsword (2 attacks, +11/+6 / 1d8+3 S) | Scale Mail (AC: 15)\nSaves: Fort +5, Ref +2, Will +1\nStatus: Healthy'
+        description: 'Same entity-row format as Characters. Optionally starts with a "COMBAT ROUND N" header line. Martial: Att/def weapon line. Caster: Spell Atk + Spell DC + backup weapon + Spells line.',
+        example: 'COMBAT ROUND 1\nVaelen (Acolyte): 22/22 HP\nAtt/def: Spell Atk +5 | Spell DC 14 | Dagger (1 attacks, +2 / 1d4 P) | Mage Armor (AC: 13)\nSaves: Fort +2, Ref +3, Will +5\nAbilities: Spellcasting\nSpells: Fire Bolt (at will), Shocking Grasp (at will), Magic Missile (2/2), Shield (1/2)\nOther: Soldier Tier Spellcaster\nStatus: Healthy\n\nCaptain Bruga (Goblin Boss): 42/42 HP\nAtt/def: Notched Longsword (2 attacks, +11/+6 / 1d8+3 S) | Scale Mail (AC: 15)\nSaves: Fort +5, Ref +2, Will +1\nStatus: Healthy'
     },
     SPELLS: {
         label: 'Spell Pips — Slot Tracker',

@@ -2,6 +2,12 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [5.7.92] - 2026-07-18
+
+### Changed
+- **`[COMBAT]` martial vs caster**: Separate Att/def patterns — casters use `Spell Atk` + `Spell DC` + weak backup weapon; martials stay weapon-only.
+- **Caster NPC guidance**: Pre-calculated Spell Atk/DC (no improvising); casters should not hoard spell slots in a fight.
+
 ## [5.7.91] - 2026-07-18
 
 ### Changed

@@ -44,7 +44,7 @@ Declare all previously unknown NPC stats (AC, Saves, HP, Combat Line, immunities
 
 <combat_flow>
 - Simulate all actions for every NPC participant each round.
-- For [CHARACTER], [PARTY], and [COMBAT], use pre-calculated attack totals from the STATE MEMO — do not re-derive bonuses from BAB and ability modifiers during combat. On [CHARACTER]/[PARTY] use the Combat line (`Ranged (N attacks): +X` or `+C/+D` | `Melee (N attacks): +X` or `+A/+B`). On [COMBAT] use Att/def weapon bonuses (`N attacks, +X` or `+A/+B`). Slash-separated bonuses mean one roll per listed value.
+- For [CHARACTER], [PARTY], and [COMBAT], use pre-calculated attack totals from the STATE MEMO — do not re-derive or invent bonuses mid-fight. On [CHARACTER]/[PARTY] use the Combat line (`Ranged (N attacks): +X` or `+C/+D` | `Melee (N attacks): +X` or `+A/+B`). On [COMBAT] martials use Att/def weapon bonuses; casters use listed `Spell Atk +X` for spell attacks and `Spell DC Y` for save spells (never improvise these). Slash-separated weapon bonuses mean one roll per listed value.
 - State remaining HP after every damage or healing event.
 - Expire buffs/debuffs after appropriate duration. Explicitly state initial duration in turns. Examples: Mage Armor (+3 AC, 8h 0m) or Heroism (+5 Temp HP, 10 turns) or Exhaustion (Disadvantage on Ability Checks, until Long Rest)
 </combat_flow>
@@ -86,7 +86,7 @@ Legendary — World-threat    | HP 150–500+ | AC 19–22 | Attack +16 to +20+ 
 
 These are BASE ranges. Scale UP or DOWN based on quest difficulty and narrative context.
 
-SPELLCASTER ENEMIES: Use lower weapon Attack than a martial of the same tier — their threat is spells. Spell attack bonus ≈ that tier's Attack range. Spell save DCs follow the DC SCALE by tier (Minion/Soldier ≈ Easy–Moderate, Elite ≈ Hard, Boss ≈ Severe, Legendary ≈ Near-impossible/expert). Cap spell level and slots to the tier; do not hand a hedge witch Legendary magic.
+SPELLCASTER ENEMIES: Use the CASTER Att/def pattern (Spell Atk + Spell DC + weak backup weapon), not the martial weapon line. Spell Atk ≈ that tier's Attack range; weapon Attack stays lower. Spell DC follows the DC SCALE by tier (Minion/Soldier ≈ Easy–Moderate, Elite ≈ Hard, Boss ≈ Severe, Legendary ≈ Near-impossible/expert). Cap spell level and slots to the tier; do not hand a hedge witch Legendary magic. Do not hoard slots — caster NPCs should cast freely when it fits the fight; a spell unused before they drop is a wasted threat.
 </npc_stat_scaling>
 
 <npc_profile_persistence>

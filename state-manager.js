@@ -1879,7 +1879,8 @@ function getSettingsInternal(extensionSettings) {
         (s.stockPrompts.combat.includes('Finesse weapons:') ||
          s.stockPrompts.combat.includes('BAB is +10') ||
          (s.stockPrompts.combat.includes('Att/def:') && !s.stockPrompts.combat.includes('(N attacks,')) ||
-         (s.stockPrompts.combat.includes('Att/def:') && !s.stockPrompts.combat.includes('Spells:')))) {
+         (s.stockPrompts.combat.includes('Att/def:') && !s.stockPrompts.combat.includes('Spells:')) ||
+         (s.stockPrompts.combat.includes('Spells:') && !s.stockPrompts.combat.includes('Spell Atk')))) {
         s.stockPrompts.combat = DEFAULT_STOCK_PROMPTS.combat;
     }
 
