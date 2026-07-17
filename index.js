@@ -4653,16 +4653,19 @@ function createPanel() {
     }
 
     // Agent panel bottom-right resizer
+    // Must use the agent geometry key — default savePanelGeometry writes the tracker key
+    // and would snap the State Tracker onto the agent after resize + F5.
+    const AGENT_GEO_KEY = 'rpg_tracker_geometry_lorebook_agent';
     const agentPanelEl = /** @type {HTMLElement} */(panel.querySelector('#rpg-tracker-agent'));
     const agentResizerBR = panel.querySelector('#rt-agent-resizer-br');
     if (canResizePanels() && agentResizerBR instanceof HTMLElement && agentPanelEl) {
-        makeResizableBR(agentPanelEl, agentResizerBR);
+        makeResizableBR(agentPanelEl, agentResizerBR, AGENT_GEO_KEY);
     }
 
     // Agent panel bottom-left resizer
     const agentResizerBL = panel.querySelector('#rt-agent-resizer-bl');
     if (canResizePanels() && agentResizerBL instanceof HTMLElement && agentPanelEl) {
-        makeResizableBL(agentPanelEl, agentResizerBL);
+        makeResizableBL(agentPanelEl, agentResizerBL, AGENT_GEO_KEY);
     }
 
     const stopBtn = panel.querySelector('#rpg-tracker-stop-btn');

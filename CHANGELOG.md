@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [5.6.86] - 2026-07-17
+
+### Fixed
+- **Tracker snaps to Lorebook Agent after resize**: Detached agent BL/BR resizers were saving into the State Tracker geometry key (`rpg_tracker_geometry`). They now write `rpg_tracker_geometry_lorebook_agent` only.
+
 ## [5.6.81] - 2026-07-17
 
 ### Fixed

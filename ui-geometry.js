@@ -30,20 +30,23 @@ export function jqueryToggleSlide($el, show) {
 }
 
 /**
+ * Persist panel left/top/width/height to localStorage.
  * @param {HTMLElement} panel
+ * @param {string|null} [customKey] Optional storage key (defaults to main tracker geometry).
  */
-function savePanelGeometry(panel) {
+function savePanelGeometry(panel, customKey = null) {
     if (!panel || panel.style.display === 'none') return;
     const rect = panel.getBoundingClientRect();
     if (rect.width === 0 && rect.height === 0) return;
+    const key = customKey || GEOMETRY_KEY;
     const isCollapsed = panel.classList.contains('rt-panel-collapsed');
     let savedGeo = {};
     try {
-        const savedStr = localStorage.getItem(GEOMETRY_KEY);
+        const savedStr = localStorage.getItem(key);
         if (savedStr) savedGeo = JSON.parse(savedStr) || {};
     } catch { }
 
-    localStorage.setItem(GEOMETRY_KEY, JSON.stringify({
+    localStorage.setItem(key, JSON.stringify({
         left: rect.left, top: rect.top,
         width: isCollapsed ? (savedGeo.width || rect.width) : rect.width,
         height: isCollapsed ? (savedGeo.height || rect.height) : rect.height
@@ -52,10 +55,11 @@ function savePanelGeometry(panel) {
 
 /**
  * @param {HTMLElement} panel
+ * @param {string|null} [customKey]
  */
-export function loadPanelGeometry(panel) {
+export function loadPanelGeometry(panel, customKey = null) {
     try {
-        const saved = JSON.parse(localStorage.getItem(GEOMETRY_KEY));
+        const saved = JSON.parse(localStorage.getItem(customKey || GEOMETRY_KEY));
         if (!saved) return;
 
         // Sanitize coordinates to prevent "bricking" off-screen
@@ -83,6 +87,7 @@ export function loadDeltaHeight() {
 /**
  * @param {HTMLElement} panel
  * @param {HTMLElement} handle
+ * @param {string|null} [customKey]
  */
 export function makeDraggable(panel, handle, customKey = null) {
     let isDragging = false;
@@ -121,23 +126,7 @@ export function makeDraggable(panel, handle, customKey = null) {
         if (isDragging) {
             isDragging = false;
             try { handle.releasePointerCapture(e.pointerId); } catch(err){}
-            if (customKey) {
-                const rect = panel.getBoundingClientRect();
-                const isCollapsed = panel.classList.contains('rt-panel-collapsed');
-                let savedGeo = {};
-                try {
-                    const savedStr = localStorage.getItem(customKey);
-                    if (savedStr) savedGeo = JSON.parse(savedStr) || {};
-                } catch { }
-
-                localStorage.setItem(customKey, JSON.stringify({
-                    left: rect.left, top: rect.top,
-                    width: isCollapsed ? (savedGeo.width || rect.width) : rect.width,
-                    height: isCollapsed ? (savedGeo.height || rect.height) : rect.height
-                }));
-            } else {
-                savePanelGeometry(panel);
-            }
+            savePanelGeometry(panel, customKey);
         }
     };
 
@@ -161,8 +150,9 @@ export function makeDraggable(panel, handle, customKey = null) {
  * Top-Right corner resizer logic
  * @param {HTMLElement} panel 
  * @param {HTMLElement} handle 
+ * @param {string|null} [customKey]
  */
-export function makeResizableTR(panel, handle) {
+export function makeResizableTR(panel, handle, customKey = null) {
     let startX, startY, startWidth, startHeight, startTop, startLeft;
 
     handle.addEventListener('pointerdown', (e) => {
@@ -203,7 +193,7 @@ export function makeResizableTR(panel, handle) {
 
     handle.addEventListener('pointerup', (e) => {
         try { handle.releasePointerCapture(e.pointerId); } catch(err){}
-        savePanelGeometry(panel);
+        savePanelGeometry(panel, customKey);
     });
 
     handle.addEventListener('pointercancel', (e) => {
@@ -216,8 +206,9 @@ export function makeResizableTR(panel, handle) {
  * Same pointer-capture pattern as makeResizableTR.
  * @param {HTMLElement} panel
  * @param {HTMLElement} handle
+ * @param {string|null} [customKey]
  */
-export function makeResizableBR(panel, handle) {
+export function makeResizableBR(panel, handle, customKey = null) {
     let startX, startY, startWidth, startHeight, startTop, startLeft;
 
     handle.addEventListener('pointerdown', (e) => {
@@ -252,7 +243,7 @@ export function makeResizableBR(panel, handle) {
 
     handle.addEventListener('pointerup', (e) => {
         try { handle.releasePointerCapture(e.pointerId); } catch(err){}
-        savePanelGeometry(panel);
+        savePanelGeometry(panel, customKey);
     });
 
     handle.addEventListener('pointercancel', (e) => {
@@ -265,8 +256,9 @@ export function makeResizableBR(panel, handle) {
  * Same pointer-capture pattern as makeResizableTR.
  * @param {HTMLElement} panel
  * @param {HTMLElement} handle
+ * @param {string|null} [customKey]
  */
-export function makeResizableBL(panel, handle) {
+export function makeResizableBL(panel, handle, customKey = null) {
     let startX, startY, startWidth, startHeight, startTop, startLeft;
 
     handle.addEventListener('pointerdown', (e) => {
@@ -307,7 +299,7 @@ export function makeResizableBL(panel, handle) {
 
     handle.addEventListener('pointerup', (e) => {
         try { handle.releasePointerCapture(e.pointerId); } catch(err){}
-        savePanelGeometry(panel);
+        savePanelGeometry(panel, customKey);
     });
 
     handle.addEventListener('pointercancel', (e) => {
@@ -315,7 +307,11 @@ export function makeResizableBL(panel, handle) {
     });
 }
 
-export function setupResizeObserver(panel) {
+/**
+ * @param {HTMLElement} panel
+ * @param {string|null} [customKey]
+ */
+export function setupResizeObserver(panel, customKey = null) {
     // Debounced save on resize.
     // Skip the very first callback — it fires immediately on observe() before
     // the panel's restored geometry (from loadPanelGeometry) has been painted,
@@ -325,9 +321,10 @@ export function setupResizeObserver(panel) {
     const ro = new ResizeObserver(() => {
         if (!_initialFired) { _initialFired = true; return; }
         clearTimeout(_resizeTimer);
-        _resizeTimer = setTimeout(() => savePanelGeometry(panel), 300);
+        _resizeTimer = setTimeout(() => savePanelGeometry(panel, customKey), 300);
     });
     ro.observe(panel);
+    return ro;
 }
 
 export function setupDeltaResize(panel) {
