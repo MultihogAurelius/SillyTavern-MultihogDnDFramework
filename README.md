@@ -57,6 +57,7 @@ Together they solve the four core problems of LLM tabletop RP: the AI forgetting
 - **Life/dating sim-style friendship/affection component.**
 - **Export your entire setup as a "Game Cartridge."**
 - **d100 (percentage-based rolls) support.**
+- **Real-Time Visualization Mode** — Lorebook Agent can be turned into a visual viewer that generates images of the current scene (with adjustable frequency) and displays the portraits of the currently present entities.
   
 ---
 
