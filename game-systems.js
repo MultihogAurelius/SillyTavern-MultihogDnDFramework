@@ -12,7 +12,7 @@
 //                              intact.
 // ─────────────────────────────────────────────────────────────────────────
 
-import { getSettings, getNpcRelationshipMax, buildRelationshipTrackingSysprompt } from './state-manager.js';
+import { getSettings, getNpcRelationshipMax, buildRelationshipTrackingSysprompt, recordDeletedCustomTags, clearDeletedCustomTagTombstones } from './state-manager.js';
 import { sendStateRequest, restoreUserMacro } from './llm-client.js';
 import { escapeHtml } from './memo-processor.js';
 import { refreshOrderList } from './ui-editors.js';
@@ -1851,11 +1851,13 @@ function saveGameSystemFromPreview(result, existingSystemId = null) {
             };
             settings.customFields.push(field);
             customFieldTag = finalTag;
+            clearDeletedCustomTagTombstones(finalTag);
         }
     } else if (customFieldTag) {
         // User unchecked the tracker half during edit — drop the linked field + its blockOrder slot.
         settings.customFields = settings.customFields.filter(f => f.tag.toUpperCase() !== customFieldTag);
         if (settings.blockOrder) settings.blockOrder = settings.blockOrder.filter(t => t.toUpperCase() !== customFieldTag);
+        recordDeletedCustomTags(customFieldTag);
         customFieldTag = null;
     }
 
@@ -2147,6 +2149,7 @@ export async function deleteGameSystemWithConfirm(gs, options = {}) {
     if (gs.customFieldTag) {
         settings.customFields = (settings.customFields || []).filter(f => f.tag.toUpperCase() !== gs.customFieldTag);
         if (settings.blockOrder) settings.blockOrder = settings.blockOrder.filter(t => t.toUpperCase() !== gs.customFieldTag);
+        recordDeletedCustomTags(gs.customFieldTag);
     }
     settings.gameSystems = (settings.gameSystems || []).filter(g => g.id !== gs.id);
     if (deferPersistence) return true;

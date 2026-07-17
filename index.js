@@ -1,5 +1,5 @@
 import { EXAMPLES, COLOR_EXAMPLES, DEFAULT_STOCK_PROMPTS, RT_PROMPTS, BLOCK_ICONS, BLOCK_ORDER, PAGE_SIZE, NO_PAGINATE, buildOnboardingXpHint, buildOnboardingTimeHint, buildMagicGearLevelHint, buildOnboardingActiveBlocks, resolveTimePromptKey, resolveTimePromptDisplayTag } from './constants.js';
-import { MODULE_NAME, DEFAULT_MODULES, getSettings, getBarBackground, migrateCustomFields, saveChatState, writeModuleSchemaBackup, applyModuleSchemaBackup, saveProfile, deleteProfile, getEffectiveRouterCampaignPrefix, sanitizeCampaignPrefixString, buildNpcInstruction, loadStockPromptsFromProfile, getNpcRelationshipMax, getNpcRelationshipMaxDefault, clampRelationshipValue, relationshipBarPct, getFriendshipTier, getAffectionTier, getRelTierBadgeStyle, getRelTierDetailedStyle, getRelTierDetailedLabelStyle, applyRelTierBadgeElement, sanitizeRouterState, rebuildAllModuleInstructions, adjustAllStoredTemplatesForTimeFormat, DEFAULT_NPC_SECTIONS, DEFAULT_PC_SECTIONS, computeBundledPromptsFingerprint, getDefaultPortraitLocationSystemPrompt, isShippedPortraitLocationSystemPrompt, applyFactoryReset, clearExtensionLocalStorageUiState } from './state-manager.js';
+import { MODULE_NAME, DEFAULT_MODULES, getSettings, getBarBackground, migrateCustomFields, saveChatState, writeModuleSchemaBackup, applyModuleSchemaBackup, applyDeletedCustomTagTombstones, recordDeletedCustomTags, clearDeletedCustomTagTombstones, saveProfile, deleteProfile, getEffectiveRouterCampaignPrefix, sanitizeCampaignPrefixString, buildNpcInstruction, loadStockPromptsFromProfile, getNpcRelationshipMax, getNpcRelationshipMaxDefault, clampRelationshipValue, relationshipBarPct, getFriendshipTier, getAffectionTier, getRelTierBadgeStyle, getRelTierDetailedStyle, getRelTierDetailedLabelStyle, applyRelTierBadgeElement, sanitizeRouterState, rebuildAllModuleInstructions, adjustAllStoredTemplatesForTimeFormat, DEFAULT_NPC_SECTIONS, DEFAULT_PC_SECTIONS, computeBundledPromptsFingerprint, getDefaultPortraitLocationSystemPrompt, isShippedPortraitLocationSystemPrompt, applyFactoryReset, clearExtensionLocalStorageUiState } from './state-manager.js';
 import { sendStateRequest, fetchOllamaModels, fetchOpenAIModels, testOpenAIConnection, getConnectionProfiles, getCurrentCompletionPreset, setCompletionPreset, syncCombatProfile, resetCombatProfileOverride } from './llm-client.js';
 import { getDiceToolName, getDiceCommandName, getDiceCommandAliases, doDiceRoll, registerDiceFunctionTool, registerDiceSlashCommand, installInterceptor, getNarrativeBlocks, onGenerationStarted, onGenerationEnded, ensureRelTagRegex, resetRouterTick, getRouterTick, resetRouterAutoTick, getRouterSchedulerInternals, makeRngQueue, buildRngBlock, RNG_QUEUE_LEN, parseAndApplyNarrativeRelTags } from './narrative-hooks.js';
 import { deduplicateMemo, mergeMemo, computeDelta, escapeHtml, escapeRegex, highlightParens, cleanToolCallMessage, cleanMessageContent, getLastUserAction, buildLorebookContext, buildModulesInstructionText, buildModuleFormatInstruction, parseQuestsFromMemo, syncQuestsFromMemo, syncQuestsToMemo, writeQuestsToMemo, getQuestMood, extractCurrentTimeStr, stripArchivedQuestsFromMemo, stripCompletedQuestsFromMemo, applyQuestSyncAndStripMemo, isArchivedQuestStatus, removeArchivedQuest, parseInWorldTime, formatInWorldTime, sanitizeLorebookRecordContent, memoForTrackerContext, memoForGmContext } from './memo-processor.js';
@@ -464,6 +464,9 @@ async function syncCampaignPrefixAndWorldsForChat(newChatId, source) {
 let _saveSettingsTimer = null;
 /** Re-entrancy guard: saveSettings → saveChatState must not call saveSettings again. */
 let _saveSettingsInFlight = false;
+/** If a save is requested while one is in flight, run again after (keeps deletes durable). */
+let _saveSettingsPending = false;
+let _saveSettingsPendingForce = false;
 /**
  * @param {boolean} force Skip the debounce and save immediately.
  * @param {number} delay Debounce delay in ms when not forcing (default 0 = immediate).
@@ -473,25 +476,54 @@ export function saveSettings(force = false, delay = 0) {
     // Keep UI synchronization immediate so toggle checkboxes and forms respond instantly
     syncOnboardingUI();
 
-    const doSave = async () => {
+    // Always mirror module schema to sync localStorage first — even if a disk save is
+    // already in flight (delete/add must not be dropped by the re-entrancy guard).
+    try {
+        const s0 = getSettings();
+        const chatId0 = _currentChatId || SillyTavern.getContext()?.chatId || null;
+        writeModuleSchemaBackup(chatId0);
+        if (s0.chatLinkEnabled && chatId0 && !isPortraitMigrationLocked()) {
+            // Keep chatStates partition aligned with live schema without nesting saveSettings.
+            const existing = s0.chatStates?.[chatId0];
+            if (existing) {
+                existing.customFields = JSON.parse(JSON.stringify(s0.customFields || []));
+                existing.blockOrder = JSON.parse(JSON.stringify(s0.blockOrder || []));
+                existing.modules = JSON.parse(JSON.stringify(s0.modules || {}));
+            }
+        }
+    } catch (_) { /* non-fatal */ }
+
+    const doSave = async (forceWrite) => {
         _saveSettingsTimer = null;
-        if (_saveSettingsInFlight) return;
+        if (_saveSettingsInFlight) {
+            _saveSettingsPending = true;
+            _saveSettingsPendingForce = _saveSettingsPendingForce || !!forceWrite;
+            return;
+        }
         _saveSettingsInFlight = true;
         try {
-            const s = getSettings();
-            const ctx = SillyTavern.getContext();
-            const activeChatId = _currentChatId || ctx.chatId;
-            // Snapshot chat-linked state into extension settings before persisting to disk.
-            if (s.chatLinkEnabled && activeChatId && !isPortraitMigrationLocked()) {
-                saveChatState(activeChatId, { skipDiskWrite: true });
-            } else {
-                writeModuleSchemaBackup(activeChatId);
-            }
-            if (force && typeof ctx.saveSettings === 'function') {
-                await ctx.saveSettings();
-            } else {
-                ctx.saveSettingsDebounced();
-            }
+            do {
+                _saveSettingsPending = false;
+                const pendingForce = _saveSettingsPendingForce;
+                _saveSettingsPendingForce = false;
+                const useForce = !!forceWrite || pendingForce;
+
+                const s = getSettings();
+                const ctx = SillyTavern.getContext();
+                const activeChatId = _currentChatId || ctx.chatId;
+                // Snapshot chat-linked state into extension settings before persisting to disk.
+                if (s.chatLinkEnabled && activeChatId && !isPortraitMigrationLocked()) {
+                    saveChatState(activeChatId, { skipDiskWrite: true });
+                } else {
+                    writeModuleSchemaBackup(activeChatId);
+                }
+                if (useForce && typeof ctx.saveSettings === 'function') {
+                    await ctx.saveSettings();
+                } else {
+                    ctx.saveSettingsDebounced();
+                }
+                forceWrite = false;
+            } while (_saveSettingsPending);
         } finally {
             _saveSettingsInFlight = false;
         }
@@ -500,11 +532,11 @@ export function saveSettings(force = false, delay = 0) {
     if (force || delay <= 0) {
         if (_saveSettingsTimer) clearTimeout(_saveSettingsTimer);
         _saveSettingsTimer = null;
-        return doSave();
+        return doSave(force);
     }
 
     if (_saveSettingsTimer) clearTimeout(_saveSettingsTimer);
-    _saveSettingsTimer = setTimeout(doSave, delay);
+    _saveSettingsTimer = setTimeout(() => { void doSave(false); }, delay);
 }
 
 /** When NPC portraits are disabled, turn off NPC auto-generation and sync dependent UI. */
@@ -12039,21 +12071,25 @@ async function runPortraitMigrationIfNeeded() {
         sanitizeRouterState(settings);
         const bootChatId = ctx.chatId || ctx.getCurrentChatId?.() || null;
         _currentChatId = bootChatId;
-        // Heal module schema (customFields/blockOrder) from sync localStorage WAL before
-        // loadChatState — otherwise a cancelled settings save after deleting NEW_FIELD
-        // resurrects the stale partition on code-edit F5.
+        // Strip intentionally-deleted custom modules (tombstones) and heal schema WAL
+        // before loadChatState — cancelled settings saves otherwise resurrect NEW_FIELD etc.
+        const strippedTombstones = applyDeletedCustomTagTombstones();
         const healedFromBackup = applyModuleSchemaBackup(bootChatId);
-        if (healedFromBackup && settings.debugMode) {
-            console.log('[RPG Tracker] Applied module schema backup before chat-state load.');
+        if ((strippedTombstones || healedFromBackup) && settings.debugMode) {
+            console.log('[RPG Tracker] Healed module schema before chat-state load.', {
+                strippedTombstones, healedFromBackup,
+            });
         }
         eventSource.on(event_types.CHAT_CHANGED, onChatChanged);
         if (bootChatId && settings.chatLinkEnabled) {
             loadChatState(bootChatId);
+            // loadChatState can reintroduce tombstoned tags from a stale partition — strip again.
+            applyDeletedCustomTagTombstones();
         }
         // Baseline WAL after boot so the next cancelled save still has a sync snapshot.
         writeModuleSchemaBackup(bootChatId);
-        // If we healed from WAL, push the repaired schema to disk so settings.js catches up.
-        if (healedFromBackup) {
+        // If we healed from WAL/tombstones, push the repaired schema to disk so settings.js catches up.
+        if (strippedTombstones || healedFromBackup) {
             void saveSettings(true);
         }
 
@@ -13077,6 +13113,7 @@ async function runPortraitMigrationIfNeeded() {
                 template: EXAMPLES + '\n\n' + COLOR_EXAMPLES,
                 enabled: true
             });
+            clearDeletedCustomTagTombstones(newTag);
             refreshOrderList();
             saveSettings(true);
         });
@@ -13256,8 +13293,9 @@ RULES:
                     template: parsed.template,
                     enabled: true
                 });
+                clearDeletedCustomTagTombstones(parsed.tag);
                 refreshOrderList();
-                saveSettings();
+                saveSettings(true);
                 toastr['success'](`Custom field "${parsed.label}" created!`, 'AI Field Creator');
             } catch (err) {
                 console.error('[RPG Tracker] AI Field Creator error:', err);
@@ -13346,6 +13384,7 @@ RULES:
 
             if (confirm(`Delete ALL (${s.customFields.length}) custom modules?\n\nThis will also remove their data from the current tracker state. Stock modules (COMBAT, CHARACTER, etc.) will not be touched.\n\nProceed?`)) {
                 const customTags = new Set(s.customFields.map(f => f.tag.toUpperCase()));
+                recordDeletedCustomTags([...customTags]);
 
                 // Clear fields
                 s.customFields = [];

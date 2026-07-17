@@ -1,4 +1,4 @@
-import { getSettings, getNpcRelationshipMaxDefault, DEFAULT_NPC_SECTIONS, DEFAULT_PC_SECTIONS } from './state-manager.js';
+import { getSettings, getNpcRelationshipMaxDefault, DEFAULT_NPC_SECTIONS, DEFAULT_PC_SECTIONS, recordDeletedCustomTags, clearDeletedCustomTagTombstones } from './state-manager.js';
 import { sendStateRequest } from './llm-client.js';
 import { BLOCK_ICONS, BLOCK_ORDER, DEFAULT_STOCK_PROMPTS, PAGE_SIZE, resolveTimePromptKey, resolveTimePromptDisplayTag } from './constants.js';
 import { escapeHtml } from './memo-processor.js';
@@ -635,10 +635,12 @@ export function openCustomFieldEditor(index) {
 
     document.getElementById('rt_cfe_delete').onclick = () => {
         if (confirm(`Delete the custom module "${field.label || field.tag}"? This cannot be undone.`)) {
+            const deletedTag = field.tag;
             s.customFields.splice(index, 1);
             if (s.blockOrder) {
-                s.blockOrder = s.blockOrder.filter(t => t.toUpperCase() !== field.tag.toUpperCase());
+                s.blockOrder = s.blockOrder.filter(t => t.toUpperCase() !== deletedTag.toUpperCase());
             }
+            recordDeletedCustomTags(deletedTag);
             saveSettings(true);
             refreshOrderList();
             refreshRenderedView();
@@ -961,6 +963,7 @@ export async function importModulesFromJson(jsonString) {
             s.customFields.push(newField);
             if (!s.blockOrder.includes(m.tag)) s.blockOrder.push(m.tag);
         }
+        clearDeletedCustomTagTombstones(m.tag);
         importedCount++;
     }
 

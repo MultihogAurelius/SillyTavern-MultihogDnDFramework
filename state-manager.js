@@ -2169,6 +2169,95 @@ export function persistRouterLastRunTimestamp(epochMs = Date.now()) {
  * editing extension code then refreshing before ST's save completes).
  */
 const MODULE_SCHEMA_BACKUP_KEY = 'rpg_tracker_module_schema_backup';
+/** Sync tombstones for deleted custom module tags — survives cancelled settings saves even when WAL is missing. */
+const DELETED_CUSTOM_TAGS_KEY = 'rpg_tracker_deleted_custom_tags';
+
+/**
+ * @returns {string[]}
+ */
+function readDeletedCustomTagTombstones() {
+    try {
+        const raw = localStorage.getItem(DELETED_CUSTOM_TAGS_KEY);
+        if (!raw) return [];
+        const arr = JSON.parse(raw);
+        return Array.isArray(arr) ? arr.map(t => String(t).toUpperCase()).filter(Boolean) : [];
+    } catch {
+        return [];
+    }
+}
+
+/**
+ * @param {string[]} tags
+ */
+function writeDeletedCustomTagTombstones(tags) {
+    try {
+        const uniq = [...new Set((tags || []).map(t => String(t).toUpperCase()).filter(Boolean))];
+        if (uniq.length === 0) localStorage.removeItem(DELETED_CUSTOM_TAGS_KEY);
+        else localStorage.setItem(DELETED_CUSTOM_TAGS_KEY, JSON.stringify(uniq));
+    } catch (err) {
+        console.warn('[RPG Tracker] Deleted-custom-tag tombstone write failed:', err);
+    }
+}
+
+/**
+ * Record custom module tags as intentionally deleted (sync localStorage).
+ * @param {string|string[]} tags
+ */
+export function recordDeletedCustomTags(tags) {
+    const add = (Array.isArray(tags) ? tags : [tags]).map(t => String(t || '').toUpperCase()).filter(Boolean);
+    if (!add.length) return;
+    const merged = new Set([...readDeletedCustomTagTombstones(), ...add]);
+    writeDeletedCustomTagTombstones([...merged]);
+}
+
+/**
+ * Clear tombstones when the user intentionally re-adds a custom tag.
+ * @param {string|string[]} tags
+ */
+export function clearDeletedCustomTagTombstones(tags) {
+    const remove = new Set((Array.isArray(tags) ? tags : [tags]).map(t => String(t || '').toUpperCase()).filter(Boolean));
+    if (!remove.size) return;
+    writeDeletedCustomTagTombstones(readDeletedCustomTagTombstones().filter(t => !remove.has(t)));
+}
+
+/**
+ * Strip tombstoned custom modules from live settings and all chatStates partitions.
+ * Call on boot before loadChatState.
+ * @returns {boolean} true if anything was removed
+ */
+export function applyDeletedCustomTagTombstones() {
+    const banned = new Set(readDeletedCustomTagTombstones());
+    if (!banned.size) return false;
+    const s = getSettings();
+    let changed = false;
+
+    const stripFields = (fields) => {
+        if (!Array.isArray(fields)) return fields;
+        const next = fields.filter(f => !banned.has(String(f?.tag || '').toUpperCase()));
+        if (next.length !== fields.length) changed = true;
+        return next;
+    };
+    const stripOrder = (order) => {
+        if (!Array.isArray(order)) return order;
+        const next = order.filter(t => !banned.has(String(t || '').toUpperCase()));
+        if (next.length !== order.length) changed = true;
+        return next;
+    };
+
+    s.customFields = stripFields(s.customFields || []);
+    s.blockOrder = stripOrder(s.blockOrder || []);
+
+    if (s.chatStates && typeof s.chatStates === 'object') {
+        for (const chatId of Object.keys(s.chatStates)) {
+            const part = s.chatStates[chatId];
+            if (!part || typeof part !== 'object') continue;
+            if (part.customFields) part.customFields = stripFields(part.customFields);
+            if (part.blockOrder) part.blockOrder = stripOrder(part.blockOrder);
+        }
+    }
+
+    return changed;
+}
 
 /**
  * @param {string|null|undefined} chatId
