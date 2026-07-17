@@ -1013,6 +1013,40 @@ Current Time: 08:00 AM, ${startDateVal}
 Last Rest must be N/A — this is a brand-new character who has not taken a Long Rest yet.`;
 }
 
+/**
+ * Memo block tags for onboarding / character creator prompts: enabled stock modules
+ * (except PARTY) plus enabled custom fields, in tracker display order.
+ * @param {object} settings
+ * @returns {string[]}
+ */
+export function buildOnboardingActiveBlocks(settings) {
+    const mods = settings.modules || {};
+    /** @type {string[]} */
+    const blocks = [];
+
+    for (const tag of BLOCK_ORDER) {
+        if (tag === 'PARTY') continue;
+        if (tag === 'CHARACTER') {
+            blocks.push('CHARACTER');
+            continue;
+        }
+        const key = tag.toLowerCase();
+        if (key === 'quests' && settings.syspromptModules?.quests === false) continue;
+        if (mods[key]) blocks.push(tag);
+    }
+
+    const seen = new Set(blocks);
+    for (const field of settings.customFields || []) {
+        if (!field.enabled || !field.tag) continue;
+        const tag = String(field.tag).toUpperCase();
+        if (tag === 'PARTY' || seen.has(tag)) continue;
+        blocks.push(tag);
+        seen.add(tag);
+    }
+
+    return blocks;
+}
+
 /** REQUIREMENTS bullet for D&D magic weapon/armor tier by level (fantasy + inventory only). */
 export function buildMagicGearLevelHint(level, genre, hasInventory) {
     if (genre !== 'fantasy' || !hasInventory) return '';

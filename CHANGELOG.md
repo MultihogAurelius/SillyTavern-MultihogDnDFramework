@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [5.6.45] - 2026-07-17
+
+### Fixed
+- **Character Creator startup memo**: Restores custom fields and all enabled stock modules in generated blocks (regression from Jul 12 module-gating fix). PARTY remains excluded.
+
 ## [5.6.35] - 2026-07-17
 
 ### Added

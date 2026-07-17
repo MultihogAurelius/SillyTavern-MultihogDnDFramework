@@ -1,6 +1,6 @@
 import { getSettings, saveChatState, DEFAULT_PC_SECTIONS } from './state-manager.js';
 import { sendStateRequest } from './llm-client.js';
-import { buildOnboardingXpHint, buildOnboardingTimeHint, buildMagicGearLevelHint } from './constants.js';
+import { buildOnboardingXpHint, buildOnboardingTimeHint, buildMagicGearLevelHint, buildOnboardingActiveBlocks } from './constants.js';
 import { escapeHtml } from './memo-processor.js';
 import { getRequestHeaders } from '../../../../script.js';
 import { saveSettings, sendDirectPrompt, refreshAgentManifestNow, refreshRenderedView, syncTimeFormatSettingsUi } from './index.js';
@@ -476,12 +476,10 @@ async function handleCharRollGenerate(el, panel) {
     const TIME_FORMAT_HINT = hasTime ? buildOnboardingTimeHint(startDateVal) : '';
     const magicGearHint = buildMagicGearLevelHint(level, genre, hasInventory);
 
-    // Build the dynamic block list for the closing-tag rule (only active blocks)
-    const activeBlocks = ['CHARACTER', ...(hasInventory ? ['INVENTORY'] : []), ...(hasAbilities ? ['ABILITIES'] : []), ...(hasSpells ? ['SPELLS'] : []), ...(hasXp ? ['XP'] : []), ...(hasTime ? ['TIME'] : [])];
+    const activeBlocks = buildOnboardingActiveBlocks(s);
     const closingTagExamples = activeBlocks.map(b => `[/${b}]`).join(', ');
     const CHARACTER_FORMAT_HINT = `\n\nCRITICAL TAG WRAPPING RULE: Every block you output MUST be enclosed in matching opening and closing tags (${closingTagExamples}).\nCRITICAL PARTY RULE: Do NOT output a [PARTY] block under any circumstances unless explicitly instructed.`;
 
-    // Build the "Output X, Y, Z blocks" instruction
     const blockListStr = activeBlocks.join(', ');
     const spellsClause = hasSpells ? " Only include [SPELLS] if the class genuinely uses magic." : '';
 
@@ -517,7 +515,7 @@ ${cardSnippet ? `\n--- CHARACTER CARD CONTEXT ---${cardSnippet}` : ''}
 --- REQUIREMENTS ---
 • Fill every blank field above with creative, setting-appropriate content. No field may be empty, "Unknown", "N/A", or a placeholder.
 • The name must be original and fitting. NEVER write "User" or any variation.
-• Output the following blocks: ${blockListStr}.${spellsClause}
+• Output every currently active state-memo field (enabled stock modules and custom fields): ${blockListStr}.${spellsClause}
 • Do NOT output a [PARTY] block under any circumstances unless explicitly instructed.
 • ${isOther || isStoryFitting ? 'Invent the most fitting class for the setting and context.' : `Use the chosen class "${classRaw}" exactly as given — do not rename or substitute it.`}
 • If the setting is non-fantasy and no class was specified, create a class that feels natural to the world — not a fantasy D&D class name.
@@ -999,13 +997,15 @@ async function importPcFromCard(charCard, mode, el) {
     } catch (_) {}
     const worldCtx = contextLines.join('\n\n---\n\n');
 
+    const importBlockList = buildOnboardingActiveBlocks(s).join(', ');
+
     // --- Step 1: State Memo ---
     const memoPromptMinimal = `You are a state tracker assistant. Translate this character card into state tracker format for the player character.
 
 RULES:
 - Preserve ALL values, stats, abilities, and inventory EXACTLY as written in the card.
 - Only adjust specific terminology that would be a hard logical impossibility in the current setting (e.g. "smartphone" in a medieval world).
-- Output [CHARACTER], [INVENTORY], [ABILITIES], [SPELLS] (if the class uses magic), [XP], and [TIME] blocks.
+- Output every currently active state-memo field (enabled stock modules and custom fields): ${importBlockList}.
 - Do NOT invent stats or equipment not present on the card.
 - Use the existing system prompt's block format.
 
@@ -1016,7 +1016,7 @@ ${worldCtx}`;
 RULES:
 - Fit the character's class, gear, backstory, and abilities naturally into the current world.
 - Rename anachronistic equipment or references to setting-appropriate equivalents.
-- Output [CHARACTER], [INVENTORY], [ABILITIES], [SPELLS] (if the class uses magic), [XP], and [TIME] blocks.
+- Output every currently active state-memo field (enabled stock modules and custom fields): ${importBlockList}.
 - Use the existing system prompt's block format.
 - CRITICAL: Never output template macro strings such as {{char}}, {{user}}, or any other {{...}} placeholders. Always replace them with the actual character's name or a fitting proper name.
 
