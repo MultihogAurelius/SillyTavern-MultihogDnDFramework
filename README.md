@@ -60,11 +60,11 @@ Together they solve the four core problems of LLM tabletop RP: the AI forgetting
   
 ---
 
-<div align="center">
-  <figure>
-    <img width="1918" height="982" alt="Screenshot 2026-06-18 195917" src="https://github.com/user-attachments/assets/a9778adb-8bdf-485e-ac96-973613321407" />
-  </figure>
-</div>
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/cdfc169e-a14a-41bc-8fa0-7cf6f61d12ad" width="100%" alt="Combat in progress" />
+  <br>
+  <em>Some combat in progress</em>
+</p>
 
 ---
 
@@ -99,11 +99,11 @@ For the State Tracker and Lorebook Agent, use Gemini 3.1 Flash. It's good enough
 
 ---
 
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/cdfc169e-a14a-41bc-8fa0-7cf6f61d12ad" width="100%" alt="Combat in progress" />
-  <br>
-  <em>Some combat in progress</em>
-</p>
+<div align="center">
+  <figure>
+    <img width="1918" height="982" alt="Screenshot 2026-06-18 195917" src="https://github.com/user-attachments/assets/a9778adb-8bdf-485e-ac96-973613321407" />
+  </figure>
+</div>
 
 ---
 
