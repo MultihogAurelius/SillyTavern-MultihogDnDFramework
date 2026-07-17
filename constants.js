@@ -124,10 +124,12 @@ Name: current/max HP
 Att/def: Weapon (N attacks, +X / damage) | Armor (AC: Z)
 Saves: Fort +X, Ref +X, Will +X
 Abilities: Ability1 (effect), Ability2 (effect)
+Spells: Spell1 (avail/max), Spell2 (avail/max)
 Other: Trait1 (description), Trait2 (description)
 Status: Effect (duration)
 
 Pre-calculate attack bonuses on Att/def when the enemy is first declared — e.g. Pickaxe (1 attacks, +3 / 1d6+1 P) or Longsword (2 attacks, +12/+7 / 1d8+3). Use those listed values directly; do not recalculate mid-fight.
+Caster enemies: keep Att/def as a weapon or attack cantrip. List known/prepared spells with remaining uses on the Spells line — e.g. Spells: Ray of Sickness (2/2), Fire Bolt (at will). Omit Spells: for non-casters.
 
 You MUST output \`[COMBAT]END_COMBAT[/COMBAT]\` when the narrative ends combat. Do not put members of [PARTY] into [COMBAT].`,
   inventory: `Items, loot, equipment, and wealth. You MAY create this section if loot is found and it doesn't currently exist.
@@ -302,7 +304,7 @@ This is a custom hybrid ruleset that utilizes 5e flavor (spells, feats, XP table
 </ruleset_note>
 
 <combat_start>
-Declare all previously unknown NPC stats (AC, Saves, HP, Combat Line, immunities/resistances/etc), then roll initiative for all participants.
+Declare all previously unknown NPC stats (AC, Saves, HP, Combat Line, immunities/resistances/spells and slots for caster enemies/etc), then roll initiative for all participants.
 </combat_start>
 
 <combat_flow>
@@ -341,13 +343,15 @@ NO ACTIVE QUEST / GENERAL ENCOUNTERS:
 When the player is not on a quest, use pure narrative context. A random bandit should NOT have 80 HP just because the player does. A dragon should have 300+ HP regardless of player level. Prioritize REALISM over balance. Do NOT babysit the player. Vary it — sometimes enemies are above the player by several levels, sometimes below. But always give the player at least a fighting chance.
 
 BASE NPC TIERS (guidelines, scale with context):
-Minion — Rabble, untrained | HP 8–15   | AC 10–12 | BAB +0 to +2
-Soldier — Trained          | HP 18–30  | AC 13–15 | BAB +3 to +6
-Elite — Veteran/specialist | HP 35–60  | AC 15–17 | BAB +7 to +10 (2 attacks possible)
-Boss — Powerful individual  | HP 60–120 | AC 17–19 | BAB +11 to +15 (2 attacks standard)
-Legendary — World-threat    | HP 150–500+ | AC 19–22 | BAB +16 to +20+ (rare; still max 2 APR)
+Minion — Rabble, untrained | HP 8–15   | AC 10–12 | Attack +0 to +2
+Soldier — Trained          | HP 18–30  | AC 13–15 | Attack +3 to +6
+Elite — Veteran/specialist | HP 35–60  | AC 15–17 | Attack +7 to +10 (2 attacks possible)
+Boss — Powerful individual  | HP 60–120 | AC 17–19 | Attack +11 to +15 (2 attacks standard)
+Legendary — World-threat    | HP 150–500+ | AC 19–22 | Attack +16 to +20+ (rare; still max 2 APR)
 
 These are BASE ranges. Scale UP or DOWN based on quest difficulty and narrative context.
+
+SPELLCASTER ENEMIES: Use lower weapon Attack than a martial of the same tier — their threat is spells. Spell attack bonus ≈ that tier's Attack range. Spell save DCs follow the DC SCALE by tier (Minion/Soldier ≈ Easy–Moderate, Elite ≈ Hard, Boss ≈ Severe, Legendary ≈ Near-impossible/expert). Cap spell level and slots to the tier; do not hand a hedge witch Legendary magic.
 </npc_stat_scaling>
 
 <npc_profile_persistence>
@@ -681,7 +685,7 @@ This is a custom hybrid ruleset that utilizes 5e flavor (spells, feats, XP table
 </ruleset_note>
 
 <combat_start>
-Declare all previously unknown NPC stats (AC, Saves, HP, Combat Line, immunities/resistances/etc), then roll initiative for all participants.
+Declare all previously unknown NPC stats (AC, Saves, HP, Combat Line, immunities/resistances/spells and slots for caster enemies/etc), then roll initiative for all participants.
 </combat_start>
 
 <combat_flow>
@@ -720,13 +724,15 @@ NO ACTIVE QUEST / GENERAL ENCOUNTERS:
 When the player is not on a quest, use pure narrative context. A random bandit should NOT have 80 HP just because the player does. A dragon should have 300+ HP regardless of player level. Prioritize REALISM over balance. Do NOT babysit the player. Vary it — sometimes enemies are above the player by several levels, sometimes below. But always give the player at least a fighting chance.
 
 BASE NPC TIERS (guidelines, scale with context):
-Minion — Rabble, untrained | HP 8–15   | AC 10–12 | BAB +0 to +2
-Soldier — Trained          | HP 18–30  | AC 13–15 | BAB +3 to +6
-Elite — Veteran/specialist | HP 35–60  | AC 15–17 | BAB +7 to +10 (2 attacks possible)
-Boss — Powerful individual  | HP 60–120 | AC 17–19 | BAB +11 to +15 (2 attacks standard)
-Legendary — World-threat    | HP 150–500+ | AC 19–22 | BAB +16 to +20+ (rare; still max 2 APR)
+Minion — Rabble, untrained | HP 8–15   | AC 10–12 | Attack +0 to +2
+Soldier — Trained          | HP 18–30  | AC 13–15 | Attack +3 to +6
+Elite — Veteran/specialist | HP 35–60  | AC 15–17 | Attack +7 to +10 (2 attacks possible)
+Boss — Powerful individual  | HP 60–120 | AC 17–19 | Attack +11 to +15 (2 attacks standard)
+Legendary — World-threat    | HP 150–500+ | AC 19–22 | Attack +16 to +20+ (rare; still max 2 APR)
 
 These are BASE ranges. Scale UP or DOWN based on quest difficulty and narrative context.
+
+SPELLCASTER ENEMIES: Use lower weapon Attack than a martial of the same tier — their threat is spells. Spell attack bonus ≈ that tier's Attack range. Spell save DCs follow the DC SCALE by tier (Minion/Soldier ≈ Easy–Moderate, Elite ≈ Hard, Boss ≈ Severe, Legendary ≈ Near-impossible/expert). Cap spell level and slots to the tier; do not hand a hedge witch Legendary magic.
 </npc_stat_scaling>
 
 <npc_profile_persistence>

@@ -1,5 +1,5 @@
 import { EXAMPLES, COLOR_EXAMPLES, DEFAULT_STOCK_PROMPTS, RT_PROMPTS, BLOCK_ICONS, BLOCK_ORDER, PAGE_SIZE, NO_PAGINATE, buildOnboardingXpHint, buildOnboardingTimeHint, buildStartingGearHint, buildOnboardingActiveBlocks, buildCombatAndSkillScalingHint, resolveTimePromptKey, resolveTimePromptDisplayTag } from './constants.js';
-import { MODULE_NAME, DEFAULT_MODULES, getSettings, getBarBackground, migrateCustomFields, saveChatState, writeModuleSchemaBackup, applyModuleSchemaBackup, applyDeletedCustomTagTombstones, recordDeletedCustomTags, clearDeletedCustomTagTombstones, saveProfile, deleteProfile, getEffectiveRouterCampaignPrefix, sanitizeCampaignPrefixString, buildNpcInstruction, loadStockPromptsFromProfile, getNpcRelationshipMax, getNpcRelationshipMaxDefault, clampRelationshipValue, relationshipBarPct, getFriendshipTier, getAffectionTier, getRelTierBadgeStyle, getRelTierDetailedStyle, getRelTierDetailedLabelStyle, applyRelTierBadgeElement, sanitizeRouterState, rebuildAllModuleInstructions, adjustAllStoredTemplatesForTimeFormat, DEFAULT_NPC_SECTIONS, DEFAULT_PC_SECTIONS, computeBundledPromptsFingerprint, getDefaultPortraitLocationSystemPrompt, isShippedPortraitLocationSystemPrompt, applyFactoryReset, clearExtensionLocalStorageUiState } from './state-manager.js';
+import { MODULE_NAME, DEFAULT_MODULES, getSettings, getBarBackground, migrateCustomFields, saveChatState, writeModuleSchemaBackup, applyModuleSchemaBackup, applyDeletedCustomTagTombstones, recordDeletedCustomTags, clearDeletedCustomTagTombstones, saveProfile, deleteProfile, getEffectiveRouterCampaignPrefix, sanitizeCampaignPrefixString, buildNpcInstruction, loadStockPromptsFromProfile, getNpcRelationshipMax, getNpcRelationshipMaxDefault, clampRelationshipValue, relationshipBarPct, getFriendshipTier, getAffectionTier, getRelTierBadgeStyle, getRelTierDetailedStyle, getRelTierDetailedLabelStyle, applyRelTierBadgeElement, sanitizeRouterState, rebuildAllModuleInstructions, adjustAllStoredTemplatesForTimeFormat, DEFAULT_NPC_SECTIONS, DEFAULT_PC_SECTIONS, computeBundledPromptsFingerprint, getDefaultPortraitLocationSystemPrompt, isShippedPortraitLocationSystemPrompt, applyFactoryReset, clearExtensionLocalStorageUiState, stripChatStateGlobalUiPrefs } from './state-manager.js';
 import { sendStateRequest, fetchOllamaModels, fetchOpenAIModels, testOpenAIConnection, getConnectionProfiles, getCurrentCompletionPreset, setCompletionPreset, syncCombatProfile, resetCombatProfileOverride } from './llm-client.js';
 import { getDiceToolName, getDiceCommandName, getDiceCommandAliases, doDiceRoll, registerDiceFunctionTool, registerDiceSlashCommand, installInterceptor, getNarrativeBlocks, onGenerationStarted, onGenerationEnded, ensureRelTagRegex, resetRouterTick, getRouterTick, resetRouterAutoTick, getRouterSchedulerInternals, makeRngQueue, buildRngBlock, RNG_QUEUE_LEN, parseAndApplyNarrativeRelTags } from './narrative-hooks.js';
 import { deduplicateMemo, mergeMemo, computeDelta, escapeHtml, escapeRegex, highlightParens, cleanToolCallMessage, cleanMessageContent, getLastUserAction, buildLorebookContext, buildModulesInstructionText, buildModuleFormatInstruction, parseQuestsFromMemo, syncQuestsFromMemo, syncQuestsToMemo, writeQuestsToMemo, getQuestMood, extractCurrentTimeStr, stripArchivedQuestsFromMemo, stripCompletedQuestsFromMemo, applyQuestSyncAndStripMemo, isArchivedQuestStatus, removeArchivedQuest, parseInWorldTime, formatInWorldTime, sanitizeLorebookRecordContent, memoForTrackerContext, memoForGmContext } from './memo-processor.js';
@@ -1358,47 +1358,8 @@ function loadChatState(chatId) {
     s.worldProgressionConsolidateEnabled = saved.worldProgressionConsolidateEnabled ?? false;
     s.worldProgressionConsolidateInterval = saved.worldProgressionConsolidateInterval ?? 7;
 
-    s.portraitGeneratorSource = saved.portraitGeneratorSource ?? "native";
-    s.portraitSkipPromptDialog = saved.portraitSkipPromptDialog ?? false;
-    s.hideImageGenToasts = saved.hideImageGenToasts ?? false;
-    s.portraitAutoGenerateParty = saved.portraitAutoGenerateParty ?? false;
-    s.portraitAutoGeneratePlayer = saved.portraitAutoGeneratePlayer ?? false;
-    s.portraitAutoGenerateEnemies = saved.portraitAutoGenerateEnemies ?? false;
-    s.portraitAutoGenerateNpcs = saved.portraitAutoGenerateNpcs ?? false;
-    s.portraitAutoGenerateLocations = saved.portraitAutoGenerateLocations ?? false;
-    s.portraitAutoGenerateSceneView = saved.portraitAutoGenerateSceneView ?? false;
-    s.portraitRealtimeTriggerMode = ['location_enter', 'location_change', 'every_n_outputs'].includes(saved.portraitRealtimeTriggerMode)
-        ? saved.portraitRealtimeTriggerMode
-        : 'location_change';
-    s.portraitRealtimeEveryNOutputs = Math.max(1, Number(saved.portraitRealtimeEveryNOutputs) || 1);
-    s.locationImages = !!saved.locationImages;
-    s.portraitLocationIncludePresentNpcs = saved.portraitLocationIncludePresentNpcs ?? false;
-    if (s.portraitAutoGenerateSceneView) {
-        applyRealTimeModeBundle(s);
-        syncPortraitLocationPromptForNpcToggle(s, true, { force: true });
-    } else {
-        s.portraitRegenerateVisitedLocations = false;
-    }
-    s.agentImmersionMode = saved.agentImmersionMode ?? false;
-
-    s.worldConnectionSource = saved.worldConnectionSource ?? "default";
-    s.worldConnectionProfileId = saved.worldConnectionProfileId || "";
-    s.worldCompletionPresetId = saved.worldCompletionPresetId || "";
-    s.worldOllamaUrl = saved.worldOllamaUrl || "http://localhost:11434";
-    s.worldOllamaModel = saved.worldOllamaModel || "";
-    s.worldOpenaiUrl = saved.worldOpenaiUrl || "";
-    s.worldOpenaiKey = saved.worldOpenaiKey || "";
-    s.worldOpenaiModel = saved.worldOpenaiModel || "";
-
-    s.gameSystemWizardConnectionSource = saved.gameSystemWizardConnectionSource ?? "default";
-    s.gameSystemWizardConnectionProfileId = saved.gameSystemWizardConnectionProfileId || "";
-    s.gameSystemWizardCompletionPresetId = saved.gameSystemWizardCompletionPresetId || "";
-    s.gameSystemWizardOllamaUrl = saved.gameSystemWizardOllamaUrl || "http://localhost:11434";
-    s.gameSystemWizardOllamaModel = saved.gameSystemWizardOllamaModel || "";
-    s.gameSystemWizardOpenaiUrl = saved.gameSystemWizardOpenaiUrl || "";
-    s.gameSystemWizardOpenaiKey = saved.gameSystemWizardOpenaiKey || "";
-    s.gameSystemWizardOpenaiModel = saved.gameSystemWizardOpenaiModel || "";
-    s.gameSystemWizardSystemPrompt = saved.gameSystemWizardSystemPrompt || "";
+    // Global UI / connection / auto-image prefs are NOT restored from chatStates —
+    // they stay on live top-level settings so Chat Link cannot clobber them on F5.
 
     applyChatTimeFormatSettings(saved);
     applyChatNpcRelMaxSettings(saved);
@@ -10852,8 +10813,8 @@ const RENDER_HINTS = {
     },
     COMBAT: {
         label: 'Entity Rows — HP Bars (Enemies)',
-        description: 'Same entity-row format as Characters. Optionally starts with a "COMBAT ROUND N" header line. Each enemy: "Name (Type): cur/max HP". Sub-lines: Att/def (N attacks, +bonus / damage), Saves, Abilities, Status.',
-        example: 'COMBAT ROUND 1\nSkritch (Goblin Minion): 8/8 HP\nAtt/def: Pickaxe (1 attacks, +3 / 1d6+1 P) | Furs (AC: 12)\nSaves: Fort +0, Ref +2, Will +0\nAbilities: Nimble Escape (disengage as bonus action)\nStatus: Healthy\n\nCaptain Bruga (Goblin Boss): 42/42 HP\nAtt/def: Notched Longsword (2 attacks, +11/+6 / 1d8+3 S) | Scale Mail (AC: 15)\nSaves: Fort +5, Ref +2, Will +1\nStatus: Healthy'
+        description: 'Same entity-row format as Characters. Optionally starts with a "COMBAT ROUND N" header line. Each enemy: "Name (Type): cur/max HP". Sub-lines: Att/def (N attacks, +bonus / damage), Saves, Abilities, Spells, Status.',
+        example: 'COMBAT ROUND 1\nShadow Acolyte Vael (Soldier Tier Spellcaster): 22/22 HP\nAtt/def: Dagger (1 attacks, +3 / 1d4+1 P) | Mage Armor (AC: 13)\nSaves: Fort +2, Ref +3, Will +5\nAbilities: Spellcasting\nSpells: Ray of Sickness (2/2), Fire Bolt (at will)\nOther: Soldier Tier Spellcaster\nStatus: Healthy\n\nCaptain Bruga (Goblin Boss): 42/42 HP\nAtt/def: Notched Longsword (2 attacks, +11/+6 / 1d8+3 S) | Scale Mail (AC: 15)\nSaves: Fort +5, Ref +2, Will +1\nStatus: Healthy'
     },
     SPELLS: {
         label: 'Spell Pips — Slot Tracker',
@@ -12138,11 +12099,14 @@ async function runPortraitMigrationIfNeeded() {
         _currentChatId = bootChatId;
         // Strip intentionally-deleted custom modules (tombstones) and heal schema WAL
         // before loadChatState — cancelled settings saves otherwise resurrect NEW_FIELD etc.
+        // Also strip global UI prefs from chat partitions so loadChatState cannot clobber
+        // auto-image-gen / immersion / connection settings from a stale snapshot.
         const strippedTombstones = applyDeletedCustomTagTombstones();
+        const strippedGlobalUi = stripChatStateGlobalUiPrefs(settings);
         const healedFromBackup = applyModuleSchemaBackup(bootChatId);
-        if ((strippedTombstones || healedFromBackup) && settings.debugMode) {
+        if ((strippedTombstones || healedFromBackup || strippedGlobalUi) && settings.debugMode) {
             console.log('[RPG Tracker] Healed module schema before chat-state load.', {
-                strippedTombstones, healedFromBackup,
+                strippedTombstones, healedFromBackup, strippedGlobalUi,
             });
         }
         eventSource.on(event_types.CHAT_CHANGED, onChatChanged);
@@ -12154,7 +12118,7 @@ async function runPortraitMigrationIfNeeded() {
         // Baseline WAL after boot so the next cancelled save still has a sync snapshot.
         writeModuleSchemaBackup(bootChatId);
         // If we healed from WAL/tombstones, push the repaired schema to disk so settings.js catches up.
-        if (strippedTombstones || healedFromBackup) {
+        if ((strippedTombstones || healedFromBackup || strippedGlobalUi)) {
             void saveSettings(true);
         }
 
@@ -12166,12 +12130,11 @@ async function runPortraitMigrationIfNeeded() {
         // saveSettings() debounces disk writes by ~2s, and ST's saveSettings() is async
         // (fetch). Reloading for a code update before the write lands resurrects the last
         // flushed snapshot — looks like settings "reset to a particular point."
-        // Chat Link makes this worse: boot always runs loadChatState(), which overwrites
-        // live customFields/modules/stockPrompts/memo from chatStates[chatId]. If that
-        // snapshot is stale relative to live settings, those fields revert.
+        // Chat Link makes memo/modules worse: boot runs loadChatState() from chatStates.
+        // Global UI prefs (auto-image-gen, immersion, connections, panel backgrounds) are
+        // intentionally NOT stored in chatStates anymore — only campaign/memo state is.
         //
-        // Order matters: snapshot chatStates FIRST, then write. (The old unload handler
-        // wrote disk then called saveChatState — so the updated snapshot never made it.)
+        // Order matters: snapshot chatStates FIRST, then write.
         // Also flush on visibility hidden so the async save usually finishes before reload.
         let _flushInFlight = false;
         const flushPendingSettingsToDisk = (reason = 'flush') => {

@@ -39,7 +39,7 @@ This is a custom hybrid ruleset that utilizes 5e flavor (spells, feats, XP table
 </ruleset_note>
 
 <combat_start>
-Declare all previously unknown NPC stats (AC, Saves, HP, Combat Line, immunities/resistances/etc), then roll initiative for all participants.
+Declare all previously unknown NPC stats (AC, Saves, HP, Combat Line, immunities/resistances/spells and slots for caster enemies/etc), then roll initiative for all participants.
 </combat_start>
 
 <combat_flow>
@@ -78,13 +78,15 @@ NO ACTIVE QUEST / GENERAL ENCOUNTERS:
 When the player is not on a quest, use pure narrative context. A random bandit should NOT have 80 HP just because the player does. A dragon should have 300+ HP regardless of player level. Prioritize REALISM over balance. Do NOT babysit the player. Vary it — sometimes enemies are above the player by several levels, sometimes below. But always give the player at least a fighting chance.
 
 BASE NPC TIERS (guidelines, scale with context):
-Minion — Rabble, untrained | HP 8–15   | AC 10–12 | BAB +0 to +2
-Soldier — Trained          | HP 18–30  | AC 13–15 | BAB +3 to +6
-Elite — Veteran/specialist | HP 35–60  | AC 15–17 | BAB +7 to +10 (2 attacks possible)
-Boss — Powerful individual  | HP 60–120 | AC 17–19 | BAB +11 to +15 (2 attacks standard)
-Legendary — World-threat    | HP 150–500+ | AC 19–22 | BAB +16 to +20+ (rare; still max 2 APR)
+Minion — Rabble, untrained | HP 8–15   | AC 10–12 | Attack +0 to +2
+Soldier — Trained          | HP 18–30  | AC 13–15 | Attack +3 to +6
+Elite — Veteran/specialist | HP 35–60  | AC 15–17 | Attack +7 to +10 (2 attacks possible)
+Boss — Powerful individual  | HP 60–120 | AC 17–19 | Attack +11 to +15 (2 attacks standard)
+Legendary — World-threat    | HP 150–500+ | AC 19–22 | Attack +16 to +20+ (rare; still max 2 APR)
 
 These are BASE ranges. Scale UP or DOWN based on quest difficulty and narrative context.
+
+SPELLCASTER ENEMIES: Use lower weapon Attack than a martial of the same tier — their threat is spells. Spell attack bonus ≈ that tier's Attack range. Spell save DCs follow the DC SCALE by tier (Minion/Soldier ≈ Easy–Moderate, Elite ≈ Hard, Boss ≈ Severe, Legendary ≈ Near-impossible/expert). Cap spell level and slots to the tier; do not hand a hedge witch Legendary magic.
 </npc_stat_scaling>
 
 <npc_profile_persistence>

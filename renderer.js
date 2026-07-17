@@ -488,8 +488,39 @@ export function renderDayNightBadge(str) {
             }
             html += `<div class="rt-spell-row"><span class="rt-spell-level">${escapeHtmlWithColor(lbl.trim())}</span><div class="rt-spell-inline-group"><div class="rt-spell-list">${pipsHtml}${spellsHtml}</div></div></div>`;
         }
-        return html || `<div class="rt-entity-sub-line"><span class="rt-entity-sub-label">Spells:</span> ${highlightParens(escapeHtmlWithColor(val))}</div>`;
+        // Party/CHARACTER style matched — return leveled rows.
+        if (html) return html;
+        // Combat / flat list: Spells: Ray of Sickness (2/2), Fire Bolt (at will) → blue magic pills.
+        return `<div class="rt-entity-sub-line rt-units-container"><span class="rt-entity-sub-label">Spells:</span> ${renderPillsAsMagic(val)}</div>`;
     }
+
+    /** Like renderPills, but always uses the blue magic pill style (combat caster spells). */
+    const renderPillsAsMagic = (text) => {
+        return splitSmart(text).map(t => {
+            let displayText = t;
+            if (t.startsWith('(+)') || t.startsWith('(+) ')) {
+                displayText = t.replace(/^\(\+\)\s*/, '');
+            } else if (t.startsWith('(-)') || t.startsWith('(-) ')) {
+                displayText = t.replace(/^\(-\)\s*/, '');
+            }
+
+            const m = displayText.match(/^(.+?)\s*\((.+)\)$/);
+            if (m) {
+                const [, name, desc] = m;
+                let iconHtml = '';
+                const resourceMatch = desc.match(/(\d+)\s*\/\s*(\d+)/);
+                if (resourceMatch) {
+                    iconHtml = `<span class="rt-unit-icon">${escapeHtmlWithColor(resourceMatch[0])}</span>`;
+                }
+                return `<span class="rt-unit-pill rt-pill-magic">
+                    <span class="rt-unit-name">${escapeHtmlWithColor(name)}</span>
+                    ${iconHtml}
+                    <span class="rt-unit-descr">(${escapeHtmlWithColor(desc)})</span>
+                </span>`;
+            }
+            return `<span class="rt-unit-pill rt-pill-magic no-desc"><span class="rt-unit-name">${escapeHtmlWithColor(displayText)}</span></span>`;
+        }).join('');
+    };
 
 
     // Shared marker type map used by tokenizeMarkers and tryRenderMarker.

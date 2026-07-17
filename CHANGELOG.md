@@ -2,6 +2,17 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [5.7.90] - 2026-07-18
+
+### Added
+- **Combat caster support**: `[COMBAT]` `Spells:` line with remaining uses; flat lists render as blue magic pills. `<combat_start>` asks for spells/slots on caster enemies.
+
+### Fixed
+- **Chat Link clobbering global UI**: Auto-image-gen, immersion, connection, and appearance prefs are no longer saved/restored via `chatStates` (stops F5/code-reload resets).
+
+### Changed
+- **BASE NPC TIERS**: Label uses Attack (not BAB); spellcaster scaling note added under the tier table.
+
 ## [5.7.85] - 2026-07-18
 
 ### Added

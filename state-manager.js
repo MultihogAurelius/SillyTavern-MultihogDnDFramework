@@ -18,7 +18,7 @@ export const DEFAULT_NPC_SECTIONS = [
     { id: 'sec_habits', name: 'Habits/Behaviors', description: 'Recurring mannerisms and patterns — not one scene\'s behavior.', icon: '🔄', color: '#10b981' },
     { id: 'sec_strengths', name: 'Strengths', description: '[Concise bullet phrases formatted in bullet points of their most notable strengths, skills, or virtues. Sharp and specific — no vague generalities. A kind character may have more strengths than flaws.]', icon: '⚡', color: '#22c55e' },
     { id: 'sec_flaws', name: 'Flaws', description: '[Concise bullet phrases formatted in bullet points of their most notable weaknesses, bad habits, or moral failings. Be honest and specific. A troubled character may have more flaws than strengths.]\n(Note: The split between strengths and flaws does not need to be even. It is perfectly fine to have an uneven split—like having more strengths than flaws, or more flaws than strengths—so long as it authentically reflects the character. However, it can be evenly split if it makes sense.)', icon: '⚠️', color: '#ef4444' },
-    { id: 'sec_combat_profile', name: 'Combat Profile', description: '[HIDDEN UNTIL SET — only written when a [COMBAT] block for this NPC is visible in the narrative. Copy the full stat block verbatim: HP, AC, saves, weapons, abilities, and any other declared stats. Never fabricate or summarize.]', icon: '🤺', color: '#38bdf8', hiddenUntilSet: true }
+    { id: 'sec_combat_profile', name: 'Combat Profile', description: '[HIDDEN UNTIL SET — only written when a [COMBAT] block for this NPC is visible in the narrative. Copy the full stat block verbatim: HP, AC, saves, weapons, abilities, spells, and any other declared stats. Never fabricate or summarize.]', icon: '🤺', color: '#38bdf8', hiddenUntilSet: true }
 ];
 
 export const DEFAULT_PC_SECTIONS = [
@@ -1861,6 +1861,9 @@ function getSettingsInternal(extensionSettings) {
             );
     }
 
+    // ── MIGRATION: strip global UI prefs out of chatStates (Chat Link clobber fix) ─
+    stripChatStateGlobalUiPrefs(s);
+
     // ── MIGRATION: CHARACTER/PARTY/COMBAT — (N attacks) APR format ────────────────
     if (s.stockPrompts?.character &&
         s.stockPrompts.character.includes('Finesse:') &&
@@ -1875,7 +1878,8 @@ function getSettingsInternal(extensionSettings) {
     if (s.stockPrompts?.combat &&
         (s.stockPrompts.combat.includes('Finesse weapons:') ||
          s.stockPrompts.combat.includes('BAB is +10') ||
-         (s.stockPrompts.combat.includes('Att/def:') && !s.stockPrompts.combat.includes('(N attacks,')))) {
+         (s.stockPrompts.combat.includes('Att/def:') && !s.stockPrompts.combat.includes('(N attacks,')) ||
+         (s.stockPrompts.combat.includes('Att/def:') && !s.stockPrompts.combat.includes('Spells:')))) {
         s.stockPrompts.combat = DEFAULT_STOCK_PROMPTS.combat;
     }
 
@@ -2382,6 +2386,80 @@ export function applyModuleSchemaBackup(preferredChatId) {
  * @param {string} chatId
  * @param {{ skipDiskWrite?: boolean }} [opts]
  */
+/**
+ * Global UI / connection prefs that must NOT live in chatStates.
+ * Chat Link used to snapshot these; loadChatState then overwrote live settings on every
+ * F5/code reload with a stale partition — auto-image-gen, immersion, connections, etc.
+ * Memo/modules/portraits/WP timers stay per-chat; these stay global.
+ */
+export const CHAT_STATE_GLOBAL_UI_KEYS = [
+    'portraitGeneratorSource',
+    'portraitSkipPromptDialog',
+    'hideImageGenToasts',
+    'portraitAutoGenerateParty',
+    'portraitAutoGeneratePlayer',
+    'portraitAutoGenerateEnemies',
+    'portraitAutoGenerateNpcs',
+    'portraitAutoGenerateLocations',
+    'portraitAutoGenerateSceneView',
+    'portraitRealtimeTriggerMode',
+    'portraitRealtimeEveryNOutputs',
+    'portraitRegenerateVisitedLocations',
+    'portraitLocationIncludePresentNpcs',
+    'locationImages',
+    'agentImmersionMode',
+    'portraitConnectionSource',
+    'portraitConnectionProfileId',
+    'portraitCompletionPresetId',
+    'portraitOllamaUrl',
+    'portraitOllamaModel',
+    'portraitOpenaiUrl',
+    'portraitOpenaiKey',
+    'portraitOpenaiModel',
+    'worldConnectionSource',
+    'worldConnectionProfileId',
+    'worldCompletionPresetId',
+    'worldOllamaUrl',
+    'worldOllamaModel',
+    'worldOpenaiUrl',
+    'worldOpenaiKey',
+    'worldOpenaiModel',
+    'gameSystemWizardConnectionSource',
+    'gameSystemWizardConnectionProfileId',
+    'gameSystemWizardCompletionPresetId',
+    'gameSystemWizardOllamaUrl',
+    'gameSystemWizardOllamaModel',
+    'gameSystemWizardOpenaiUrl',
+    'gameSystemWizardOpenaiKey',
+    'gameSystemWizardOpenaiModel',
+    'gameSystemWizardSystemPrompt',
+    // Appearance is global — never chat-linked (defensive; not historically snapshotted)
+    'panelBgImage',
+    'panelBgImageNight',
+    'panelBgOverlayStrength',
+    'agentPanelBgImage',
+    'agentPanelBgImageNight',
+    'agentPanelBgOverlayStrength',
+    'dayNightCycleEnabled',
+];
+
+/** Strip global UI keys from every chatStates partition (one-shot hygiene on load/save). */
+export function stripChatStateGlobalUiPrefs(settings) {
+    const states = settings?.chatStates;
+    if (!states || typeof states !== 'object') return false;
+    let changed = false;
+    for (const part of Object.values(states)) {
+        if (!part || typeof part !== 'object') continue;
+        for (const key of CHAT_STATE_GLOBAL_UI_KEYS) {
+            if (Object.prototype.hasOwnProperty.call(part, key)) {
+                delete part[key];
+                changed = true;
+            }
+        }
+    }
+    return changed;
+}
+
 export function saveChatState(chatId, opts = {}) {
     if (!chatId) return;
     if (typeof globalThis._rpgPortraitMigrationLocked === 'function' && globalThis._rpgPortraitMigrationLocked()) {
@@ -2455,44 +2533,11 @@ export function saveChatState(chatId, opts = {}) {
         worldProgressionConsolidateInterval: s.worldProgressionConsolidateInterval ?? 7,
         worldProgressionExclusionList: s.worldProgressionExclusionList || '',
 
-        portraitGeneratorSource: s.portraitGeneratorSource ?? "native",
-        portraitSkipPromptDialog: s.portraitSkipPromptDialog ?? false,
-        hideImageGenToasts: s.hideImageGenToasts ?? false,
-        portraitAutoGenerateParty: s.portraitAutoGenerateParty ?? false,
-        portraitAutoGeneratePlayer: s.portraitAutoGeneratePlayer ?? false,
-        portraitAutoGenerateEnemies: s.portraitAutoGenerateEnemies ?? false,
-        portraitAutoGenerateNpcs: s.portraitAutoGenerateNpcs ?? false,
-        portraitAutoGenerateLocations: s.portraitAutoGenerateLocations ?? false,
-        portraitAutoGenerateSceneView: s.portraitAutoGenerateSceneView ?? false,
-        portraitRealtimeTriggerMode: s.portraitRealtimeTriggerMode || 'location_change',
-        portraitRealtimeEveryNOutputs: Math.max(1, Number(s.portraitRealtimeEveryNOutputs) || 1),
-        portraitRegenerateVisitedLocations: s.portraitRegenerateVisitedLocations ?? false,
-        locationImages: !!s.locationImages,
-        worldConnectionSource: s.worldConnectionSource ?? "default",
-        worldConnectionProfileId: s.worldConnectionProfileId || "",
-        worldCompletionPresetId: s.worldCompletionPresetId || "",
-        worldOllamaUrl: s.worldOllamaUrl || "http://localhost:11434",
-        worldOllamaModel: s.worldOllamaModel || "",
-        worldOpenaiUrl: s.worldOpenaiUrl || "",
-        worldOpenaiKey: s.worldOpenaiKey || "",
-        worldOpenaiModel: s.worldOpenaiModel || "",
-        gameSystemWizardConnectionSource: s.gameSystemWizardConnectionSource ?? "default",
-        gameSystemWizardConnectionProfileId: s.gameSystemWizardConnectionProfileId || "",
-        gameSystemWizardCompletionPresetId: s.gameSystemWizardCompletionPresetId || "",
-        gameSystemWizardOllamaUrl: s.gameSystemWizardOllamaUrl || "http://localhost:11434",
-        gameSystemWizardOllamaModel: s.gameSystemWizardOllamaModel || "",
-        gameSystemWizardOpenaiUrl: s.gameSystemWizardOpenaiUrl || "",
-        gameSystemWizardOpenaiKey: s.gameSystemWizardOpenaiKey || "",
-        gameSystemWizardOpenaiModel: s.gameSystemWizardOpenaiModel || "",
-        gameSystemWizardSystemPrompt: s.gameSystemWizardSystemPrompt || "",
-
         // Per-chat time/date formatting (24h clock, DD/MM/YYYY vs Day N, initial anchor)
         use24hTime: !!s.use24hTime,
         useDdMmYyFormat: !!s.useDdMmYyFormat,
         initialDate: s.initialDate || 'Day 1',
         npcRelationshipMax: getNpcRelationshipMax(s),
-
-        agentImmersionMode: s.agentImmersionMode ?? false,
 
         // Preserve lorebook stack link — written by Link button and router, not by normal state saves
         campaignBooks: existing.campaignBooks || [],
@@ -2508,6 +2553,8 @@ export function saveChatState(chatId, opts = {}) {
 
     // Sync WAL before the async disk write — survives F5 if /api/settings/save is cancelled.
     writeModuleSchemaBackup(chatId);
+    // Drop any legacy global-UI keys copied into older partitions.
+    stripChatStateGlobalUiPrefs(s);
     
     // Use a synchronous save so data is not lost if the page is closed before
     // a debounced timer fires (the root cause of the PC/state/relationship loss bug).
