@@ -304,6 +304,7 @@ Declare all previously unknown NPC stats (AC, Saves, HP, Combat Line, immunities
 
 <combat_flow>
 - Simulate all actions for every NPC participant each round.
+- For [CHARACTER] and [PARTY], use the pre-calculated attack totals on the Combat line (`Ranged: +X | Melee: +X`) from the STATE MEMO — do not re-derive melee or ranged bonuses from BAB and ability modifiers during combat.
 - State remaining HP after every damage or healing event.
 - Expire buffs/debuffs after appropriate duration. Explicitly state initial duration in turns. Examples: Mage Armor (+3 AC, 8h 0m) or Heroism (+5 Temp HP, 10 turns) or Exhaustion (Disadvantage on Ability Checks, until Long Rest)
 </combat_flow>
@@ -680,6 +681,7 @@ Declare all previously unknown NPC stats (AC, Saves, HP, Combat Line, immunities
 
 <combat_flow>
 - Simulate all actions for every NPC participant each round.
+- For [CHARACTER] and [PARTY], use the pre-calculated attack totals on the Combat line (`Ranged: +X | Melee: +X`) from the STATE MEMO — do not re-derive melee or ranged bonuses from BAB and ability modifiers during combat.
 - State remaining HP after every damage or healing event.
 - Expire buffs/debuffs after appropriate duration. Explicitly state initial duration in turns. Examples: Mage Armor (+3 AC, 8h 0m) or Heroism (+5 Temp HP, 10 turns) or Exhaustion (Disadvantage on Ability Checks, until Long Rest)
 </combat_flow>
