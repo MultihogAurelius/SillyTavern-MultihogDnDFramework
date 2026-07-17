@@ -2,6 +2,12 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [5.7.93] - 2026-07-18
+
+### Changed
+- **`[COMBAT]` caster spells**: Party-style `Cantrips` / `Level N (avail/max)` lines; Att/def before Saves in the template order.
+- **`<combat_start>`**: Caster enemies must be introduced with spells by level and available slots.
+
 ## [5.7.92] - 2026-07-18
 
 ### Changed

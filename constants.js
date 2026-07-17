@@ -120,31 +120,46 @@ The ETA must always be an explicit timestamp, e.g. "Day 1, HH:MM", or "17/10/200
 ETA [BENCH] example: Status: Benched (08:08 AM, Day 1, separated to investigate the docks and meet back at Day 1, 12:10 AM)`,
   combat: `Active enemies/NPCs in combat. Track the current COMBAT ROUND starting from 1. Decrement buff/debuff durations by 1 each round.
 
-Shared header for every combatant:
+Output fields in this exact order for every combatant. Choose MARTIAL or CASTER Att/def + Spells rules below — never mix styles on the same enemy.
+
 COMBAT ROUND X
 Name: current/max HP
+Att/def: (see MARTIAL or CASTER)
 Saves: Fort +X, Ref +X, Will +X
 Abilities: Ability1 (effect), Ability2 (effect)
+Spells: (CASTER only — one line per spell level, same format as [PARTY])
 Other: Trait1 (description), Trait2 (description)
 Status: Effect (duration)
 
-Then use ONE of these two Att/def patterns (never mix styles on the same enemy):
-
-MARTIAL (fighters, beasts, thugs — no Spells line):
+MARTIAL (fighters, beasts, thugs — omit Spells: entirely):
 Att/def: Weapon (N attacks, +X / damage) | Armor (AC: Z)
-Example: Att/def: Longsword (2 attacks, +12/+7 / 1d8+3 S) | Scale Mail (AC: 15)
+Example:
+Bandit: 18/18 HP
+Att/def: Longsword (2 attacks, +12/+7 / 1d8+3 S) | Scale Mail (AC: 15)
+Saves: Fort +4, Ref +2, Will +1
+Abilities: Pack Tactics
+Other: Soldier Tier
+Status: Healthy
 
-CASTER (mages, priests, warlocks — must include Spells:):
+CASTER (mages, priests, warlocks — must include Spells: lines):
 Att/def: Spell Atk +X | Spell DC Y | Backup Weapon (1 attacks, +Z / damage) | Armor (AC: Z)
-Spells: Spell1 (avail/max), Spell2 (at will)
-Example: Att/def: Spell Atk +5 | Spell DC 14 | Dagger (1 attacks, +2 / 1d4 P) | Mage Armor (AC: 13)
-Spells: Fire Bolt (at will), Shocking Grasp (at will), Magic Missile (2/2), Shield (1/2)
+Spells: Cantrips: Spell1, Spell2
+Spells: Level N (avail/max): Spell1, Spell2
+Example:
+Cultist Acolyte: 15/15 HP
+Att/def: Spell Atk +4 | Spell DC 12 | Dagger (1 attacks, +1 / 1d4-1 P) | Robes (AC: 11)
+Saves: Fort +1, Ref +2, Will +3
+Abilities: Spellcasting
+Spells: Cantrips: Fire Bolt, Prestidigitation
+Spells: Level 1 (2/2): Magic Missile, Shield
+Other: Soldier Tier Spellcaster
+Status: Healthy
 
 Rules:
-- Pre-calculate all attack bonuses when the enemy is first declared; use listed values directly — do not invent or re-derive mid-fight.
-- Martial: weapon Attack is the primary threat. Omit Spells: entirely.
-- Caster: Spell Atk is used for spell attack rolls; Spell DC for saving-throw spells. Backup weapon Attack should be weaker than Spell Atk. Always output Spells: with remaining uses.
-- Hybrid gishes (spell + serious weapon): use the CASTER Att/def line, but the backup weapon may match martial Attack of the same tier.
+- Pre-calculate Spell Atk, Spell DC, and weapon bonuses when the enemy is first declared; use listed values directly — do not invent or re-derive mid-fight.
+- Martial: weapon Attack is the primary threat. Never output Spells:.
+- Caster: Spell Atk for spell attack rolls; Spell DC for saving-throw spells. Backup weapon Attack should be weaker than Spell Atk. Output ONE Spells: line per level (Cantrips, then Level 1, etc.) and track avail/max slots as they are spent.
+- Hybrid gishes: use the CASTER Att/def + Spells pattern; backup weapon may match martial Attack of the same tier.
 
 You MUST output \`[COMBAT]END_COMBAT[/COMBAT]\` when the narrative ends combat. Do not put members of [PARTY] into [COMBAT].`,
   inventory: `Items, loot, equipment, and wealth. You MAY create this section if loot is found and it doesn't currently exist.
@@ -319,7 +334,7 @@ This is a custom hybrid ruleset that utilizes 5e flavor (spells, feats, XP table
 </ruleset_note>
 
 <combat_start>
-Declare all previously unknown NPC stats (AC, Saves, HP, Combat Line, immunities/resistances/spells and slots for caster enemies/etc), then roll initiative for all participants.
+Declare all previously unknown NPC stats (AC, Saves, HP, Combat Line, immunities/resistances/etc), then roll initiative for all participants. For caster enemies, list spells by level with available slots at introduction — e.g. Cantrips: Fire Bolt; Level 1 (2/2): Magic Missile, Shield — never a flat comma list without levels/slots.
 </combat_start>
 
 <combat_flow>
@@ -366,7 +381,7 @@ Legendary — World-threat    | HP 150–500+ | AC 19–22 | Attack +16 to +20+ 
 
 These are BASE ranges. Scale UP or DOWN based on quest difficulty and narrative context.
 
-SPELLCASTER ENEMIES: Use the CASTER Att/def pattern (Spell Atk + Spell DC + weak backup weapon), not the martial weapon line. Spell Atk ≈ that tier's Attack range; weapon Attack stays lower. Spell DC follows the DC SCALE by tier (Minion/Soldier ≈ Easy–Moderate, Elite ≈ Hard, Boss ≈ Severe, Legendary ≈ Near-impossible/expert). Cap spell level and slots to the tier; do not hand a hedge witch Legendary magic. Do not hoard slots — caster NPCs should cast freely when it fits the fight; a spell unused before they drop is a wasted threat.
+SPELLCASTER ENEMIES: Use the CASTER Att/def pattern (Spell Atk + Spell DC + weak backup weapon) and [PARTY]-style Spells lines (Cantrips / Level N with avail/max), not the martial weapon-only line. Spell Atk ≈ that tier's Attack range; weapon Attack stays lower. Spell DC follows the DC SCALE by tier (Minion/Soldier ≈ Easy–Moderate, Elite ≈ Hard, Boss ≈ Severe, Legendary ≈ Near-impossible/expert). Cap spell level and slots to the tier; do not hand a hedge witch Legendary magic. Do not hoard slots — caster NPCs should cast freely when it fits the fight; a spell unused before they drop is a wasted threat.
 </npc_stat_scaling>
 
 <npc_profile_persistence>
@@ -700,7 +715,7 @@ This is a custom hybrid ruleset that utilizes 5e flavor (spells, feats, XP table
 </ruleset_note>
 
 <combat_start>
-Declare all previously unknown NPC stats (AC, Saves, HP, Combat Line, immunities/resistances/spells and slots for caster enemies/etc), then roll initiative for all participants.
+Declare all previously unknown NPC stats (AC, Saves, HP, Combat Line, immunities/resistances/etc), then roll initiative for all participants. For caster enemies, list spells by level with available slots at introduction — e.g. Cantrips: Fire Bolt; Level 1 (2/2): Magic Missile, Shield — never a flat comma list without levels/slots.
 </combat_start>
 
 <combat_flow>
@@ -747,7 +762,7 @@ Legendary — World-threat    | HP 150–500+ | AC 19–22 | Attack +16 to +20+ 
 
 These are BASE ranges. Scale UP or DOWN based on quest difficulty and narrative context.
 
-SPELLCASTER ENEMIES: Use the CASTER Att/def pattern (Spell Atk + Spell DC + weak backup weapon), not the martial weapon line. Spell Atk ≈ that tier's Attack range; weapon Attack stays lower. Spell DC follows the DC SCALE by tier (Minion/Soldier ≈ Easy–Moderate, Elite ≈ Hard, Boss ≈ Severe, Legendary ≈ Near-impossible/expert). Cap spell level and slots to the tier; do not hand a hedge witch Legendary magic. Do not hoard slots — caster NPCs should cast freely when it fits the fight; a spell unused before they drop is a wasted threat.
+SPELLCASTER ENEMIES: Use the CASTER Att/def pattern (Spell Atk + Spell DC + weak backup weapon) and [PARTY]-style Spells lines (Cantrips / Level N with avail/max), not the martial weapon-only line. Spell Atk ≈ that tier's Attack range; weapon Attack stays lower. Spell DC follows the DC SCALE by tier (Minion/Soldier ≈ Easy–Moderate, Elite ≈ Hard, Boss ≈ Severe, Legendary ≈ Near-impossible/expert). Cap spell level and slots to the tier; do not hand a hedge witch Legendary magic. Do not hoard slots — caster NPCs should cast freely when it fits the fight; a spell unused before they drop is a wasted threat.
 </npc_stat_scaling>
 
 <npc_profile_persistence>

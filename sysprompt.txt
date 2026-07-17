@@ -42,7 +42,7 @@ This is a custom hybrid ruleset that utilizes 5e flavor (spells, feats, XP table
 </ruleset_note>
 
 <combat_start>
-Declare all previously unknown NPC stats (AC, Saves, HP, Combat Line, immunities/resistances/spells and slots for caster enemies/etc), then roll initiative for all participants.
+Declare all previously unknown NPC stats (AC, Saves, HP, Combat Line, immunities/resistances/etc), then roll initiative for all participants. For caster enemies, list spells by level with available slots at introduction — e.g. Cantrips: Fire Bolt; Level 1 (2/2): Magic Missile, Shield — never a flat comma list without levels/slots.
 </combat_start>
 
 <combat_flow>
@@ -89,7 +89,7 @@ Legendary — World-threat    | HP 150–500+ | AC 19–22 | Attack +16 to +20+ 
 
 These are BASE ranges. Scale UP or DOWN based on quest difficulty and narrative context.
 
-SPELLCASTER ENEMIES: Use the CASTER Att/def pattern (Spell Atk + Spell DC + weak backup weapon), not the martial weapon line. Spell Atk ≈ that tier's Attack range; weapon Attack stays lower. Spell DC follows the DC SCALE by tier (Minion/Soldier ≈ Easy–Moderate, Elite ≈ Hard, Boss ≈ Severe, Legendary ≈ Near-impossible/expert). Cap spell level and slots to the tier; do not hand a hedge witch Legendary magic. Do not hoard slots — caster NPCs should cast freely when it fits the fight; a spell unused before they drop is a wasted threat.
+SPELLCASTER ENEMIES: Use the CASTER Att/def pattern (Spell Atk + Spell DC + weak backup weapon) and [PARTY]-style Spells lines (Cantrips / Level N with avail/max), not the martial weapon-only line. Spell Atk ≈ that tier's Attack range; weapon Attack stays lower. Spell DC follows the DC SCALE by tier (Minion/Soldier ≈ Easy–Moderate, Elite ≈ Hard, Boss ≈ Severe, Legendary ≈ Near-impossible/expert). Cap spell level and slots to the tier; do not hand a hedge witch Legendary magic. Do not hoard slots — caster NPCs should cast freely when it fits the fight; a spell unused before they drop is a wasted threat.
 </npc_stat_scaling>
 
 <npc_profile_persistence>
