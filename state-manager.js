@@ -1861,6 +1861,24 @@ function getSettingsInternal(extensionSettings) {
             );
     }
 
+    // ── MIGRATION: CHARACTER/PARTY/COMBAT — (N attacks) APR format ────────────────
+    if (s.stockPrompts?.character &&
+        s.stockPrompts.character.includes('Finesse:') &&
+        !s.stockPrompts.character.includes('Ranged (N attacks):')) {
+        s.stockPrompts.character = DEFAULT_STOCK_PROMPTS.character;
+    }
+    if (s.stockPrompts?.party &&
+        s.stockPrompts.party.includes('Finesse:') &&
+        !s.stockPrompts.party.includes('Ranged (N attacks):')) {
+        s.stockPrompts.party = DEFAULT_STOCK_PROMPTS.party;
+    }
+    if (s.stockPrompts?.combat &&
+        (s.stockPrompts.combat.includes('Finesse weapons:') ||
+         s.stockPrompts.combat.includes('BAB is +10') ||
+         (s.stockPrompts.combat.includes('Att/def:') && !s.stockPrompts.combat.includes('(N attacks,')))) {
+        s.stockPrompts.combat = DEFAULT_STOCK_PROMPTS.combat;
+    }
+
     // ── MIGRATION: CHARACTER/PARTY/COMBAT — finesse melee uses DEX ───────────────
     const PRE_FINESSE_ATTACK_SNIPPET = 'weapon enhancement = +1/+2/+3 from the equipped weapon; 0 if mundane).';
     if (s.stockPrompts?.character &&
@@ -1876,7 +1894,7 @@ function getSettingsInternal(extensionSettings) {
     const PRE_FINESSE_COMBAT_SNIPPET = 'You MUST output `[COMBAT]END_COMBAT[/COMBAT]`';
     if (s.stockPrompts?.combat &&
         s.stockPrompts.combat.includes(PRE_FINESSE_COMBAT_SNIPPET) &&
-        !s.stockPrompts.combat.includes('Finesse weapons:')) {
+        !s.stockPrompts.combat.includes('(N attacks,')) {
         s.stockPrompts.combat = DEFAULT_STOCK_PROMPTS.combat;
     }
 

@@ -2,6 +2,17 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [5.7.85] - 2026-07-18
+
+### Added
+- **Attacks per round (APR)**: Second attack at BAB +10 (−5), max 2; Combat line uses `Ranged (N attacks)` / `Melee (N attacks)` with optional slash totals.
+- **`<attacks_per_round>`**: Dedicated sysprompt block; weapon-proficiencies trimmed to formulas + finesse only.
+
+### Changed
+- **NPC `[COMBAT]` format**: Compact `Att/def: Weapon (N attacks, +X / damage)` — no BAB/attribute/finesse rules on enemy blocks.
+- **BASE NPC TIERS**: Stretched BAB bands (Boss +11–15, Legendary +16–20+) so labels match martial progression and APR.
+- **DC SCALE**: Easy 14 → Near-impossible/expert 33+.
+
 ## [5.7.75] - 2026-07-17
 
 ### Added

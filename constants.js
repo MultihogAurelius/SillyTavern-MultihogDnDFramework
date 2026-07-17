@@ -26,14 +26,17 @@ export const COLOR_EXAMPLES = `<font color=#ff5555>Red Text</font>
 
 // ── Default module prompts ─────────────────────────────────────────────────────
 
-/** How Combat-line Melee/Ranged totals are derived (used in stock prompts + sysprompt). */
-export const ATTACK_TOTAL_FORMULA_HINT = `ATTACK TOTALS: Melee Total Formula: Melee Total = BAB + STR modifier + Weapon enhancement bonus. Ranged Total Formula: Ranged Total = BAB + DEX modifier + Weapon enhancement bonus. The Melee and Ranged values on the Combat line are these totals (weapon enhancement = +1/+2/+3 from the equipped weapon; 0 if mundane). Finesse: melee attacks with finesse weapons (rapier, dagger, scimitar, etc.) use DEX modifier instead of STR when the wielder benefits — standard D&D finesse rule.`;
+/** Stock-prompt APR note (sysprompt uses <attacks_per_round> instead). */
+export const ATTACKS_PER_ROUND_STOCK_HINT = `APR: Second attack at exactly +10 BAB, at −5; no further attacks. Pre-calculate on the Combat line: Ranged (N attacks): +X or +C/+D | Melee (N attacks): +X or +A/+B — N=1 below BAB +10; N=2 at BAB +10+ (second slash value is 5 lower).`;
+
+/** How Combat-line Melee/Ranged totals are derived (used in stock prompts). */
+export const ATTACK_TOTAL_FORMULA_HINT = `ATTACK TOTALS: Melee Total Formula: Melee Total = BAB + STR modifier + Weapon enhancement bonus. Ranged Total Formula: Ranged Total = BAB + DEX modifier + Weapon enhancement bonus. The Melee and Ranged values on the Combat line are these totals (weapon enhancement = +1/+2/+3 from the equipped weapon; 0 if mundane). Finesse: melee attacks with finesse weapons (rapier, dagger, scimitar, etc.) use DEX modifier instead of STR when the wielder benefits. ${ATTACKS_PER_ROUND_STOCK_HINT}`;
 
 export const DEFAULT_STOCK_PROMPTS = {
   character: `Main character's core stats. Use this format:
 [CHARACTER]
 {{user}} (Class): current/max HP
-Combat: BAB: +X | Ranged: +X | Melee: +X | Base AC: X | Total AC: Z
+Combat: BAB: +X | Ranged (N attacks): +X or +C/+D | Melee (N attacks): +X or +A/+B | Base AC: X | Total AC: Z
 Gear: Weapon1 (stats) | Weapon2, if exists, (stats) | Armor Name (+Y AC)
 Proficiencies: Category1, Category2
 Attr: STR X (mod), DEX X (mod), CON X (mod), INT X (mod), WIS X (mod), CHA X (mod)
@@ -49,7 +52,7 @@ ${ATTACK_TOTAL_FORMULA_HINT}
 Upon LEVEL UP, incorporate attribute changes.`,
   party: `Companion/Party members. Use this format for each member:
 Name (Class): current/max HP
-Combat: BAB: +X | Ranged: +X | Melee: +X | Base AC: X | Total AC: Z
+Combat: BAB: +X | Ranged (N attacks): +X or +C/+D | Melee (N attacks): +X or +A/+B | Base AC: X | Total AC: Z
 Gear: Weapon (stats) | Armor Name (+Y AC)
 Proficiencies: Category1, Category2
 Attr: STR X (mod), DEX X (mod), CON X (mod), INT X (mod), WIS X (mod), CHA X (mod)
@@ -75,7 +78,7 @@ TRIGGERS:
 PERSISTENCE: If [PARTY] changes, you MUST output the ENTIRE block (all remaining members), per standard BLOCK PERSISTENCE rules. If it had no changes this turn, omit it entirely from your output.
 
 Example: [PARTY]Elara (Ranger): 26/45 HP
-Combat: BAB: +3 | Ranged: +6 | Melee: +4 | Base AC: 13 | Total AC: 15
+Combat: BAB: +3 | Ranged (1 attacks): +6 | Melee (1 attacks): +4 | Base AC: 13 | Total AC: 15
 Gear: Shortbow (1d6+3 P) | Leather Armor (+2 AC)
 Proficiencies: Simple Weapons, Martial Weapons
 Attr: STR 12 (+1), DEX 16 (+3), CON 14 (+2), INT 10 (+0), WIS 14 (+2), CHA 12 (+1)
@@ -118,13 +121,13 @@ ETA [BENCH] example: Status: Benched (08:08 AM, Day 1, separated to investigate 
   combat: `Active enemies/NPCs in combat. Track the current COMBAT ROUND starting from 1. Decrement buff/debuff durations by 1 each round. Format each combatant as:
 COMBAT ROUND X
 Name: current/max HP
-Att/def: Weapon (+X / damage) | Armor (AC: Z)
+Att/def: Weapon (N attacks, +X / damage) | Armor (AC: Z)
 Saves: Fort +X, Ref +X, Will +X
 Abilities: Ability1 (effect), Ability2 (effect)
 Other: Trait1 (description), Trait2 (description)
 Status: Effect (duration)
 
-Finesse weapons: use DEX modifier (not STR) for melee attack totals when applicable.
+Pre-calculate attack bonuses on Att/def when the enemy is first declared — e.g. Pickaxe (1 attacks, +3 / 1d6+1 P) or Longsword (2 attacks, +12/+7 / 1d8+3). Use those listed values directly; do not recalculate mid-fight.
 
 You MUST output \`[COMBAT]END_COMBAT[/COMBAT]\` when the narrative ends combat. Do not put members of [PARTY] into [COMBAT].`,
   inventory: `Items, loot, equipment, and wealth. You MAY create this section if loot is found and it doesn't currently exist.
@@ -281,11 +284,11 @@ ROLL FORMAT (Strictly enforced for both systems):
 
 DC SCALE:
  Trivial—8
- Easy—11
- Moderate—14
- Hard—18
- Severe—21
- Near-impossible—24+
+ Easy—14
+ Moderate—18
+ Hard—23
+ Severe—28
+ Near-impossible/expert—33+
 
 Unknown skill bonuses:
 When a character's skill level is unknown, use your best judgment based on their background and archetype. Also take into account situational bonuses/maluses.
@@ -304,7 +307,7 @@ Declare all previously unknown NPC stats (AC, Saves, HP, Combat Line, immunities
 
 <combat_flow>
 - Simulate all actions for every NPC participant each round.
-- For [CHARACTER] and [PARTY], use the pre-calculated attack totals on the Combat line (\`Ranged: +X | Melee: +X\`) from the STATE MEMO — do not re-derive melee or ranged bonuses from BAB and ability modifiers during combat.
+- For [CHARACTER] and [PARTY], use the pre-calculated attack totals on the Combat line (\`Ranged (N attacks): +X\` or \`+C/+D\` | \`Melee (N attacks): +X\` or \`+A/+B\`) from the STATE MEMO — do not re-derive bonuses from BAB and ability modifiers during combat. Slash-separated bonuses mean one roll per listed value.
 - State remaining HP after every damage or healing event.
 - Expire buffs/debuffs after appropriate duration. Explicitly state initial duration in turns. Examples: Mage Armor (+3 AC, 8h 0m) or Heroism (+5 Temp HP, 10 turns) or Exhaustion (Disadvantage on Ability Checks, until Long Rest)
 </combat_flow>
@@ -338,11 +341,11 @@ NO ACTIVE QUEST / GENERAL ENCOUNTERS:
 When the player is not on a quest, use pure narrative context. A random bandit should NOT have 80 HP just because the player does. A dragon should have 300+ HP regardless of player level. Prioritize REALISM over balance. Do NOT babysit the player. Vary it — sometimes enemies are above the player by several levels, sometimes below. But always give the player at least a fighting chance.
 
 BASE NPC TIERS (guidelines, scale with context):
-Minion — Rabble, untrained | HP 8–15   | AC 10–12 | BAB +0 to +1
-Soldier — Trained          | HP 18–30  | AC 13–15 | BAB +2 to +3
-Elite — Veteran/specialist | HP 35–60  | AC 15–17 | BAB +4 to +5
-Boss — Powerful individual  | HP 60–120 | AC 17–19 | BAB +6 to +8
-Legendary — World-threat    | HP 150–500+ | AC 19–22 | BAB +9 to +12
+Minion — Rabble, untrained | HP 8–15   | AC 10–12 | BAB +0 to +2
+Soldier — Trained          | HP 18–30  | AC 13–15 | BAB +3 to +6
+Elite — Veteran/specialist | HP 35–60  | AC 15–17 | BAB +7 to +10 (2 attacks possible)
+Boss — Powerful individual  | HP 60–120 | AC 17–19 | BAB +11 to +15 (2 attacks standard)
+Legendary — World-threat    | HP 150–500+ | AC 19–22 | BAB +16 to +20+ (rare; still max 2 APR)
 
 These are BASE ranges. Scale UP or DOWN based on quest difficulty and narrative context.
 </npc_stat_scaling>
@@ -380,9 +383,11 @@ If a character lacks a "Proficiencies:" line entirely, infer proficiency from th
 Melee Total Formula: Melee Total = BAB + STR modifier + Weapon enhancement bonus
 Ranged Total Formula: Ranged Total = BAB + DEX modifier + Weapon enhancement bonus
 Finesse: melee attacks with finesse weapons (rapier, dagger, scimitar, etc.) use DEX modifier instead of STR when the wielder benefits.
-The Melee and Ranged values on the Combat line must equal these totals.
-Note: High-quality or magical weapons may have an inherent accuracy/damage modifier (e.g., a "Longsword +1" or "Vampire's Blade +2"). This bonus applies to both the attack roll and damage roll.
 </weapon_proficiencies>
+
+<attacks_per_round>
+This system uses a simplified formula for APR: a second attack is gained at exactly +10 BAB, at -5; no further attacks are gained.
+</attacks_per_round>
 
 <saving_throws>
 NPC SAVING THROWS:
@@ -519,8 +524,8 @@ The active context contains recent "World Progression" reports detailing backgro
 When a character JOINS the party, explicitly state (Name joins the party) and declare their COMBAT PROFILE immediately using this exact structural database layout:
 [PARTY]
 Name (Class): current/max HP
-Combat: BAB: +X | Ranged: +X | Melee: +X | Base AC: X | Total AC: Z
-(Melee Total = BAB + STR modifier + Weapon enhancement bonus; Ranged Total = BAB + DEX modifier + Weapon enhancement bonus)
+Combat: BAB: +X | Ranged (N attacks): +X or +C/+D | Melee (N attacks): +X or +A/+B | Base AC: X | Total AC: Z
+(Melee Total = BAB + STR modifier + Weapon enhancement bonus; Ranged Total = BAB + DEX modifier + Weapon enhancement bonus; N attacks = 1 below BAB +10, 2 at BAB +10+ with second attack at −5)
 Gear: Primary_Weapon (Damage_Die + Mod / Damage_Type) | Armor_Name (+Y AC)
 Proficiencies: Category1, Category2
 Attr: STR X (mod), DEX X (mod), CON X (mod), INT X (mod), WIS X (mod), CHA X (mod)
@@ -658,11 +663,11 @@ ROLL FORMAT:
 
 DC SCALE:
  Trivial—8
- Easy—11
- Moderate—14
- Hard—18
- Severe—21
- Near-impossible—24+
+ Easy—14
+ Moderate—18
+ Hard—23
+ Severe—28
+ Near-impossible/expert—33+
 
 Unknown skill bonuses:
 When a character's skill level is unknown, use your best judgment based on their background and archetype. Also take into account situational bonuses/maluses.
@@ -681,7 +686,7 @@ Declare all previously unknown NPC stats (AC, Saves, HP, Combat Line, immunities
 
 <combat_flow>
 - Simulate all actions for every NPC participant each round.
-- For [CHARACTER] and [PARTY], use the pre-calculated attack totals on the Combat line (\`Ranged: +X | Melee: +X\`) from the STATE MEMO — do not re-derive melee or ranged bonuses from BAB and ability modifiers during combat.
+- For [CHARACTER] and [PARTY], use the pre-calculated attack totals on the Combat line (\`Ranged (N attacks): +X\` or \`+C/+D\` | \`Melee (N attacks): +X\` or \`+A/+B\`) from the STATE MEMO — do not re-derive bonuses from BAB and ability modifiers during combat. Slash-separated bonuses mean one roll per listed value.
 - State remaining HP after every damage or healing event.
 - Expire buffs/debuffs after appropriate duration. Explicitly state initial duration in turns. Examples: Mage Armor (+3 AC, 8h 0m) or Heroism (+5 Temp HP, 10 turns) or Exhaustion (Disadvantage on Ability Checks, until Long Rest)
 </combat_flow>
@@ -715,11 +720,11 @@ NO ACTIVE QUEST / GENERAL ENCOUNTERS:
 When the player is not on a quest, use pure narrative context. A random bandit should NOT have 80 HP just because the player does. A dragon should have 300+ HP regardless of player level. Prioritize REALISM over balance. Do NOT babysit the player. Vary it — sometimes enemies are above the player by several levels, sometimes below. But always give the player at least a fighting chance.
 
 BASE NPC TIERS (guidelines, scale with context):
-Minion — Rabble, untrained | HP 8–15   | AC 10–12 | BAB +0 to +1
-Soldier — Trained          | HP 18–30  | AC 13–15 | BAB +2 to +3
-Elite — Veteran/specialist | HP 35–60  | AC 15–17 | BAB +4 to +5
-Boss — Powerful individual  | HP 60–120 | AC 17–19 | BAB +6 to +8
-Legendary — World-threat    | HP 150–500+ | AC 19–22 | BAB +9 to +12
+Minion — Rabble, untrained | HP 8–15   | AC 10–12 | BAB +0 to +2
+Soldier — Trained          | HP 18–30  | AC 13–15 | BAB +3 to +6
+Elite — Veteran/specialist | HP 35–60  | AC 15–17 | BAB +7 to +10 (2 attacks possible)
+Boss — Powerful individual  | HP 60–120 | AC 17–19 | BAB +11 to +15 (2 attacks standard)
+Legendary — World-threat    | HP 150–500+ | AC 19–22 | BAB +16 to +20+ (rare; still max 2 APR)
 
 These are BASE ranges. Scale UP or DOWN based on quest difficulty and narrative context.
 </npc_stat_scaling>
@@ -757,9 +762,11 @@ If a character lacks a "Proficiencies:" line entirely, infer proficiency from th
 Melee Total Formula: Melee Total = BAB + STR modifier + Weapon enhancement bonus
 Ranged Total Formula: Ranged Total = BAB + DEX modifier + Weapon enhancement bonus
 Finesse: melee attacks with finesse weapons (rapier, dagger, scimitar, etc.) use DEX modifier instead of STR when the wielder benefits.
-The Melee and Ranged values on the Combat line must equal these totals.
-Note: High-quality or magical weapons may have an inherent accuracy/damage modifier (e.g., a "Longsword +1" or "Vampire's Blade +2"). This bonus applies to both the attack roll and damage roll.
 </weapon_proficiencies>
+
+<attacks_per_round>
+This system uses a simplified formula for APR: a second attack is gained at exactly +10 BAB, at -5; no further attacks are gained.
+</attacks_per_round>
 
 <saving_throws>
 NPC SAVING THROWS:
@@ -899,8 +906,8 @@ The active context contains recent "World Progression" reports detailing backgro
 When a character JOINS the party, explicitly state (Name joins the party) and declare their COMBAT PROFILE immediately using this exact structural database layout:
 [PARTY]
 Name (Class): current/max HP
-Combat: BAB: +X | Ranged: +X | Melee: +X | Base AC: X | Total AC: Z
-(Melee Total = BAB + STR modifier + Weapon enhancement bonus; Ranged Total = BAB + DEX modifier + Weapon enhancement bonus)
+Combat: BAB: +X | Ranged (N attacks): +X or +C/+D | Melee (N attacks): +X or +A/+B | Base AC: X | Total AC: Z
+(Melee Total = BAB + STR modifier + Weapon enhancement bonus; Ranged Total = BAB + DEX modifier + Weapon enhancement bonus; N attacks = 1 below BAB +10, 2 at BAB +10+ with second attack at −5)
 Gear: Primary_Weapon (Damage_Die + Mod / Damage_Type) | Armor_Name (+Y AC)
 Proficiencies: Category1, Category2
 Attr: STR X (mod), DEX X (mod), CON X (mod), INT X (mod), WIS X (mod), CHA X (mod)
@@ -1264,7 +1271,9 @@ Skills should scale more conservatively than combat fantasy suggests:
 - If a character is a broad generalist, lower individual skill bonuses.
 - If a character is an extreme specialist, allow one standout skill, but justify it in Traits/Abilities.
 
-Never generate inflated "heroic" numbers just because the concept sounds cool. Keep bonuses grounded, tier-appropriate, and internally consistent with level, archetype, attributes, and gear.`;
+Never generate inflated "heroic" numbers just because the concept sounds cool. Keep bonuses grounded, tier-appropriate, and internally consistent with level, archetype, attributes, and gear.
+
+APR: second attack at exactly +10 BAB, at −5; no further attacks. Pre-calculate Ranged (N attacks) and Melee (N attacks) on the Combat line.`;
 }
 
 // ── Renderer / block layout constants ─────────────────────────────────────────
