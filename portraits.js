@@ -1272,6 +1272,40 @@ export async function removeAllPortraits(refresh) {
 const activeGenerations = new Set();
 
 /**
+ * Single shared queue for all auto image gens (portraits + locations).
+ * ComfyUI / native image gen cannot handle a combat batch firing in parallel —
+ * enqueue jobs and run them one at a time.
+ * @type {Array<() => Promise<void>>}
+ */
+const _imageGenQueue = [];
+let _imageGenQueueRunning = false;
+
+async function _drainImageGenQueue() {
+    if (_imageGenQueueRunning) return;
+    _imageGenQueueRunning = true;
+    try {
+        while (_imageGenQueue.length > 0) {
+            const job = _imageGenQueue.shift();
+            try {
+                await job();
+            } catch (err) {
+                console.error('[RPG Tracker] Image gen queue job failed:', err);
+            }
+        }
+    } finally {
+        _imageGenQueueRunning = false;
+        // A job may have enqueued more work while we were finishing.
+        if (_imageGenQueue.length > 0) void _drainImageGenQueue();
+    }
+}
+
+/** @param {() => Promise<void>} job */
+function enqueueImageGen(job) {
+    _imageGenQueue.push(job);
+    void _drainImageGenQueue();
+}
+
+/**
  * Checks if a custom portrait already exists for the given entity name.
  * @param {string} name
  * @returns {boolean}
@@ -1323,8 +1357,8 @@ export function getEnemyEntities() {
 }
 
 /**
- * Triggers background portrait generation for a name asynchronously.
- * Does not block the main execution flow.
+ * Queues background portrait generation for a name (sequential — one image at a time).
+ * Does not block the main execution flow; jobs share a global ComfyUI-safe queue.
  * @param {string} name
  * @param {function} refresh - callback to refresh the UI on success
  */
@@ -1336,9 +1370,14 @@ export function triggerBackgroundPortraitGeneration(name, refresh, npcContent = 
     if (alreadyGenerating) return;
 
     activeGenerations.add(name);
-    imageGenToast('info', `Auto-generating portrait for ${name} in background...`, 'RPG Tracker');
+    const queuePos = _imageGenQueue.length + (_imageGenQueueRunning ? 1 : 0);
+    if (queuePos <= 0) {
+        imageGenToast('info', `Auto-generating portrait for ${name}...`, 'RPG Tracker');
+    } else {
+        imageGenToast('info', `Queued portrait for ${name} (${queuePos} ahead)...`, 'RPG Tracker');
+    }
 
-    (async () => {
+    enqueueImageGen(async () => {
         try {
             console.log(`[RPG Tracker] Generating prompt for "${name}" (NPC content provided: ${!!npcContent})`);
             const prompt = npcContent
@@ -1347,7 +1386,6 @@ export function triggerBackgroundPortraitGeneration(name, refresh, npcContent = 
             console.log(`[RPG Tracker] Generated prompt for "${name}":`, prompt);
             if (!prompt) {
                 console.warn(`[RPG Tracker] Could not generate prompt for ${name} - no context found.`);
-                activeGenerations.delete(name);
                 return;
             }
             console.log(`[RPG Tracker] Calling generatePortraitDirect for "${name}"...`);
@@ -1378,7 +1416,7 @@ export function triggerBackgroundPortraitGeneration(name, refresh, npcContent = 
             activeGenerations.delete(name);
             console.log(`[RPG Tracker] Removed "${name}" from activeGenerations. Remaining:`, Array.from(activeGenerations));
         }
-    })();
+    });
 }
 
 // Track entities already in the party/combat to avoid auto-generating on page refresh (F5)
@@ -1932,18 +1970,22 @@ export function triggerBackgroundLocationGeneration(locationPath, refresh, locCo
     const leaf = normPath.split(' :: ').pop() || normPath;
     const isRealtimeArrival = !!opts.realtimeArrival;
     if (!isRealtimeArrival) {
-        imageGenToast('info', `${forceReplace ? 'Regenerating' : 'Auto-generating'} location image for ${leaf} in background...`, 'RPG Tracker');
+        const queuePos = _imageGenQueue.length + (_imageGenQueueRunning ? 1 : 0);
+        if (queuePos <= 0) {
+            imageGenToast('info', `${forceReplace ? 'Regenerating' : 'Auto-generating'} location image for ${leaf}...`, 'RPG Tracker');
+        } else {
+            imageGenToast('info', `Queued location image for ${leaf} (${queuePos} ahead)...`, 'RPG Tracker');
+        }
     } else if (typeof refresh === 'function') {
         refresh();
     }
 
-    (async () => {
+    enqueueImageGen(async () => {
         try {
             // generateLocationImagePrompt runs the Present-Now keyword scanner (latest
             // output only) before building the image prompt — must stay ahead of generatePortraitDirect.
             const prompt = await generateLocationImagePrompt(normPath, locContent);
             if (!prompt) {
-                activeLocationGenerations.delete(normPath);
                 if (isRealtimeArrival && typeof refresh === 'function') refresh();
                 return;
             }
@@ -1964,7 +2006,7 @@ export function triggerBackgroundLocationGeneration(locationPath, refresh, locCo
         } finally {
             activeLocationGenerations.delete(normPath);
         }
-    })();
+    });
 }
 
 /**
