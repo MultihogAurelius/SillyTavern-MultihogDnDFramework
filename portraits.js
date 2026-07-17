@@ -1510,8 +1510,8 @@ function normalizeCharacterLabel(label) {
 }
 
 /**
- * NPCs keyword-matched in the most recent narrator output only (Present-Now scanner).
- * Independent of Lorebook Agent activeRouterKeys.
+ * NPCs whose names appear in the most recent narrator output (Present-Now name scanner).
+ * First/last name match only — not lorebook key[] keywords. Independent of activeRouterKeys.
  * @param {object} [settings]
  * @returns {Promise<Array<{ label: string, content: string }>>}
  */
@@ -1542,8 +1542,8 @@ async function loadPresentCharactersForLocationPrompt(settings, ctx) {
     }
 
     if (s.portraitLocationIncludePresentNpcs) {
-        // Fresh Present-Now keyword scan of the latest output — must run here so image
-        // generation never uses stale Lorebook Agent active keys.
+        // Fresh Present-Now name scan of the latest output — must run here so image
+        // generation never uses stale Lorebook Agent active keys or broad key[] matches.
         const npcs = await loadPresentNpcsFromRecentOutput(s);
         const pcNorm = pc ? normalizeCharacterLabel(pc.name) : '';
         for (const npc of npcs) {
@@ -1606,8 +1606,9 @@ export async function generateLocationImagePrompt(locationPath, locContent) {
     } catch { /* ignore */ }
 
     try {
-        // Present-Now scan of the latest narrator output — runs here so Characters Present Now
+        // Present-Now name scan of the latest narrator output — runs here so Characters Present Now
         // is fresh immediately before the image-generation prompt is sent (not after).
+        // Matches NPC names only (first/last), not lorebook key[] keywords.
         const presentCharacters = await loadPresentCharactersForLocationPrompt(s, ctx);
         if (presentCharacters.length > 0) {
             const charBlocks = presentCharacters.map(ch =>

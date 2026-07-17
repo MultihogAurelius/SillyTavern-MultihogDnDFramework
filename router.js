@@ -3061,9 +3061,10 @@ function getMostRecentNarrativeText(includeHidden = false) {
 }
 
 /**
- * Present-Now keyword scanner — separate from the Lorebook Agent scanner.
- * Scans ONLY the most recent narrator output for NPC entry keywords.
- * Does NOT mutate activeRouterKeys / keywordActivatedKeys (avoids stale Present Now).
+ * Present-Now name scanner — separate from the Lorebook Agent keyword scanner.
+ * Scans ONLY the most recent narrator output for NPC names (entry comment/label).
+ * First name or last name is enough; lorebook key[] arrays are intentionally ignored
+ * (too broad for Present Now). Does NOT mutate activeRouterKeys / keywordActivatedKeys.
  *
  * Call immediately before location scene image generation (and when building Present Now UI).
  *
@@ -3095,7 +3096,6 @@ export async function scanRecentOutputForPresentNpcs(narrativeText) {
     }
     if (!booksToScan.length) return [];
 
-    const lowerText = text.toLowerCase();
     /** @type {Array<{ id: string, label: string, content: string }>} */
     const matched = [];
     const seenLabels = new Set();
@@ -3110,17 +3110,11 @@ export async function scanRecentOutputForPresentNpcs(narrativeText) {
         if (!book?.entries) continue;
 
         for (const [uid, entry] of Object.entries(book.entries)) {
-            const keywords = Array.isArray(entry.key) ? entry.key : [];
-            if (keywords.length === 0) continue;
-
-            const isMatch = keywords.some(kw =>
-                typeof kw === 'string' && kw.length > 0 &&
-                lowerText.includes(kw.toLowerCase()),
-            );
-            if (!isMatch) continue;
-
-            const label = (entry.comment || entry.key?.[0] || '').trim();
+            // Name-only: use the entry label (comment), never lorebook key[] keywords.
+            const label = (entry.comment || '').replace(/^\[.*?\]\s*/i, '').trim();
             if (!label) continue;
+            if (!narrativeMentionsNpcName(text, label)) continue;
+
             const labelKey = label.replace(/\s*\(.*?\)/g, '').trim().toLowerCase();
             if (seenLabels.has(labelKey)) continue;
             seenLabels.add(labelKey);
@@ -3134,9 +3128,37 @@ export async function scanRecentOutputForPresentNpcs(narrativeText) {
     }
 
     if (settings.debugMode) {
-        console.log('[RPG Tracker] Present-Now keyword scan (latest output only):', matched.map(m => m.label));
+        console.log('[RPG Tracker] Present-Now name scan (latest output only):', matched.map(m => m.label));
     }
     return matched;
+}
+
+/**
+ * True if narrative text mentions the NPC's full name, or any first/last name token.
+ * Word-boundary match; ignores parenthetical suffixes and very short tokens.
+ * @param {string} narrativeText
+ * @param {string} npcLabel
+ * @returns {boolean}
+ */
+function narrativeMentionsNpcName(narrativeText, npcLabel) {
+    const cleaned = String(npcLabel || '')
+        .replace(/\s*\(.*?\)/g, '')
+        .replace(/[^\p{L}\p{N}\s'-]/gu, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    if (!cleaned) return false;
+
+    const lowerText = String(narrativeText || '').toLowerCase();
+    const lowerFull = cleaned.toLowerCase();
+    if (lowerFull.length >= 2 && lowerText.includes(lowerFull)) return true;
+
+    const tokens = cleaned.split(/\s+/).filter(t => t.length >= 2);
+    for (const token of tokens) {
+        const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const re = new RegExp(`(?:^|[^\\p{L}\\p{N}])${escaped}(?:[^\\p{L}\\p{N}]|$)`, 'iu');
+        if (re.test(narrativeText)) return true;
+    }
+    return false;
 }
 
 

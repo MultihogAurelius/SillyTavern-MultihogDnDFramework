@@ -53,7 +53,8 @@ export async function loadAllLocationPaths(ctx, settings) {
 }
 
 /**
- * Present Now NPCs from a keyword scan of the most recent narrator output only.
+ * Present Now NPCs from a name scan of the most recent narrator output only.
+ * Matches NPC entry labels (first/last name); ignores lorebook key[] keywords.
  * Independent of Lorebook Agent activeRouterKeys (avoids stale characters).
  * @param {object} settings
  * @param {object} ctx
@@ -285,7 +286,7 @@ export function renderImmersionViewHtml(scene) {
                 <div class="rt-immersion-npc-name">${escapeHtml(npc.label)}</div>
             </button>`;
         }).join('')
-        : `<div class="rt-immersion-empty">No player character linked and no NPCs keyword-matched in the latest narrator output.</div>`;
+        : `<div class="rt-immersion-empty">No player character linked and no NPCs named in the latest narrator output.</div>`;
 
     return `<div class="rt-immersion-root">
         ${locationImagesEnabled ? `
