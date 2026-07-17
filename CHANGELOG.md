@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [5.7.91] - 2026-07-18
+
+### Changed
+- **`<combat_flow>`**: Pre-calculated attack totals guidance now includes `[COMBAT]` Att/def bonuses, not only `[CHARACTER]`/`[PARTY]`.
+
 ## [5.7.90] - 2026-07-18
 
 ### Added

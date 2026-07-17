@@ -47,7 +47,7 @@ Declare all previously unknown NPC stats (AC, Saves, HP, Combat Line, immunities
 
 <combat_flow>
 - Simulate all actions for every NPC participant each round.
-- For [CHARACTER] and [PARTY], use the pre-calculated attack totals on the Combat line (`Ranged (N attacks): +X` or `+C/+D` | `Melee (N attacks): +X` or `+A/+B`) from the STATE MEMO — do not re-derive bonuses from BAB and ability modifiers during combat. Slash-separated bonuses mean one roll per listed value.
+- For [CHARACTER], [PARTY], and [COMBAT], use pre-calculated attack totals from the STATE MEMO — do not re-derive bonuses from BAB and ability modifiers during combat. On [CHARACTER]/[PARTY] use the Combat line (`Ranged (N attacks): +X` or `+C/+D` | `Melee (N attacks): +X` or `+A/+B`). On [COMBAT] use Att/def weapon bonuses (`N attacks, +X` or `+A/+B`). Slash-separated bonuses mean one roll per listed value.
 - State remaining HP after every damage or healing event.
 - Expire buffs/debuffs after appropriate duration. Explicitly state initial duration in turns. Examples: Mage Armor (+3 AC, 8h 0m) or Heroism (+5 Temp HP, 10 turns) or Exhaustion (Disadvantage on Ability Checks, until Long Rest)
 </combat_flow>
