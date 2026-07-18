@@ -1528,6 +1528,10 @@ export function refreshQuestPrompt(s) {
     if (!s.syspromptModules?.questsFrustration) {
         prompt = prompt.replace(/  FRUSTRATION_COEFF:.*\n/g, '');
         prompt = prompt.replace(/- On quest creation, set FRUSTRATION_COEFF.*\n/g, '');
+        prompt = prompt.replace(/- For NPC-given quests only[^\n]*\n/g, '');
+        prompt = prompt.replace(/- Omit FRUSTRATION_COEFF for emergent\/self-imposed quests[^\n]*\n/g, '');
+        // Older combined emergent line → keep TYPE marker only
+        prompt = prompt.replace(/- For emergent\/self-imposed quests: set TYPE: emergent, use GIVER: Self @ —, and omit FRUSTRATION_COEFF entirely \(no NPC expects completion\)\.\n/g, '- For emergent/self-imposed quests: set TYPE: emergent and use GIVER: Self @ —.\n');
     }
     if (!s.syspromptModules?.questsDifficulty) {
         prompt = prompt.replace(/  DIFFICULTY:.*\n/g, '');

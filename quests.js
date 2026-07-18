@@ -4,7 +4,7 @@
  */
 
 import { getSettings } from './state-manager.js';
-import { parseQuestsFromMemo, writeQuestsToMemo, parseInWorldTime, isArchivedQuestStatus, questHasEffectiveDeadline } from './memo-processor.js';
+import { parseQuestsFromMemo, writeQuestsToMemo, parseInWorldTime, isArchivedQuestStatus, questHasEffectiveDeadline, isEmergentQuest } from './memo-processor.js';
 
 /**
  * Unregisters the deprecated LogQuest tool if it was left registered from a prior version.
@@ -37,6 +37,7 @@ export function unregisterLogQuestTool() {
  * @returns {number} Mood value from -1 (pleased) upward (unbounded)
  */
 export function computeFrustration(quest, currentTime) {
+    if (isEmergentQuest(quest)) return null;
     if (quest.status !== 'active' && quest.status !== 'past deadline') return null;
     if (!questHasEffectiveDeadline(quest)) return null;
 
@@ -126,25 +127,28 @@ export function renderQuestsAsPlainText(quests, currentTime) {
     for (const q of relevantQuests) {
         text += `- **${q.title}** (Given by ${q.giver_name} at ${q.giver_location})\n`;
 
-        // Deadline / mood only when the quest has a real deadline
+        // Deadline always; NPC mood / frustration only for quests someone expects completed
         if (questHasEffectiveDeadline(q)) {
-            const frust = computeFrustration(q, currentTime);
-            let moodLabel;
-            if (frust != null && showFrustration) {
-                if (frust <= -0.5)      moodLabel = 'Very Pleased — NPC is optimistic you will make it';
-                else if (frust <= -0.1) moodLabel = 'Pleased — on schedule';
-                else if (frust <=  0.1) moodLabel = 'Neutral — at deadline';
-                else if (frust <=  0.5) moodLabel = 'Mildly Frustrated — deadline missed';
-                else if (frust <=  1.0) moodLabel = 'Frustrated — deadline missed';
-                else if (frust <=  1.5) moodLabel = 'Very Frustrated — deadline passed long ago';
-                else                    moodLabel = 'Furious — NPC may withdraw the quest entirely';
-            } else if (frust != null && showDeadlines) {
-                if (frust <= 0)        moodLabel = 'Ahead of Schedule';
-                else if (frust <= 0.5) moodLabel = 'On Time';
-                else if (frust <= 1.0) moodLabel = 'Near Deadline';
-                else                   moodLabel = 'Overdue';
+            let moodInfo = '';
+            if (!isEmergentQuest(q)) {
+                const frust = computeFrustration(q, currentTime);
+                let moodLabel;
+                if (frust != null && showFrustration) {
+                    if (frust <= -0.5)      moodLabel = 'Very Pleased — NPC is optimistic you will make it';
+                    else if (frust <= -0.1) moodLabel = 'Pleased — on schedule';
+                    else if (frust <=  0.1) moodLabel = 'Neutral — at deadline';
+                    else if (frust <=  0.5) moodLabel = 'Mildly Frustrated — deadline missed';
+                    else if (frust <=  1.0) moodLabel = 'Frustrated — deadline missed';
+                    else if (frust <=  1.5) moodLabel = 'Very Frustrated — deadline passed long ago';
+                    else                    moodLabel = 'Furious — NPC may withdraw the quest entirely';
+                } else if (frust != null && showDeadlines) {
+                    if (frust <= 0)        moodLabel = 'Ahead of Schedule';
+                    else if (frust <= 0.5) moodLabel = 'On Time';
+                    else if (frust <= 1.0) moodLabel = 'Near Deadline';
+                    else                   moodLabel = 'Overdue';
+                }
+                if (moodLabel) moodInfo = ` — ${moodLabel}`;
             }
-            const moodInfo = moodLabel ? ` — ${moodLabel}` : '';
             text += `  Deadline: ${q.deadline_time}${moodInfo}\n`;
         }
 

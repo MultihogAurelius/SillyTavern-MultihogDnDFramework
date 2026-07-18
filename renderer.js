@@ -1,6 +1,6 @@
 import { getSettings, getBarBackground, getBarShowAsPercentage } from './state-manager.js';
 import { lookupCustomPortraitSrc } from './portrait-storage.js';
-import { escapeHtml, decodeHtml, highlightParens, highlightNumbers, parseInWorldTime, isRestTimeUnset, formatTimeDiff, isArchivedQuestStatus, questHasEffectiveDeadline } from './memo-processor.js';
+import { escapeHtml, decodeHtml, highlightParens, highlightNumbers, parseInWorldTime, isRestTimeUnset, formatTimeDiff, isArchivedQuestStatus, questHasEffectiveDeadline, isEmergentQuest } from './memo-processor.js';
 import { BLOCK_ICONS, BLOCK_ORDER, PAGE_SIZE, NO_PAGINATE, renderStartingGearTierOptions } from './constants.js';
 
 // ── Renderer module: pure HTML string producers, localStorage helpers ──
@@ -2586,9 +2586,10 @@ export function renderQuestLog(quests, currentTime, collapsed, detached, filterT
         const dismissible = !!opts.dismissible;
 
         const hasDeadline = questHasEffectiveDeadline(quest);
+        const emergent = isEmergentQuest(quest);
 
         const { getQuestMood } = /** @type {any} */ (globalThis.__rpgQuestUtils || {});
-        const moodData = hasDeadline && typeof getQuestMood === 'function'
+        const moodData = hasDeadline && !emergent && typeof getQuestMood === 'function'
             ? getQuestMood(quest, currentTime, showFrustration)
             : { label: '', color: '#00cc77', value: null };
 
@@ -2605,10 +2606,11 @@ export function renderQuestLog(quests, currentTime, collapsed, detached, filterT
 
         const barTitle = showFrustration && moodData.label
             ? `NPC Mood: ${label} (${frust >= 0 ? '+' : ''}${frust.toFixed(2)})`
-            : (hasDeadline ? `Time Progress: ${label}` : '');
+            : (hasDeadline && !emergent ? `Time Progress: ${label}` : '');
 
         // Tick mark at the neutral position (33%) and deadline position (67%)
-        const moodBarHtml = hasDeadline ? `
+        // Emergent quests: no NPC expects completion → no mood/frustration bar
+        const moodBarHtml = hasDeadline && !emergent ? `
             <div class="rt-quest-mood-bar-wrap" title="${escapeHtml(barTitle)}">
                 <div class="rt-quest-mood-bar" style="width:${fillPct}%; background:${barColor};"></div>
                 <div class="rt-quest-mood-tick rt-quest-mood-tick-neutral"></div>

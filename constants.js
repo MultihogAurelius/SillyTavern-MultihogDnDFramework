@@ -256,7 +256,9 @@ QUEST: The Missing Sheep
 - For rewards, use the REWARD marker (e.g. REWARD: 50 Gold). List multiple rewards on separate lines.
 - For difficulty, use the DIFFICULTY marker (Very Easy, Easy, Medium, Hard, Very Hard).
 - Only use DEADLINE if the quest has a time limit.
-- On quest creation, set FRUSTRATION_COEFF from the quest giver's personality: 0.4 = very patient, 1.0 = normal, 3.0 = volatile. Do not change it on later turns unless the narrative establishes a permanent temperament shift.
+- For NPC-given quests only (someone expects completion), set FRUSTRATION_COEFF from the quest giver's personality: 0.4 = very patient, 1.0 = normal, 3.0 = volatile. Do not change it on later turns unless the narrative establishes a permanent temperament shift.
+- For emergent/self-imposed quests: set TYPE: emergent and use GIVER: Self @ —.
+- Omit FRUSTRATION_COEFF for emergent/self-imposed quests (no NPC expects completion).
 - Do not output the MOOD field — the engine calculates and injects it automatically.
 - When a quest completes or fails, set STATUS to completed or failed on that quest.`,
   time_24h: `Current time and day grabbed from the status footer. Also track time of the last rest (only on Long Rest, e.g. 'Last Rest: 22:00, Day 0'). Use this to track out-of-combat buff durations by comparing to the PRIOR MEMO's time.
@@ -313,10 +315,11 @@ export const QUESTS_NARRATOR = `GENERAL:
 - State who gave the quest, where they are located, what the task entails, how many objectives there are, the difficulty (Very Easy to Very Hard), any time pressure, and what rewards were promised. Do NOT do this for something the {{user}} has not yet agreed to.
 - When an objective is completed, mention it naturally in the narrative. When a quest concludes (success or failure), narrate the outcome.
 - Keep objectives few and broad — outcomes players can solve creatively, not step-by-step routes. Prefer 1–3 goals; do not keep adding micro-objectives as the scene unfolds. Bad: Reach the door → Use the fire exit → Reach the ground floor → Reach the vehicle. Good: Survive the immediate threat; Lose the pursuers.
-- The MOOD field on each active quest with a deadline in the STATE MEMO is calculated by the engine from time pressure and FRUSTRATION_COEFF. Use it to guide how the questgiver NPC speaks and acts.
+- The MOOD field on each active NPC-given quest with a deadline in the STATE MEMO is calculated by the engine from time pressure and FRUSTRATION_COEFF. Use it to guide how the questgiver NPC speaks and acts.
 
 EMERGENT QUESTS:
-- When the player pursues a clear, sustained goal through action (investigating a mystery, hunting a target, exploring a location, helping a stranger, etc.), treat it as an emergent quest. Output *(Emergent Quest Active: Quest Name Here)* and the details of the quest, like above.`;
+- When the player pursues a clear, sustained goal through action (investigating a mystery, hunting a target, exploring a location, helping a stranger, etc.), treat it as an emergent quest. Output *(Emergent Quest Active: Quest Name Here)* and the details of the quest, like above.
+- Emergent/self-imposed quests have no questgiver expectation — never assign FRUSTRATION_COEFF or treat them as having NPC mood pressure.`;
 
 // ── Embedded sysprompts — mobile/Termux fallback (fetch preferred, this is the safety net) ──
 
@@ -456,9 +459,9 @@ LEVEL THRESHOLDS: 1–0 | 2–300 | 3–900 | 4–2,700 | 5–6,500 | 6–14,000
 </xp_system>
 
 <quests>
-On unambiguous acceptance: narrate clearly, end with *(Quest Accepted: Name)*. State giver, location, task, objective count, difficulty (Very Easy–Very Hard), time pressure, promised reward. Don't do this pre-agreement. Note objective completion naturally; narrate success/failure at conclusion. Keep objectives few and broad (outcomes, not step-by-step routes); do not keep adding micro-objectives mid-scene. Quest MOOD (in STATE MEMO, from time pressure + FRUSTRATION_COEFF) should guide questgiver tone.
+On unambiguous acceptance: narrate clearly, end with *(Quest Accepted: Name)*. State giver, location, task, objective count, difficulty (Very Easy–Very Hard), time pressure, promised reward. Don't do this pre-agreement. Note objective completion naturally; narrate success/failure at conclusion. Keep objectives few and broad (outcomes, not step-by-step routes); do not keep adding micro-objectives mid-scene. Quest MOOD (in STATE MEMO, from time pressure + FRUSTRATION_COEFF) should guide questgiver tone for NPC-given quests only.
 
-EMERGENT QUESTS: Sustained player-driven goals (investigating, hunting, exploring, helping) → *(Emergent Quest Active: Name)* + same details as above.
+EMERGENT QUESTS: Sustained player-driven goals (investigating, hunting, exploring, helping) → *(Emergent Quest Active: Name)* + same details as above. No FRUSTRATION_COEFF / NPC mood pressure on emergent quests.
 </quests>
 
 <level_up_protocol>
@@ -694,9 +697,9 @@ LEVEL THRESHOLDS: 1–0 | 2–300 | 3–900 | 4–2,700 | 5–6,500 | 6–14,000
 </xp_system>
 
 <quests>
-On unambiguous acceptance: narrate clearly, end with *(Quest Accepted: Name)*. State giver, location, task, objective count, difficulty (Very Easy–Very Hard), time pressure, promised reward. Don't do this pre-agreement. Note objective completion naturally; narrate success/failure at conclusion. Keep objectives few and broad (outcomes, not step-by-step routes); do not keep adding micro-objectives mid-scene. Quest MOOD (in STATE MEMO, from time pressure + FRUSTRATION_COEFF) should guide questgiver tone.
+On unambiguous acceptance: narrate clearly, end with *(Quest Accepted: Name)*. State giver, location, task, objective count, difficulty (Very Easy–Very Hard), time pressure, promised reward. Don't do this pre-agreement. Note objective completion naturally; narrate success/failure at conclusion. Keep objectives few and broad (outcomes, not step-by-step routes); do not keep adding micro-objectives mid-scene. Quest MOOD (in STATE MEMO, from time pressure + FRUSTRATION_COEFF) should guide questgiver tone for NPC-given quests only.
 
-EMERGENT QUESTS: Sustained player-driven goals (investigating, hunting, exploring, helping) → *(Emergent Quest Active: Name)* + same details as above.
+EMERGENT QUESTS: Sustained player-driven goals (investigating, hunting, exploring, helping) → *(Emergent Quest Active: Name)* + same details as above. No FRUSTRATION_COEFF / NPC mood pressure on emergent quests.
 </quests>
 
 <level_up_protocol>

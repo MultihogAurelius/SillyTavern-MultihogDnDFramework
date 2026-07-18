@@ -22,6 +22,7 @@ import { DEFAULT_STOCK_PROMPTS, resolveTimePromptKey } from './constants.js';
  * @returns {number}
  */
 function computeFrustrationLocal(quest, currentTime) {
+    if (isEmergentQuest(quest)) return null;
     if (quest.status !== 'active' && quest.status !== 'past deadline') return null;
     if (!questHasEffectiveDeadline(quest)) return null;
 
@@ -231,6 +232,20 @@ export function questHasEffectiveDeadline(quest) {
     if (accepted != null && deadline <= accepted) return false;
 
     return true;
+}
+
+const EMERGENT_GIVER_RE = /^(self|player|\{\{user\}\}|emergent|none|n\/a|na|-|—)$/i;
+
+/**
+ * Emergent / self-imposed quests have no NPC expecting completion — no FRUSTRATION_COEFF or MOOD.
+ * @param {object} quest
+ * @returns {boolean}
+ */
+export function isEmergentQuest(quest) {
+    if (!quest) return false;
+    if (quest.emergent === true) return true;
+    if (String(quest.type || '').trim().toLowerCase() === 'emergent') return true;
+    return EMERGENT_GIVER_RE.test(String(quest.giver_name || '').trim());
 }
 
 /**
@@ -1002,6 +1017,12 @@ export function parseQuestsFromText(text) {
         const rawCoeff = getField('FRUSTRATION_COEFF');
         const coeff = rawCoeff ? parseFloat(rawCoeff) : null;
 
+        const typeField = (getField('TYPE') || '').trim().toLowerCase();
+        const emergentField = (getField('EMERGENT') || '').trim().toLowerCase();
+        const emergent = typeField === 'emergent'
+            || /^(true|yes|1)$/i.test(emergentField)
+            || EMERGENT_GIVER_RE.test(giverName);
+
         // Objectives: OBJ_ACTIVE, OBJ_COMPLETED/OBJ_DONE, or OBJ_FAILED lines
         // Robust: handles both one-per-line and comma-separated objectives on a single line
         const objectives = [];
@@ -1074,7 +1095,10 @@ export function parseQuestsFromText(text) {
             accepted_time:          getField('ACCEPTED'),
             deadline_time:          getField('DEADLINE'),
             difficulty:             getField('DIFFICULTY'),
-            frustration_coefficient: coeff !== null && !isNaN(coeff) ? coeff : undefined,
+            emergent:               emergent || undefined,
+            type:                   emergent ? 'emergent' : undefined,
+            // Emergent/self-imposed: no NPC expects completion → never store a coeff
+            frustration_coefficient: (!emergent && coeff !== null && !isNaN(coeff)) ? coeff : undefined,
             objectives,
             rewards,
         });
@@ -1095,15 +1119,18 @@ export function serializeQuestsToText(quests) {
         const lines = [`QUEST: ${q.title}`];
         lines.push(`  ID: ${q.id}`);
         lines.push(`  STATUS: ${q.status || 'active'}`);
+        const emergent = isEmergentQuest(q);
+        if (emergent) lines.push(`  TYPE: emergent`);
         lines.push(`  GIVER: ${q.giver_name} @ ${q.giver_location}`);
         if (q.accepted_time)          lines.push(`  ACCEPTED: ${q.accepted_time}`);
         if (q.deadline_time)          lines.push(`  DEADLINE: ${q.deadline_time}`);
         if (q.difficulty)             lines.push(`  DIFFICULTY: ${q.difficulty}`);
-        if (q.frustration_coefficient != null)
+        // Only NPC-given quests carry a frustration coefficient
+        if (!emergent && q.frustration_coefficient != null)
                                       lines.push(`  FRUSTRATION_COEFF: ${q.frustration_coefficient}`);
 
-        // Inject human-readable mood for the AI narrator (deadline quests only)
-        if (q.status === 'active' || q.status === 'past deadline') {
+        // Inject human-readable mood for the AI narrator (deadline NPC quests only)
+        if (!emergent && (q.status === 'active' || q.status === 'past deadline')) {
             const settings = getSettings();
             const showFrustration = !!settings.syspromptModules?.questsFrustration;
             if (showFrustration && questHasEffectiveDeadline(q)) {
@@ -1142,14 +1169,28 @@ export function parseQuestsFromMemo(memoText) {
 
     const content = match[1].trim();
 
+    /** @param {any} q */
+    const normalize = (q) => {
+        if (!q || typeof q !== 'object') return q;
+        if (isEmergentQuest(q)) {
+            return {
+                ...q,
+                emergent: true,
+                type: 'emergent',
+                frustration_coefficient: undefined,
+            };
+        }
+        return q;
+    };
+
     // Auto-detect format: plain-text starts with QUEST:
     if (content.startsWith('QUEST:')) {
-        return parseQuestsFromText(content);
+        return parseQuestsFromText(content).map(normalize);
     } else {
         try {
             const parsed = JSON.parse(content);
             const quests = Array.isArray(parsed) ? parsed : (parsed.quests || []);
-            return quests;
+            return quests.map(normalize);
         } catch (e) {
             console.warn('[RPG Tracker] parseQuestsFromMemo: Failed to parse [QUESTS] as JSON:', e);
             return [];
@@ -1546,6 +1587,9 @@ export function buildModulesInstructionText(settings) {
                 if (!isFrustration) {
                     p = p.replace(/\n\s*FRUSTRATION_COEFF:.*?\n/g, '\n');
                     p = p.replace(/\n- On quest creation, set FRUSTRATION_COEFF.*\n/g, '\n');
+                    p = p.replace(/\n- For NPC-given quests only[^\n]*\n/g, '\n');
+                    p = p.replace(/\n- Omit FRUSTRATION_COEFF for emergent\/self-imposed quests[^\n]*\n/g, '\n');
+                    p = p.replace(/\n- For emergent\/self-imposed quests: set TYPE: emergent, use GIVER: Self @ —, and omit FRUSTRATION_COEFF entirely \(no NPC expects completion\)\.\n/g, '\n- For emergent/self-imposed quests: set TYPE: emergent and use GIVER: Self @ —.\n');
                 }
                 if (!isDifficulty) {
                     p = p.replace(/\n\s*DIFFICULTY:.*?\n/g, '\n');
