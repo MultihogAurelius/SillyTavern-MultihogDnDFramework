@@ -2,6 +2,12 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [5.7.94] - 2026-07-18
+
+### Changed
+- **APR threshold**: Second attack at BAB +8 (−5), was +10.
+- **Model guidance**: Onboarding + README note Combat API Override for slow-thinking GM models (Gemini 3.5 Flash, Medium thinking).
+
 ## [5.7.93] - 2026-07-18
 
 ### Changed

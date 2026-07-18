@@ -1864,6 +1864,18 @@ function getSettingsInternal(extensionSettings) {
     // ── MIGRATION: strip global UI prefs out of chatStates (Chat Link clobber fix) ─
     stripChatStateGlobalUiPrefs(s);
 
+    // ── MIGRATION: CHARACTER/PARTY — APR threshold +10 → +8 ─────────────────────
+    if (s.stockPrompts?.character &&
+        s.stockPrompts.character.includes('exactly +10 BAB') &&
+        !s.stockPrompts.character.includes('exactly +8 BAB')) {
+        s.stockPrompts.character = DEFAULT_STOCK_PROMPTS.character;
+    }
+    if (s.stockPrompts?.party &&
+        s.stockPrompts.party.includes('exactly +10 BAB') &&
+        !s.stockPrompts.party.includes('exactly +8 BAB')) {
+        s.stockPrompts.party = DEFAULT_STOCK_PROMPTS.party;
+    }
+
     // ── MIGRATION: CHARACTER/PARTY/COMBAT — (N attacks) APR format ────────────────
     if (s.stockPrompts?.character &&
         s.stockPrompts.character.includes('Finesse:') &&

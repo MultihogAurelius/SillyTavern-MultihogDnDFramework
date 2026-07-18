@@ -27,7 +27,7 @@ export const COLOR_EXAMPLES = `<font color=#ff5555>Red Text</font>
 // ── Default module prompts ─────────────────────────────────────────────────────
 
 /** Stock-prompt APR note (sysprompt uses <attacks_per_round> instead). */
-export const ATTACKS_PER_ROUND_STOCK_HINT = `APR: Second attack at exactly +10 BAB, at −5; no further attacks. Pre-calculate on the Combat line: Ranged (N attacks): +X or +C/+D | Melee (N attacks): +X or +A/+B — N=1 below BAB +10; N=2 at BAB +10+ (second slash value is 5 lower).`;
+export const ATTACKS_PER_ROUND_STOCK_HINT = `APR: Second attack at exactly +8 BAB, at −5; no further attacks. Pre-calculate on the Combat line: Ranged (N attacks): +X or +C/+D | Melee (N attacks): +X or +A/+B — N=1 below BAB +8; N=2 at BAB +8+ (second slash value is 5 lower).`;
 
 /** How Combat-line Melee/Ranged totals are derived (used in stock prompts). */
 export const ATTACK_TOTAL_FORMULA_HINT = `ATTACK TOTALS: Melee Total Formula: Melee Total = BAB + STR modifier + Weapon enhancement bonus. Ranged Total Formula: Ranged Total = BAB + DEX modifier + Weapon enhancement bonus. The Melee and Ranged values on the Combat line are these totals (weapon enhancement = +1/+2/+3 from the equipped weapon; 0 if mundane). Finesse: melee attacks with finesse weapons (rapier, dagger, scimitar, etc.) use DEX modifier instead of STR when the wielder benefits. ${ATTACKS_PER_ROUND_STOCK_HINT}`;
@@ -375,7 +375,7 @@ When the player is not on a quest, use pure narrative context. A random bandit s
 BASE NPC TIERS (guidelines, scale with context):
 Minion — Rabble, untrained | HP 8–15   | AC 10–12 | Attack +0 to +2
 Soldier — Trained          | HP 18–30  | AC 13–15 | Attack +3 to +6
-Elite — Veteran/specialist | HP 35–60  | AC 15–17 | Attack +7 to +10 (2 attacks possible)
+Elite — Veteran/specialist | HP 35–60  | AC 15–17 | Attack +7 to +10 (2 attacks at +8+)
 Boss — Powerful individual  | HP 60–120 | AC 17–19 | Attack +11 to +15 (2 attacks standard)
 Legendary — World-threat    | HP 150–500+ | AC 19–22 | Attack +16 to +20+ (rare; still max 2 APR)
 
@@ -420,7 +420,7 @@ Finesse: melee attacks with finesse weapons (rapier, dagger, scimitar, etc.) use
 </weapon_proficiencies>
 
 <attacks_per_round>
-This system uses a simplified formula for APR: a second attack is gained at exactly +10 BAB, at -5; no further attacks are gained.
+This system uses a simplified formula for APR: a second attack is gained at exactly +8 BAB, at -5; no further attacks are gained.
 </attacks_per_round>
 
 <saving_throws>
@@ -559,7 +559,7 @@ When a character JOINS the party, explicitly state (Name joins the party) and de
 [PARTY]
 Name (Class): current/max HP
 Combat: BAB: +X | Ranged (N attacks): +X or +C/+D | Melee (N attacks): +X or +A/+B | Base AC: X | Total AC: Z
-(Melee Total = BAB + STR modifier + Weapon enhancement bonus; Ranged Total = BAB + DEX modifier + Weapon enhancement bonus; N attacks = 1 below BAB +10, 2 at BAB +10+ with second attack at −5)
+(Melee Total = BAB + STR modifier + Weapon enhancement bonus; Ranged Total = BAB + DEX modifier + Weapon enhancement bonus; N attacks = 1 below BAB +8, 2 at BAB +8+ with second attack at −5)
 Gear: Primary_Weapon (Damage_Die + Mod / Damage_Type) | Armor_Name (+Y AC)
 Proficiencies: Category1, Category2
 Attr: STR X (mod), DEX X (mod), CON X (mod), INT X (mod), WIS X (mod), CHA X (mod)
@@ -756,7 +756,7 @@ When the player is not on a quest, use pure narrative context. A random bandit s
 BASE NPC TIERS (guidelines, scale with context):
 Minion — Rabble, untrained | HP 8–15   | AC 10–12 | Attack +0 to +2
 Soldier — Trained          | HP 18–30  | AC 13–15 | Attack +3 to +6
-Elite — Veteran/specialist | HP 35–60  | AC 15–17 | Attack +7 to +10 (2 attacks possible)
+Elite — Veteran/specialist | HP 35–60  | AC 15–17 | Attack +7 to +10 (2 attacks at +8+)
 Boss — Powerful individual  | HP 60–120 | AC 17–19 | Attack +11 to +15 (2 attacks standard)
 Legendary — World-threat    | HP 150–500+ | AC 19–22 | Attack +16 to +20+ (rare; still max 2 APR)
 
@@ -801,7 +801,7 @@ Finesse: melee attacks with finesse weapons (rapier, dagger, scimitar, etc.) use
 </weapon_proficiencies>
 
 <attacks_per_round>
-This system uses a simplified formula for APR: a second attack is gained at exactly +10 BAB, at -5; no further attacks are gained.
+This system uses a simplified formula for APR: a second attack is gained at exactly +8 BAB, at -5; no further attacks are gained.
 </attacks_per_round>
 
 <saving_throws>
@@ -943,7 +943,7 @@ When a character JOINS the party, explicitly state (Name joins the party) and de
 [PARTY]
 Name (Class): current/max HP
 Combat: BAB: +X | Ranged (N attacks): +X or +C/+D | Melee (N attacks): +X or +A/+B | Base AC: X | Total AC: Z
-(Melee Total = BAB + STR modifier + Weapon enhancement bonus; Ranged Total = BAB + DEX modifier + Weapon enhancement bonus; N attacks = 1 below BAB +10, 2 at BAB +10+ with second attack at −5)
+(Melee Total = BAB + STR modifier + Weapon enhancement bonus; Ranged Total = BAB + DEX modifier + Weapon enhancement bonus; N attacks = 1 below BAB +8, 2 at BAB +8+ with second attack at −5)
 Gear: Primary_Weapon (Damage_Die + Mod / Damage_Type) | Armor_Name (+Y AC)
 Proficiencies: Category1, Category2
 Attr: STR X (mod), DEX X (mod), CON X (mod), INT X (mod), WIS X (mod), CHA X (mod)
@@ -1309,7 +1309,7 @@ Skills should scale more conservatively than combat fantasy suggests:
 
 Never generate inflated "heroic" numbers just because the concept sounds cool. Keep bonuses grounded, tier-appropriate, and internally consistent with level, archetype, attributes, and gear.
 
-APR: second attack at exactly +10 BAB, at −5; no further attacks. Pre-calculate Ranged (N attacks) and Melee (N attacks) on the Combat line.`;
+APR: second attack at exactly +8 BAB, at −5; no further attacks. Pre-calculate Ranged (N attacks) and Melee (N attacks) on the Combat line.`;
 }
 
 // ── Renderer / block layout constants ─────────────────────────────────────────
