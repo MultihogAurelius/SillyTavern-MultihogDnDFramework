@@ -425,7 +425,6 @@ export function transformBaseSectionContent(tag, innerContent, settings) {
         let instruction = QUESTS_NARRATOR;
         if (!mods.questsFrustration) {
             instruction = instruction.replace(/\n- The MOOD field[^\n]*questgiver NPC speaks and acts\./g, '');
-            instruction = instruction.replace(/\n- When a new quest is accepted or becomes emergent, assign FRUSTRATION_COEFF[^\n]*/g, '');
         }
         if (!mods.questsDifficulty) {
             instruction = instruction.replace(/the difficulty \(Very Easy to Very Hard\), /g, '');

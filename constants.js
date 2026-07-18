@@ -312,12 +312,11 @@ export const QUESTS_NARRATOR = `GENERAL:
 - When the player unambiguously accepts a quest from an NPC, describe it clearly in the narrative and conclude with *(Quest Accepted: Quest Name Here)*.
 - State who gave the quest, where they are located, what the task entails, how many objectives there are, the difficulty (Very Easy to Very Hard), any time pressure, and what rewards were promised. Do NOT do this for something the {{user}} has not yet agreed to.
 - When an objective is completed, mention it naturally in the narrative. When a quest concludes (success or failure), narrate the outcome.
-- When giving quests, focus on obtainable and achievable objectives rather than vague/long-term goals.
+- Keep objectives few and broad — outcomes players can solve creatively, not step-by-step routes. Prefer 1–3 goals; do not keep adding micro-objectives as the scene unfolds. Bad: Reach the door → Use the fire exit → Reach the ground floor → Reach the vehicle. Good: Survive the immediate threat; Lose the pursuers.
 - The MOOD field on each active quest with a deadline in the STATE MEMO is calculated by the engine from time pressure and FRUSTRATION_COEFF. Use it to guide how the questgiver NPC speaks and acts.
 
 EMERGENT QUESTS:
-- When the player pursues a clear, sustained goal through action (investigating a mystery, hunting a target, exploring a location, helping a stranger, etc.), treat it as an emergent quest. Output *(Emergent Quest Active: Quest Name Here)* and the details of the quest, like above.
-- When a new quest is accepted or becomes emergent, assign FRUSTRATION_COEFF based on the quest giver's personality—or, for self-imposed goals, the implied urgency: 0.4 = very patient, 1.0 = normal, 3.0 = volatile.`;
+- When the player pursues a clear, sustained goal through action (investigating a mystery, hunting a target, exploring a location, helping a stranger, etc.), treat it as an emergent quest. Output *(Emergent Quest Active: Quest Name Here)* and the details of the quest, like above.`;
 
 // ── Embedded sysprompts — mobile/Termux fallback (fetch preferred, this is the safety net) ──
 
@@ -457,9 +456,9 @@ LEVEL THRESHOLDS: 1–0 | 2–300 | 3–900 | 4–2,700 | 5–6,500 | 6–14,000
 </xp_system>
 
 <quests>
-On unambiguous acceptance: narrate clearly, end with *(Quest Accepted: Name)*. State giver, location, task, objective count, difficulty (Very Easy–Very Hard), time pressure, promised reward. Don't do this pre-agreement. Note objective completion naturally; narrate success/failure at conclusion. Favor obtainable objectives over vague long-term goals. Quest MOOD (in STATE MEMO, from time pressure + FRUSTRATION_COEFF) should guide questgiver tone.
+On unambiguous acceptance: narrate clearly, end with *(Quest Accepted: Name)*. State giver, location, task, objective count, difficulty (Very Easy–Very Hard), time pressure, promised reward. Don't do this pre-agreement. Note objective completion naturally; narrate success/failure at conclusion. Keep objectives few and broad (outcomes, not step-by-step routes); do not keep adding micro-objectives mid-scene. Quest MOOD (in STATE MEMO, from time pressure + FRUSTRATION_COEFF) should guide questgiver tone.
 
-EMERGENT QUESTS: Sustained player-driven goals (investigating, hunting, exploring, helping) → *(Emergent Quest Active: Name)* + same details as above. Assign FRUSTRATION_COEFF by questgiver personality or implied urgency: 0.4 patient, 1.0 normal, 3.0 volatile.
+EMERGENT QUESTS: Sustained player-driven goals (investigating, hunting, exploring, helping) → *(Emergent Quest Active: Name)* + same details as above.
 </quests>
 
 <level_up_protocol>
@@ -695,9 +694,9 @@ LEVEL THRESHOLDS: 1–0 | 2–300 | 3–900 | 4–2,700 | 5–6,500 | 6–14,000
 </xp_system>
 
 <quests>
-On unambiguous acceptance: narrate clearly, end with *(Quest Accepted: Name)*. State giver, location, task, objective count, difficulty (Very Easy–Very Hard), time pressure, promised reward. Don't do this pre-agreement. Note objective completion naturally; narrate success/failure at conclusion. Favor obtainable objectives over vague long-term goals. Quest MOOD (in STATE MEMO, from time pressure + FRUSTRATION_COEFF) should guide questgiver tone.
+On unambiguous acceptance: narrate clearly, end with *(Quest Accepted: Name)*. State giver, location, task, objective count, difficulty (Very Easy–Very Hard), time pressure, promised reward. Don't do this pre-agreement. Note objective completion naturally; narrate success/failure at conclusion. Keep objectives few and broad (outcomes, not step-by-step routes); do not keep adding micro-objectives mid-scene. Quest MOOD (in STATE MEMO, from time pressure + FRUSTRATION_COEFF) should guide questgiver tone.
 
-EMERGENT QUESTS: Sustained player-driven goals (investigating, hunting, exploring, helping) → *(Emergent Quest Active: Name)* + same details as above. Assign FRUSTRATION_COEFF by questgiver personality or implied urgency: 0.4 patient, 1.0 normal, 3.0 volatile.
+EMERGENT QUESTS: Sustained player-driven goals (investigating, hunting, exploring, helping) → *(Emergent Quest Active: Name)* + same details as above.
 </quests>
 
 <level_up_protocol>
