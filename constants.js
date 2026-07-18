@@ -254,6 +254,7 @@ QUEST: The Missing Sheep
 - Use OBJ_ACTIVE / OBJ_COMPLETED / OBJ_FAILED markers.
 - Append ' (optional)' only if the task is not required.
 - For collection/count objectives, append [current/total] after the text (e.g. [4/6]) and add an OBJ_TOTAL line with the total. Update the count each turn as progress is made.
+- Keep objectives few and broad (outcomes, not step-by-step routes); prefer 1–3. Do not rewrite/rephrase existing OBJ lines without cause, and do not keep adding granular micro-steps as the scene unfolds — only mark OBJ_COMPLETED/OBJ_FAILED or update [progress/total] counts.
 - For rewards, use the REWARD marker (e.g. REWARD: 50 Gold). List multiple rewards on separate lines.
 - For difficulty, use the DIFFICULTY marker (Very Easy, Easy, Medium, Hard, Very Hard).
 - Only use DEADLINE if the quest has a time limit.

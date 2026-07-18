@@ -11984,6 +11984,13 @@ async function runPortraitMigrationIfNeeded() {
                 changed = true;
             }
 
+            // Guard against needless OBJ rewrites / granular micro-steps
+            if (settings.stockPrompts.quests?.includes('OBJ_ACTIVE') &&
+                !settings.stockPrompts.quests.includes('Do not rewrite/rephrase existing OBJ')) {
+                refreshQuestPrompt(settings);
+                changed = true;
+            }
+
             if (changed) {
                 saveSettings();
             }
