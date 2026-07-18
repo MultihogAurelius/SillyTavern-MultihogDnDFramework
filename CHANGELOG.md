@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [5.8.0] - 2026-07-18
+
+### Added
+- **Realistic firearms damage (creation-time)**: when writing new PC/NPC/loot/enemy gear stats, scale firearm damage ~2–3× typical D&D/PF tables by common sense (pistol < carbine/rifle < shotgun/LMG); attack bonuses stay normal. Explicitly not a mid-scene conversion rule. In `<homebrew_and_custom_classes>` (main + legacy) and all character-creation paths.
+
 ## [5.7.102] - 2026-07-18
 
 ### Added

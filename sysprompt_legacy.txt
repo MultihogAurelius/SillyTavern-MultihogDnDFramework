@@ -89,6 +89,7 @@ Non-standard/homebrew classes (e.g. "Electronics Hobbyist," "Mechanic") don't us
 - Pure non-combatants: BAB scales slowly (+0 early, max +2/+3 late).
 - Blue-collar/improvised fighters: moderate progression.
 - Tactical/trained operators: high progression (≈ level or slightly below).
+Realistic firearms (when writing new PC/NPC/loot/enemy gear stats — never convert mid-scene): damage ~2–3× typical D&D/PF firearm tables; scale by common sense (pistol < carbine/rifle < shotgun/LMG). Attack bonuses stay normal — only damage scales.
 </homebrew_and_custom_classes>
 
 <weapon_proficiencies>

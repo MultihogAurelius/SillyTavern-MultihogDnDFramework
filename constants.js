@@ -415,6 +415,7 @@ Non-standard/homebrew classes (e.g. "Electronics Hobbyist," "Mechanic") don't us
 - Pure non-combatants: BAB scales slowly (+0 early, max +2/+3 late).
 - Blue-collar/improvised fighters: moderate progression.
 - Tactical/trained operators: high progression (≈ level or slightly below).
+Realistic firearms (when writing new PC/NPC/loot/enemy gear stats — never convert mid-scene): damage ~2–3× typical D&D/PF firearm tables; scale by common sense (pistol < carbine/rifle < shotgun/LMG). Attack bonuses stay normal — only damage scales.
 </homebrew_and_custom_classes>
 
 <weapon_proficiencies>
@@ -652,6 +653,7 @@ Non-standard/homebrew classes (e.g. "Electronics Hobbyist," "Mechanic") don't us
 - Pure non-combatants: BAB scales slowly (+0 early, max +2/+3 late).
 - Blue-collar/improvised fighters: moderate progression.
 - Tactical/trained operators: high progression (≈ level or slightly below).
+Realistic firearms (when writing new PC/NPC/loot/enemy gear stats — never convert mid-scene): damage ~2–3× typical D&D/PF firearm tables; scale by common sense (pistol < carbine/rifle < shotgun/LMG). Attack bonuses stay normal — only damage scales.
 </homebrew_and_custom_classes>
 
 <weapon_proficiencies>
@@ -1051,7 +1053,9 @@ Skills should scale more conservatively than combat fantasy suggests:
 
 Never generate inflated "heroic" numbers just because the concept sounds cool. Keep bonuses grounded, tier-appropriate, and internally consistent with level, archetype, attributes, and gear.
 
-APR: second attack at exactly +8 BAB, at −5; no further attacks. Pre-calculate Ranged (N attacks) and Melee (N attacks) on the Combat line.`;
+APR: second attack at exactly +8 BAB, at −5; no further attacks. Pre-calculate Ranged (N attacks) and Melee (N attacks) on the Combat line.
+
+Firearms (modern/realistic homebrew): when assigning damage on new characters/gear/NPCs/loot, use ~2–3× D&D/PF firearm norms by common sense (type/caliber); do not inflate attack bonuses — only damage scales. Not a mid-scene conversion rule.`;
 }
 
 // ── Renderer / block layout constants ─────────────────────────────────────────

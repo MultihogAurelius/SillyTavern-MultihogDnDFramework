@@ -3654,7 +3654,8 @@ Gear:
 - Do NOT output a [SPELLS] block under any circumstances. Avoid all magic, spells, or magical powers.
 - Avoid D&D classes (e.g. do NOT label them as Bard, Rogue, Fighter, Wizard, etc.) and fantasy races. Keep them as a realistic human.
 - Use realistic modern/historical currency (e.g. $, USD, GBP, or simple cash/money) instead of GP/SP/CP.
-- Wing it and homebrew modern capabilities: adapt attributes, saves, gear, and skills to fit a realistic setting. Keep items, weapons, and tools realistic (no fantasy or magical weapons).`;
+- Wing it and homebrew modern capabilities: adapt attributes, saves, gear, and skills to fit a realistic setting. Keep items, weapons, and tools realistic (no fantasy or magical weapons).
+- Firearms: when writing new gear/NPC/loot stats (not mid-scene conversion), damage ~2–3× D&D/PF firearm tables; common sense by type/caliber. Attack bonuses normal — only damage scales.`;
 
             const SCIFI_HINT = `\n\nCRITICAL SCI-FI RULE: This is a science-fiction setting.
 - Do NOT output a [SPELLS] block. Avoid D&D classes and fantasy races.
@@ -3666,7 +3667,8 @@ Gear:
 - Do NOT output a [SPELLS] block; represent any occult rituals or supernatural resistances as entries in [ABILITIES] instead.
 - Avoid D&D classes and fantasy races. Keep the character grounded and vulnerable — horror characters are not superheroes.
 - Use realistic modern/historical currency instead of GP/SP/CP.
-- Wing it and homebrew fitting capabilities: adapt attributes, saves, gear, and skills for a tense horror survival setting.`;
+- Wing it and homebrew fitting capabilities: adapt attributes, saves, gear, and skills for a tense horror survival setting.
+- Firearms (if any): when writing new gear/NPC/loot stats (not mid-scene conversion), damage ~2–3× D&D/PF firearm tables; common sense by type/caliber. Attack bonuses normal — only damage scales.`;
 
             const prompts = {
                 magic:            `${levelPrefix} Generate a random Level ${level} D&D Magic User (Wizard, Sorcerer, or Warlock). Give them a random fantasy name (do NOT use {{user}}). Output ${_blockListStr} blocks${_hasSpells ? " (using 'Cantrips:' for level 0 spells)" : ''}. Include appropriate${_hasSpells ? ' spells,' : ''} items, and attributes consistent with Level ${level}.${CHARACTER_FORMAT_HINT}${xpHint}${TIME_FORMAT_HINT}${magicGearHint}`,
@@ -3693,7 +3695,7 @@ Gear:
                 btn.textContent = labels.custom;
                 let customPrompt = `${levelPrefix} Generate a random Level ${level} character based entirely on these custom instructions: "${customInstructions}". Output ${_blockListStr} blocks${_hasSpells ? " (and [SPELLS] if appropriate for the class, using 'Cantrips:' for level 0 spells)" : ''}. Adapt all attributes, skills, saves, descriptions, and gear to match the setting and instructions perfectly.${CHARACTER_FORMAT_HINT}${xpHint}${TIME_FORMAT_HINT}${magicGearHint}`;
                 if (isCalendar) {
-                    customPrompt += `\n\nCRITICAL REALISM RULE: This is a realistic/non-fantasy setting. Do NOT output a [SPELLS] block. Use realistic modern/historical currencies instead of GP/SP/CP.`;
+                    customPrompt += `\n\nCRITICAL REALISM RULE: This is a realistic/non-fantasy setting. Do NOT output a [SPELLS] block. Use realistic modern/historical currencies instead of GP/SP/CP. Firearms on new gear/NPCs/loot: damage ~2–3× D&D/PF norms by common sense; attack bonuses unchanged (not mid-scene conversion).`;
                 }
                 try {
                     syncOnboardingPersonaPrefsFromDom(el);

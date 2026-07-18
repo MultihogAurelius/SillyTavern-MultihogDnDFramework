@@ -495,9 +495,9 @@ async function handleCharRollGenerate(el, panel) {
     const spellsClause = hasSpells ? " Only include [SPELLS] if the class genuinely uses magic." : '';
 
     const SETTING_HINTS = {
-        realistic: `\n\nCRITICAL REALISM RULE: This is a realistic/non-fantasy setting.${hasSpells ? ' Do NOT output a [SPELLS] block.' : ''} Avoid fantasy classes and races. Use realistic currency (e.g. $, USD, GBP). Gear and weapons must be realistic.`,
+        realistic: `\n\nCRITICAL REALISM RULE: This is a realistic/non-fantasy setting.${hasSpells ? ' Do NOT output a [SPELLS] block.' : ''} Avoid fantasy classes and races. Use realistic currency (e.g. $, USD, GBP). Gear and weapons must be realistic. Firearms on new gear/NPCs/loot: damage ~2–3× D&D/PF norms by common sense (type/caliber); attack bonuses unchanged (not mid-scene conversion).`,
         scifi: `\n\nCRITICAL SCI-FI RULE: Science-fiction setting.${hasSpells ? ' No [SPELLS] block.' : ''} No fantasy classes or races. Use Credits or equivalent currency. Gear should be futuristic.`,
-        horror: `\n\nCRITICAL HORROR RULE: Horror setting.${hasSpells ? ' No [SPELLS] block — occult abilities go in [ABILITIES].' : ''} No fantasy classes or races. Use realistic currency. Characters are grounded and vulnerable.`,
+        horror: `\n\nCRITICAL HORROR RULE: Horror setting.${hasSpells ? ' No [SPELLS] block — occult abilities go in [ABILITIES].' : ''} No fantasy classes or races. Use realistic currency. Characters are grounded and vulnerable. Firearms (if any) on new gear/NPCs/loot: damage ~2–3× D&D/PF norms by common sense; attack bonuses unchanged (not mid-scene conversion).`,
         fantasy: '',
     };
     const settingHint = SETTING_HINTS[genre] || '';
