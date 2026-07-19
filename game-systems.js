@@ -424,7 +424,7 @@ export function transformBaseSectionContent(tag, innerContent, settings) {
     if (tag === 'quests') {
         let instruction = QUESTS_NARRATOR;
         if (!mods.questsFrustration) {
-            instruction = instruction.replace(/\n- The MOOD field[^\n]*questgiver NPC speaks and acts\./g, '');
+            instruction = instruction.replace(/ Quest MOOD \(in STATE MEMO, from time pressure \+ FRUSTRATION_COEFF\) should guide questgiver tone for NPC-given quests only\./g, '');
         }
         let result = `<quests>\n${instruction.trim()}\n</quests>`;
         if (!mods.questsDeadlines) {
