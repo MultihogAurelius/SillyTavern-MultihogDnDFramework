@@ -2346,6 +2346,12 @@ export function writeModuleSchemaBackup(chatId) {
             customFields: JSON.parse(JSON.stringify(s.customFields || [])),
             blockOrder: JSON.parse(JSON.stringify(s.blockOrder || BLOCK_ORDER)),
             modules: JSON.parse(JSON.stringify(s.modules || {})),
+            // Same race as customFields/blockOrder: a reload (code edit, extension
+            // update, plain F5) fired before the debounced disk write landed reverts
+            // these to whatever was last actually on disk. Mirror them too so edited
+            // stock prompts / narrator toggles self-heal on the next boot.
+            stockPrompts: JSON.parse(JSON.stringify(s.stockPrompts || {})),
+            syspromptModules: JSON.parse(JSON.stringify(s.syspromptModules || {})),
         };
         localStorage.setItem(MODULE_SCHEMA_BACKUP_KEY, JSON.stringify(payload));
     } catch (err) {
@@ -2374,8 +2380,14 @@ export function applyModuleSchemaBackup(preferredChatId) {
         const backupOrder = JSON.stringify(backup.blockOrder);
         const partition = backup.chatId ? s.chatStates?.[backup.chatId] : null;
         const partTags = JSON.stringify((partition?.customFields || []).map(f => f.tag));
+        const liveStockPrompts = JSON.stringify(s.stockPrompts || {});
+        const backupStockPrompts = JSON.stringify(backup.stockPrompts || {});
+        const liveSyspromptModules = JSON.stringify(s.syspromptModules || {});
+        const backupSyspromptModules = JSON.stringify(backup.syspromptModules || {});
         const alreadyMatched = liveTags === backupTags && liveOrder === backupOrder
-            && (!backup.chatId || partTags === backupTags);
+            && (!backup.chatId || partTags === backupTags)
+            && (!backup.stockPrompts || liveStockPrompts === backupStockPrompts)
+            && (!backup.syspromptModules || liveSyspromptModules === backupSyspromptModules);
         if (alreadyMatched) return false;
 
         // Always restore live schema from the last known-good in-memory snapshot.
@@ -2385,6 +2397,12 @@ export function applyModuleSchemaBackup(preferredChatId) {
         s.blockOrder = JSON.parse(JSON.stringify(backup.blockOrder));
         if (backup.modules && typeof backup.modules === 'object') {
             s.modules = { ...s.modules, ...JSON.parse(JSON.stringify(backup.modules)) };
+        }
+        if (backup.stockPrompts && typeof backup.stockPrompts === 'object') {
+            s.stockPrompts = { ...s.stockPrompts, ...JSON.parse(JSON.stringify(backup.stockPrompts)) };
+        }
+        if (backup.syspromptModules && typeof backup.syspromptModules === 'object') {
+            s.syspromptModules = { ...s.syspromptModules, ...JSON.parse(JSON.stringify(backup.syspromptModules)) };
         }
 
         if (backup.chatId) {

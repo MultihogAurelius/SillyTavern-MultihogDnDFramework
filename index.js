@@ -12533,6 +12533,12 @@ async function runPortraitMigrationIfNeeded() {
                 strippedTombstones, healedFromBackup, strippedGlobalUi,
             });
         }
+        if (healedFromBackup) {
+            // A reload raced a pending disk write (code update, extension update, plain F5)
+            // and disk came back stale — this browser's last known-good in-memory copy of
+            // custom modules / stock prompts / narrator toggles just self-healed over it.
+            toastr['info']('Detected a stale settings save from before a reload and restored your last known-good tracker config.', 'RPG Tracker', { timeOut: 6000 });
+        }
         eventSource.on(event_types.CHAT_CHANGED, onChatChanged);
         if (bootChatId && settings.chatLinkEnabled) {
             loadChatState(bootChatId);
