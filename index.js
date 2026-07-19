@@ -116,6 +116,34 @@ function snapshotMemoToLocalStorage(chatId, opts = {}) {
 }
 
 /**
+ * Formats a recovery timestamp for the restore/keep-disk dialog.
+ * @param {number|null|undefined} ts
+ * @returns {string}
+ */
+function formatRecoveryTimestamp(ts) {
+    const n = Number(ts);
+    if (!n || !Number.isFinite(n) || n <= 0) return 'unknown time';
+    try {
+        const d = new Date(n);
+        const absolute = d.toLocaleString(undefined, {
+            year: 'numeric', month: 'short', day: 'numeric',
+            hour: 'numeric', minute: '2-digit', second: '2-digit',
+        });
+        const ageMs = Date.now() - n;
+        if (ageMs < 0) return absolute;
+        const mins = Math.round(ageMs / 60000);
+        if (mins < 1) return `${absolute} (just now)`;
+        if (mins < 60) return `${absolute} (~${mins} min ago)`;
+        const hours = Math.round(mins / 60);
+        if (hours < 48) return `${absolute} (~${hours}h ago)`;
+        const days = Math.round(hours / 24);
+        return `${absolute} (~${days}d ago)`;
+    } catch (_) {
+        return 'unknown time';
+    }
+}
+
+/**
  * At boot, compares the just-loaded (disk) memo for this chat against the last memo this
  * browser actually saw live. If the disk copy is stale (older, different, and the local
  * snapshot isn't ancient), offers to restore the local copy. Must run BEFORE any save can
@@ -162,11 +190,17 @@ async function checkLocalMemoRecovery(chatId) {
 
         prompted = true;
         _rtRecoveryPromptActive = true;
-        const ageMins = Math.max(1, Math.round((Date.now() - entry.ts) / 60000));
+        const localWhen = formatRecoveryTimestamp(entry.ts);
+        const diskWhen = formatRecoveryTimestamp(s.memoPersistedAt);
         const popupContent = `<div style="text-align:left; line-height:1.45;">
             <p><b>Possible unsaved tracker data found.</b></p>
-            <p>This browser has a newer local copy of the STATE MEMO for this chat (from ~${ageMins} min ago) than what's currently on disk. This can happen if the page reloaded before SillyTavern finished writing settings.json.</p>
-            <p>Disk memo: ${diskMemo.length.toLocaleString()} chars &nbsp;|&nbsp; Local backup: ${entry.currentMemo.length.toLocaleString()} chars</p>
+            <p>This browser has a newer local copy of the STATE MEMO for this chat than what's currently on disk. This can happen if the page reloaded before SillyTavern finished writing settings.json.</p>
+            <p style="margin:10px 0; padding:8px 10px; background:rgba(255,255,255,0.05); border-radius:6px; font-size:0.95em;">
+                <b>Local backup</b> (this browser)<br>
+                ${entry.currentMemo.length.toLocaleString()} chars · ${escapeHtml(localWhen)}<br><br>
+                <b>Disk version</b> (settings.json)<br>
+                ${diskMemo.length.toLocaleString()} chars · ${escapeHtml(diskWhen)}
+            </p>
             <p style="margin-top:10px; padding:8px 10px; border-left:3px solid #f0ad4e; background:rgba(240,173,78,0.12); border-radius:4px;">
                 <b>Look behind this dialog</b> (background is left unblurred on purpose). If the tracker / chat UI looks outdated or stale compared to what you just had — click <b>Restore</b>.
             </p>
@@ -694,6 +728,7 @@ async function forceDiskCheckpoint() {
         saveChatState(chatId, { skipDiskWrite: true });
     }
     snapshotMemoToLocalStorage(chatId, { force: true });
+    s.memoPersistedAt = Date.now();
     const saveFn = await resolveCoreSaveSettings();
     if (!saveFn) {
         throw new Error('Core saveSettings() could not be loaded');
@@ -755,6 +790,9 @@ export function saveSettings(force = false, delay = 0) {
                 // Mirror the live memo into localStorage on every save cycle — regardless of
                 // chatLinkEnabled — so a lost/raced disk write is recoverable at next boot.
                 snapshotMemoToLocalStorage(activeChatId);
+                // Stamp before the write so a successful disk save carries its own time;
+                // if the write races/aborts, boot still sees the older stamp from disk.
+                s.memoPersistedAt = Date.now();
                 if (useForce) {
                     const saveFn = await resolveCoreSaveSettings();
                     if (saveFn) await saveFn();
