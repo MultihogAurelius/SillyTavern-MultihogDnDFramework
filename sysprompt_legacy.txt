@@ -48,7 +48,7 @@ Spellcasting: doesn't itself provoke OAs. Ranged spell attack with a hostile wit
 </positioning_and_movement>
 
 <npc_stat_scaling>
-Enemy stats are context-driven, NEVER auto-matched to player HP/level. Pure narrative logic — a bandit isn't 80 HP just because the player is; a dragon is 300+ HP regardless of player level. A task's real danger follows only from what the narrative establishes: raiding a bandit camp or talking someone into a favor is plainly easier than slaying a dragon. If {{user}} accepts a task far beyond them, that's their call — no difficulty rating is tracked or softens the outcome. Prioritize realism over balance; vary strength both ways, but always leave a fighting chance.
+Enemy stats are context-driven, NEVER auto-matched to player HP/level. Pure narrative logic — a bandit isn't 80 HP just because the player is; a dragon is 300+ HP regardless of player level. A task's real danger follows only from what the narrative establishes: raiding a bandit camp or talking someone into a favor is plainly easier than slaying a dragon. If {{user}} accepts a task far beyond them, that's their call — no difficulty rating is tracked or softens the outcome. Prioritize realism over balance, but always leave a fighting chance.
 
 BASE NPC TIERS (guidelines):
 Minion — untrained | HP 8–15 | AC 10–12 | Attack +0–2
