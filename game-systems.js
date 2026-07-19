@@ -941,7 +941,7 @@ export async function runManualSectionBuilder(options = {}) {
 
 function buildWizardSystemPrompt() {
     const renderingHints = RENDERING_TAGS_LIBRARY.join('\n  - ');
-    return `You are a game-system architect for a D&D-style tabletop RPG framework. The user will describe ONE mechanic/system in plain language (e.g. "radiation zones", "a faction reputation system", "hunger and thirst"). You must design BOTH halves of it and return ONLY the tags below — no explanation, no markdown fences, no other text.
+    return `You are a game-system architect for a D&D-style tabletop RPG framework. The user will describe ONE mechanic/system in plain language (e.g. "radiation zones", "a faction reputation system", "hunger and thirst", "a farming sim with crop growth", "a construction skill with build projects"). You must design BOTH halves of it and return ONLY the tags below — no explanation, no markdown fences, no other text.
 
 ═══════════════════════════════════════════════════════════════════════════
 COMPOUND VS. SINGLE METERS
@@ -1892,6 +1892,68 @@ function saveGameSystemFromPreview(result, existingSystemId = null) {
     return true;
 }
 
+/** Example mechanic descriptions shown as clickable chips in the wizard prompt UI. */
+const WIZARD_EXAMPLE_SYSTEMS = [
+    {
+        label: '🌾 Farming',
+        text: 'A farming sim: crop plots with growth stages over in-world time, soil quality, watering/fertilizer needs, harvest yields, and seasonal planting windows.',
+    },
+    {
+        label: '🔨 Construction',
+        text: 'A construction skill: track proficiency and project progress for building/repairing structures — XP from practice, material costs, build stages, and quality of finished work.',
+    },
+    {
+        label: '☢ Radiation',
+        text: 'Irradiated zones where the player accumulates RADS the longer they stay, with escalating debuffs at higher exposure.',
+    },
+    {
+        label: '🏛 Reputation',
+        text: 'A faction reputation system where standing with each major faction shifts based on visible deeds, quests completed for them, and public betrayals.',
+    },
+    {
+        label: '🍖 Hunger & Thirst',
+        text: 'Hunger and thirst as separate meters that drain over time; eating and drinking restore them with rough portion-based recovery.',
+    },
+    {
+        label: '🛠 Crafting',
+        text: 'A crafting skill tree: recipe unlocks, material quality tiers, success chance by skill level, and durable crafted gear with rarity.',
+    },
+    {
+        label: '⛽ Vehicle Fuel',
+        text: 'Vehicle fuel that drains with travel time/distance, refuels at stations or jerry cans, and strands the vehicle when empty.',
+    },
+    {
+        label: '🧠 Sanity',
+        text: 'A sanity/stress meter that drops from horror, isolation, or trauma; recovers with rest, safety, or companionship — with escalating mental-break tiers.',
+    },
+];
+
+function buildWizardExampleChipsHtml() {
+    const chips = WIZARD_EXAMPLE_SYSTEMS.map((ex, i) =>
+        `<button type="button" class="rt-gs-wizard-example" data-example-idx="${i}" ` +
+        `style="font-size:10px; padding:3px 8px; border-radius:12px; border:1px solid rgba(255,255,255,0.18); ` +
+        `background:rgba(255,255,255,0.06); color:inherit; cursor:pointer; opacity:0.85; white-space:nowrap;" ` +
+        `title="${escapeHtml(ex.text)}">${escapeHtml(ex.label)}</button>`
+    ).join('');
+    return `
+            <div style="font-size:10px; opacity:0.55; margin-top:2px;">Try an example:</div>
+            <div id="rt_gs_wizard_examples" style="display:flex; flex-wrap:wrap; gap:5px;">${chips}</div>`;
+}
+
+function bindWizardExampleChips(textarea) {
+    if (!textarea) return;
+    document.querySelectorAll('.rt-gs-wizard-example').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const idx = parseInt(btn.getAttribute('data-example-idx') || '-1', 10);
+            const ex = WIZARD_EXAMPLE_SYSTEMS[idx];
+            if (!ex) return;
+            textarea.value = ex.text;
+            textarea.dispatchEvent(new Event('input', { bubbles: true }));
+            textarea.focus();
+        });
+    });
+}
+
 /** @returns {Promise<{description: string, systemPrompt: string}|null>} User's mechanic description + wizard system prompt, or null if cancelled. */
 async function promptGameSystemWizardDescription(initialDescription = '') {
     const { Popup } = SillyTavern.getContext();
@@ -1908,6 +1970,7 @@ async function promptGameSystemWizardDescription(initialDescription = '') {
             <textarea id="rt_gs_wizard_desc" rows="4" class="text_pole"
                 style="font-size:12px; resize:vertical; width:100%;"
                 placeholder="Example: Irradiated zones where the player accumulates RADS the longer they stay, with escalating debuffs at higher exposure.">${escapeHtml(initialDescription)}</textarea>
+            ${buildWizardExampleChipsHtml()}
             ${buildWizardPromptEditorHtml('rt_gs_wizard_system_prompt', getEffectiveWizardSystemPrompt(settings))}
         </div>
     `;
@@ -1916,6 +1979,7 @@ async function promptGameSystemWizardDescription(initialDescription = '') {
         bindWizardPromptEditor(settings, 'rt_gs_wizard_system_prompt');
         const ta = document.getElementById('rt_gs_wizard_desc');
         const promptTa = document.getElementById('rt_gs_wizard_system_prompt');
+        bindWizardExampleChips(ta);
         if (ta) {
             if (!description) description = ta.value.trim();
             ta.addEventListener('input', () => { description = ta.value.trim(); });
