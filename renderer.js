@@ -2047,9 +2047,10 @@ function formatValueToCurrency(totalCp, detectedCurrency) {
                     </div>
                     <div style="margin-top: 12px;">
                         🤖 <b>What Model to Use?</b><br><br>
-                        <b>MiMo 2.5 Pro:</b> Great bang for the buck; high output quality. This is what I use for the GM myself through OpenRouter.<br><br>
+                        <b>MiMo 2.5 Pro</b> or <b>DeepSeek 4 Pro</b>: both are great bang for the buck with high GM output quality. I use MiMo myself through OpenRouter — DeepSeek 4 Pro is another strong pick in the same tier. Try both and see which voice you prefer.<br><br>
                         For the State Tracker and Lorebook Agent, I use <b>Gemini 3.1 Flash-Lite</b>. It's very inexpensive and handles the job amazingly well. Gemini 3 Flash or 3.5 Flash are of course even better, but I don't think they're needed. Flash-Lite does the job.<br><br>
-                        If your model thinks too long in combat, enable <b>Combat API Override</b> in State Tracker settings — it auto-switches when the <code>[COMBAT]</code> tag is active in the tracker and switches back when combat ends. <b>Gemini 3.5 Flash</b> is a great choice for this; set thinking to <b>Medium</b> so it still thinks a little.
+                        If your model thinks too long in combat, enable <b>Combat API Override</b> in State Tracker settings — it auto-switches when the <code>[COMBAT]</code> tag is active in the tracker and switches back when combat ends. <b>Gemini 3.5 Flash</b> is a great choice for this; set thinking to <b>Medium</b> so it still thinks a little.<br><br>
+                        These are recommendations, not rules — experiment. Different models shine for different styles of play.
                     </div>
                 </div>
 

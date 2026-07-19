@@ -1878,41 +1878,31 @@ function getSettingsInternal(extensionSettings) {
         s.stockPrompts.party = DEFAULT_STOCK_PROMPTS.party;
     }
 
-    // ── MIGRATION: CHARACTER/PARTY/COMBAT — (N attacks) APR format ────────────────
-    if (s.stockPrompts?.character &&
-        s.stockPrompts.character.includes('Finesse:') &&
-        !s.stockPrompts.character.includes('Ranged (N attacks):')) {
+    // ── MIGRATION: CHARACTER/PARTY/COMBAT — APR / dual-wield / singular grammar ──
+    // Current defaults use "1 attack / 2 attacks / 3 attacks" and literally say
+    // Never write "1 attacks". Older migrations matched those phrases and reset
+    // stockPrompts on every getSettings() — wiping user edits immediately.
+    const APR_NEW = '1 attack / 2 attacks / 3 attacks';
+    const needsAprPromptUpgrade = (text) => {
+        if (!text || text.includes(APR_NEW)) return false;
+        return text.includes('Ranged (N attacks):')
+            || text.includes('Weapon (N attacks,')
+            || text.includes('Finesse weapons:')
+            || text.includes('BAB is +10')
+            || (/\(1 attacks/.test(text) && !text.includes('Never write "1 attacks"'))
+            || (text.includes('Att/def:') && !text.includes('Spells:'))
+            || (text.includes('Spell Atk') && !text.includes('Spells: Cantrips:'))
+            || (text.includes('Att/def:') && !text.includes('TIER BANDS'))
+            || (text.includes('Att/def:') && !text.includes('DUAL-WIELDING'))
+            || (text.includes('Ranged (N attacks):') && !text.includes('DUAL-WIELDING'));
+    };
+    if (needsAprPromptUpgrade(s.stockPrompts?.character)) {
         s.stockPrompts.character = DEFAULT_STOCK_PROMPTS.character;
     }
-    if (s.stockPrompts?.party &&
-        s.stockPrompts.party.includes('Finesse:') &&
-        !s.stockPrompts.party.includes('Ranged (N attacks):')) {
+    if (needsAprPromptUpgrade(s.stockPrompts?.party)) {
         s.stockPrompts.party = DEFAULT_STOCK_PROMPTS.party;
     }
-    if (s.stockPrompts?.combat &&
-        (s.stockPrompts.combat.includes('Finesse weapons:') ||
-         s.stockPrompts.combat.includes('BAB is +10') ||
-         (s.stockPrompts.combat.includes('Att/def:') && !s.stockPrompts.combat.includes('(N attacks,')) ||
-         (s.stockPrompts.combat.includes('Att/def:') && !s.stockPrompts.combat.includes('Spells:')) ||
-         (s.stockPrompts.combat.includes('Spell Atk') && !s.stockPrompts.combat.includes('Spells: Cantrips:')) ||
-         (s.stockPrompts.combat.includes('Att/def:') && !s.stockPrompts.combat.includes('TIER BANDS')))) {
-        s.stockPrompts.combat = DEFAULT_STOCK_PROMPTS.combat;
-    }
-
-    // ── MIGRATION: CHARACTER/PARTY/COMBAT — dual-wielding 3rd-attack support ─────
-    if (s.stockPrompts?.character &&
-        s.stockPrompts.character.includes('Ranged (N attacks):') &&
-        !s.stockPrompts.character.includes('DUAL-WIELDING')) {
-        s.stockPrompts.character = DEFAULT_STOCK_PROMPTS.character;
-    }
-    if (s.stockPrompts?.party &&
-        s.stockPrompts.party.includes('Ranged (N attacks):') &&
-        !s.stockPrompts.party.includes('DUAL-WIELDING')) {
-        s.stockPrompts.party = DEFAULT_STOCK_PROMPTS.party;
-    }
-    if (s.stockPrompts?.combat &&
-        s.stockPrompts.combat.includes('Att/def:') &&
-        !s.stockPrompts.combat.includes('DUAL-WIELDING')) {
+    if (needsAprPromptUpgrade(s.stockPrompts?.combat)) {
         s.stockPrompts.combat = DEFAULT_STOCK_PROMPTS.combat;
     }
 
@@ -1920,20 +1910,6 @@ function getSettingsInternal(extensionSettings) {
     if (s.stockPrompts?.combat &&
         s.stockPrompts.combat.includes('TIER BANDS') &&
         !s.stockPrompts.combat.includes('Reasonable pistol baseline: 2d8+1')) {
-        s.stockPrompts.combat = DEFAULT_STOCK_PROMPTS.combat;
-    }
-
-    // ── MIGRATION: CHARACTER/PARTY/COMBAT — "1 attack" singular grammar ──────────
-    if (s.stockPrompts?.character &&
-        (s.stockPrompts.character.includes('1 attacks') || s.stockPrompts.character.includes('Ranged (N attacks):'))) {
-        s.stockPrompts.character = DEFAULT_STOCK_PROMPTS.character;
-    }
-    if (s.stockPrompts?.party &&
-        (s.stockPrompts.party.includes('1 attacks') || s.stockPrompts.party.includes('Ranged (N attacks):'))) {
-        s.stockPrompts.party = DEFAULT_STOCK_PROMPTS.party;
-    }
-    if (s.stockPrompts?.combat &&
-        (s.stockPrompts.combat.includes('1 attacks') || s.stockPrompts.combat.includes('Weapon (N attacks,'))) {
         s.stockPrompts.combat = DEFAULT_STOCK_PROMPTS.combat;
     }
 
@@ -1952,7 +1928,8 @@ function getSettingsInternal(extensionSettings) {
     const PRE_FINESSE_COMBAT_SNIPPET = 'You MUST output `[COMBAT]END_COMBAT[/COMBAT]`';
     if (s.stockPrompts?.combat &&
         s.stockPrompts.combat.includes(PRE_FINESSE_COMBAT_SNIPPET) &&
-        !s.stockPrompts.combat.includes('(N attacks,')) {
+        !s.stockPrompts.combat.includes('(N attacks,') &&
+        !s.stockPrompts.combat.includes('1 attack / 2 attacks / 3 attacks')) {
         s.stockPrompts.combat = DEFAULT_STOCK_PROMPTS.combat;
     }
 

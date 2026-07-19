@@ -11975,9 +11975,12 @@ async function runPortraitMigrationIfNeeded() {
                 changed = true;
             }
 
-            // Quest difficulty removed as a mechanic — strip any lingering DIFFICULTY field
+            // Quest difficulty removed as a mechanic — only wipe prompts that still
+            // instruct outputting a DIFFICULTY: field (not the "Do not output…" note).
             if (settings.stockPrompts.quests?.includes('OBJ_ACTIVE') &&
-                settings.stockPrompts.quests.includes('DIFFICULTY')) {
+                !settings.stockPrompts.quests.includes('Do not output a DIFFICULTY field') &&
+                (settings.stockPrompts.quests.includes('For difficulty, use the DIFFICULTY marker')
+                    || /(?:^|\n)\s*DIFFICULTY\s*:/m.test(settings.stockPrompts.quests))) {
                 refreshQuestPrompt(settings);
                 changed = true;
             }

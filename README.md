@@ -95,11 +95,13 @@ You can scrap the entire system prompt and all the default fields and track your
 ## What Model to Use?
 Your primary narrator model must support **Tool Calling** for the Hybrid RNG system to work properly, though this is only relevant if you're using tool calls. The extension also works without them (selectable in the settings.)
 
-**MiMo 2.5 Pro:** Great bang for the buck; high output quality. This is what I use for the GM myself through OpenRouter.
+**MiMo 2.5 Pro** or **DeepSeek 4 Pro**: both are great bang for the buck with high GM output quality. I use MiMo myself through OpenRouter — DeepSeek 4 Pro is another strong pick in the same tier. Try both and see which voice you prefer.
 
 For the State Tracker and Lorebook Agent, I use **Gemini 3.1 Flash-Lite**. It's very inexpensive and handles the job amazingly well. Gemini 3 Flash or 3.5 Flash are of course even better, but I don't think they're needed. Flash-Lite does the job.
 
 If your model thinks too long in combat, enable **Combat API Override** in State Tracker settings — it auto-switches when the `[COMBAT]` tag is active in the tracker and switches back when combat ends. **Gemini 3.5 Flash** is a great choice for this; set thinking to **Medium** so it still thinks a little.
+
+These are recommendations, not rules — experiment. Different models shine for different styles of play.
 
 ---
 

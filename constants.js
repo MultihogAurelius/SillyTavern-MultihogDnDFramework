@@ -438,7 +438,7 @@ PARTY SAVES: On joining, derive Fort/Ref/Will from CON/DEX/WIS mods + a +2 to +4
 
 <loot>
 On finding an item, pop a d20: 1–5 Junk/broken | 6–10 Common | 11–15 Useful/quality | 16–19 Rare/notable | 20 Exceptional.
-Narrate rarity tier, combat properties (damage dice, AC bonus, special effects), and approximate value for the Tracker.
+Narrate rarity tier, combat properties (damage dice, attack bonus like +1/+2/+3 e.g. "epic sword +2", AC bonus, special effects), and approximate value for the Tracker.
 </loot>
 
 <random_events>
@@ -679,7 +679,7 @@ PARTY SAVES: On joining, derive Fort/Ref/Will from CON/DEX/WIS mods + a +2 to +4
 
 <loot>
 On finding an item, pop a d20: 1–5 Junk/broken | 6–10 Common | 11–15 Useful/quality | 16–19 Rare/notable | 20 Exceptional.
-Narrate rarity tier, combat properties (damage dice, AC bonus, special effects), and approximate value for the Tracker.
+Narrate rarity tier, combat properties (damage dice, attack bonus like +1/+2/+3 e.g. "epic sword +2", AC bonus, special effects), and approximate value for the Tracker.
 </loot>
 
 <random_events>
