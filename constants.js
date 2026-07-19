@@ -254,7 +254,7 @@ QUEST: The Missing Sheep
 - Use OBJ_ACTIVE / OBJ_COMPLETED / OBJ_FAILED markers.
 - Append ' (optional)' only if the task is not required.
 - For collection/count objectives, append [current/total] after the text (e.g. [4/6]) and add an OBJ_TOTAL line with the total. Update the count each turn as progress is made.
-- Keep objectives few and broad (outcomes, not step-by-step routes); prefer 1–3. Do not rewrite/rephrase existing OBJ lines without cause, and do not keep adding granular micro-steps as the scene unfolds — only mark OBJ_COMPLETED/OBJ_FAILED or update [progress/total] counts.
+- Keep objectives few and broad (clear, completable outcomes — not step-by-step routes); prefer 1–3. Do not rewrite/rephrase existing OBJ lines without cause, and do not keep adding granular micro-steps as the scene unfolds — only mark OBJ_COMPLETED/OBJ_FAILED or update [progress/total] counts.
 - For rewards, use the REWARD marker (e.g. REWARD: 50 Gold). List multiple rewards on separate lines.
 - For difficulty, use the DIFFICULTY marker (Very Easy, Easy, Medium, Hard, Very Hard).
 - Only use DEADLINE if the quest has a time limit.
@@ -316,7 +316,7 @@ export const QUESTS_NARRATOR = `GENERAL:
 - When the player unambiguously accepts a quest from an NPC, describe it clearly in the narrative and conclude with *(Quest Accepted: Quest Name Here)*.
 - State who gave the quest, where they are located, what the task entails, how many objectives there are, the difficulty (Very Easy to Very Hard), any time pressure, and what rewards were promised. Do NOT do this for something the {{user}} has not yet agreed to.
 - When an objective is completed, mention it naturally in the narrative. When a quest concludes (success or failure), narrate the outcome.
-- Keep objectives few and broad — outcomes players can solve creatively, not step-by-step routes. Prefer 1–3 goals; do not keep adding micro-objectives as the scene unfolds. Bad: Reach the door → Use the fire exit → Reach the ground floor → Reach the vehicle. Good: Survive the immediate threat; Lose the pursuers.
+- Keep objectives few and broad — outcomes players can solve creatively, not step-by-step routes, but still keep the goal clear so that it's clear when it has been achieved and can be marked as completed. Prefer 1–3 goals; do not keep adding micro-objectives as the scene unfolds. Bad: Reach the door → Use the fire exit → Reach the ground floor → Reach the vehicle. Good: Survive the immediate threat; Lose the pursuers.
 - The MOOD field on each active NPC-given quest with a deadline in the STATE MEMO is calculated by the engine from time pressure and FRUSTRATION_COEFF. Use it to guide how the questgiver NPC speaks and acts.
 
 EMERGENT QUESTS:
@@ -461,7 +461,7 @@ LEVEL THRESHOLDS: 1–0 | 2–300 | 3–900 | 4–2,700 | 5–6,500 | 6–14,000
 </xp_system>
 
 <quests>
-On unambiguous acceptance: narrate clearly, end with *(Quest Accepted: Name)*. State giver, location, task, objective count, difficulty (Very Easy–Very Hard), time pressure, promised reward. Don't do this pre-agreement. Note objective completion naturally; narrate success/failure at conclusion. Keep objectives few and broad (outcomes, not step-by-step routes); do not keep adding micro-objectives mid-scene. Quest MOOD (in STATE MEMO, from time pressure + FRUSTRATION_COEFF) should guide questgiver tone for NPC-given quests only.
+On unambiguous acceptance: narrate clearly, end with *(Quest Accepted: Name)*. State giver, location, task, objective count, difficulty (Very Easy–Very Hard), time pressure, promised reward. Don't do this pre-agreement. Note objective completion naturally; narrate success/failure at conclusion. Keep objectives few and broad (clear, completable outcomes — not step-by-step routes); do not keep adding micro-objectives mid-scene. Quest MOOD (in STATE MEMO, from time pressure + FRUSTRATION_COEFF) should guide questgiver tone for NPC-given quests only.
 
 EMERGENT QUESTS: Sustained player-driven goals (investigating, hunting, exploring, helping) → *(Emergent Quest Active: Name)* + same details as above. No FRUSTRATION_COEFF / NPC mood pressure on emergent quests.
 </quests>
@@ -703,7 +703,7 @@ LEVEL THRESHOLDS: 1–0 | 2–300 | 3–900 | 4–2,700 | 5–6,500 | 6–14,000
 </xp_system>
 
 <quests>
-On unambiguous acceptance: narrate clearly, end with *(Quest Accepted: Name)*. State giver, location, task, objective count, difficulty (Very Easy–Very Hard), time pressure, promised reward. Don't do this pre-agreement. Note objective completion naturally; narrate success/failure at conclusion. Keep objectives few and broad (outcomes, not step-by-step routes); do not keep adding micro-objectives mid-scene. Quest MOOD (in STATE MEMO, from time pressure + FRUSTRATION_COEFF) should guide questgiver tone for NPC-given quests only.
+On unambiguous acceptance: narrate clearly, end with *(Quest Accepted: Name)*. State giver, location, task, objective count, difficulty (Very Easy–Very Hard), time pressure, promised reward. Don't do this pre-agreement. Note objective completion naturally; narrate success/failure at conclusion. Keep objectives few and broad (clear, completable outcomes — not step-by-step routes); do not keep adding micro-objectives mid-scene. Quest MOOD (in STATE MEMO, from time pressure + FRUSTRATION_COEFF) should guide questgiver tone for NPC-given quests only.
 
 EMERGENT QUESTS: Sustained player-driven goals (investigating, hunting, exploring, helping) → *(Emergent Quest Active: Name)* + same details as above. No FRUSTRATION_COEFF / NPC mood pressure on emergent quests.
 </quests>

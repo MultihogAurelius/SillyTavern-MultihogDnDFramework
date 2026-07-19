@@ -11991,6 +11991,13 @@ async function runPortraitMigrationIfNeeded() {
                 changed = true;
             }
 
+            // Objectives must stay clear/completable (not vague or micro-stepped)
+            if (settings.stockPrompts.quests?.includes('OBJ_ACTIVE') &&
+                !settings.stockPrompts.quests.includes('clear, completable outcomes')) {
+                refreshQuestPrompt(settings);
+                changed = true;
+            }
+
             if (changed) {
                 saveSettings();
             }
