@@ -397,7 +397,11 @@ export function transformBaseSectionContent(tag, innerContent, settings) {
 
     if (tag === 'CYOA_mode') {
         const cfg = settings.cyoaConfig || {};
-        const promptText = cfg.customPromptText?.trim() || buildCyoaPrompt(cfg);
+        // Builder is source of truth unless the user explicitly opted into a custom CYOA prompt.
+        // (Older builds always wrote customPromptText on save, which blocked shipped CYOA refreshes.)
+        const promptText = (cfg.useCustomPrompt && cfg.customPromptText?.trim())
+            ? cfg.customPromptText.trim()
+            : buildCyoaPrompt(cfg);
         return `<CYOA_mode>\n${promptText}\n</CYOA_mode>`;
     }
     if (tag === 'random_events' && !(settings.rngEnabled && settings.diceFunctionTool)) {

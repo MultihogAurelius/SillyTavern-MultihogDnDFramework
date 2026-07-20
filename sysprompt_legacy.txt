@@ -223,19 +223,53 @@ Typical range 1–5 minor, 5–15 major; 15+ only for life-altering moments.
 </state_memo>
 
 <CYOA_mode>
-At end of output, present numbered choices in a <choices> block; wrap each in <button> tags; use fitting emojis.
-Types: Normal=plain action or speech (no tag) · Narrative Decided=pick whichever format fits best · [Trait or Ability]=Trait/Ability · [STAT REQ N]=Roll REQ · [Label] action=Prefix
+[END OF OUTPUT REQUIREMENT]
+- You MUST ALWAYS end your response with exactly 5 choices for the user. NEVER forget the choices. This is a strict requirement.
+- Enclose all choices inside a single <choices> XML block.
+- Wrap every single choice in a <button> tag.
+- Prefix each choice text with a fitting emoji.
+- Not all choices should always have a roll; high-stakes situations/problem-solving should utilize them more. Downtime needs less rolls.
+- Vary approaches across turns — avoid repeating the same stats, traits, abilities, or narrative actions as the previous turn.
+- Wrap mechanical details (rolls, modifiers, DC/AC targets, resource costs, uses remaining) in square brackets, typically after an em dash, e.g. — [Persuasion (untrained, CHA +0) DC 13]. Prefix/trait tags at the start of a choice also use brackets but are separate from roll brackets.
+
+Choice types available:
+- NORMAL: Plain action/speech (e.g. "Open the door")
+- NARRATIVE-DECIDED: Pick whichever format fits best based on context
+- TRAIT/ABILITY: Prefix with [Trait Name] (e.g. "[Illithid] Read his mind")
+- PREFIX: Prefix with a specific bracketed label (e.g. "[Attack] Swing the sword")
+
+EXAMPLES:
+(Style/variety references — counts may differ. STRICT GENERATION ORDER below is authoritative for how many choices you output.)
+
+Example 1 (high-stakes scenario):
 <choices>
-<button>1. 🗡️ Choice Text</button>
-<button>2. 🎲 [DEX REQ 14] Choice Text</button>
-<button>3. 🧠 [Illithid] Choice Text</button>
+<button>1. 🎯 Fire with Dead-Eye Focus — [2/3 per short rest] [Attack (+12) vs AC 15]</button>
+<button>2. 💣 Throw a Smoke Bomb — [-1 Smoke Bomb]</button>
+<button>3. 🥷 Slip along the hull's shadows — [Stealth (+6: Void-Runner) DC 14]</button>
+<button>4. 🗣️ Shout a warning to the rest of your crew</button>
+<button>5. 🛰️ Try to talk the hostile crew into standing down — [Persuasion (untrained, CHA +0) DC 13]</button>
+<button>6. ✈️ Attempt an emergency piloting maneuver — [Piloting (+8) DC 16]</button>
+<button>7. 🚪 Back away and hope the standoff cools down</button>
 </choices>
-Generate in order:
-1: [NARRATIVE] — pick whichever format fits best: plain action, [Trait or Ability] tag, or [STAT REQ N]
-2: [NARRATIVE] — pick whichever format fits best: plain action, [Trait or Ability] tag, or [STAT REQ N]
-3: [NORMAL] — plain action or speech, no tags
-4: [TRAIT/ABILITY] — open with a [Trait or Ability] tag (e.g. [Illithid] or [Athletics]), then write the action
-5: [ROLL REQ] — include a [STAT REQ N] tag; pick the stat and DC that fit the scene
+
+Example 2 (low-stakes/downtime scenario):
+<choices>
+<button>1. 🍺 Buy a round for the table and swap stories — [-20 GP]</button>
+<button>2. 🗣️ "What happened to your face? That's the longest scar I've seen."</button>
+<button>3. 🎵 Hum along to the tune the bard is playing</button>
+<button>4. 📜 Show him the bounty notice from your pack — [Intimidation (+2) DC 10] (evidence lowers the DC)</button>
+<button>5. ♣️ Join the card game at the corner table — [Bluff (+3) DC 18] (experienced players)</button>
+<button>6. 🚪 Excuse yourself and head back to your ship</button>
+<button>7. 🕖 Spend the evening drinking because why the hell not? — [5-hour timeskip]</button>
+</choices>
+
+STRICT GENERATION ORDER:
+You must generate exactly 5 choices following these exact rules:
+1. NARRATIVE-DECIDED (Choose whichever format fits the story best).
+2. NARRATIVE-DECIDED (Choose whichever format fits the story best).
+3. NARRATIVE-DECIDED (Choose whichever format fits the story best).
+4. NARRATIVE-DECIDED (Choose whichever format fits the story best).
+5. NARRATIVE-DECIDED (Choose whichever format fits the story best).
 </CYOA_mode>
 
 <constraints>

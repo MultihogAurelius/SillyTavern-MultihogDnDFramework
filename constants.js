@@ -547,19 +547,53 @@ Typical range 1–5 minor, 5–15 major; 15+ only for life-altering moments.
 </state_memo>
 
 <CYOA_mode>
-At end of output, present numbered choices in a <choices> block; wrap each in <button> tags; use fitting emojis.
-Types: Normal=plain action or speech (no tag) · Narrative Decided=pick whichever format fits best · [Trait or Ability]=Trait/Ability · [STAT REQ N]=Roll REQ · [Label] action=Prefix
+[END OF OUTPUT REQUIREMENT]
+- You MUST ALWAYS end your response with exactly 5 choices for the user. NEVER forget the choices. This is a strict requirement.
+- Enclose all choices inside a single <choices> XML block.
+- Wrap every single choice in a <button> tag.
+- Prefix each choice text with a fitting emoji.
+- Not all choices should always have a roll; high-stakes situations/problem-solving should utilize them more. Downtime needs less rolls.
+- Vary approaches across turns — avoid repeating the same stats, traits, abilities, or narrative actions as the previous turn.
+- Wrap mechanical details (rolls, modifiers, DC/AC targets, resource costs, uses remaining) in square brackets, typically after an em dash, e.g. — [Persuasion (untrained, CHA +0) DC 13]. Prefix/trait tags at the start of a choice also use brackets but are separate from roll brackets.
+
+Choice types available:
+- NORMAL: Plain action/speech (e.g. "Open the door")
+- NARRATIVE-DECIDED: Pick whichever format fits best based on context
+- TRAIT/ABILITY: Prefix with [Trait Name] (e.g. "[Illithid] Read his mind")
+- PREFIX: Prefix with a specific bracketed label (e.g. "[Attack] Swing the sword")
+
+EXAMPLES:
+(Style/variety references — counts may differ. STRICT GENERATION ORDER below is authoritative for how many choices you output.)
+
+Example 1 (high-stakes scenario):
 <choices>
-<button>1. 🗡️ Choice Text</button>
-<button>2. 🎲 [DEX REQ 14] Choice Text</button>
-<button>3. 🧠 [Illithid] Choice Text</button>
+<button>1. 🎯 Fire with Dead-Eye Focus — [2/3 per short rest] [Attack (+12) vs AC 15]</button>
+<button>2. 💣 Throw a Smoke Bomb — [-1 Smoke Bomb]</button>
+<button>3. 🥷 Slip along the hull's shadows — [Stealth (+6: Void-Runner) DC 14]</button>
+<button>4. 🗣️ Shout a warning to the rest of your crew</button>
+<button>5. 🛰️ Try to talk the hostile crew into standing down — [Persuasion (untrained, CHA +0) DC 13]</button>
+<button>6. ✈️ Attempt an emergency piloting maneuver — [Piloting (+8) DC 16]</button>
+<button>7. 🚪 Back away and hope the standoff cools down</button>
 </choices>
-Generate in order:
-1: [NARRATIVE] — pick whichever format fits best: plain action, [Trait or Ability] tag, or [STAT REQ N]
-2: [NARRATIVE] — pick whichever format fits best: plain action, [Trait or Ability] tag, or [STAT REQ N]
-3: [NORMAL] — plain action or speech, no tags
-4: [TRAIT/ABILITY] — open with a [Trait or Ability] tag (e.g. [Illithid] or [Athletics]), then write the action
-5: [ROLL REQ] — include a [STAT REQ N] tag; pick the stat and DC that fit the scene
+
+Example 2 (low-stakes/downtime scenario):
+<choices>
+<button>1. 🍺 Buy a round for the table and swap stories — [-20 GP]</button>
+<button>2. 🗣️ "What happened to your face? That's the longest scar I've seen."</button>
+<button>3. 🎵 Hum along to the tune the bard is playing</button>
+<button>4. 📜 Show him the bounty notice from your pack — [Intimidation (+2) DC 10] (evidence lowers the DC)</button>
+<button>5. ♣️ Join the card game at the corner table — [Bluff (+3) DC 18] (experienced players)</button>
+<button>6. 🚪 Excuse yourself and head back to your ship</button>
+<button>7. 🕖 Spend the evening drinking because why the hell not? — [5-hour timeskip]</button>
+</choices>
+
+STRICT GENERATION ORDER:
+You must generate exactly 5 choices following these exact rules:
+1. NARRATIVE-DECIDED (Choose whichever format fits the story best).
+2. NARRATIVE-DECIDED (Choose whichever format fits the story best).
+3. NARRATIVE-DECIDED (Choose whichever format fits the story best).
+4. NARRATIVE-DECIDED (Choose whichever format fits the story best).
+5. NARRATIVE-DECIDED (Choose whichever format fits the story best).
 </CYOA_mode>
 
 <constraints>
@@ -801,19 +835,53 @@ Typical range 1–5 minor, 5–15 major; 15+ only for life-altering moments.
 </state_memo>
 
 <CYOA_mode>
-At end of output, present numbered choices in a <choices> block; wrap each in <button> tags; use fitting emojis.
-Types: Normal=plain action or speech (no tag) · Narrative Decided=pick whichever format fits best · [Trait or Ability]=Trait/Ability · [STAT REQ N]=Roll REQ · [Label] action=Prefix
+[END OF OUTPUT REQUIREMENT]
+- You MUST ALWAYS end your response with exactly 5 choices for the user. NEVER forget the choices. This is a strict requirement.
+- Enclose all choices inside a single <choices> XML block.
+- Wrap every single choice in a <button> tag.
+- Prefix each choice text with a fitting emoji.
+- Not all choices should always have a roll; high-stakes situations/problem-solving should utilize them more. Downtime needs less rolls.
+- Vary approaches across turns — avoid repeating the same stats, traits, abilities, or narrative actions as the previous turn.
+- Wrap mechanical details (rolls, modifiers, DC/AC targets, resource costs, uses remaining) in square brackets, typically after an em dash, e.g. — [Persuasion (untrained, CHA +0) DC 13]. Prefix/trait tags at the start of a choice also use brackets but are separate from roll brackets.
+
+Choice types available:
+- NORMAL: Plain action/speech (e.g. "Open the door")
+- NARRATIVE-DECIDED: Pick whichever format fits best based on context
+- TRAIT/ABILITY: Prefix with [Trait Name] (e.g. "[Illithid] Read his mind")
+- PREFIX: Prefix with a specific bracketed label (e.g. "[Attack] Swing the sword")
+
+EXAMPLES:
+(Style/variety references — counts may differ. STRICT GENERATION ORDER below is authoritative for how many choices you output.)
+
+Example 1 (high-stakes scenario):
 <choices>
-<button>1. 🗡️ Choice Text</button>
-<button>2. 🎲 [DEX REQ 14] Choice Text</button>
-<button>3. 🧠 [Illithid] Choice Text</button>
+<button>1. 🎯 Fire with Dead-Eye Focus — [2/3 per short rest] [Attack (+12) vs AC 15]</button>
+<button>2. 💣 Throw a Smoke Bomb — [-1 Smoke Bomb]</button>
+<button>3. 🥷 Slip along the hull's shadows — [Stealth (+6: Void-Runner) DC 14]</button>
+<button>4. 🗣️ Shout a warning to the rest of your crew</button>
+<button>5. 🛰️ Try to talk the hostile crew into standing down — [Persuasion (untrained, CHA +0) DC 13]</button>
+<button>6. ✈️ Attempt an emergency piloting maneuver — [Piloting (+8) DC 16]</button>
+<button>7. 🚪 Back away and hope the standoff cools down</button>
 </choices>
-Generate in order:
-1: [NARRATIVE] — pick whichever format fits best: plain action, [Trait or Ability] tag, or [STAT REQ N]
-2: [NARRATIVE] — pick whichever format fits best: plain action, [Trait or Ability] tag, or [STAT REQ N]
-3: [NORMAL] — plain action or speech, no tags
-4: [TRAIT/ABILITY] — open with a [Trait or Ability] tag (e.g. [Illithid] or [Athletics]), then write the action
-5: [ROLL REQ] — include a [STAT REQ N] tag; pick the stat and DC that fit the scene
+
+Example 2 (low-stakes/downtime scenario):
+<choices>
+<button>1. 🍺 Buy a round for the table and swap stories — [-20 GP]</button>
+<button>2. 🗣️ "What happened to your face? That's the longest scar I've seen."</button>
+<button>3. 🎵 Hum along to the tune the bard is playing</button>
+<button>4. 📜 Show him the bounty notice from your pack — [Intimidation (+2) DC 10] (evidence lowers the DC)</button>
+<button>5. ♣️ Join the card game at the corner table — [Bluff (+3) DC 18] (experienced players)</button>
+<button>6. 🚪 Excuse yourself and head back to your ship</button>
+<button>7. 🕖 Spend the evening drinking because why the hell not? — [5-hour timeskip]</button>
+</choices>
+
+STRICT GENERATION ORDER:
+You must generate exactly 5 choices following these exact rules:
+1. NARRATIVE-DECIDED (Choose whichever format fits the story best).
+2. NARRATIVE-DECIDED (Choose whichever format fits the story best).
+3. NARRATIVE-DECIDED (Choose whichever format fits the story best).
+4. NARRATIVE-DECIDED (Choose whichever format fits the story best).
+5. NARRATIVE-DECIDED (Choose whichever format fits the story best).
 </CYOA_mode>
 
 <constraints>
@@ -837,77 +905,125 @@ No uses left on a resource/spell/ability/HD → state they can't do that, prompt
 export const DEFAULT_CYOA_SLOTS = [
     { type: 'narrative' },
     { type: 'narrative' },
-    { type: 'normal' },
-    { type: 'trait', label: '' },
-    { type: 'roll', label: '', dc: 14 },
+    { type: 'narrative' },
+    { type: 'narrative' },
+    { type: 'narrative' },
 ];
 
 /**
  * Builds the CYOA_mode inner prompt text from a cyoaConfig object.
- * Compact format — no redundant type descriptions, just the reference line + format block + slot list.
  * @param {object} config  settings.cyoaConfig
  * @returns {string}
  */
 export function buildCyoaPrompt(config = {}) {
-    const slots = Array.isArray(config.slots) && config.slots.length > 0
+    const slots = (Array.isArray(config.slots) && config.slots.length > 0
         ? config.slots
-        : DEFAULT_CYOA_SLOTS;
-    const useEmojis    = config.useEmojis    !== false;
-    const useXmlTag    = config.useXmlTag    !== false;
+        : DEFAULT_CYOA_SLOTS
+    ).map((slot) => (slot?.type === 'roll' ? { ...slot, type: 'narrative' } : slot));
+    const useEmojis     = config.useEmojis !== false;
+    const useXmlTag     = config.useXmlTag !== false;
     const useButtonTags = config.useButtonTags !== false;
+    const totalCount = slots.length;
 
-    const btn = (s) => useButtonTags ? `<button>${s}</button>` : s;
+    const wrapChoice = (inner) => {
+        let text = String(inner);
+        if (!useEmojis) {
+            // Strip emoji after the "N. " prefix when emojis are disabled.
+            text = text.replace(/^(\d+\.\s*)(?:\p{Extended_Pictographic}|\p{Emoji_Presentation}|[\uFE0F\u200D])+\s*/u, '$1');
+        }
+        return useButtonTags ? `<button>${text}</button>` : text;
+    };
 
-    const intro = `[END OF OUTPUT REQUIREMENT]
-You MUST ALWAYS end your response with exactly ${slots.length} choices for the user. NEVER forget the choices. This is a strict requirement.
-CRITICAL AVOIDANCE: To break repetitive loops, you are STRICTLY FORBIDDEN from using the exact same stats, traits, roll requirements, abilities, or narrative actions as the previous turn. You MUST force yourself to introduce completely NEW mechanics and approaches every time.
-${useXmlTag ? 'Enclose all choices inside a single <choices> XML block.' : ''}
-${useButtonTags ? 'Wrap every single choice in a <button> tag.' : ''}
-${useEmojis ? 'Prefix each choice text with a fitting emoji.' : ''}`;
+    const wrapBlock = (lines) => {
+        const body = lines.map(wrapChoice).join('\n');
+        return useXmlTag ? `<choices>\n${body}\n</choices>` : body;
+    };
+
+    const reqLines = [
+        `- You MUST ALWAYS end your response with exactly ${totalCount} choices for the user. NEVER forget the choices. This is a strict requirement.`,
+    ];
+    if (useXmlTag) reqLines.push('- Enclose all choices inside a single <choices> XML block.');
+    if (useButtonTags) reqLines.push('- Wrap every single choice in a <button> tag.');
+    if (useEmojis) reqLines.push('- Prefix each choice text with a fitting emoji.');
+    reqLines.push('- Not all choices should always have a roll; high-stakes situations/problem-solving should utilize them more. Downtime needs less rolls.');
+    reqLines.push('- Vary approaches across turns — avoid repeating the same stats, traits, abilities, or narrative actions as the previous turn.');
+    reqLines.push('- Wrap mechanical details (rolls, modifiers, DC/AC targets, resource costs, uses remaining) in square brackets, typically after an em dash, e.g. — [Persuasion (untrained, CHA +0) DC 13]. Prefix/trait tags at the start of a choice also use brackets but are separate from roll brackets.');
+
+    const intro = `[END OF OUTPUT REQUIREMENT]\n${reqLines.join('\n')}`;
 
     const typeLine = `Choice types available:
 - NORMAL: Plain action/speech (e.g. "Open the door")
-- NARRATIVE: Pick whichever format fits best based on context
+- NARRATIVE-DECIDED: Pick whichever format fits best based on context
 - TRAIT/ABILITY: Prefix with [Trait Name] (e.g. "[Illithid] Read his mind")
-- ROLL REQ: Prefix with [STAT REQ N] where N is difficulty (e.g. "[DEX REQ 14] Dodge the attack")
 - PREFIX: Prefix with a specific bracketed label (e.g. "[Attack] Swing the sword")`;
 
-    const formatBlock = `Example formatting:
-${useXmlTag ? '<choices>\n' : ''}${btn('1. \ud83d\udde1\ufe0f Confront the guard.')}
-${btn('2. \ud83c\udfb2 [DEX REQ 14] Try to sneak past.')}
-${btn('3. \ud83e\udde0 [Illithid] Dominate his mind.')}${useXmlTag ? '\n</choices>' : ''}`;
+    // Style examples stay rich on purpose; counts may differ from STRICT GENERATION ORDER.
+    const examples = `EXAMPLES:
+(Style/variety references — counts may differ. STRICT GENERATION ORDER below is authoritative for how many choices you output.)
+
+Example 1 (high-stakes scenario):
+${wrapBlock([
+        '1. 🎯 Fire with Dead-Eye Focus — [2/3 per short rest] [Attack (+12) vs AC 15]',
+        '2. 💣 Throw a Smoke Bomb — [-1 Smoke Bomb]',
+        '3. 🥷 Slip along the hull\'s shadows — [Stealth (+6: Void-Runner) DC 14]',
+        '4. 🗣️ Shout a warning to the rest of your crew',
+        '5. 🛰️ Try to talk the hostile crew into standing down — [Persuasion (untrained, CHA +0) DC 13]',
+        '6. ✈️ Attempt an emergency piloting maneuver — [Piloting (+8) DC 16]',
+        '7. 🚪 Back away and hope the standoff cools down',
+    ])}
+
+Example 2 (low-stakes/downtime scenario):
+${wrapBlock([
+        '1. 🍺 Buy a round for the table and swap stories — [-20 GP]',
+        '2. 🗣️ "What happened to your face? That\'s the longest scar I\'ve seen."',
+        '3. 🎵 Hum along to the tune the bard is playing',
+        '4. 📜 Show him the bounty notice from your pack — [Intimidation (+2) DC 10] (evidence lowers the DC)',
+        '5. ♣️ Join the card game at the corner table — [Bluff (+3) DC 18] (experienced players)',
+        '6. 🚪 Excuse yourself and head back to your ship',
+        '7. 🕖 Spend the evening drinking because why the hell not? — [5-hour timeskip]',
+    ])}`;
 
     const slotLines = slots.map((slot, i) => {
         const num = i + 1;
-        const e = useEmojis ? '🗺️ ' : ''; // Example emoji placeholder
         switch (slot.type) {
             case 'normal':
-                return `${num}. MUST be NORMAL (plain text, no bracketed tags). Format: "${e}Action text".`;
-            case 'roll': {
-                const stat = slot.label?.trim();
-                return stat
-                    ? `${num}. MUST be a ROLL REQ for ${stat}. Format: "${e}[${stat} REQ N] action" (you choose the DC for N).`
-                    : `${num}. MUST be a ROLL REQ. Choose an appropriate stat and DC. Format: "${e}[STAT REQ N] action" (CRITICAL: You MUST pick a completely NEW and DIFFERENT stat/DC than the ones used in recent turns. NEVER repeat the same stat loop!).`;
-            }
+                return `${num}. MUST be NORMAL (plain action/speech, no bracketed tags).`;
             case 'trait': {
                 const name = slot.label?.trim();
                 return name
-                    ? `${num}. MUST use TRAIT/ABILITY [${name}]. Format: "${e}[${name}] action text".`
-                    : `${num}. MUST use a relevant TRAIT/ABILITY tag. Format: "${e}[Trait Name] action text" (CRITICAL: You MUST pick a completely NEW and DIFFERENT trait/ability than the ones used in recent turns. NEVER repeat the same trait loop!).`;
+                    ? `${num}. MUST use TRAIT/ABILITY [${name}].`
+                    : `${num}. MUST use a relevant TRAIT/ABILITY tag (pick a fresh trait/ability — do not repeat the previous turn's).`;
             }
             case 'prefix': {
                 const label = slot.label?.trim();
                 return label
-                    ? `${num}. MUST begin with the exact prefix [${label}]. Format: "${e}[${label}] action text".`
-                    : `${num}. MUST begin with a thematic [PREFIX] of your choice. Format: "${e}[Prefix] action text".`;
+                    ? `${num}. MUST begin with the exact prefix [${label}].`
+                    : `${num}. MUST begin with a thematic [PREFIX] of your choice.`;
             }
             case 'narrative':
             default:
-                return `${num}. NARRATIVE (Choose whichever format fits the story best).`;
+                return `${num}. NARRATIVE-DECIDED (Choose whichever format fits the story best).`;
         }
     }).join('\n');
 
-    return `${intro}\n\n${typeLine}\n\n${formatBlock}\n\nSTRICT GENERATION ORDER:\nYou must generate exactly ${slots.length} choices following these exact rules:\n${slotLines}`;
+    return `${intro}\n\n${typeLine}\n\n${examples}\n\nSTRICT GENERATION ORDER:\nYou must generate exactly ${totalCount} choices following these exact rules:\n${slotLines}`;
+}
+
+/**
+ * Drop a sticky custom CYOA prompt so the live builder is used again.
+ * Optionally reset choice slots to the shipped default layout.
+ * @param {Record<string, any>|null|undefined} cyoaConfig
+ * @param {{ resetSlots?: boolean }} [opts]
+ * @returns {Record<string, any>}
+ */
+export function refreshCyoaConfigToShipped(cyoaConfig, opts = {}) {
+    const cfg = (cyoaConfig && typeof cyoaConfig === 'object') ? cyoaConfig : {};
+    if (opts.resetSlots !== false) {
+        cfg.slots = DEFAULT_CYOA_SLOTS.map((slot) => ({ ...slot }));
+    }
+    cfg.useCustomPrompt = false;
+    cfg.customPromptText = '';
+    return cfg;
 }
 
 /** Cumulative XP required to reach each level (index 0 = Level 1). */

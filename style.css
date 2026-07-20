@@ -6124,6 +6124,57 @@ textarea.rt-cr-input {
 }
 
 
+
+/* Prompt Defaults Updated — primary action emphasis */
+.rt-prompt-upgrade-callout {
+    padding: 12px 14px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 136, 68, 0.45);
+    background: linear-gradient(180deg, rgba(255, 120, 40, 0.24), rgba(255, 90, 30, 0.09));
+    box-shadow: inset 0 1px 0 rgba(255, 200, 140, 0.12);
+}
+
+.rt-prompt-cat-changed {
+    display: inline-block;
+    margin-left: 4px;
+    padding: 0 6px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: #ffb4a0;
+    background: rgba(255, 90, 60, 0.18);
+    border: 1px solid rgba(255, 120, 80, 0.35);
+    vertical-align: middle;
+}
+
+.popup .popup-button-ok.rt-prompt-upgrade-ok {
+    background: rgba(220, 82, 40, 0.42) !important;
+    border-color: #ff8844 !important;
+    color: #fff2e8 !important;
+    font-weight: 700 !important;
+    box-shadow: 0 0 0 1px rgba(255, 136, 68, 0.28), 0 2px 14px rgba(255, 100, 40, 0.22) !important;
+}
+
+.popup .popup-button-ok.rt-prompt-upgrade-ok:hover {
+    background: rgba(240, 98, 48, 0.55) !important;
+    border-color: #ffaa66 !important;
+}
+
+#rpg_tracker_btn_upgrade_changed_prompts.rt-prompt-upgrade-pending {
+    background: rgba(220, 82, 40, 0.28) !important;
+    border-color: #ff8844 !important;
+    color: #ffe8dc !important;
+    font-weight: 700;
+    box-shadow: 0 0 0 1px rgba(255, 136, 68, 0.2);
+}
+
+#rpg_tracker_btn_upgrade_changed_prompts.rt-prompt-upgrade-pending:hover {
+    background: rgba(240, 98, 48, 0.38) !important;
+    border-color: #ffaa66 !important;
+}
+
 /* Memo recovery confirm: keep background readable so user can judge if UI looks stale */
 .popup.rt-memo-recovery-popup[open]::backdrop {
     backdrop-filter: none !important;
@@ -6131,14 +6182,122 @@ textarea.rt-cr-input {
     background-color: rgba(0, 0, 0, 0.28);
 }
 
-/* Ã¢â€â‚¬Ã¢â€â‚¬ CYOA Choice Block Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */
+/* ── CYOA Choice Block ─────────────────────────────────────────────────────── */
+/* Chromium leaves huge gaps around unknown <choices> tags; we normalize to
+   .rt-cyoa-choices (a real div). Firefox looked fine either way. */
 
+.mes_text .rt-cyoa-choices,
 .mes_text choices {
-    display: block;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 5px !important;
     margin: 14px 0 4px;
-    padding: 0;
+    padding: 0 0 0 8px;
     border-left: 2px solid rgba(120, 80, 220, 0.35);
-    padding-left: 8px;
 }
 
+.mes_text .rt-cyoa-choices > p,
+.mes_text .rt-cyoa-choices > div,
+.mes_text choices > p,
+.mes_text choices > div {
+    margin: 0 !important;
+    padding: 0 !important;
+    line-height: 0 !important;
+    font-size: 0 !important;
+}
+
+.mes_text .rt-cyoa-choices > br,
+.mes_text choices > br,
+.mes_text .rt-cyoa-choices > p > br,
+.mes_text choices > p > br {
+    display: none !important;
+}
+
+.mes_text .rt-cyoa-choices > button,
+.mes_text choices > button,
+.mes_text .rt-cyoa-choices button,
+.mes_text choices button {
+    margin: 0 !important;
+    font-size: 0.9rem !important;
+    line-height: 1.4 !important;
+}
+
+.mes_text button:not([class]):empty,
+.mes_text button[data-cyoa-bound]:empty,
+.mes_text button.rt-cyoa-incomplete {
+    display: none !important;
+}
+
+/* Even before JS flatten runs: kill paragraph spacing around lone choice buttons. */
+
+/* ST puts every CYOA button in one <p> separated by <br> — Chromium adds huge gaps. */
+.mes_text p:has(> button:nth-of-type(2)) {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 5px !important;
+    margin: 14px 0 4px !important;
+    padding: 0 0 0 8px !important;
+    border-left: 2px solid rgba(120, 80, 220, 0.35);
+    line-height: 0 !important;
+    font-size: 0 !important;
+}
+
+.mes_text p:has(> button:nth-of-type(2)) > br {
+    display: none !important;
+}
+
+.mes_text p:has(> button:nth-of-type(2)) > button {
+    margin: 0 !important;
+    font-size: 0.9rem !important;
+    line-height: 1.4 !important;
+}
+
+.mes_text p:has(> button:only-child) {
+    margin: 0 !important;
+    padding: 0 !important;
+    line-height: 0 !important;
+}
+
+.mes_text p:has(> button:only-child) > button {
+    margin: 0 0 5px 0 !important;
+    line-height: 1.4 !important;
+}
+
+.mes_text p:empty {
+    display: none !important;
+}
+
+/* CYOA choice button: bracketed mechanics */
+.mes_text button[data-cyoa-bound] .rt-cyoa-mech,
+.mes_text .rt-cyoa-choices button .rt-cyoa-mech {
+    color: #ffc966;
+    background: rgba(255, 180, 60, 0.14);
+    border-radius: 3px;
+    padding: 0 4px;
+    font-family: var(--rt-font-mono, ui-monospace, monospace);
+    font-size: 0.92em;
+    white-space: nowrap;
+}
+
+.mes_text button[data-cyoa-bound] .rt-cyoa-dc,
+.mes_text .rt-cyoa-choices button .rt-cyoa-dc {
+    color: #ff9f6b;
+    font-weight: 600;
+}
+
+.mes_text button[data-cyoa-bound] .rt-cyoa-mod,
+.mes_text .rt-cyoa-choices button .rt-cyoa-mod {
+    color: #9fd4ff;
+}
+
+.mes_text button[data-cyoa-bound] .rt-cyoa-tag,
+.mes_text .rt-cyoa-choices button .rt-cyoa-tag {
+    color: #c9b0ff;
+    font-weight: 600;
+}
+
+.mes_text button[data-cyoa-bound]:has(.rt-cyoa-mech),
+.mes_text .rt-cyoa-choices button:has(.rt-cyoa-mech) {
+    border-left: 3px solid rgba(255, 180, 60, 0.45);
+}
 

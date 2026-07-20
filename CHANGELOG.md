@@ -2,12 +2,29 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [5.9.2] - 2026-07-20 — LEEEROOOOOOY JEEENKIIIINS
+
+### Changed
+- **CYOA defaults**: 5 Narrative-Decided choice slots (was 4); dropdown/prompt wording is now **Narrative-Decided**.
+- **CYOA prompt**: removed the always-on freeform "Something else?" choice — players can type freely without a dedicated button bloating the list.
+- **CYOA settings**: recommends Pre-Seeded RNG (RNG Queue) from Narrator Configuration; RollTheDice mostly adds cost/latency in CYOA because DCs are pre-committed in the choices.
+
+### Added
+- **CYOA button appearance**: text colour (or theme default), border, choice stripe, plus bracket highlight colours (mechanics / DC / modifiers / prefix tags / roll accent) with live preview and reset.
+- **CYOA mechanical highlights**: `[Persuasion … DC 13]`-style brackets render with distinct colours for DC, modifiers, and tags.
+
+### Fixed
+- **CYOA streaming**: empty tiny boxes while choices stream in — button font size no longer collapses inside gap-killing wrappers; incomplete empty buttons stay hidden until they have text; flatten/bind waits until generation ends.
+- **CYOA Chromium layout**: multi-button choice blocks no longer leave huge vertical gaps.
+- **CYOA custom prompt sticky**: builder is source of truth unless `useCustomPrompt` is explicitly set (older saves always wrote `customPromptText` and blocked shipped refreshes).
+- **Prompt defaults**: "Update Changed Prompts" stays visually emphasized; Debug panel button when updates are pending.
+
 ## [5.9.0] - 2026-07-20
 
 ### Added
 - **Choose Your Own Adventure (CYOA) Engine**: A robust interactive choice system, inspired by Disco Elysium was added to the narrator framework. Click the cog icon next the CYOA component to see the new additions!
   - **Clickable Choices**: Choices are generated as interactive buttons at the end of the AI's response. Clicking a choice instantly sends it as your next chat message.
-  - **Dynamic Choice Slots**: Define exactly how many choices the AI should generate and assign specific roles to each (e.g., Narrative, Normal dialogue, Roll Requirements, Trait/Ability checks, or Custom Prefixes like `[Attack]`).
+  - **Dynamic Choice Slots**: Define exactly how many choices the AI should generate and assign specific roles to each (e.g., Narrative-Decided, Normal dialogue, Trait/Ability checks, or Custom Prefixes like `[Attack]`).
   - **Customizable Styling**: Fully adjust button colors, opacity, emojis, and XML tag wrapping directly from the settings to match your preferred theme.
   - **CYOA Presets**: Save your favorite choice slot configurations as named presets. Swap between different structural layouts (e.g., a 3-choice narrative setup vs. a 6-choice combat choices menu) with a single click via the auto-loading dropdown menu.
 

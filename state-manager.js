@@ -890,9 +890,9 @@ You may be asked to use Markers: ((PLS)), ((B)), ((XB)), ((BDG)), ((HGT)). These
             slots: [
                 { type: 'narrative' },
                 { type: 'narrative' },
-                { type: 'normal' },
-                { type: 'trait', label: '' },
-                { type: 'roll', label: '', dc: 14 },
+                { type: 'narrative' },
+                { type: 'narrative' },
+                { type: 'narrative' },
             ],
             presets: {},
             useEmojis: true,
@@ -900,6 +900,15 @@ You may be asked to use Markers: ((PLS)), ((B)), ((XB)), ((BDG)), ((HGT)). These
             useButtonTags: true,
             buttonColor: '#120a28',
             buttonOpacity: 0.9,
+            buttonTextColor: '',
+            buttonBorderColor: '',
+            choiceAccentColor: '',
+            mechColor: '#ffc966',
+            mechBgOpacity: 0.14,
+            dcColor: '#ff9f6b',
+            modColor: '#9fd4ff',
+            tagColor: '#c9b0ff',
+            mechAccentColor: '',
         },
         routerEnabled: true,
         routerLog: [],
@@ -1708,6 +1717,27 @@ function getSettingsInternal(extensionSettings) {
         localStorage.removeItem('rpg_tracker_agent_visible');
     } else {
         localStorage.setItem('rpg_tracker_content_mode', s.trackerContentMode || 'tracker');
+    }
+
+    // ── MIGRATION: CYOA slot type `roll` removed — map to narrative ────────────
+    if (Array.isArray(s.cyoaConfig?.slots)) {
+        for (const slot of s.cyoaConfig.slots) {
+            if (slot?.type === 'roll') slot.type = 'narrative';
+        }
+    }
+    if (s.cyoaConfig?.presets && typeof s.cyoaConfig.presets === 'object') {
+        for (const presetSlots of Object.values(s.cyoaConfig.presets)) {
+            if (!Array.isArray(presetSlots)) continue;
+            for (const slot of presetSlots) {
+                if (slot?.type === 'roll') slot.type = 'narrative';
+            }
+        }
+    }
+    // Older builds always persisted customPromptText on CYOA save even when the user
+    // never opted into a custom prompt — that froze CYOA through Main System Prompt updates.
+    // Unless useCustomPrompt is explicitly true, the builder is source of truth.
+    if (s.cyoaConfig && s.cyoaConfig.useCustomPrompt !== true && s.cyoaConfig.customPromptText) {
+        s.cyoaConfig.customPromptText = '';
     }
     
     // ── MIGRATION: routerModules (v1.8.35+) ───────────────────────────────────

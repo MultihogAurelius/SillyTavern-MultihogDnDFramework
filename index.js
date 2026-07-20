@@ -1,4 +1,4 @@
-import { EXAMPLES, COLOR_EXAMPLES, DEFAULT_STOCK_PROMPTS, RT_PROMPTS, BLOCK_ICONS, BLOCK_ORDER, PAGE_SIZE, NO_PAGINATE, buildOnboardingXpHint, buildOnboardingTimeHint, buildStartingGearHint, buildOnboardingActiveBlocks, buildCombatAndSkillScalingHint, resolveTimePromptKey, resolveTimePromptDisplayTag, buildCyoaPrompt, DEFAULT_CYOA_SLOTS } from './constants.js';
+import { EXAMPLES, COLOR_EXAMPLES, DEFAULT_STOCK_PROMPTS, RT_PROMPTS, BLOCK_ICONS, BLOCK_ORDER, PAGE_SIZE, NO_PAGINATE, buildOnboardingXpHint, buildOnboardingTimeHint, buildStartingGearHint, buildOnboardingActiveBlocks, buildCombatAndSkillScalingHint, resolveTimePromptKey, resolveTimePromptDisplayTag, buildCyoaPrompt, DEFAULT_CYOA_SLOTS, refreshCyoaConfigToShipped } from './constants.js';
 import { MODULE_NAME, DEFAULT_MODULES, getSettings, getBarBackground, migrateCustomFields, saveChatState, writeModuleSchemaBackup, applyModuleSchemaBackup, applyDeletedCustomTagTombstones, recordDeletedCustomTags, clearDeletedCustomTagTombstones, saveProfile, deleteProfile, getEffectiveRouterCampaignPrefix, sanitizeCampaignPrefixString, buildNpcInstruction, loadStockPromptsFromProfile, getNpcRelationshipMax, getNpcRelationshipMaxDefault, clampRelationshipValue, relationshipBarPct, getFriendshipTier, getAffectionTier, getRelTierBadgeStyle, getRelTierDetailedStyle, getRelTierDetailedLabelStyle, applyRelTierBadgeElement, sanitizeRouterState, rebuildAllModuleInstructions, adjustAllStoredTemplatesForTimeFormat, DEFAULT_NPC_SECTIONS, DEFAULT_PC_SECTIONS, computeBundledPromptsFingerprint, buildBundledPromptsSnapshot, getSnapshotCategoryBlocks, getPromptCategoryImpactBadge, PROMPT_DEFAULTS_CATEGORIES, PROMPT_DEFAULTS_CATEGORY_LABELS, getDefaultPortraitLocationSystemPrompt, isShippedPortraitLocationSystemPrompt, applyFactoryReset, clearExtensionLocalStorageUiState, stripChatStateGlobalUiPrefs } from './state-manager.js';
 import { diffTextLines, diffHasChanges } from './prompt-diff.js';
 import { sendStateRequest, fetchOllamaModels, fetchOpenAIModels, testOpenAIConnection, getConnectionProfiles, getCurrentCompletionPreset, setCompletionPreset, syncCombatProfile, resetCombatProfileOverride } from './llm-client.js';
@@ -11619,6 +11619,62 @@ async function runPortraitMigrationIfNeeded() {
 
 
         /**
+         * Categories whose shipped defaults differ between two snapshots.
+         * @param {ReturnType<typeof buildBundledPromptsSnapshot>|null|undefined} oldSnap
+         * @param {ReturnType<typeof buildBundledPromptsSnapshot>} newSnap
+         * @returns {Set<string>}
+         */
+
+        function hasPendingPromptDefaultsUpdate(settings = getSettings()) {
+            const fp = settings.lastSeenPromptDefaultsFingerprint || '';
+            if (!fp) return false;
+            return fp !== computeBundledPromptsFingerprint();
+        }
+
+        /** @param {any} popup */
+        function stylePromptDefaultsUpgradePopup(popup) {
+            popup?.okButton?.classList?.add('rt-prompt-upgrade-ok');
+        }
+
+        function syncPromptDefaultsUpgradeButton() {
+            const btn = document.getElementById('rpg_tracker_btn_upgrade_changed_prompts');
+            if (!btn) return;
+            const pending = hasPendingPromptDefaultsUpdate();
+            btn.style.display = pending ? '' : 'none';
+            btn.classList.toggle('rt-prompt-upgrade-pending', pending);
+            btn.setAttribute('aria-hidden', pending ? 'false' : 'true');
+        }
+
+        function getChangedPromptDefaultCategories(oldSnap, newSnap) {
+            /** @type {Set<string>} */
+            const changed = new Set();
+            if (!oldSnap || !newSnap) {
+                // No prior snapshot — treat every category as changed so "Update Changed"
+                // still has a sensible target (all of them).
+                for (const cat of PROMPT_DEFAULTS_CATEGORIES) changed.add(cat);
+                return changed;
+            }
+            for (const cat of PROMPT_DEFAULTS_CATEGORIES) {
+                const oldBlocks = getSnapshotCategoryBlocks(oldSnap, cat);
+                const newBlocks = getSnapshotCategoryBlocks(newSnap, cat);
+                const labels = new Set([
+                    ...oldBlocks.map((b) => b.label),
+                    ...newBlocks.map((b) => b.label),
+                ]);
+                for (const label of labels) {
+                    const oldText = oldBlocks.find((b) => b.label === label)?.text ?? '';
+                    const newText = newBlocks.find((b) => b.label === label)?.text ?? '';
+                    if (oldText === newText) continue;
+                    if (diffHasChanges(diffTextLines(oldText, newText))) {
+                        changed.add(cat);
+                        break;
+                    }
+                }
+            }
+            return changed;
+        }
+
+        /**
          * Build collapsible shipped-defaults diff HTML for the Prompt Defaults Updated dialog.
          * @param {ReturnType<typeof buildBundledPromptsSnapshot>|null} oldSnap
          * @param {ReturnType<typeof buildBundledPromptsSnapshot>} newSnap
@@ -11714,6 +11770,8 @@ async function runPortraitMigrationIfNeeded() {
                                     </details>`;
         }
 
+        let _runPromptDefaultsDialog = null;
+
         // --- Version Upgrade Prompt Reset Dialog ---
         {
             let currentVersion = '4.8.10'; // Fallback
@@ -11748,6 +11806,7 @@ async function runPortraitMigrationIfNeeded() {
                 persistPromptDefaultsAck(settings);
                 saveSettings();
             } else if (storedFingerprint !== currentFingerprint) {
+                syncPromptDefaultsUpgradeButton();
                 const acknowledgePromptDefaults = (fresh) => {
                     persistPromptDefaultsAck(fresh);
                     saveSettings();
@@ -11767,6 +11826,8 @@ async function runPortraitMigrationIfNeeded() {
                             const narratorConfigBlock = document.getElementById('rpg_narrator_config_block');
                             if (narratorConfigBlock) narratorConfigBlock.style.display = '';
                         }
+                        if (!fresh.cyoaConfig) fresh.cyoaConfig = {};
+                        refreshCyoaConfigToShipped(fresh.cyoaConfig, { resetSlots: true });
                         await autoApplySysprompt(true);
 
                         // 2. State Tracker
@@ -11851,12 +11912,19 @@ async function runPortraitMigrationIfNeeded() {
                     const { Popup } = SillyTavern.getContext();
                     if (Popup && Popup.show && Popup.show.confirm) {
                         // Run asynchronously so main extension init/loading is not blocked
-                        (async () => {
+                        _runPromptDefaultsDialog = async () => {
                             // Wait a short moment for the UI to be fully drawn
                             await sleepMs(500);
 
                             const mainTa = getMainSyspromptTextarea();
                             const mainSyspromptText = mainTa ? mainTa.value : '';
+                            const changedCats = getChangedPromptDefaultCategories(storedSnapshot, currentSnapshot);
+                            const hasSnapshot = !!storedSnapshot;
+                            const changedLabels = [...changedCats]
+                                .map((c) => PROMPT_DEFAULTS_CATEGORY_LABELS[c] || c);
+                            const changedSummary = changedLabels.length
+                                ? changedLabels.join(', ')
+                                : 'none detected';
                             const diffSectionHtml = buildPromptDefaultsDiffSectionHtml(
                                 storedSnapshot,
                                 currentSnapshot,
@@ -11864,32 +11932,44 @@ async function runPortraitMigrationIfNeeded() {
                                 mainSyspromptText,
                             );
 
+                            const chk = (cat) => (changedCats.has(cat) ? 'checked' : '');
+                            const allChangedChecked = PROMPT_DEFAULTS_CATEGORIES.every((c) => changedCats.has(c));
+
+                            const primaryHint = hasSnapshot
+                                ? `The main action <b>Update Changed Prompts</b> replaces only categories with shipped text changes: <b>${escapeHtml(changedSummary)}</b>. Unchanged categories stay as-is.`
+                                : `No prior defaults snapshot yet — <b>Update Changed Prompts</b> will update <b>all</b> categories below. After you acknowledge, future updates can target only what changed.`;
+
                             const popupHtml = `
                                 <div style="display:flex; flex-direction:column; gap:12px; text-align:left; font-size:13px; line-height:1.4; width:100%; box-sizing:border-box;">
                                     <div>Shipped default prompts have changed in v<b>${escapeHtml(currentVersion)}</b>.</div>
-                                    <div>Would you like to upgrade to the latest default prompts? Select which to reset, or use <b>Save as Cartridge &amp; Upgrade All</b> to keep a named backup of your current config first.</div>
+                                    <div class="rt-prompt-upgrade-callout">
+                                        <div style="font-size:14px; font-weight:700; margin-bottom:6px;">Recommended: Update Changed Prompts</div>
+                                        <div style="opacity:0.92; font-size:12.5px;">${primaryHint}</div>
+                                        <div style="margin-top:8px; font-size:11.5px; opacity:0.75;">Use the primary button below. Other actions are secondary.</div>
+                                    </div>
+                                    <div style="opacity:0.9;">Or manually select categories, then use <b>Update Selected</b>. <b>Keep Custom — leave prompts untouched</b> makes no prompt changes at all (only acknowledges this update). Use <b>Save as Cartridge &amp; Update All</b> to back up first, then replace every category.</div>
                                     <div style="margin-left: 10px; display:flex; flex-direction:column; gap:8px; background: rgba(0,0,0,0.15); padding: 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05);">
                                         <label style="display:flex; align-items:center; gap:8px; cursor:pointer; user-select:none; margin: 0;">
-                                            <input type="checkbox" id="rt-reset-sysprompt" checked style="cursor:pointer;">
-                                            <span>Main System Prompt</span>
+                                            <input type="checkbox" id="rt-reset-sysprompt" ${chk('sysprompt')} style="cursor:pointer;">
+                                            <span>Main System Prompt${changedCats.has('sysprompt') ? ' <span class="rt-prompt-cat-changed">changed</span>' : ''}</span>
                                         </label>
                                         <label style="display:flex; align-items:center; gap:8px; cursor:pointer; user-select:none; margin: 0;">
-                                            <input type="checkbox" id="rt-reset-tracker" checked style="cursor:pointer;">
-                                            <span>State Tracker Prompts</span>
+                                            <input type="checkbox" id="rt-reset-tracker" ${chk('tracker')} style="cursor:pointer;">
+                                            <span>State Tracker Prompts${changedCats.has('tracker') ? ' <span class="rt-prompt-cat-changed">changed</span>' : ''}</span>
                                         </label>
                                         <label style="display:flex; align-items:center; gap:8px; cursor:pointer; user-select:none; margin: 0;">
-                                            <input type="checkbox" id="rt-reset-lorebook" checked style="cursor:pointer;">
-                                            <span>Lorebook Agent Prompts</span>
+                                            <input type="checkbox" id="rt-reset-lorebook" ${chk('lorebook')} style="cursor:pointer;">
+                                            <span>Lorebook Agent Prompts${changedCats.has('lorebook') ? ' <span class="rt-prompt-cat-changed">changed</span>' : ''}</span>
                                         </label>
                                         <label style="display:flex; align-items:center; gap:8px; cursor:pointer; user-select:none; margin: 0;">
-                                            <input type="checkbox" id="rt-reset-world" checked style="cursor:pointer;">
-                                            <span>World Progression Prompts</span>
+                                            <input type="checkbox" id="rt-reset-world" ${chk('world')} style="cursor:pointer;">
+                                            <span>World Progression Prompts${changedCats.has('world') ? ' <span class="rt-prompt-cat-changed">changed</span>' : ''}</span>
                                         </label>
                                     </div>
                                     <hr style="border:0; border-top:1px solid rgba(255,255,255,0.1); margin: 2px 0;">
                                     <label style="display:flex; align-items:center; gap:8px; cursor:pointer; user-select:none; font-weight:bold; margin: 0;">
-                                        <input type="checkbox" id="rt-reset-all" checked style="cursor:pointer;">
-                                        <span>Reset/Update All</span>
+                                        <input type="checkbox" id="rt-reset-all" ${allChangedChecked ? 'checked' : ''} style="cursor:pointer;">
+                                        <span>Select All Categories</span>
                                     </label>
                                     <label style="display:flex; align-items:center; gap:8px; cursor:pointer; user-select:none; margin: 0; opacity: 0.85;">
                                         <input type="checkbox" id="rt-reset-always-auto" style="cursor:pointer;">
@@ -11900,10 +11980,10 @@ async function runPortraitMigrationIfNeeded() {
                             `;
 
                             // Synchronize checkbox toggles in the DOM
-                            let sysReset = true;
-                            let trackerReset = true;
-                            let loreReset = true;
-                            let worldReset = true;
+                            let sysReset = changedCats.has('sysprompt');
+                            let trackerReset = changedCats.has('tracker');
+                            let loreReset = changedCats.has('lorebook');
+                            let worldReset = changedCats.has('world');
                             let alwaysAuto = false;
 
                             setTimeout(() => {
@@ -11945,13 +12025,20 @@ async function runPortraitMigrationIfNeeded() {
 
                             const { POPUP_RESULT } = SillyTavern.getContext();
                             const confirmResult = await Popup.show.confirm('✨ Prompt Defaults Updated', popupHtml, {
-                                okButton: 'Upgrade Selected',
-                                cancelButton: 'Keep Custom',
-                                customButtons: [{
-                                    text: 'Save as Cartridge & Upgrade All',
-                                    result: POPUP_RESULT.CUSTOM1,
-                                }],
+                                okButton: 'Update Changed Prompts',
+                                cancelButton: 'Keep Custom — leave prompts untouched',
+                                customButtons: [
+                                    {
+                                        text: 'Update Selected',
+                                        result: POPUP_RESULT.CUSTOM2,
+                                    },
+                                    {
+                                        text: 'Save as Cartridge & Update All',
+                                        result: POPUP_RESULT.CUSTOM1,
+                                    },
+                                ],
                                 wide: true,
+                                onOpen: stylePromptDefaultsUpgradePopup,
                             });
 
                             const fresh = getSettings();
@@ -11961,13 +12048,21 @@ async function runPortraitMigrationIfNeeded() {
                                 if (stCb) stCb.checked = true;
                             }
 
-                            // CUSTOM1 = snapshot current config as a named Game Cartridge, then upgrade everything.
+                            // AFFIRMATIVE = update only categories with shipped diffs.
+                            if (confirmResult === POPUP_RESULT.AFFIRMATIVE) {
+                                sysReset = changedCats.has('sysprompt');
+                                trackerReset = changedCats.has('tracker');
+                                loreReset = changedCats.has('lorebook');
+                                worldReset = changedCats.has('world');
+                            }
+
+                            // CUSTOM1 = snapshot current config as a named Game Cartridge, then update everything.
                             let cartridgeBackupName = '';
                             if (confirmResult === POPUP_RESULT.CUSTOM1) {
                                 const saved = await promptAndSaveCurrentAsCartridge({
                                     title: '💾 Save Current Config as Game Cartridge',
-                                    okButton: 'Save & Upgrade',
-                                    initialName: `Pre-upgrade backup (v${currentVersion})`,
+                                    okButton: 'Save & Update',
+                                    initialName: `Pre-update backup (v${currentVersion})`,
                                 });
                                 if (!saved) {
                                     toastr['info']('Cartridge save cancelled — prompts left unchanged. You\'ll be asked again next load.', 'RPG Tracker');
@@ -11980,8 +12075,10 @@ async function runPortraitMigrationIfNeeded() {
                                 worldReset = true;
                             }
 
-                            const shouldUpgrade = !!confirmResult || confirmResult === POPUP_RESULT.CUSTOM1;
-                            // AFFIRMATIVE (1) and CUSTOM1 (1001) are truthy; Keep Custom is 0/false.
+                            // AFFIRMATIVE / CUSTOM1 / CUSTOM2 update prompts; Keep Custom is 0/false.
+                            const shouldUpgrade = confirmResult === POPUP_RESULT.AFFIRMATIVE
+                                || confirmResult === POPUP_RESULT.CUSTOM1
+                                || confirmResult === POPUP_RESULT.CUSTOM2;
                             if (shouldUpgrade) {
                                 let resetCount = 0;
 
@@ -11995,6 +12092,11 @@ async function runPortraitMigrationIfNeeded() {
                                         const narratorConfigBlock = document.getElementById('rpg_narrator_config_block');
                                         if (narratorConfigBlock) narratorConfigBlock.style.display = '';
                                     }
+                                    // CYOA_mode is injected from cyoaConfig at apply-time; refresh shipped
+                                    // slots + clear sticky customPromptText so Main System Prompt updates
+                                    // actually replace the CYOA section.
+                                    if (!fresh.cyoaConfig) fresh.cyoaConfig = {};
+                                    refreshCyoaConfigToShipped(fresh.cyoaConfig, { resetSlots: true });
                                     await autoApplySysprompt(true);
                                     resetCount++;
                                     console.log('[RPG Tracker] Main system prompt reset to defaults.');
@@ -12085,6 +12187,7 @@ async function runPortraitMigrationIfNeeded() {
                                 }
 
                                 acknowledgePromptDefaults(fresh);
+                                syncPromptDefaultsUpgradeButton();
 
                                 if (resetCount > 0) {
                                     toastr['success'](`Successfully reset ${resetCount} prompt category/categories to defaults.`, 'RPG Tracker');
@@ -12093,9 +12196,12 @@ async function runPortraitMigrationIfNeeded() {
                                 }
                             } else {
                                 acknowledgePromptDefaults(fresh);
-                                toastr['info']('Custom prompts kept intact.', 'RPG Tracker');
+                                syncPromptDefaultsUpgradeButton();
+                                toastr['info']('Kept custom — no prompts were changed.', 'RPG Tracker');
                             }
-                        })();
+                            syncPromptDefaultsUpgradeButton();
+                        };
+                        void _runPromptDefaultsDialog();
                     } else {
                         acknowledgePromptDefaults(getSettings());
                     }
@@ -14157,6 +14263,14 @@ RULES:
         // Heavy logic lives in game-cartridges.js; this is a thin binding only.
         $('#rpg_tracker_btn_manage_cartridges').on('click', () => openManageGameCartridges());
 
+        $('#rpg_tracker_btn_upgrade_changed_prompts').on('click', function () {
+            if (typeof _runPromptDefaultsDialog === 'function') {
+                void _runPromptDefaultsDialog();
+                return;
+            }
+            toastr['warning']('No pending prompt-default update dialog is loaded. Reload the page.', 'RPG Tracker');
+        });
+
         $('#rpg_tracker_btn_reset_and_apply_sysprompt').on('click', async function () {
             if (!confirm('This will:\n\n1. Reset the Core State Model prompt to built-in default\n2. Reset all Stock Module prompts, Active Modules, and Module Order to factory defaults\n3. Reset all Lorebook Agent prompts and World Progression prompts to factory defaults\n4. Fetch the latest sysprompt.txt and write it directly into your Quick Prompt "Main" box\n5. Automatically re-enable any custom sysprompt sections that were already enabled\n\nYour custom modules will NOT be affected. Proceed?')) return;
 
@@ -14267,17 +14381,113 @@ RULES:
         // them send their text content as a user message when clicked.
         // Replicated from st-clickable-inputs approach — no external extension needed.
 
+        function parseCyoaHexColor(hex, fallback = '#ffffff') {
+            const s = String(hex || '').trim();
+            return /^#[0-9a-f]{6}$/i.test(s) ? s : fallback;
+        }
+
+        function cyoaHexToRgba(hex, alpha) {
+            const h = parseCyoaHexColor(hex, '#ffffff');
+            const r = parseInt(h.slice(1, 3), 16);
+            const g = parseInt(h.slice(3, 5), 16);
+            const b = parseInt(h.slice(5, 7), 16);
+            return `rgba(${r},${g},${b},${alpha})`;
+        }
+
+        /** @param {Record<string, any>|undefined|null} cfg */
+        function readCyoaStyleSettings(cfg) {
+            const buttonHex = parseCyoaHexColor(cfg?.buttonColor, '#120a28');
+            const buttonOpacity = cfg?.buttonOpacity ?? 0.9;
+            const br = parseInt(buttonHex.slice(1, 3), 16);
+            const bg = parseInt(buttonHex.slice(3, 5), 16);
+            const bb = parseInt(buttonHex.slice(5, 7), 16);
+            const mechHex = parseCyoaHexColor(cfg?.mechColor, '#ffc966');
+            const mechAccentHex = parseCyoaHexColor(cfg?.mechAccentColor || cfg?.mechColor, '#ffb43c');
+            const textColor = (cfg?.buttonTextColor && /^#[0-9a-f]{6}$/i.test(cfg.buttonTextColor))
+                ? cfg.buttonTextColor
+                : 'var(--SmartThemeBodyColor, #e8e8e8)';
+            const borderColor = (cfg?.buttonBorderColor && /^#[0-9a-f]{6}$/i.test(cfg.buttonBorderColor))
+                ? cyoaHexToRgba(cfg.buttonBorderColor, 0.55)
+                : 'rgba(120, 80, 220, 0.4)';
+            const borderHover = (cfg?.buttonBorderColor && /^#[0-9a-f]{6}$/i.test(cfg.buttonBorderColor))
+                ? cyoaHexToRgba(cfg.buttonBorderColor, 0.75)
+                : 'rgba(120, 80, 220, 0.7)';
+            const choiceAccent = (cfg?.choiceAccentColor && /^#[0-9a-f]{6}$/i.test(cfg.choiceAccentColor))
+                ? cyoaHexToRgba(cfg.choiceAccentColor, 0.45)
+                : 'rgba(120, 80, 220, 0.35)';
+            return {
+                bg: `rgba(${br},${bg},${bb},${buttonOpacity})`,
+                bgHv: `rgba(${Math.min(br + 40, 255)},${Math.min(bg + 20, 255)},${Math.min(bb + 60, 255)},${Math.min(buttonOpacity + 0.05, 1)})`,
+                bgAc: `rgba(${Math.min(br + 60, 255)},${Math.min(bg + 30, 255)},${Math.min(bb + 80, 255)},${Math.min(buttonOpacity + 0.1, 1)})`,
+                textColor,
+                borderColor,
+                borderHover,
+                choiceAccent,
+                mechColor: mechHex,
+                mechBg: cyoaHexToRgba(mechHex, cfg?.mechBgOpacity ?? 0.14),
+                dcColor: parseCyoaHexColor(cfg?.dcColor, '#ff9f6b'),
+                modColor: parseCyoaHexColor(cfg?.modColor, '#9fd4ff'),
+                tagColor: parseCyoaHexColor(cfg?.tagColor, '#c9b0ff'),
+                mechAccent: cyoaHexToRgba(mechAccentHex, 0.45),
+            };
+        }
+
         function updateCyoaStyle() {
             const s = getSettings();
             if (!s.cyoaConfig) return;
-            const _hex = s.cyoaConfig.buttonColor || '#120a28';
-            const _op  = s.cyoaConfig.buttonOpacity ?? 0.9;
-            const _r = parseInt(_hex.slice(1,3),16), _g = parseInt(_hex.slice(3,5),16), _b = parseInt(_hex.slice(5,7),16);
-            const _bg   = `rgba(${_r},${_g},${_b},${_op})`;
-            const _bgHv = `rgba(${Math.min(_r+40,255)},${Math.min(_g+20,255)},${Math.min(_b+60,255)},${Math.min(_op+0.05,1)})`;
-            const _bgAc = `rgba(${Math.min(_r+60,255)},${Math.min(_g+30,255)},${Math.min(_b+80,255)},${Math.min(_op+0.1,1)})`;
-            
+            const st = readCyoaStyleSettings(s.cyoaConfig);
             const css = `
+                .mes_text .rt-cyoa-choices,
+                .mes_text choices {
+                    display: flex !important;
+                    flex-direction: column !important;
+                    gap: 5px !important;
+                    margin: 14px 0 4px !important;
+                    padding: 0 0 0 8px !important;
+                    border-left: 2px solid ${st.choiceAccent} !important;
+                }
+                .mes_text .rt-cyoa-choices > p,
+                .mes_text .rt-cyoa-choices > div,
+                .mes_text choices > p,
+                .mes_text choices > div {
+                    margin: 0 !important;
+                    padding: 0 !important;
+                    line-height: 0 !important;
+                    font-size: 0 !important;
+                }
+                .mes_text .rt-cyoa-choices > br,
+                .mes_text choices > br,
+                .mes_text .rt-cyoa-choices > p > br,
+                .mes_text choices > p > br {
+                    display: none !important;
+                }
+                .mes_text p:has(> button:only-child) {
+                    margin: 0 !important;
+                    padding: 0 !important;
+                    line-height: 0 !important;
+                }
+                .mes_text p:has(> button:nth-of-type(2)) {
+                    display: flex !important;
+                    flex-direction: column !important;
+                    gap: 5px !important;
+                    margin: 14px 0 4px !important;
+                    padding: 0 0 0 8px !important;
+                    border-left: 2px solid ${st.choiceAccent} !important;
+                    line-height: 0 !important;
+                    font-size: 0 !important;
+                }
+                .mes_text p:has(> button:nth-of-type(2)) > br {
+                    display: none !important;
+                }
+                .mes_text p:has(> button:nth-of-type(2)) > button {
+                    margin: 0 !important;
+                    font-size: 0.9rem !important;
+                    line-height: 1.4 !important;
+                }
+                .mes_text p:empty {
+                    display: none !important;
+                }
+                /* rem (not em): wrappers use font-size:0 to kill gaps; em collapses text to nothing mid-stream */
                 .mes_text button:not([class]),
                 .mes_text button[data-cyoa-bound] {
                     display: block !important;
@@ -14285,35 +14495,60 @@ RULES:
                     text-align: left !important;
                     -webkit-appearance: none !important;
                     appearance: none !important;
-                    background-color: ${_bg} !important;
+                    background-color: ${st.bg} !important;
                     background-image: none !important;
-                    border: 1px solid rgba(120, 80, 220, 0.4) !important;
+                    border: 1px solid ${st.borderColor} !important;
                     border-radius: 5px !important;
-                    color: var(--SmartThemeBodyColor, #e8e8e8) !important;
-                    font-size: 0.9em !important;
+                    color: ${st.textColor} !important;
+                    font-size: 0.9rem !important;
                     padding: 6px 10px !important;
-                    margin-bottom: 5px !important;
+                    margin: 0 !important;
                     cursor: pointer !important;
                     transition: background-color 0.15s, border-color 0.15s, transform 0.1s !important;
                     line-height: 1.4 !important;
                     font-family: inherit !important;
                     box-shadow: none !important;
                     outline: none !important;
+                    box-sizing: border-box !important;
+                }
+                .mes_text button:not([class]):empty,
+                .mes_text button[data-cyoa-bound]:empty,
+                .mes_text button.rt-cyoa-incomplete {
+                    display: none !important;
                 }
                 .mes_text button:not([class]):hover,
                 .mes_text button[data-cyoa-bound]:hover {
-                    background-color: ${_bgHv} !important;
-                    border-color: rgba(120, 80, 220, 0.7) !important;
+                    background-color: ${st.bgHv} !important;
+                    border-color: ${st.borderHover} !important;
                     transform: translateX(2px) !important;
                 }
                 .mes_text button:not([class]):active,
                 .mes_text button[data-cyoa-bound]:active {
-                    background-color: ${_bgAc} !important;
+                    background-color: ${st.bgAc} !important;
                     transform: translateX(1px) !important;
                 }
-                .mes_text button:not([class]):has-text('[REQ'),
-                .mes_text button[data-cyoa-bound]:has-text('[REQ') {
-                    border-left: 3px solid rgba(255, 180, 60, 0.5) !important;
+                .mes_text button[data-cyoa-bound] .rt-cyoa-mech {
+                    color: ${st.mechColor} !important;
+                    background: ${st.mechBg} !important;
+                    border-radius: 3px !important;
+                    padding: 0 4px !important;
+                    font-family: var(--rt-font-mono, ui-monospace, monospace) !important;
+                    font-size: 0.92em !important;
+                    white-space: nowrap !important;
+                }
+                .mes_text button[data-cyoa-bound] .rt-cyoa-dc {
+                    color: ${st.dcColor} !important;
+                    font-weight: 600 !important;
+                }
+                .mes_text button[data-cyoa-bound] .rt-cyoa-mod {
+                    color: ${st.modColor} !important;
+                }
+                .mes_text button[data-cyoa-bound] .rt-cyoa-tag {
+                    color: ${st.tagColor} !important;
+                    font-weight: 600 !important;
+                }
+                .mes_text button[data-cyoa-bound]:has(.rt-cyoa-mech) {
+                    border-left: 3px solid ${st.mechAccent} !important;
                 }
             `;
             let style = document.getElementById('cyoa-dynamic-style');
@@ -14325,23 +14560,239 @@ RULES:
             style.textContent = css;
         }
 
-        function cyoaBindChoiceButtons() {
+        function escapeCyoaHtml(s) {
+            return String(s)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+        }
+
+        function isCyoaMechanicalBracket(inner) {
+            return /\bDC\s*\d+|vs\s*AC|AC\s*\d+|\(\s*[+\-]?\d|GP\b|per\s+(short|long)\s+rest|untrained|timeskip|hour|\d+\s*\/\s*\d+/i.test(inner);
+        }
+
+        function formatCyoaMechanicalBracket(inner) {
+            let body = escapeCyoaHtml(inner);
+            body = body.replace(/\b(vs\s*AC\s*\d+)/gi, '<span class="rt-cyoa-dc">$1</span>');
+            body = body.replace(/\b(DC\s*\d+)/gi, '<span class="rt-cyoa-dc">$1</span>');
+            body = body.replace(/(\(\s*[+\-]?\d[^)]*\))/g, '<span class="rt-cyoa-mod">$1</span>');
+            return body;
+        }
+
+        /** @param {HTMLButtonElement} btn */
+        function decorateCyoaMechanicsInButton(btn) {
+            if (btn.dataset.cyoaDecorated === 'true' && btn.querySelector('.rt-cyoa-mech, .rt-cyoa-tag')) {
+                return;
+            }
+            if (btn.dataset.cyoaDecorated === 'true' && !btn.querySelector('.rt-cyoa-mech, .rt-cyoa-tag')) {
+                delete btn.dataset.cyoaDecorated;
+            }
+            const raw = (btn.textContent || '').trim();
+            btn.dataset.cyoaRaw = raw;
+            if (!raw || !raw.includes('[')) return;
+
+            const html = raw.replace(/\[([^\]]+)\]/g, (match, inner, offset) => {
+                if (isCyoaMechanicalBracket(inner)) {
+                    return `<span class="rt-cyoa-mech">[${formatCyoaMechanicalBracket(inner)}]</span>`;
+                }
+                if (offset < 24 && inner.length <= 40 && !/\bDC\b|vs\s*AC/i.test(inner)) {
+                    return `<span class="rt-cyoa-tag">[${escapeCyoaHtml(inner)}]</span>`;
+                }
+                return `<span class="rt-cyoa-mech">[${formatCyoaMechanicalBracket(inner)}]</span>`;
+            });
+            if (html !== raw) {
+                btn.innerHTML = html;
+                btn.dataset.cyoaDecorated = 'true';
+            }
+        }
+
+        /**
+         * Chromium treats non-hyphenated tags like <choices> as HTMLUnknownElement and
+         * often leaves huge block/inline gaps between nested <button>s (Firefox does not).
+         * Normalize every choice group into a real <div class="rt-cyoa-choices"> with
+         * buttons as direct children — that layout is consistent across engines.
+         * @param {ParentNode} root
+         */
+        function createCyoaChoicesWrap() {
+            const wrap = document.createElement('div');
+            wrap.className = 'rt-cyoa-choices';
+            return wrap;
+        }
+
+        /** @param {Element|null} el */
+        function isCyoaChoicesWrap(el) {
+            return !!(el && (
+                el.tagName === 'CHOICES'
+                || (el.tagName === 'DIV' && el.classList.contains('rt-cyoa-choices'))
+            ));
+        }
+
+        /**
+         * @param {HTMLElement} source
+         * @param {HTMLButtonElement[]} buttons
+         */
+        function replaceWithFlatCyoaWrap(source, buttons) {
+            const wrap = createCyoaChoicesWrap();
+            source.parentNode?.insertBefore(wrap, source);
+            buttons.forEach((btn) => wrap.appendChild(btn));
+            if (source.isConnected) source.remove();
+            return wrap;
+        }
+
+        /**
+         * @param {ParentNode} root
+         */
+        function flattenCyoaChoiceBlocks(root) {
+            // 1) Convert any <choices>…</choices> into <div class="rt-cyoa-choices">.
+            root.querySelectorAll('choices').forEach((choicesEl) => {
+                const buttons = Array.from(choicesEl.querySelectorAll('button'));
+                if (!buttons.length) {
+                    choicesEl.remove();
+                    return;
+                }
+                replaceWithFlatCyoaWrap(/** @type {HTMLElement} */ (choicesEl), buttons);
+            });
+
+            // 1b) ST often renders all choices in one <p> with <br> between buttons.
+            root.querySelectorAll('p, div').forEach((host) => {
+                if (host.closest('.rt-cyoa-choices, choices')) return;
+                if (host.classList?.contains('rt-cyoa-choices')) return;
+                const buttons = Array.from(host.querySelectorAll(':scope > button'));
+                if (buttons.length < 2) return;
+                const isChoiceBlock = Array.from(host.childNodes).every((n) => {
+                    if (n.nodeType === Node.TEXT_NODE) return !String(n.textContent || '').trim();
+                    if (n.nodeType !== Node.ELEMENT_NODE) return false;
+                    const tag = /** @type {Element} */ (n).tagName;
+                    return tag === 'BUTTON' || tag === 'BR';
+                });
+                if (!isChoiceBlock) return;
+                replaceWithFlatCyoaWrap(/** @type {HTMLElement} */ (host), buttons);
+            });
+
+            // 1c) Re-flatten already-normalized wraps that got re-wrapped by ST re-render.
+            root.querySelectorAll('div.rt-cyoa-choices').forEach((choicesEl) => {
+                const buttons = Array.from(choicesEl.querySelectorAll('button'));
+                if (!buttons.length) return;
+                const alreadyFlat = buttons.every((btn) => btn.parentElement === choicesEl)
+                    && Array.from(choicesEl.childNodes).every((n) =>
+                        n.nodeType === Node.ELEMENT_NODE && /** @type {Element} */ (n).tagName === 'BUTTON');
+                if (alreadyFlat) return;
+                while (choicesEl.firstChild) choicesEl.removeChild(choicesEl.firstChild);
+                buttons.forEach((btn) => choicesEl.appendChild(btn));
+            });
+
+            // 2) If ST stripped <choices>, gather consecutive <p><button> hosts into one wrap.
+            const kids = Array.from(root.childNodes);
+            /** @type {HTMLElement[]} */
+            let run = [];
+            const flush = () => {
+                if (run.length < 2) { run = []; return; }
+                /** @type {HTMLButtonElement[]} */
+                const buttons = [];
+                for (const el of run) {
+                    if (el.tagName === 'BUTTON') buttons.push(/** @type {HTMLButtonElement} */ (el));
+                    else buttons.push(.../** @type {NodeListOf<HTMLButtonElement>} */ (el.querySelectorAll('button')));
+                }
+                if (buttons.length < 2) { run = []; return; }
+                if (buttons.every((b) => b.closest('.rt-cyoa-choices, choices'))) { run = []; return; }
+                const wrap = createCyoaChoicesWrap();
+                const first = run[0];
+                first.parentNode?.insertBefore(wrap, first);
+                buttons.forEach((btn) => wrap.appendChild(btn));
+                for (const el of run) {
+                    if (el.isConnected && el !== wrap && !wrap.contains(el)) {
+                        if (!el.querySelector?.('button') && el.tagName !== 'BUTTON') el.remove();
+                        else if (el.tagName === 'P' && !el.textContent?.trim()) el.remove();
+                    }
+                }
+                run = [];
+            };
+
+            const isCyoaButtonHost = (/** @type {ChildNode} */ node) => {
+                if (node.nodeType !== Node.ELEMENT_NODE) return false;
+                const el = /** @type {HTMLElement} */ (node);
+                if (isCyoaChoicesWrap(el)) return false;
+                if (el.tagName === 'BUTTON') return true;
+                if (el.tagName === 'P' || el.tagName === 'DIV') {
+                    const buttons = el.querySelectorAll(':scope > button');
+                    return buttons.length === 1 && el.childElementCount === 1;
+                }
+                return false;
+            };
+            const isGapJunk = (/** @type {ChildNode} */ node) => {
+                if (node.nodeType === Node.TEXT_NODE) return !String(node.textContent || '').trim();
+                if (node.nodeType !== Node.ELEMENT_NODE) return false;
+                const el = /** @type {HTMLElement} */ (node);
+                if (el.tagName === 'BR') return true;
+                if ((el.tagName === 'P' || el.tagName === 'DIV') && !el.textContent?.trim() && !el.querySelector('button')) return true;
+                return false;
+            };
+
+            for (const node of kids) {
+                if (isCyoaButtonHost(node)) {
+                    run.push(/** @type {HTMLElement} */ (node));
+                    continue;
+                }
+                if (run.length && isGapJunk(node)) {
+                    node.parentNode?.removeChild(node);
+                    continue;
+                }
+                flush();
+            }
+            flush();
+        }
+
+        let _cyoaGenerating = false;
+
+        /** Mark empty / still-streaming choice buttons so CSS can hide them. */
+        function syncCyoaStreamingPlaceholders(root = document) {
+            const scope = root === document || root === document.documentElement
+                ? document.querySelectorAll('#chat .mes_text button')
+                : root.querySelectorAll('button');
+            scope.forEach((btn) => {
+                if (!(btn instanceof HTMLButtonElement)) return;
+                // Ignore unrelated buttons inside message chrome if any leak through
+                if (btn.closest('.mes_block') && !btn.closest('.mes_text')) return;
+                const text = (btn.textContent || '').trim();
+                if (!text) btn.classList.add('rt-cyoa-incomplete');
+                else btn.classList.remove('rt-cyoa-incomplete');
+            });
+        }
+
+        function setCyoaGenerating(active) {
+            _cyoaGenerating = !!active;
+            document.documentElement.classList.toggle('rt-cyoa-streaming', _cyoaGenerating);
+            if (_cyoaGenerating) syncCyoaStreamingPlaceholders();
+        }
+
+        function cyoaBindChoiceButtons({ allowFlatten = true } = {}) {
             const s = getSettings();
             if (!s.cyoaConfig?.useButtonTags) return;
             if (!s.syspromptModules?.CYOA_mode) return;
             document.querySelectorAll('#chat .mes_text').forEach(block => {
-                block.querySelectorAll('button:not([data-cyoa-bound])').forEach(btn => {
+                // Flattening mid-stream fights ST's live HTML updates and leaves empty shells.
+                if (allowFlatten && !_cyoaGenerating) flattenCyoaChoiceBlocks(block);
+                syncCyoaStreamingPlaceholders(block);
+                block.querySelectorAll('button').forEach(btn => {
+                    const text = (btn.textContent || '').trim();
+                    if (!text) return; // still streaming / empty shell
+                    // Don't rewrite button HTML or bind clicks until the stream finishes —
+                    // decorate() uses innerHTML and fights live streaming updates.
+                    if (_cyoaGenerating) return;
+                    decorateCyoaMechanicsInButton(btn);
+                    if (btn.getAttribute('data-cyoa-bound') === 'true') return;
+
                     btn.setAttribute('data-cyoa-bound', 'true');
 
                     btn.addEventListener('click', (e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        const text = btn.textContent.trim();
-                        if (!text) return;
+                        const clickText = (btn.dataset.cyoaRaw || btn.textContent || '').trim();
+                        if (!clickText) return;
                         const textarea = document.getElementById('send_textarea');
                         const sendBtn  = document.getElementById('send_but');
                         if (!textarea || !sendBtn) return;
-                        textarea.value = text;
+                        textarea.value = clickText;
                         textarea.dispatchEvent(new Event('input', { bubbles: true }));
                         sendBtn.click();
                     });
@@ -14349,34 +14800,84 @@ RULES:
             });
         }
 
+        function scheduleCyoaBind(delayMs = 0, opts = {}) {
+            setTimeout(() => {
+                updateCyoaStyle();
+                cyoaBindChoiceButtons(opts);
+            }, delayMs);
+        }
 
-
-        // Re-bind after every generation
-        eventSource.on(event_types.GENERATION_ENDED,  cyoaBindChoiceButtons);
-        eventSource.on(event_types.GENERATION_STOPPED, cyoaBindChoiceButtons);
+        if (event_types.GENERATION_STARTED) {
+            eventSource.on(event_types.GENERATION_STARTED, (...args) => {
+                // ST passes dryRun as the last arg — ignore prompt-build dry runs
+                const dryRun = args.length ? args[args.length - 1] : false;
+                if (dryRun === true) return;
+                setCyoaGenerating(true);
+            });
+        }
+        // Re-bind after every generation (ST may re-render HTML slightly later)
+        eventSource.on(event_types.GENERATION_ENDED, () => {
+            setCyoaGenerating(false);
+            scheduleCyoaBind(0);
+            scheduleCyoaBind(250);
+            scheduleCyoaBind(800);
+        });
+        eventSource.on(event_types.GENERATION_STOPPED, () => {
+            setCyoaGenerating(false);
+            scheduleCyoaBind(0);
+            scheduleCyoaBind(250);
+        });
         // Also bind on chat load / message swipe
-        eventSource.on(event_types.CHAT_CHANGED, () => setTimeout(cyoaBindChoiceButtons, 300));
-        if (event_types.MESSAGE_SWIPED) eventSource.on(event_types.MESSAGE_SWIPED, cyoaBindChoiceButtons);
+        eventSource.on(event_types.CHAT_CHANGED, () => scheduleCyoaBind(300));
+        if (event_types.MESSAGE_SWIPED) eventSource.on(event_types.MESSAGE_SWIPED, () => scheduleCyoaBind(100));
+        if (event_types.MESSAGE_EDITED) eventSource.on(event_types.MESSAGE_EDITED, () => scheduleCyoaBind(100));
+        // During stream: refresh placeholder visibility only (no flatten)
+        if (event_types.MESSAGE_RECEIVED) eventSource.on(event_types.MESSAGE_RECEIVED, () => scheduleCyoaBind(50));
+        if (event_types.MESSAGE_UPDATED) eventSource.on(event_types.MESSAGE_UPDATED, () => scheduleCyoaBind(30));
+        if (event_types.MORE_MESSAGES_LOADED) eventSource.on(event_types.MORE_MESSAGES_LOADED, () => scheduleCyoaBind(100));
+        if (event_types.STREAM_TOKEN_RECEIVED) {
+            let _cyoaStreamTimer = null;
+            eventSource.on(event_types.STREAM_TOKEN_RECEIVED, () => {
+                if (_cyoaStreamTimer) clearTimeout(_cyoaStreamTimer);
+                _cyoaStreamTimer = setTimeout(() => syncCyoaStreamingPlaceholders(), 40);
+            });
+        }
+        // ST re-renders .mes_text from stored HTML and can undo flatten; watch for br-separated buttons.
+        let _cyoaMutTimer = null;
+        const _cyoaChatRoot = document.getElementById('chat');
+        if (_cyoaChatRoot) {
+            new MutationObserver(() => {
+                if (_cyoaGenerating) {
+                    syncCyoaStreamingPlaceholders();
+                    return;
+                }
+                if (_cyoaMutTimer) clearTimeout(_cyoaMutTimer);
+                _cyoaMutTimer = setTimeout(() => {
+                    if (document.querySelector('#chat .mes_text p:has(> button + br + button)')) {
+                        scheduleCyoaBind(0);
+                    }
+                }, 100);
+            }).observe(_cyoaChatRoot, { childList: true, subtree: true, characterData: true });
+        }
         // Initial bind for existing chat history
-        setTimeout(cyoaBindChoiceButtons, 500);
-        setTimeout(updateCyoaStyle, 500);
+        scheduleCyoaBind(500);
+        scheduleCyoaBind(1500);
 
         // ── CYOA Settings Popup ───────────────────────────────────────────────────
 
         function buildCyoaSlotRow(slot, idx) {
+            const slotType = slot.type === 'roll' ? 'narrative' : slot.type;
             const typeOpts = [
-                ['narrative', '🌀 Narrative Decided'],
+                ['narrative', '🌀 Narrative-Decided'],
                 ['normal',    '💬 Normal'],
                 ['trait',     '⚡ Trait/Ability'],
-                ['roll',      '🎲 Roll REQ'],
                 ['prefix',    '🏷️ Prefix'],
-            ].map(([v, l]) => `<option value="${v}"${slot.type === v ? ' selected' : ''}>${l}</option>`).join('');
+            ].map(([v, l]) => `<option value="${v}"${slotType === v ? ' selected' : ''}>${l}</option>`).join('');
 
             const labelVal = slot.label || '';
-            const hasInput = slot.type === 'trait' || slot.type === 'roll' || slot.type === 'prefix';
-            const placeholder = slot.type === 'trait'  ? 'Ability name (e.g. Illithid) — optional'
-                              : slot.type === 'roll'   ? 'Stat (e.g. DEX) — optional, AI picks DC'
-                              : slot.type === 'prefix' ? 'Label (e.g. [Attack] or [Timeskip])'
+            const hasInput = slotType === 'trait' || slotType === 'prefix';
+            const placeholder = slotType === 'trait'  ? 'Ability name (e.g. Illithid) — optional'
+                              : slotType === 'prefix' ? 'Label (e.g. [Attack] or [Timeskip])'
                               : '';
 
             return `<div class="cyoa-slot-row" data-idx="${idx}" style="display:flex;align-items:center;gap:5px;margin-bottom:5px;">
@@ -14391,7 +14892,8 @@ RULES:
 
         function readSlotsFromPopup(container) {
             return Array.from(container.querySelectorAll('.cyoa-slot-row')).map(row => {
-                const type  = row.querySelector('.cyoa-slot-type').value;
+                let type  = row.querySelector('.cyoa-slot-type').value;
+                if (type === 'roll') type = 'narrative';
                 const label = row.querySelector('.cyoa-slot-label')?.value?.trim() || '';
                 return { type, ...(label ? { label } : {}) };
             });
@@ -14413,16 +14915,63 @@ RULES:
         }
 
 
+
+        /** @param {Record<string, any>} cfg */
+        function buildCyoaStylePreviewHtml(cfg) {
+            const st = readCyoaStyleSettings(cfg);
+            return `<button type="button" style="display:block;width:100%;text-align:left;padding:6px 10px;border-radius:5px;border:1px solid ${st.borderColor};background:${st.bg};color:${st.textColor};font-size:12px;line-height:1.4;cursor:default;">
+                3. Slip along the hull's shadows — <span style="color:${st.mechColor};background:${st.mechBg};border-radius:3px;padding:0 4px;font-family:ui-monospace,monospace;">[Stealth (<span style="color:${st.modColor};">(+6)</span> <span style="color:${st.dcColor};">DC 14</span>)]</span>
+            </button>
+            <div style="margin-top:5px;font-size:11px;opacity:0.75;">1. <span style="color:${st.tagColor};font-weight:600;">[Attack]</span> Swing the sword</div>`;
+        }
+
+        /** @param {ParentNode} dlg */
+        function readCyoaStyleFromDialog(dlg) {
+            const useThemeText = !!dlg.querySelector('#cyoa-text-theme')?.checked;
+            const borderCustom = !!dlg.querySelector('#cyoa-border-custom')?.checked;
+            const accentCustom = !!dlg.querySelector('#cyoa-accent-custom')?.checked;
+            const mechAccentCustom = !!dlg.querySelector('#cyoa-mech-accent-custom')?.checked;
+            return {
+                buttonColor: dlg.querySelector('#cyoa-btn-color')?.value || '#120a28',
+                buttonOpacity: (parseInt(dlg.querySelector('#cyoa-btn-opacity')?.value ?? '90', 10) / 100),
+                buttonTextColor: useThemeText ? '' : (dlg.querySelector('#cyoa-text-color')?.value || ''),
+                buttonBorderColor: borderCustom ? (dlg.querySelector('#cyoa-border-color')?.value || '') : '',
+                choiceAccentColor: accentCustom ? (dlg.querySelector('#cyoa-accent-color')?.value || '') : '',
+                mechColor: dlg.querySelector('#cyoa-mech-color')?.value || '#ffc966',
+                mechBgOpacity: (parseInt(dlg.querySelector('#cyoa-mech-bg-opacity')?.value ?? '14', 10) / 100),
+                dcColor: dlg.querySelector('#cyoa-dc-color')?.value || '#ff9f6b',
+                modColor: dlg.querySelector('#cyoa-mod-color')?.value || '#9fd4ff',
+                tagColor: dlg.querySelector('#cyoa-tag-color')?.value || '#c9b0ff',
+                mechAccentColor: mechAccentCustom ? (dlg.querySelector('#cyoa-mech-accent-color')?.value || '') : '',
+            };
+        }
+
+        /** @param {ParentNode} dlg */
+        function refreshCyoaStylePreview(dlg) {
+            const preview = dlg.querySelector('#cyoa-style-preview');
+            if (!preview) return;
+            preview.innerHTML = buildCyoaStylePreviewHtml(readCyoaStyleFromDialog(dlg));
+            const hex = dlg.querySelector('#cyoa-btn-color')?.value || '#120a28';
+            const pct = parseInt(dlg.querySelector('#cyoa-btn-opacity')?.value ?? '90', 10);
+            const label = dlg.querySelector('#cyoa-btn-opacity-label');
+            const swatch = dlg.querySelector('#cyoa-btn-preview');
+            if (label) label.textContent = `${pct}%`;
+            if (swatch) swatch.style.background = hex + Math.round(pct / 100 * 255).toString(16).padStart(2, '0');
+        }
+
         function showCyoaSettingsPopup() {
             const s = getSettings();
             if (!s.cyoaConfig) s.cyoaConfig = {};
             const cfg = s.cyoaConfig;
 
-            const slots = Array.isArray(cfg.slots) && cfg.slots.length ? cfg.slots : DEFAULT_CYOA_SLOTS;
+            const slots = (Array.isArray(cfg.slots) && cfg.slots.length ? cfg.slots : DEFAULT_CYOA_SLOTS)
+                .map((sl) => (sl?.type === 'roll' ? { ...sl, type: 'narrative' } : sl));
             const checked = (v) => v !== false ? 'checked' : '';
             const { Popup, POPUP_TYPE, POPUP_RESULT: PR } = SillyTavern.getContext();
 
-            const initialPrompt = cfg.customPromptText?.trim() || buildCyoaPrompt(cfg);
+            const initialPrompt = (cfg.useCustomPrompt && cfg.customPromptText?.trim())
+                ? cfg.customPromptText.trim()
+                : buildCyoaPrompt(cfg);
 
             const currentSlotsStr = JSON.stringify(slots);
             const presetMatches = Object.entries(cfg.presets || {}).find(([k, v]) => JSON.stringify(v) === currentSlotsStr);
@@ -14430,7 +14979,11 @@ RULES:
 
             const html = `
             <div style="font-family:inherit;max-width:560px;min-width:380px;">
-                <div style="font-size:15px;font-weight:bold;margin-bottom:12px;color:var(--SmartThemeBodyColor, #eee);">⚙️ CYOA Mode Settings</div>
+                <div style="font-size:15px;font-weight:bold;margin-bottom:10px;color:var(--SmartThemeBodyColor, #eee);">⚙️ CYOA Mode Settings</div>
+                <div style="margin-bottom:14px;padding:8px 10px;border-radius:6px;background:rgba(120,80,220,0.12);border:1px solid rgba(120,80,220,0.35);font-size:11.5px;line-height:1.45;color:var(--SmartThemeBodyColor,#eee);">
+                    <div style="font-weight:600;margin-bottom:4px;">Recommended: Pre-Seeded RNG (RNG Queue)</div>
+                    <div style="opacity:0.9;">In Narrator Configuration, prefer <b>Pre-Seeded RNG</b> / the RNG Queue for CYOA mode. <b>RollTheDice</b> tool calls mostly add cost and latency here — choice DCs are already pre-committed in the buttons, so there is no sycophancy risk to solve with live tool rolls.</div>
+                </div>
 
                 <div style="font-size:11px;font-weight:bold;opacity:0.6;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Presets</div>
                 <div style="display:flex;gap:5px;margin-bottom:12px;align-items:center;">
@@ -14460,13 +15013,50 @@ RULES:
                     <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;">
                         <input type="checkbox" id="cyoa-use-buttons" ${checked(cfg.useButtonTags)} /> <span>Clickable Choices <span title="Click choices to automatically send them using &lt;button&gt; functions" class="fa-solid fa-circle-question" style="opacity:0.5;cursor:help;margin-left:4px;"></span></span>
                     </label>
-                    <label style="display:flex;align-items:center;gap:8px;font-size:12px;margin-top:2px;">
-                        <span style="opacity:0.8;">Button colour</span>
+                </div>
+
+                <div style="margin-top:14px;font-size:11px;font-weight:bold;opacity:0.6;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Button Appearance</div>
+                <div style="display:flex;flex-direction:column;gap:6px;padding:8px 10px;border-radius:6px;background:rgba(0,0,0,0.15);border:1px solid rgba(255,255,255,0.06);">
+                    <label style="display:flex;align-items:center;gap:8px;font-size:12px;flex-wrap:wrap;">
+                        <span style="min-width:92px;opacity:0.85;">Background</span>
                         <input type="color" id="cyoa-btn-color" value="${cfg.buttonColor || '#120a28'}" style="width:32px;height:22px;padding:1px 2px;border-radius:4px;border:1px solid rgba(255,255,255,0.2);background:none;cursor:pointer;" />
-                        <input type="range" id="cyoa-btn-opacity" min="0" max="100" value="${Math.round((cfg.buttonOpacity ?? 0.9) * 100)}" style="flex:1;max-width:90px;accent-color:rgba(120,80,220,0.8);" />
+                        <input type="range" id="cyoa-btn-opacity" min="0" max="100" value="${Math.round((cfg.buttonOpacity ?? 0.9) * 100)}" style="flex:1;min-width:70px;max-width:110px;accent-color:rgba(120,80,220,0.8);" />
                         <span id="cyoa-btn-opacity-label" style="font-size:10px;opacity:0.6;min-width:28px;">${Math.round((cfg.buttonOpacity ?? 0.9) * 100)}%</span>
                         <span id="cyoa-btn-preview" style="display:inline-block;width:24px;height:18px;border-radius:3px;border:1px solid rgba(255,255,255,0.25);background:${cfg.buttonColor || '#120a28'};"></span>
                     </label>
+                    <label style="display:flex;align-items:center;gap:8px;font-size:12px;flex-wrap:wrap;">
+                        <span style="min-width:92px;opacity:0.85;">Text colour</span>
+                        <input type="color" id="cyoa-text-color" value="${cfg.buttonTextColor || '#e8e8e8'}" style="width:32px;height:22px;padding:1px 2px;border-radius:4px;border:1px solid rgba(255,255,255,0.2);background:none;cursor:pointer;" ${cfg.buttonTextColor ? '' : 'disabled'} />
+                        <label style="display:flex;align-items:center;gap:4px;font-size:11px;opacity:0.8;cursor:pointer;"><input type="checkbox" id="cyoa-text-theme" ${cfg.buttonTextColor ? '' : 'checked'} /> Theme default</label>
+                    </label>
+                    <label style="display:flex;align-items:center;gap:8px;font-size:12px;flex-wrap:wrap;">
+                        <span style="min-width:92px;opacity:0.85;">Border</span>
+                        <input type="checkbox" id="cyoa-border-custom" ${cfg.buttonBorderColor ? 'checked' : ''} />
+                        <input type="color" id="cyoa-border-color" value="${cfg.buttonBorderColor || '#7850dc'}" style="width:32px;height:22px;padding:1px 2px;border-radius:4px;border:1px solid rgba(255,255,255,0.2);background:none;cursor:pointer;" ${cfg.buttonBorderColor ? '' : 'disabled'} />
+                        <span style="font-size:10px;opacity:0.55;">Custom border colour</span>
+                    </label>
+                    <label style="display:flex;align-items:center;gap:8px;font-size:12px;flex-wrap:wrap;">
+                        <span style="min-width:92px;opacity:0.85;">Choice stripe</span>
+                        <input type="checkbox" id="cyoa-accent-custom" ${cfg.choiceAccentColor ? 'checked' : ''} />
+                        <input type="color" id="cyoa-accent-color" value="${cfg.choiceAccentColor || '#7850dc'}" style="width:32px;height:22px;padding:1px 2px;border-radius:4px;border:1px solid rgba(255,255,255,0.2);background:none;cursor:pointer;" ${cfg.choiceAccentColor ? '' : 'disabled'} />
+                        <span style="font-size:10px;opacity:0.55;">Left accent on choice block</span>
+                    </label>
+                </div>
+
+                <div style="margin-top:14px;font-size:11px;font-weight:bold;opacity:0.6;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Bracket Highlights</div>
+                <div style="display:flex;flex-direction:column;gap:6px;padding:8px 10px;border-radius:6px;background:rgba(0,0,0,0.15);border:1px solid rgba(255,255,255,0.06);">
+                    <label style="display:flex;align-items:center;gap:8px;font-size:12px;"><span style="min-width:92px;opacity:0.85;">Mechanics</span><input type="color" id="cyoa-mech-color" value="${cfg.mechColor || '#ffc966'}" style="width:32px;height:22px;padding:1px 2px;border-radius:4px;border:1px solid rgba(255,255,255,0.2);background:none;cursor:pointer;" /></label>
+                    <label style="display:flex;align-items:center;gap:8px;font-size:12px;"><span style="min-width:92px;opacity:0.85;">Mech background</span><input type="range" id="cyoa-mech-bg-opacity" min="0" max="100" value="${Math.round((cfg.mechBgOpacity ?? 0.14) * 100)}" style="flex:1;max-width:120px;accent-color:rgba(255,180,60,0.85);" /><span id="cyoa-mech-bg-opacity-label" style="font-size:10px;opacity:0.6;min-width:28px;">${Math.round((cfg.mechBgOpacity ?? 0.14) * 100)}%</span></label>
+                    <label style="display:flex;align-items:center;gap:8px;font-size:12px;"><span style="min-width:92px;opacity:0.85;">DC / vs AC</span><input type="color" id="cyoa-dc-color" value="${cfg.dcColor || '#ff9f6b'}" style="width:32px;height:22px;padding:1px 2px;border-radius:4px;border:1px solid rgba(255,255,255,0.2);background:none;cursor:pointer;" /></label>
+                    <label style="display:flex;align-items:center;gap:8px;font-size:12px;"><span style="min-width:92px;opacity:0.85;">Modifiers</span><input type="color" id="cyoa-mod-color" value="${cfg.modColor || '#9fd4ff'}" style="width:32px;height:22px;padding:1px 2px;border-radius:4px;border:1px solid rgba(255,255,255,0.2);background:none;cursor:pointer;" /></label>
+                    <label style="display:flex;align-items:center;gap:8px;font-size:12px;"><span style="min-width:92px;opacity:0.85;">Prefix / trait</span><input type="color" id="cyoa-tag-color" value="${cfg.tagColor || '#c9b0ff'}" style="width:32px;height:22px;padding:1px 2px;border-radius:4px;border:1px solid rgba(255,255,255,0.2);background:none;cursor:pointer;" /></label>
+                    <label style="display:flex;align-items:center;gap:8px;font-size:12px;flex-wrap:wrap;"><span style="min-width:92px;opacity:0.85;">Roll accent</span><input type="checkbox" id="cyoa-mech-accent-custom" ${cfg.mechAccentColor ? 'checked' : ''} /><input type="color" id="cyoa-mech-accent-color" value="${cfg.mechAccentColor || cfg.mechColor || '#ffb43c'}" style="width:32px;height:22px;padding:1px 2px;border-radius:4px;border:1px solid rgba(255,255,255,0.2);background:none;cursor:pointer;" ${cfg.mechAccentColor ? '' : 'disabled'} /><span style="font-size:10px;opacity:0.55;">Left stripe on roll choices</span></label>
+                    <div style="display:flex;justify-content:flex-end;margin-top:2px;"><button type="button" id="cyoa-colors-reset" style="font-size:10px;background:none;border:1px solid rgba(255,255,255,0.18);border-radius:4px;color:inherit;padding:2px 8px;cursor:pointer;opacity:0.75;">Reset colours to default</button></div>
+                </div>
+
+                <div style="margin-top:10px;">
+                    <div style="font-size:10px;opacity:0.55;margin-bottom:4px;">Live preview</div>
+                    <div id="cyoa-style-preview"></div>
                 </div>
 
                 <div style="margin-top:14px;">
@@ -14484,6 +15074,7 @@ RULES:
             // popup.dlg is the actual <dialog> element — available immediately after construction,
             // persists on the object even after ST removes the element from the document.
             const dlg = popup.dlg;
+            refreshCyoaStylePreview(dlg);
 
             // Wire up all interactivity directly on dlg — no requestAnimationFrame needed
             if (dlg) {
@@ -14492,15 +15083,34 @@ RULES:
                         const row = e.target.closest('.cyoa-slot-row');
                         if (!row) return;
                         const t = e.target.value;
-                        const hasInput = t === 'trait' || t === 'roll' || t === 'prefix';
+                        const hasInput = t === 'trait' || t === 'prefix';
                         const inputDiv = row.querySelector('.cyoa-slot-input');
                         inputDiv.style.display = hasInput ? 'block' : 'none';
                         const lbl = inputDiv.querySelector('.cyoa-slot-label');
                         if (lbl) lbl.placeholder = t === 'trait'  ? 'Ability name (e.g. Illithid) — optional'
-                                                 : t === 'roll'   ? 'Stat (e.g. DEX) — optional, AI picks DC'
                                                  : t === 'prefix' ? 'Label (e.g. [Attack] or [Timeskip])'
                                                  : '';
                         regeneratePromptPreview(dlg);
+                    }
+                    if (e.target.id === 'cyoa-text-theme') {
+                        const inp = dlg.querySelector('#cyoa-text-color');
+                        if (inp) inp.disabled = e.target.checked;
+                        refreshCyoaStylePreview(dlg);
+                    }
+                    if (e.target.id === 'cyoa-border-custom') {
+                        const inp = dlg.querySelector('#cyoa-border-color');
+                        if (inp) inp.disabled = !e.target.checked;
+                        refreshCyoaStylePreview(dlg);
+                    }
+                    if (e.target.id === 'cyoa-accent-custom') {
+                        const inp = dlg.querySelector('#cyoa-accent-color');
+                        if (inp) inp.disabled = !e.target.checked;
+                        refreshCyoaStylePreview(dlg);
+                    }
+                    if (e.target.id === 'cyoa-mech-accent-custom') {
+                        const inp = dlg.querySelector('#cyoa-mech-accent-color');
+                        if (inp) inp.disabled = !e.target.checked;
+                        refreshCyoaStylePreview(dlg);
                     }
                     if (e.target.matches('#cyoa-use-emojis, #cyoa-use-xml, #cyoa-use-buttons')) {
                         regeneratePromptPreview(dlg);
@@ -14522,17 +15132,44 @@ RULES:
                         regeneratePromptPreview(dlg);
                     }
                     // Live colour preview
-                    if (e.target.id === 'cyoa-btn-color' || e.target.id === 'cyoa-btn-opacity') {
-                        const hex = dlg.querySelector('#cyoa-btn-color')?.value || '#120a28';
-                        const pct = parseInt(dlg.querySelector('#cyoa-btn-opacity')?.value ?? '90');
-                        const label = dlg.querySelector('#cyoa-btn-opacity-label');
-                        const preview = dlg.querySelector('#cyoa-btn-preview');
-                        if (label) label.textContent = pct + '%';
-                        if (preview) preview.style.background = hex + Math.round(pct / 100 * 255).toString(16).padStart(2, '0');
+                    const styleInputIds = new Set([
+                        'cyoa-btn-color', 'cyoa-btn-opacity', 'cyoa-text-color', 'cyoa-border-color',
+                        'cyoa-accent-color', 'cyoa-mech-color', 'cyoa-mech-bg-opacity', 'cyoa-dc-color',
+                        'cyoa-mod-color', 'cyoa-tag-color', 'cyoa-mech-accent-color',
+                    ]);
+                    if (styleInputIds.has(e.target.id)) {
+                        if (e.target.id === 'cyoa-mech-bg-opacity') {
+                            const lbl = dlg.querySelector('#cyoa-mech-bg-opacity-label');
+                            if (lbl) lbl.textContent = `${e.target.value}%`;
+                        }
+                        refreshCyoaStylePreview(dlg);
                     }
                 });
 
                 dlg.addEventListener('click', (e) => {
+                    if (e.target.id === 'cyoa-colors-reset') {
+                        const setVal = (sel, val) => { const el = dlg.querySelector(sel); if (el) el.value = val; };
+                        const setChk = (sel, val) => { const el = dlg.querySelector(sel); if (el) el.checked = val; };
+                        setVal('#cyoa-text-color', '#e8e8e8');
+                        setChk('#cyoa-text-theme', true);
+                        setChk('#cyoa-border-custom', false);
+                        setVal('#cyoa-border-color', '#7850dc');
+                        setChk('#cyoa-accent-custom', false);
+                        setVal('#cyoa-accent-color', '#7850dc');
+                        setVal('#cyoa-mech-color', '#ffc966');
+                        setVal('#cyoa-mech-bg-opacity', '14');
+                        setVal('#cyoa-dc-color', '#ff9f6b');
+                        setVal('#cyoa-mod-color', '#9fd4ff');
+                        setVal('#cyoa-tag-color', '#c9b0ff');
+                        setChk('#cyoa-mech-accent-custom', false);
+                        setVal('#cyoa-mech-accent-color', '#ffb43c');
+                        dlg.querySelector('#cyoa-text-color').disabled = true;
+                        dlg.querySelector('#cyoa-border-color').disabled = true;
+                        dlg.querySelector('#cyoa-accent-color').disabled = true;
+                        dlg.querySelector('#cyoa-mech-accent-color').disabled = true;
+                        refreshCyoaStylePreview(dlg);
+                        return;
+                    }
                     if (e.target.classList.contains('cyoa-slot-del')) {
                         const list = dlg.querySelector('#cyoa-slot-list');
                         if (list.querySelectorAll('.cyoa-slot-row').length <= 1) return;
@@ -14598,9 +15235,17 @@ RULES:
                 freshS.cyoaConfig.useEmojis      = !!dlg.querySelector('#cyoa-use-emojis')?.checked;
                 freshS.cyoaConfig.useXmlTag      = !!dlg.querySelector('#cyoa-use-xml')?.checked;
                 freshS.cyoaConfig.useButtonTags  = !!dlg.querySelector('#cyoa-use-buttons')?.checked;
-                freshS.cyoaConfig.buttonColor    = dlg.querySelector('#cyoa-btn-color')?.value || '#120a28';
-                freshS.cyoaConfig.buttonOpacity  = (parseInt(dlg.querySelector('#cyoa-btn-opacity')?.value ?? '90') / 100);
-                freshS.cyoaConfig.customPromptText = dlg.querySelector('#cyoa-prompt-textarea')?.value?.trim() || '';
+                const styleCfg = readCyoaStyleFromDialog(dlg);
+                Object.assign(freshS.cyoaConfig, styleCfg);
+                const promptTa = dlg.querySelector('#cyoa-prompt-textarea')?.value?.trim() || '';
+                const generated = buildCyoaPrompt(freshS.cyoaConfig);
+                if (promptTa && promptTa !== generated) {
+                    freshS.cyoaConfig.useCustomPrompt = true;
+                    freshS.cyoaConfig.customPromptText = promptTa;
+                } else {
+                    freshS.cyoaConfig.useCustomPrompt = false;
+                    freshS.cyoaConfig.customPromptText = '';
+                }
 
                 saveSettings();
                 updateCyoaStyle();
