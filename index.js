@@ -14344,11 +14344,11 @@ RULES:
                     <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;">
                         <input type="checkbox" id="cyoa-use-emojis" ${checked(cfg.useEmojis)} /> Use fitting emojis
                     </label>
-                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;" title="Allows you to apply custom CSS styling to change how your choices block looks if you prefer">
-                        <input type="checkbox" id="cyoa-use-xml" ${checked(cfg.useXmlTag)} /> Wrap in &lt;choices&gt; XML tag
+                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;">
+                        <input type="checkbox" id="cyoa-use-xml" ${checked(cfg.useXmlTag)} /> <span>Wrap in &lt;choices&gt; XML tag <span title="Allows you to apply custom CSS styling to change how your choices block looks if you prefer" class="fa-solid fa-circle-question" style="opacity:0.5;cursor:help;margin-left:4px;"></span></span>
                     </label>
-                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;" title="Click choices to automatically send them using &lt;button&gt; functions">
-                        <input type="checkbox" id="cyoa-use-buttons" ${checked(cfg.useButtonTags)} /> Clickable choices
+                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;">
+                        <input type="checkbox" id="cyoa-use-buttons" ${checked(cfg.useButtonTags)} /> <span>Clickable Choices <span title="Click choices to automatically send them using &lt;button&gt; functions" class="fa-solid fa-circle-question" style="opacity:0.5;cursor:help;margin-left:4px;"></span></span>
                     </label>
                     <label style="display:flex;align-items:center;gap:8px;font-size:12px;margin-top:2px;">
                         <span style="opacity:0.8;">Button colour</span>
