@@ -1,5 +1,6 @@
 import { EXAMPLES, COLOR_EXAMPLES, DEFAULT_STOCK_PROMPTS, RT_PROMPTS, BLOCK_ICONS, BLOCK_ORDER, PAGE_SIZE, NO_PAGINATE, buildOnboardingXpHint, buildOnboardingTimeHint, buildStartingGearHint, buildOnboardingActiveBlocks, buildCombatAndSkillScalingHint, resolveTimePromptKey, resolveTimePromptDisplayTag } from './constants.js';
-import { MODULE_NAME, DEFAULT_MODULES, getSettings, getBarBackground, migrateCustomFields, saveChatState, writeModuleSchemaBackup, applyModuleSchemaBackup, applyDeletedCustomTagTombstones, recordDeletedCustomTags, clearDeletedCustomTagTombstones, saveProfile, deleteProfile, getEffectiveRouterCampaignPrefix, sanitizeCampaignPrefixString, buildNpcInstruction, loadStockPromptsFromProfile, getNpcRelationshipMax, getNpcRelationshipMaxDefault, clampRelationshipValue, relationshipBarPct, getFriendshipTier, getAffectionTier, getRelTierBadgeStyle, getRelTierDetailedStyle, getRelTierDetailedLabelStyle, applyRelTierBadgeElement, sanitizeRouterState, rebuildAllModuleInstructions, adjustAllStoredTemplatesForTimeFormat, DEFAULT_NPC_SECTIONS, DEFAULT_PC_SECTIONS, computeBundledPromptsFingerprint, getDefaultPortraitLocationSystemPrompt, isShippedPortraitLocationSystemPrompt, applyFactoryReset, clearExtensionLocalStorageUiState, stripChatStateGlobalUiPrefs } from './state-manager.js';
+import { MODULE_NAME, DEFAULT_MODULES, getSettings, getBarBackground, migrateCustomFields, saveChatState, writeModuleSchemaBackup, applyModuleSchemaBackup, applyDeletedCustomTagTombstones, recordDeletedCustomTags, clearDeletedCustomTagTombstones, saveProfile, deleteProfile, getEffectiveRouterCampaignPrefix, sanitizeCampaignPrefixString, buildNpcInstruction, loadStockPromptsFromProfile, getNpcRelationshipMax, getNpcRelationshipMaxDefault, clampRelationshipValue, relationshipBarPct, getFriendshipTier, getAffectionTier, getRelTierBadgeStyle, getRelTierDetailedStyle, getRelTierDetailedLabelStyle, applyRelTierBadgeElement, sanitizeRouterState, rebuildAllModuleInstructions, adjustAllStoredTemplatesForTimeFormat, DEFAULT_NPC_SECTIONS, DEFAULT_PC_SECTIONS, computeBundledPromptsFingerprint, buildBundledPromptsSnapshot, getSnapshotCategoryBlocks, getPromptCategoryImpactBadge, PROMPT_DEFAULTS_CATEGORIES, PROMPT_DEFAULTS_CATEGORY_LABELS, getDefaultPortraitLocationSystemPrompt, isShippedPortraitLocationSystemPrompt, applyFactoryReset, clearExtensionLocalStorageUiState, stripChatStateGlobalUiPrefs } from './state-manager.js';
+import { diffTextLines, diffHasChanges } from './prompt-diff.js';
 import { sendStateRequest, fetchOllamaModels, fetchOpenAIModels, testOpenAIConnection, getConnectionProfiles, getCurrentCompletionPreset, setCompletionPreset, syncCombatProfile, resetCombatProfileOverride } from './llm-client.js';
 import { getDiceToolName, getDiceCommandName, getDiceCommandAliases, doDiceRoll, registerDiceFunctionTool, registerDiceSlashCommand, installInterceptor, getNarrativeBlocks, onGenerationStarted, onGenerationEnded, ensureRelTagRegex, resetRouterTick, getRouterTick, resetRouterAutoTick, getRouterSchedulerInternals, makeRngQueue, buildRngBlock, RNG_QUEUE_LEN, parseAndApplyNarrativeRelTags } from './narrative-hooks.js';
 import { deduplicateMemo, mergeMemo, computeDelta, escapeHtml, escapeRegex, highlightParens, cleanToolCallMessage, cleanMessageContent, getLastUserAction, buildLorebookContext, buildModulesInstructionText, buildModuleFormatInstruction, parseQuestsFromMemo, syncQuestsFromMemo, syncQuestsToMemo, writeQuestsToMemo, getQuestMood, extractCurrentTimeStr, stripArchivedQuestsFromMemo, stripCompletedQuestsFromMemo, applyQuestSyncAndStripMemo, isArchivedQuestStatus, removeArchivedQuest, parseInWorldTime, formatInWorldTime, sanitizeLorebookRecordContent, memoForTrackerContext, memoForGmContext } from './memo-processor.js';
@@ -17,7 +18,7 @@ import { applyCustomTheme, openThemeWizard, refreshSavedThemesList, handleRecolo
 import { showCharacterRollPanel, showPcImportPanel, handleCharacterCreatorGenerate, generatePersonaBio, showPersonaConfirmOverlay, extractCharNameFromMemo } from './character-creator.js';
 import { handleCategorySettings, openCustomFieldEditor, openPromptEditor, refreshOrderList, exportModules, importModulesFromJson, openNpcSectionEditor, openPcSectionEditor } from './ui-editors.js';
 import { openGameSystemWizard, openManageGameSystems, openSystemPromptControlRoom, syncAllNarratorTogglesForUnlockState, extractTopLevelSections, normalizeSectionOrder, getSectionRowDescriptor, transformBaseSectionContent, isBlankSectionContent } from './game-systems.js';
-import { openManageGameCartridges } from './game-cartridges.js';
+import { openManageGameCartridges, promptAndSaveCurrentAsCartridge } from './game-cartridges.js';
 
 export const RENDERING_TAGS_LIBRARY = getMarkerLibraryKeys().map(k => `((${k})) ${MARKER_TYPE_MAP[k].example}`);
 
@@ -11593,6 +11594,103 @@ async function runPortraitMigrationIfNeeded() {
 
         const settings = getSettings();
 
+
+        /**
+         * Build collapsible shipped-defaults diff HTML for the Prompt Defaults Updated dialog.
+         * @param {ReturnType<typeof buildBundledPromptsSnapshot>|null} oldSnap
+         * @param {ReturnType<typeof buildBundledPromptsSnapshot>} newSnap
+         * @param {Record<string, any>} liveSettings
+         * @param {string} mainSyspromptText
+         */
+        function buildPromptDefaultsDiffSectionHtml(oldSnap, newSnap, liveSettings, mainSyspromptText = '') {
+            const badgeStyles = {
+                customized: 'background:rgba(234,179,8,0.2);color:#fbbf24;border:1px solid rgba(234,179,8,0.35);',
+                'matches new': 'background:rgba(34,197,94,0.15);color:#86efac;border:1px solid rgba(34,197,94,0.3);',
+                'matches old': 'background:rgba(148,163,184,0.15);color:#cbd5e1;border:1px solid rgba(148,163,184,0.3);',
+                unknown: 'background:rgba(148,163,184,0.1);color:#94a3b8;border:1px solid rgba(148,163,184,0.2);',
+            };
+            const badgeLabel = {
+                customized: 'your copy differs',
+                'matches new': 'matches new',
+                'matches old': 'matches old',
+                unknown: 'impact unknown',
+            };
+
+            if (!oldSnap) {
+                return `
+                                    <details style="margin-top:4px;background:rgba(0,0,0,0.12);padding:8px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.06);">
+                                        <summary style="cursor:pointer;user-select:none;font-weight:600;">What changed</summary>
+                                        <div style="margin-top:8px;opacity:0.85;font-size:12px;">Diff available after this acknowledge — a snapshot of today's shipped defaults will be saved so the next update can show a line-by-line changelog.</div>
+                                    </details>`;
+            }
+
+            const opts = { mainSyspromptText };
+            /** @type {string[]} */
+            const categoryHtml = [];
+
+            for (const cat of PROMPT_DEFAULTS_CATEGORIES) {
+                const oldBlocks = getSnapshotCategoryBlocks(oldSnap, cat);
+                const newBlocks = getSnapshotCategoryBlocks(newSnap, cat);
+                const labels = new Set([
+                    ...oldBlocks.map((b) => b.label),
+                    ...newBlocks.map((b) => b.label),
+                ]);
+                let additions = 0;
+                let deletions = 0;
+                /** @type {string[]} */
+                const hunkHtml = [];
+
+                for (const label of [...labels].sort()) {
+                    const oldText = oldBlocks.find((b) => b.label === label)?.text ?? '';
+                    const newText = newBlocks.find((b) => b.label === label)?.text ?? '';
+                    if (oldText === newText) continue;
+                    const diff = diffTextLines(oldText, newText);
+                    if (!diffHasChanges(diff)) continue;
+                    additions += diff.additions;
+                    deletions += diff.deletions;
+                    const linesHtml = diff.lines.map((line) => {
+                        const color = line.type === 'add' ? '#86efac'
+                            : line.type === 'del' ? '#fca5a5'
+                            : 'rgba(255,255,255,0.45)';
+                        const prefix = line.type === 'add' ? '+'
+                            : line.type === 'del' ? '\u2212'
+                            : ' ';
+                        return `<div style="color:${color};white-space:pre-wrap;word-break:break-word;">${prefix} ${escapeHtml(line.text)}</div>`;
+                    }).join('');
+                    hunkHtml.push(`
+                                            <div style="margin:8px 0 4px;font-size:11px;opacity:0.75;font-weight:600;">${escapeHtml(label)}</div>
+                                            <div style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;line-height:1.35;background:rgba(0,0,0,0.25);padding:6px 8px;border-radius:4px;max-height:220px;overflow:auto;">${linesHtml}</div>`);
+                }
+
+                const impact = getPromptCategoryImpactBadge(oldSnap, newSnap, liveSettings, cat, opts);
+                const label = PROMPT_DEFAULTS_CATEGORY_LABELS[cat] || cat;
+                if (!hunkHtml.length) continue;
+
+                categoryHtml.push(`
+                                        <details style="margin:0;">
+                                            <summary style="cursor:pointer;user-select:none;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                                                <span>${escapeHtml(label)} — ${additions} insertion${additions === 1 ? '' : 's'}, ${deletions} deletion${deletions === 1 ? '' : 's'}</span>
+                                                <span style="font-size:10px;padding:1px 6px;border-radius:999px;${badgeStyles[impact] || badgeStyles.unknown}">${escapeHtml(badgeLabel[impact] || impact)}</span>
+                                            </summary>
+                                            <div style="margin-top:6px;">${hunkHtml.join('')}</div>
+                                        </details>`);
+            }
+
+            if (!categoryHtml.length) {
+                return `
+                                    <details style="margin-top:4px;background:rgba(0,0,0,0.12);padding:8px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.06);">
+                                        <summary style="cursor:pointer;user-select:none;font-weight:600;">What changed</summary>
+                                        <div style="margin-top:8px;opacity:0.85;font-size:12px;">No text changes detected between the last acknowledged defaults and the current shipped defaults.</div>
+                                    </details>`;
+            }
+
+            return `
+                                    <details open style="margin-top:4px;background:rgba(0,0,0,0.12);padding:8px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.06);">
+                                        <summary style="cursor:pointer;user-select:none;font-weight:600;">What changed</summary>
+                                        <div style="margin-top:8px;display:flex;flex-direction:column;gap:8px;">${categoryHtml.join('')}</div>
+                                    </details>`;
+        }
+
         // --- Version Upgrade Prompt Reset Dialog ---
         {
             let currentVersion = '4.8.10'; // Fallback
@@ -11608,22 +11706,27 @@ async function runPortraitMigrationIfNeeded() {
             }
 
             const currentFingerprint = computeBundledPromptsFingerprint();
+            const currentSnapshot = buildBundledPromptsSnapshot();
             const storedFingerprint = settings.lastSeenPromptDefaultsFingerprint || '';
+            const storedSnapshot = settings.lastSeenPromptDefaultsSnapshot || null;
+
+            const persistPromptDefaultsAck = (target) => {
+                target.lastResetVersion = currentVersion;
+                target.lastSeenPromptDefaultsFingerprint = currentFingerprint;
+                target.lastSeenPromptDefaultsSnapshot = currentSnapshot;
+            };
 
             if (!settings.lastResetVersion) {
                 // Fresh install — record version and defaults fingerprint silently.
-                settings.lastResetVersion = currentVersion;
-                settings.lastSeenPromptDefaultsFingerprint = currentFingerprint;
+                persistPromptDefaultsAck(settings);
                 saveSettings();
             } else if (!storedFingerprint) {
                 // Existing install before fingerprint tracking — adopt current defaults without prompting.
-                settings.lastSeenPromptDefaultsFingerprint = currentFingerprint;
-                settings.lastResetVersion = currentVersion;
+                persistPromptDefaultsAck(settings);
                 saveSettings();
             } else if (storedFingerprint !== currentFingerprint) {
                 const acknowledgePromptDefaults = (fresh) => {
-                    fresh.lastResetVersion = currentVersion;
-                    fresh.lastSeenPromptDefaultsFingerprint = currentFingerprint;
+                    persistPromptDefaultsAck(fresh);
                     saveSettings();
                 };
 
@@ -11717,9 +11820,7 @@ async function runPortraitMigrationIfNeeded() {
                             $wpSkelPromptEl.val(sTemp.worldProgressionSkeletonSystemPrompt).trigger('input');
                         }
 
-                        fresh.lastResetVersion = currentVersion;
-                        fresh.lastSeenPromptDefaultsFingerprint = currentFingerprint;
-                        saveSettings();
+                        acknowledgePromptDefaults(fresh);
                         toastr['info'](`Prompts auto-updated to latest defaults (v${currentVersion}).`, 'RPG Tracker');
                         console.log(`[RPG Tracker] Automatically reset all prompts to defaults for version ${currentVersion}.`);
                     })();
@@ -11731,10 +11832,19 @@ async function runPortraitMigrationIfNeeded() {
                             // Wait a short moment for the UI to be fully drawn
                             await sleepMs(500);
 
+                            const mainTa = getMainSyspromptTextarea();
+                            const mainSyspromptText = mainTa ? mainTa.value : '';
+                            const diffSectionHtml = buildPromptDefaultsDiffSectionHtml(
+                                storedSnapshot,
+                                currentSnapshot,
+                                getSettings(),
+                                mainSyspromptText,
+                            );
+
                             const popupHtml = `
                                 <div style="display:flex; flex-direction:column; gap:12px; text-align:left; font-size:13px; line-height:1.4; width:100%; box-sizing:border-box;">
                                     <div>Shipped default prompts have changed in v<b>${escapeHtml(currentVersion)}</b>.</div>
-                                    <div>Would you like to reset your custom prompts to the latest default versions? Select the prompts you wish to reset/update:</div>
+                                    <div>Would you like to upgrade to the latest default prompts? Select which to reset, or use <b>Save as Cartridge &amp; Upgrade All</b> to keep a named backup of your current config first.</div>
                                     <div style="margin-left: 10px; display:flex; flex-direction:column; gap:8px; background: rgba(0,0,0,0.15); padding: 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05);">
                                         <label style="display:flex; align-items:center; gap:8px; cursor:pointer; user-select:none; margin: 0;">
                                             <input type="checkbox" id="rt-reset-sysprompt" checked style="cursor:pointer;">
@@ -11762,6 +11872,7 @@ async function runPortraitMigrationIfNeeded() {
                                         <input type="checkbox" id="rt-reset-always-auto" style="cursor:pointer;">
                                         <span>Always update everything automatically / Don't ask again</span>
                                     </label>
+                                    ${diffSectionHtml}
                                 </div>
                             `;
 
@@ -11809,9 +11920,15 @@ async function runPortraitMigrationIfNeeded() {
                                 });
                             }, 150);
 
+                            const { POPUP_RESULT } = SillyTavern.getContext();
                             const confirmResult = await Popup.show.confirm('✨ Prompt Defaults Updated', popupHtml, {
-                                okButton: 'Yes (Reset Selected)',
-                                cancelButton: 'No (Keep Custom)'
+                                okButton: 'Upgrade Selected',
+                                cancelButton: 'Keep Custom',
+                                customButtons: [{
+                                    text: 'Save as Cartridge & Upgrade All',
+                                    result: POPUP_RESULT.CUSTOM1,
+                                }],
+                                wide: true,
                             });
 
                             const fresh = getSettings();
@@ -11821,7 +11938,28 @@ async function runPortraitMigrationIfNeeded() {
                                 if (stCb) stCb.checked = true;
                             }
 
-                            if (confirmResult) {
+                            // CUSTOM1 = snapshot current config as a named Game Cartridge, then upgrade everything.
+                            let cartridgeBackupName = '';
+                            if (confirmResult === POPUP_RESULT.CUSTOM1) {
+                                const saved = await promptAndSaveCurrentAsCartridge({
+                                    title: '💾 Save Current Config as Game Cartridge',
+                                    okButton: 'Save & Upgrade',
+                                    initialName: `Pre-upgrade backup (v${currentVersion})`,
+                                });
+                                if (!saved) {
+                                    toastr['info']('Cartridge save cancelled — prompts left unchanged. You\'ll be asked again next load.', 'RPG Tracker');
+                                    return; // do NOT acknowledge fingerprint — ask again next time
+                                }
+                                cartridgeBackupName = saved.name || '';
+                                sysReset = true;
+                                trackerReset = true;
+                                loreReset = true;
+                                worldReset = true;
+                            }
+
+                            const shouldUpgrade = !!confirmResult || confirmResult === POPUP_RESULT.CUSTOM1;
+                            // AFFIRMATIVE (1) and CUSTOM1 (1001) are truthy; Keep Custom is 0/false.
+                            if (shouldUpgrade) {
                                 let resetCount = 0;
 
                                 const { extensionSettings } = SillyTavern.getContext();
@@ -11946,17 +12084,17 @@ async function runPortraitMigrationIfNeeded() {
             }
         }
 
-        // --- Automatic Stock Prompt Synchronization ---
-        // Always ensure stockPrompts exists — users without saved settings need defaults
+        // --- Stock prompts bootstrap (NO sniff-and-replace on every load) ---
+        // Prompt content upgrades happen ONLY via the post-update "Prompt Defaults Updated"
+        // dialog (or Auto-Update Prompts on Upgrade). Silent sniff migrations wiped themed
+        // customs (e.g. Warhammer COMBAT) every time the editor reopened.
         if (!settings.stockPrompts) settings.stockPrompts = { ...DEFAULT_STOCK_PROMPTS };
         {
             let changed = false;
 
-            // Migrate from deprecated JSON/LogQuest quest mode to plain-text format
-            const hasModernPrompt = settings.stockPrompts.quests?.includes('"updates"');
-            const hasLegacyPrompt = settings.stockPrompts.quests?.includes('OBJ_ACTIVE')
-                || settings.stockPrompts.quests_legacy?.includes('OBJ_ACTIVE');
-            if (hasModernPrompt || !hasLegacyPrompt) {
+            // One-shot structural leftovers only (keys / dead formats — not content sniffing).
+            if (settings.stockPrompts.quests?.includes('"updates"')) {
+                // Old JSON/LogQuest format → plain-text quests prompt (one-time format break).
                 const migratedPrompt = (settings.stockPrompts.quests_legacy?.includes('OBJ_ACTIVE'))
                     ? settings.stockPrompts.quests_legacy
                     : DEFAULT_STOCK_PROMPTS.quests;
@@ -11969,57 +12107,6 @@ async function runPortraitMigrationIfNeeded() {
             }
             if (settings.questLegacyMode !== undefined) {
                 delete settings.questLegacyMode;
-                changed = true;
-            }
-
-            // Legacy Quests: update if it's missing OBJ_TOTAL
-            if (settings.stockPrompts.quests &&
-                settings.stockPrompts.quests.includes('OBJ_ACTIVE') &&
-                !settings.stockPrompts.quests.includes('OBJ_TOTAL')) {
-                settings.stockPrompts.quests = DEFAULT_STOCK_PROMPTS.quests;
-                changed = true;
-            }
-
-            // Fix "active only" quest prompt that caused models to drop completed quests before sync
-            if (settings.stockPrompts.quests?.includes('active** quests only') ||
-                settings.stockPrompts.quests?.includes('do not keep archived quests')) {
-                refreshQuestPrompt(settings);
-                changed = true;
-            }
-
-            // Refresh quest prompt when it still tells the model to retain archived quests in [QUESTS]
-            if (settings.stockPrompts.quests?.includes('Never delete old quests') ||
-                settings.stockPrompts.quests?.includes('do not delete or omit it from your output') ||
-                settings.stockPrompts.quests?.includes('Maintain the complete list of all quests at all times') ||
-                (settings.stockPrompts.quests?.includes('OBJ_ACTIVE') &&
-                    !settings.stockPrompts.quests?.includes('NEVER deviate from this format')) ||
-                (settings.stockPrompts.quests?.includes('OBJ_ACTIVE') &&
-                    !settings.stockPrompts.quests?.includes('Only use DEADLINE if the quest has a time limit'))) {
-                refreshQuestPrompt(settings);
-                changed = true;
-            }
-
-            // Guard against needless OBJ rewrites / granular micro-steps
-            if (settings.stockPrompts.quests?.includes('OBJ_ACTIVE') &&
-                !settings.stockPrompts.quests.includes('Do not rewrite/rephrase existing OBJ')) {
-                refreshQuestPrompt(settings);
-                changed = true;
-            }
-
-            // Objectives must stay clear/completable (not vague or micro-stepped)
-            if (settings.stockPrompts.quests?.includes('OBJ_ACTIVE') &&
-                !settings.stockPrompts.quests.includes('clear, completable outcomes')) {
-                refreshQuestPrompt(settings);
-                changed = true;
-            }
-
-            // Quest difficulty removed as a mechanic — only wipe prompts that still
-            // instruct outputting a DIFFICULTY: field (not the "Do not output…" note).
-            if (settings.stockPrompts.quests?.includes('OBJ_ACTIVE') &&
-                !settings.stockPrompts.quests.includes('Do not output a DIFFICULTY field') &&
-                (settings.stockPrompts.quests.includes('For difficulty, use the DIFFICULTY marker')
-                    || /(?:^|\n)\s*DIFFICULTY\s*:/m.test(settings.stockPrompts.quests))) {
-                refreshQuestPrompt(settings);
                 changed = true;
             }
             if (settings.syspromptModules?.questsDifficulty !== undefined) {

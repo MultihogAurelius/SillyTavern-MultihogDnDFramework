@@ -313,7 +313,7 @@ export function getResolvedTimePrompt(settings) {
 
 export const QUESTS_NARRATOR = `On unambiguous acceptance: narrate clearly, end with *(Quest Accepted: Name)*. State giver, location, task, objective count, time pressure, promised reward. Don't do this pre-agreement. Note objective completion naturally; narrate success/failure at conclusion. Keep objectives few and broad (clear, completable outcomes — not step-by-step routes); do not keep adding micro-objectives mid-scene. Quest MOOD (in STATE MEMO, from time pressure + FRUSTRATION_COEFF) should guide questgiver tone for NPC-given quests only.
 
-DIFFICULTY: difficulty should follow internal narrative/world consistency and logic; the player is not accommodated if they take a task beyond them. A dragon is not scaled down just because the player happens to be level 2, for example.
+QUEST DIFFICULTY: difficulty follows internal narrative/world consistency and logic; the player is not accommodated if they take a task beyond them.
 
 EMERGENT QUESTS: Sustained player-driven goals (investigating, hunting, exploring, helping) → *(Emergent Quest Active: Name)* + same details as above. No FRUSTRATION_COEFF / NPC mood pressure on emergent quests.`;
 
@@ -437,8 +437,9 @@ PARTY SAVES: On joining, derive Fort/Ref/Will from CON/DEX/WIS mods + a +2 to +4
 </saving_throws>
 
 <loot>
-On finding an item, pop a d20: 1–5 Junk/broken | 6–10 Common | 11–15 Useful/quality | 16–19 Rare/notable | 20 Exceptional.
-Narrate rarity tier, combat properties (damage dice, attack bonus like +1/+2/+3 e.g. "epic sword +2", AC bonus, special effects), and approximate value for the Tracker.
+- On finding an item, pop a d20: 1–5 Junk/broken | 6–10 Common | 11–15 Useful/quality | 16–19 Rare/notable | 20 Exceptional.
+- Narrate rarity tier, combat properties (damage dice, attack bonus like +1/+2/+3 e.g. "epic sword +2", AC bonus, special effects), and approximate value for the Tracker.
+- Use narrative consistency/logic for the loot range. For instance, a bandit camp shouldn't have amazing loot even with a high roll.
 </loot>
 
 <random_events>
@@ -454,7 +455,7 @@ LEVEL THRESHOLDS: 1–0 | 2–300 | 3–900 | 4–2,700 | 5–6,500 | 6–14,000
 <quests>
 On unambiguous acceptance: narrate clearly, end with *(Quest Accepted: Name)*. State giver, location, task, objective count, time pressure, promised reward. Don't do this pre-agreement. Note objective completion naturally; narrate success/failure at conclusion. Keep objectives few and broad (clear, completable outcomes — not step-by-step routes); do not keep adding micro-objectives mid-scene. Quest MOOD (in STATE MEMO, from time pressure + FRUSTRATION_COEFF) should guide questgiver tone for NPC-given quests only.
 
-DIFFICULTY: difficulty should follow internal narrative/world consistency and logic; the player is not accommodated if they take a task beyond them. A dragon is not scaled down just because the player happens to be level 2, for example.
+QUEST DIFFICULTY: difficulty follows internal narrative/world consistency and logic; the player is not accommodated if they take a task beyond them.
 
 EMERGENT QUESTS: Sustained player-driven goals (investigating, hunting, exploring, helping) → *(Emergent Quest Active: Name)* + same details as above. No FRUSTRATION_COEFF / NPC mood pressure on emergent quests.
 </quests>
@@ -678,8 +679,9 @@ PARTY SAVES: On joining, derive Fort/Ref/Will from CON/DEX/WIS mods + a +2 to +4
 </saving_throws>
 
 <loot>
-On finding an item, pop a d20: 1–5 Junk/broken | 6–10 Common | 11–15 Useful/quality | 16–19 Rare/notable | 20 Exceptional.
-Narrate rarity tier, combat properties (damage dice, attack bonus like +1/+2/+3 e.g. "epic sword +2", AC bonus, special effects), and approximate value for the Tracker.
+- On finding an item, pop a d20: 1–5 Junk/broken | 6–10 Common | 11–15 Useful/quality | 16–19 Rare/notable | 20 Exceptional.
+- Narrate rarity tier, combat properties (damage dice, attack bonus like +1/+2/+3 e.g. "epic sword +2", AC bonus, special effects), and approximate value for the Tracker.
+- Use narrative consistency/logic for the loot range. For instance, a bandit camp shouldn't have amazing loot even with a high roll.
 </loot>
 
 <random_events>
@@ -695,7 +697,7 @@ LEVEL THRESHOLDS: 1–0 | 2–300 | 3–900 | 4–2,700 | 5–6,500 | 6–14,000
 <quests>
 On unambiguous acceptance: narrate clearly, end with *(Quest Accepted: Name)*. State giver, location, task, objective count, time pressure, promised reward. Don't do this pre-agreement. Note objective completion naturally; narrate success/failure at conclusion. Keep objectives few and broad (clear, completable outcomes — not step-by-step routes); do not keep adding micro-objectives mid-scene. Quest MOOD (in STATE MEMO, from time pressure + FRUSTRATION_COEFF) should guide questgiver tone for NPC-given quests only.
 
-DIFFICULTY: difficulty should follow internal narrative/world consistency and logic; the player is not accommodated if they take a task beyond them. A dragon is not scaled down just because the player happens to be level 2, for example.
+QUEST DIFFICULTY: difficulty follows internal narrative/world consistency and logic; the player is not accommodated if they take a task beyond them.
 
 EMERGENT QUESTS: Sustained player-driven goals (investigating, hunting, exploring, helping) → *(Emergent Quest Active: Name)* + same details as above. No FRUSTRATION_COEFF / NPC mood pressure on emergent quests.
 </quests>

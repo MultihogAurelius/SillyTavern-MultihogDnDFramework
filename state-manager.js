@@ -1182,6 +1182,8 @@ Rules:
         gameSystemWizardSystemPrompt: "",
         lastResetVersion: "",
         lastSeenPromptDefaultsFingerprint: "",
+        /** @type {ReturnType<typeof buildBundledPromptsSnapshot>|null} Last-acked shipped defaults (for upgrade diffs). */
+        lastSeenPromptDefaultsSnapshot: null,
         autoResetPromptsOnUpdate: false,
         userPromptSuffix: '## OUTPUT ONLY CHANGED SECTIONS:',
     };
@@ -1222,33 +1224,233 @@ function hashPromptBundle(str) {
 }
 
 /**
+ * Structured snapshot of all factory-shipped prompt defaults.
+ * Fingerprint and upgrade-dialog diffs both derive from this object so they cannot drift.
+ * @returns {{
+ *   sysprompt: { main: string, legacy: string },
+ *   tracker: { systemPromptTemplate: string, userPromptSuffix: string, stockPrompts: Record<string, string> },
+ *   lorebook: {
+ *     routerSystemPromptTemplate: string,
+ *     routerModularPromptTemplate: string,
+ *     modules: Record<string, { instruction: string, format: string }>
+ *   },
+ *   world: { worldProgressionSystemPrompt: string, worldProgressionSkeletonSystemPrompt: string }
+ * }}
+ */
+export function buildBundledPromptsSnapshot() {
+    const defaults = buildDefaultSettings();
+    /** @type {Record<string, { instruction: string, format: string }>} */
+    const modules = {};
+    for (const [id, def] of Object.entries(DEFAULT_MODULES)) {
+        modules[id] = {
+            instruction: def.instruction || '',
+            format: def.format || '',
+        };
+    }
+    return {
+        sysprompt: {
+            main: RT_PROMPTS['sysprompt.txt'] || '',
+            legacy: RT_PROMPTS['sysprompt_legacy.txt'] || '',
+        },
+        tracker: {
+            systemPromptTemplate: defaults.systemPromptTemplate || '',
+            userPromptSuffix: defaults.userPromptSuffix || '',
+            stockPrompts: JSON.parse(JSON.stringify(DEFAULT_STOCK_PROMPTS)),
+        },
+        lorebook: {
+            routerSystemPromptTemplate: defaults.routerSystemPromptTemplate || '',
+            routerModularPromptTemplate: defaults.routerModularPromptTemplate || '',
+            modules,
+        },
+        world: {
+            worldProgressionSystemPrompt: defaults.worldProgressionSystemPrompt || '',
+            worldProgressionSkeletonSystemPrompt: defaults.worldProgressionSkeletonSystemPrompt || '',
+        },
+    };
+}
+
+/** Category ids used by the Prompt Defaults Updated dialog. */
+export const PROMPT_DEFAULTS_CATEGORIES = /** @type {const} */ ([
+    'sysprompt',
+    'tracker',
+    'lorebook',
+    'world',
+]);
+
+/** @type {Record<(typeof PROMPT_DEFAULTS_CATEGORIES)[number], string>} */
+export const PROMPT_DEFAULTS_CATEGORY_LABELS = {
+    sysprompt: 'Main System Prompt',
+    tracker: 'State Tracker Prompts',
+    lorebook: 'Lorebook Agent Prompts',
+    world: 'World Progression Prompts',
+};
+
+/**
+ * Flatten a snapshot category into labeled text blocks for line-diffing.
+ * Sysprompt display prefers the main (dice-tool) prompt; legacy is included under a header.
+ * @param {ReturnType<typeof buildBundledPromptsSnapshot>} snap
+ * @param {(typeof PROMPT_DEFAULTS_CATEGORIES)[number]} category
+ * @returns {{ label: string, text: string }[]}
+ */
+export function getSnapshotCategoryBlocks(snap, category) {
+    if (!snap) return [];
+    if (category === 'sysprompt') {
+        const blocks = [{ label: 'sysprompt.txt', text: snap.sysprompt?.main || '' }];
+        if (snap.sysprompt?.legacy) {
+            blocks.push({ label: 'sysprompt_legacy.txt', text: snap.sysprompt.legacy });
+        }
+        return blocks;
+    }
+    if (category === 'tracker') {
+        const blocks = [
+            { label: 'Core State Model', text: snap.tracker?.systemPromptTemplate || '' },
+            { label: 'User Prompt Suffix', text: snap.tracker?.userPromptSuffix || '' },
+        ];
+        const stock = snap.tracker?.stockPrompts || {};
+        for (const key of Object.keys(stock).sort()) {
+            blocks.push({ label: `Stock: ${key}`, text: stock[key] || '' });
+        }
+        return blocks;
+    }
+    if (category === 'lorebook') {
+        const blocks = [
+            { label: 'Router System Prompt', text: snap.lorebook?.routerSystemPromptTemplate || '' },
+            { label: 'Modular Prompt Template', text: snap.lorebook?.routerModularPromptTemplate || '' },
+        ];
+        const modules = snap.lorebook?.modules || {};
+        for (const id of Object.keys(modules).sort()) {
+            const m = modules[id] || {};
+            blocks.push({ label: `Module ${id} instruction`, text: m.instruction || '' });
+            blocks.push({ label: `Module ${id} format`, text: m.format || '' });
+        }
+        return blocks;
+    }
+    if (category === 'world') {
+        return [
+            { label: 'World Progression System', text: snap.world?.worldProgressionSystemPrompt || '' },
+            { label: 'Skeleton System Prompt', text: snap.world?.worldProgressionSkeletonSystemPrompt || '' },
+        ];
+    }
+    return [];
+}
+
+/**
+ * Live user copy for the same category blocks (for impact badges only).
+ * @param {Record<string, any>} settings
+ * @param {(typeof PROMPT_DEFAULTS_CATEGORIES)[number]} category
+ * @param {{ mainSyspromptText?: string }} [opts]
+ * @returns {{ label: string, text: string }[]}
+ */
+export function getLivePromptCategoryBlocks(settings, category, opts = {}) {
+    const s = settings || {};
+    if (category === 'sysprompt') {
+        // Prefer the Quick Prompt Main textarea when provided; customSysprompt means user-owned text.
+        const text = opts.mainSyspromptText != null
+            ? String(opts.mainSyspromptText)
+            : (s.customSysprompt ? '(custom sysprompt — not auto-managed)' : '');
+        return [{ label: 'sysprompt.txt', text }];
+    }
+    if (category === 'tracker') {
+        const defaults = buildDefaultSettings();
+        const blocks = [
+            { label: 'Core State Model', text: s.systemPromptTemplate ?? defaults.systemPromptTemplate ?? '' },
+            { label: 'User Prompt Suffix', text: s.userPromptSuffix ?? defaults.userPromptSuffix ?? '' },
+        ];
+        const stock = s.stockPrompts || {};
+        const keys = new Set([...Object.keys(DEFAULT_STOCK_PROMPTS), ...Object.keys(stock)]);
+        for (const key of [...keys].sort()) {
+            blocks.push({ label: `Stock: ${key}`, text: stock[key] ?? '' });
+        }
+        return blocks;
+    }
+    if (category === 'lorebook') {
+        const defaults = buildDefaultSettings();
+        const blocks = [
+            {
+                label: 'Router System Prompt',
+                text: s.routerSystemPromptTemplate ?? defaults.routerSystemPromptTemplate ?? '',
+            },
+            {
+                label: 'Modular Prompt Template',
+                text: s.routerModularPromptTemplate ?? defaults.routerModularPromptTemplate ?? '',
+            },
+        ];
+        const liveMods = s.routerModules || {};
+        const ids = new Set([...Object.keys(DEFAULT_MODULES), ...Object.keys(liveMods)]);
+        for (const id of [...ids].sort()) {
+            const live = liveMods[id] || {};
+            const def = DEFAULT_MODULES[id] || {};
+            blocks.push({ label: `Module ${id} instruction`, text: live.instruction ?? def.instruction ?? '' });
+            blocks.push({ label: `Module ${id} format`, text: live.format ?? def.format ?? '' });
+        }
+        return blocks;
+    }
+    if (category === 'world') {
+        const defaults = buildDefaultSettings();
+        return [
+            {
+                label: 'World Progression System',
+                text: s.worldProgressionSystemPrompt ?? defaults.worldProgressionSystemPrompt ?? '',
+            },
+            {
+                label: 'Skeleton System Prompt',
+                text: s.worldProgressionSkeletonSystemPrompt ?? defaults.worldProgressionSkeletonSystemPrompt ?? '',
+            },
+        ];
+    }
+    return [];
+}
+
+/**
+ * @param {{ label: string, text: string }[]} blocks
+ * @returns {string}
+ */
+function joinCategoryBlocks(blocks) {
+    return (blocks || []).map((b) => `### ${b.label}\n${b.text ?? ''}`).join('\n\n');
+}
+
+/**
+ * Impact badge for one category relative to old/new shipped snapshots.
+ * @param {ReturnType<typeof buildBundledPromptsSnapshot>|null|undefined} oldSnap
+ * @param {ReturnType<typeof buildBundledPromptsSnapshot>} newSnap
+ * @param {Record<string, any>} liveSettings
+ * @param {(typeof PROMPT_DEFAULTS_CATEGORIES)[number]} category
+ * @param {{ mainSyspromptText?: string }} [opts]
+ * @returns {'customized'|'matches new'|'matches old'|'unknown'}
+ */
+export function getPromptCategoryImpactBadge(oldSnap, newSnap, liveSettings, category, opts = {}) {
+    if (category === 'sysprompt' && liveSettings?.customSysprompt) {
+        return 'customized';
+    }
+    const liveText = joinCategoryBlocks(getLivePromptCategoryBlocks(liveSettings, category, opts));
+    const newText = joinCategoryBlocks(getSnapshotCategoryBlocks(newSnap, category));
+    if (liveText === newText) return 'matches new';
+    if (oldSnap) {
+        const oldText = joinCategoryBlocks(getSnapshotCategoryBlocks(oldSnap, category));
+        // For sysprompt, live may only include main (or textarea); compare main-only when possible.
+        if (category === 'sysprompt') {
+            const liveMain = (opts.mainSyspromptText != null)
+                ? String(opts.mainSyspromptText)
+                : '';
+            if (liveMain && liveMain === (newSnap.sysprompt?.main || '')) return 'matches new';
+            if (liveMain && liveMain === (oldSnap.sysprompt?.main || '')) return 'matches old';
+            if (liveMain && liveMain === (newSnap.sysprompt?.legacy || '')) return 'matches new';
+            if (liveMain && liveMain === (oldSnap.sysprompt?.legacy || '')) return 'matches old';
+            if (!liveMain && !liveSettings?.customSysprompt) return 'unknown';
+        } else if (liveText === oldText) {
+            return 'matches old';
+        }
+    }
+    return 'customized';
+}
+
+/**
  * Fingerprint of all factory-shipped prompt defaults. Used to decide whether an
  * extension update warrants the prompt-reset dialog (version bumps alone are not enough).
  * @returns {string}
  */
 export function computeBundledPromptsFingerprint() {
-    const defaults = buildDefaultSettings();
-    const bundle = {
-        sysprompt: [
-            RT_PROMPTS['sysprompt.txt'] || '',
-            RT_PROMPTS['sysprompt_legacy.txt'] || '',
-        ].join('\n---\n'),
-        tracker: [
-            defaults.systemPromptTemplate || '',
-            defaults.userPromptSuffix || '',
-            JSON.stringify(DEFAULT_STOCK_PROMPTS),
-        ].join('\n---\n'),
-        lorebook: [
-            defaults.routerSystemPromptTemplate || '',
-            defaults.routerModularPromptTemplate || '',
-            JSON.stringify(DEFAULT_MODULES),
-        ].join('\n---\n'),
-        world: [
-            defaults.worldProgressionSystemPrompt || '',
-            defaults.worldProgressionSkeletonSystemPrompt || '',
-        ].join('\n---\n'),
-    };
-    return hashPromptBundle(JSON.stringify(bundle));
+    return hashPromptBundle(JSON.stringify(buildBundledPromptsSnapshot()));
 }
 
 /**
@@ -1866,91 +2068,10 @@ function getSettingsInternal(extensionSettings) {
     // ── MIGRATION: strip global UI prefs out of chatStates (Chat Link clobber fix) ─
     stripChatStateGlobalUiPrefs(s);
 
-    // ── MIGRATION: CHARACTER/PARTY — APR threshold +10 → +8 ─────────────────────
-    if (s.stockPrompts?.character &&
-        s.stockPrompts.character.includes('exactly +10 BAB') &&
-        !s.stockPrompts.character.includes('exactly +8 BAB')) {
-        s.stockPrompts.character = DEFAULT_STOCK_PROMPTS.character;
-    }
-    if (s.stockPrompts?.party &&
-        s.stockPrompts.party.includes('exactly +10 BAB') &&
-        !s.stockPrompts.party.includes('exactly +8 BAB')) {
-        s.stockPrompts.party = DEFAULT_STOCK_PROMPTS.party;
-    }
-
-    // ── MIGRATION: CHARACTER/PARTY/COMBAT — APR / dual-wield / singular grammar ──
-    // Current defaults use "1 attack / 2 attacks / 3 attacks" and literally say
-    // Never write "1 attacks". Older migrations matched those phrases and reset
-    // stockPrompts on every getSettings() — wiping user edits immediately.
-    const APR_NEW = '1 attack / 2 attacks / 3 attacks';
-    const needsAprPromptUpgrade = (text) => {
-        if (!text || text.includes(APR_NEW)) return false;
-        return text.includes('Ranged (N attacks):')
-            || text.includes('Weapon (N attacks,')
-            || text.includes('Finesse weapons:')
-            || text.includes('BAB is +10')
-            || (/\(1 attacks/.test(text) && !text.includes('Never write "1 attacks"'))
-            || (text.includes('Att/def:') && !text.includes('Spells:'))
-            || (text.includes('Spell Atk') && !text.includes('Spells: Cantrips:'))
-            || (text.includes('Att/def:') && !text.includes('TIER BANDS'))
-            || (text.includes('Att/def:') && !text.includes('DUAL-WIELDING'))
-            || (text.includes('Ranged (N attacks):') && !text.includes('DUAL-WIELDING'));
-    };
-    if (needsAprPromptUpgrade(s.stockPrompts?.character)) {
-        s.stockPrompts.character = DEFAULT_STOCK_PROMPTS.character;
-    }
-    if (needsAprPromptUpgrade(s.stockPrompts?.party)) {
-        s.stockPrompts.party = DEFAULT_STOCK_PROMPTS.party;
-    }
-    if (needsAprPromptUpgrade(s.stockPrompts?.combat)) {
-        s.stockPrompts.combat = DEFAULT_STOCK_PROMPTS.combat;
-    }
-
-    // ── MIGRATION: COMBAT — realistic firearm damage when inventing enemies ─────
-    if (s.stockPrompts?.combat &&
-        s.stockPrompts.combat.includes('TIER BANDS') &&
-        !s.stockPrompts.combat.includes('Reasonable pistol baseline: 2d8+1')) {
-        s.stockPrompts.combat = DEFAULT_STOCK_PROMPTS.combat;
-    }
-
-    // ── MIGRATION: CHARACTER/PARTY/COMBAT — finesse melee uses DEX ───────────────
-    const PRE_FINESSE_ATTACK_SNIPPET = 'weapon enhancement = +1/+2/+3 from the equipped weapon; 0 if mundane).';
-    if (s.stockPrompts?.character &&
-        s.stockPrompts.character.includes(PRE_FINESSE_ATTACK_SNIPPET) &&
-        !s.stockPrompts.character.includes('Finesse:')) {
-        s.stockPrompts.character = DEFAULT_STOCK_PROMPTS.character;
-    }
-    if (s.stockPrompts?.party &&
-        s.stockPrompts.party.includes(PRE_FINESSE_ATTACK_SNIPPET) &&
-        !s.stockPrompts.party.includes('Finesse:')) {
-        s.stockPrompts.party = DEFAULT_STOCK_PROMPTS.party;
-    }
-    const PRE_FINESSE_COMBAT_SNIPPET = 'You MUST output `[COMBAT]END_COMBAT[/COMBAT]`';
-    if (s.stockPrompts?.combat &&
-        s.stockPrompts.combat.includes(PRE_FINESSE_COMBAT_SNIPPET) &&
-        !s.stockPrompts.combat.includes('(N attacks,') &&
-        !s.stockPrompts.combat.includes('1 attack / 2 attacks / 3 attacks')) {
-        s.stockPrompts.combat = DEFAULT_STOCK_PROMPTS.combat;
-    }
-
-    // ── MIGRATION: CHARACTER/PARTY prompts — Att/def → Combat + Gear (BAB) ───────
-    const OLD_CHAR_SNIPPET = 'Att/def: Weapon (stats) | Armor (AC: Z)';
-    if (s.stockPrompts?.character && s.stockPrompts.character.includes(OLD_CHAR_SNIPPET)) {
-        s.stockPrompts.character = DEFAULT_STOCK_PROMPTS.character;
-    }
-    const OLD_PARTY_SNIPPET = 'Att/def: Weapon (stats) | Armor (AC: Z)';
-    if (s.stockPrompts?.party && s.stockPrompts.party.includes(OLD_PARTY_SNIPPET)) {
-        s.stockPrompts.party = DEFAULT_STOCK_PROMPTS.party;
-    }
-
-    // ── MIGRATION: INVENTORY prompt → Gear / Other Items split (v3.7.2) ───────────
-    const OLD_INVENTORY_SNIPPET = '- 🗡️ [Rare] Flame Dagger (1d6+3 fire)';
-    if (s.stockPrompts?.inventory &&
-        s.stockPrompts.inventory.includes(OLD_INVENTORY_SNIPPET) &&
-        !s.stockPrompts.inventory.includes('Gear:')) {
-        s.stockPrompts.inventory = DEFAULT_STOCK_PROMPTS.inventory;
-    }
-
+    // NOTE: Do NOT sniff-and-replace stockPrompts here on every getSettings().
+    // That wiped themed/custom module prompts (e.g. 40k COMBAT). Stock / tracker /
+    // sysprompt / agent prompt upgrades run ONLY via the post-update "Prompt Defaults
+    // Updated" dialog (or Auto-Update Prompts on Upgrade) — once per fingerprint change.
 
     // ── MIGRATION: Block RELATIONSHIPS section in State Tracker core prompt ───────
     if (s.systemPromptTemplate) {

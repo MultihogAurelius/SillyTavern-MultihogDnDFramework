@@ -572,6 +572,24 @@ async function createCartridgeViaPrompt() {
     createCartridgeFromCurrent(values.name, values.description, values.icon);
 }
 
+/**
+ * Prompt for name/icon/description, then snapshot the live config as a Game Cartridge.
+ * Used by Manage Cartridges and by the post-update "Save as Cartridge & Upgrade" path.
+ * @param {{ title?: string, okButton?: string, initialName?: string }} [opts]
+ * @returns {Promise<object|null>} The saved cartridge, or null if cancelled / invalid name.
+ */
+export async function promptAndSaveCurrentAsCartridge(opts = {}) {
+    const values = await promptCartridgeMeta({
+        title: opts.title || '💾 Save Current as New Cartridge',
+        okButton: opts.okButton || 'Save',
+        initialName: opts.initialName || '',
+        initialDescription: opts.initialDescription || '',
+        initialIcon: opts.initialIcon || '🎮',
+    });
+    if (!values) return null;
+    return createCartridgeFromCurrent(values.name, values.description, values.icon);
+}
+
 async function editCartridgeMeta(cartridge) {
     const settings = getSettings();
     const values = await promptCartridgeMeta({
