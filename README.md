@@ -122,4 +122,4 @@ These are recommendations, not rules — experiment. Different models shine for 
 ---
 
 ## Got a Question or Ideas?
-You can find me in the SillyTavern Discord extensions forum: https://discord.com/channels/1100685673633153084/1494170113279131678
+You can find me in the SillyTavern Discord extensions forum. Join the Discord and then head to the sub-forum there: [https://discord.com/channels/1100685673633153084/1494170113279131678](https://discord.gg/sillytavern)
