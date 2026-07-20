@@ -1755,6 +1755,18 @@ function formatValueToCurrency(totalCp, detectedCurrency) {
                     <div class="rt-onboarding-hero-sub">Build your character step by step — presets, persona bio, and full stat generation.</div>
                 </div>
 
+                <div class="rt-quickstart" id="rt-quickstart">
+                    <div class="rt-quickstart-title">⚡ Instant Action</div>
+                    <div class="rt-quickstart-sub">Fully automated — pick a genre and the extension enables everything, rolls your character, builds your persona &amp; Player Card, then starts the adventure for you. No other setup needed.</div>
+                    <div class="rt-quickstart-genres" role="group" aria-label="Quick Start genre">
+                        <button type="button" class="rt-quickstart-genre-btn" data-genre="fantasy">⚔️ Fantasy</button>
+                        <button type="button" class="rt-quickstart-genre-btn" data-genre="realistic">🏙️ Modern</button>
+                        <button type="button" class="rt-quickstart-genre-btn" data-genre="scifi">🚀 Sci-Fi</button>
+                        <button type="button" class="rt-quickstart-genre-btn" data-genre="horror">👻 Horror</button>
+                    </div>
+                    <div class="rt-quickstart-status" id="rt-quickstart-status">Ready</div>
+                </div>
+
                 <div class="rt-onboarding-secondary rt-onboarding-drawer">
                 <button type="button" class="rt-onboarding-drawer-toggle" id="rt-onboarding-drawer-toggle" aria-expanded="false" aria-controls="rt-onboarding-drawer-body">
                     <span class="rt-onboarding-drawer-toggle-label">Other ways to begin</span>

@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [5.9.3] - 2026-07-20
+
+### Added
+- **Instant Action / Quick Start**: one-click genre start on the empty tracker — enables Loot, Events, Resting, Benched Party, CYOA, Relationships + Pre-Seeded Only RNG, RNG-picks an archetype, generates the character sheet, creates a Lorebook Agent Player Card and matching SillyTavern persona (so the chat username matches `[CHARACTER]`), then sends "Begin the adventure". Orchestrated in `quickstart.js` with a strict sequential pipeline.
+
 ## [5.9.2] - 2026-07-20 — LEEEROOOOOOY JEEENKIIIINS
 
 ### Changed
