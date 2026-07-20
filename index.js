@@ -14344,11 +14344,11 @@ RULES:
                     <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;">
                         <input type="checkbox" id="cyoa-use-emojis" ${checked(cfg.useEmojis)} /> Use fitting emojis
                     </label>
-                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;">
+                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;" title="Allows you to apply custom CSS styling to change how your choices block looks if you prefer">
                         <input type="checkbox" id="cyoa-use-xml" ${checked(cfg.useXmlTag)} /> Wrap in &lt;choices&gt; XML tag
                     </label>
                     <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;">
-                        <input type="checkbox" id="cyoa-use-buttons" ${checked(cfg.useButtonTags)} /> Wrap each choice in &lt;button&gt; tags (click-to-send)
+                        <input type="checkbox" id="cyoa-use-buttons" ${checked(cfg.useButtonTags)} /> Clickable choices (&lt;button&gt;)
                     </label>
                     <label style="display:flex;align-items:center;gap:8px;font-size:12px;margin-top:2px;">
                         <span style="opacity:0.8;">Button colour</span>
