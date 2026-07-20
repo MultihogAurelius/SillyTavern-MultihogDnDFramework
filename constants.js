@@ -880,7 +880,7 @@ ${btn('3. \ud83e\udde0 [Illithid] Dominate his mind.')}${useXmlTag ? '\n</choice
         const e = useEmojis ? '🗺️ ' : ''; // Example emoji placeholder
         switch (slot.type) {
             case 'normal':
-                return `${num}. MUST be NORMAL (plain text, no tags).`;
+                return `${num}. MUST be NORMAL (plain text, no bracketed tags). Format: "${e}Action text".`;
             case 'roll': {
                 const stat = slot.label?.trim();
                 return stat
