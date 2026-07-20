@@ -126,7 +126,7 @@
     --rt-card-header: rgba(240, 122, 170, 0.06);
 }
 
-/* ── AI Wizard Custom Theme ── */
+/* Ã¢â€â‚¬Ã¢â€â‚¬ AI Wizard Custom Theme Ã¢â€â‚¬Ã¢â€â‚¬ */
 /* Variables are injected dynamically by the Theme Wizard into #rt-custom-theme-style */
 .rpg-tracker-panel.rt-theme-custom {
     --rt-bg: var(--rt-custom-bg, rgba(20, 20, 30, 0.96));
@@ -239,7 +239,7 @@
     overflow: visible !important;
 }
 
-/* ── State Tracker / Lorebook Agent card-flip mode (integrated docked layout) ── */
+/* Ã¢â€â‚¬Ã¢â€â‚¬ State Tracker / Lorebook Agent card-flip mode (integrated docked layout) Ã¢â€â‚¬Ã¢â€â‚¬ */
 .rt-header-face {
     display: flex;
     align-items: center;
@@ -474,12 +474,12 @@
     opacity: 1;
 }
 
-/* Disabled via the settings checkbox — full transparency */
+/* Disabled via the settings checkbox Ã¢â‚¬â€ full transparency */
 .rpg-tracker-panel.is-disabled {
     opacity: 0.68;
     filter: grayscale(0.6) brightness(0.8);
 }
-/* Block interaction on the content area only — the header (and overflow menu)
+/* Block interaction on the content area only Ã¢â‚¬â€ the header (and overflow menu)
    stay clickable so the user can re-enable. The panel shell itself keeps
    pointer-events so scroll events don't bleed through to the chat behind it. */
 .rpg-tracker-panel.is-disabled .rpg-tracker-content,
@@ -493,7 +493,7 @@
     pointer-events: auto;
 }
 
-/* Agent panel disabled — dim content but keep header interactive */
+/* Agent panel disabled Ã¢â‚¬â€ dim content but keep header interactive */
 .rpg-tracker-agent-panel.is-agent-disabled .rpg-tracker-content {
     opacity: 0.45;
     filter: grayscale(0.5) brightness(0.75);
@@ -505,7 +505,7 @@
     pointer-events: auto;
 }
 
-/* Paused via the pause button — visible but indicating pause */
+/* Paused via the pause button Ã¢â‚¬â€ visible but indicating pause */
 .rpg-tracker-panel.is-paused .rpg-tracker-memo-area,
 .rpg-tracker-panel.is-paused .rpg-tracker-render-view {
     opacity: 0.93;
@@ -607,7 +607,7 @@
     z-index: 1;
 }
 
-/* Night header starfield — scattered across the full bar width */
+/* Night header starfield Ã¢â‚¬â€ scattered across the full bar width */
 .rt-header-starfield {
     display: none;
     position: absolute;
@@ -797,7 +797,7 @@
     background: rgba(0, 0, 0, 0.2);
 }
 
-/* ── Direct Prompt Bar ── */
+/* Ã¢â€â‚¬Ã¢â€â‚¬ Direct Prompt Bar Ã¢â€â‚¬Ã¢â€â‚¬ */
 .rpg-tracker-prompt-bar {
     display: flex;
     gap: 6px;
@@ -856,7 +856,7 @@
     border-color: var(--rt-accent);
 }
 
-/* ── Update Menu ── */
+/* Ã¢â€â‚¬Ã¢â€â‚¬ Update Menu Ã¢â€â‚¬Ã¢â€â‚¬ */
 .rt-update-menu {
     position: absolute;
     background: var(--rt-card-bg);
@@ -895,7 +895,7 @@
     color: var(--rt-text-muted);
 }
 
-/* ── Rendered Card View ── */
+/* Ã¢â€â‚¬Ã¢â€â‚¬ Rendered Card View Ã¢â€â‚¬Ã¢â€â‚¬ */
 .rpg-tracker-render-view {
     flex: 1;
     overflow-y: auto;
@@ -1038,7 +1038,7 @@
     cursor: default;
 }
 
-/* ── Tab Mode (compact layout) ────────────────────────────────────────────── */
+/* Ã¢â€â‚¬Ã¢â€â‚¬ Tab Mode (compact layout) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */
 
 .rt-tabmode-wrap {
     display: flex;
@@ -1047,7 +1047,7 @@
     /* Guarantee at least one viewport's worth of height, and always leave a generous
        block of blank, scrollable room below the content on top of that (see
        padding-bottom below). Tab switches never programmatically move the scroll
-       position (see bindRenderedCardEvents in index.js) — instead, wherever the user
+       position (see bindRenderedCardEvents in index.js) Ã¢â‚¬â€ instead, wherever the user
        has parked the viewport should simply remain a valid scroll position no matter
        which tab is short or tall, so the browser never needs to clamp scrollTop and
        nothing visibly bounces when switching tabs. */
@@ -1189,7 +1189,7 @@
     text-align: center;
 }
 
-/* Secondary badge on PARTY's tab button reflecting its folded-in benched count —
+/* Secondary badge on PARTY's tab button reflecting its folded-in benched count Ã¢â‚¬â€
    offset to the bottom-right so it never collides with the primary (active-count) badge. */
 .rt-tab-badge-secondary {
     top: auto;
@@ -1199,7 +1199,7 @@
     color: #2a1400;
 }
 
-/* Benched Party sub-panel — folded into PARTY's own card as a compact "camp roster"
+/* Benched Party sub-panel Ã¢â‚¬â€ folded into PARTY's own card as a compact "camp roster"
    rather than a standalone module, evoking a party-base/camp screen: desaturated
    portraits, a warm campfire palette, click-to-expand accordion per member. */
 .rt-benched-panel {
@@ -1290,7 +1290,7 @@
 }
 
 .rt-benched-chip-portrait::after {
-    content: '🏕️';
+    content: 'Ã°Å¸Ââ€¢Ã¯Â¸Â';
     position: absolute;
     bottom: -5px;
     right: -5px;
@@ -1349,7 +1349,7 @@
     display: flex;
     flex-direction: column;
     /* Absorb the leftover space (see .rt-tabmode-wrap above) so short tab content
-       doesn't shrink the scrollable area — it just leaves blank room below it. */
+       doesn't shrink the scrollable area Ã¢â‚¬â€ it just leaves blank room below it. */
     flex: 1 0 auto;
 }
 
@@ -1397,7 +1397,7 @@
     font-size: 0.92em;
 }
 
-/* ── Onboarding layout ── */
+/* Ã¢â€â‚¬Ã¢â€â‚¬ Onboarding layout Ã¢â€â‚¬Ã¢â€â‚¬ */
 .rt-onboarding-config-row {
     display: flex;
     align-items: flex-end;
@@ -1607,7 +1607,7 @@
     flex-shrink: 0;
 }
 
-/* Segmented toggle (choose-one, left/right) — used for Time & Date format controls */
+/* Segmented toggle (choose-one, left/right) Ã¢â‚¬â€ used for Time & Date format controls */
 .rt-seg-toggle {
     display: inline-flex;
     border: 1px solid rgba(255, 255, 255, 0.15);
@@ -1645,7 +1645,7 @@
     color: var(--rt-accent, #00c88c);
 }
 
-/* ── Spells ── */
+/* Ã¢â€â‚¬Ã¢â€â‚¬ Spells Ã¢â€â‚¬Ã¢â€â‚¬ */
 .rt-spell-row {
     display: grid;
     grid-template-columns: 70px 1fr;
@@ -1943,7 +1943,7 @@
     align-self: center;
 }
 
-/* ── Status Pill Color Variants ── */
+/* Ã¢â€â‚¬Ã¢â€â‚¬ Status Pill Color Variants Ã¢â€â‚¬Ã¢â€â‚¬ */
 .rt-pill-buff {
     background: rgba(0, 200, 100, 0.1);
     border-color: rgba(0, 200, 100, 0.3);
@@ -2008,7 +2008,7 @@
     padding-bottom: 2px;
 }
 
-/* Each cell wrapper — fixed types (pills, badges, text) take natural width */
+/* Each cell wrapper Ã¢â‚¬â€ fixed types (pills, badges, text) take natural width */
 .rt-mmc-cell {
     flex: 0 0 auto;
     min-width: 0;
@@ -2127,7 +2127,7 @@
     margin-top: 0;
 }
 
-/* ── Universal Rendering Tags ── */
+/* Ã¢â€â‚¬Ã¢â€â‚¬ Universal Rendering Tags Ã¢â€â‚¬Ã¢â€â‚¬ */
 
 /* Objective checkboxes */
 .rt-objective {
@@ -2295,7 +2295,7 @@
     padding: 1px 0;
 }
 
-/* ── Delta Resize Handle ── */
+/* Ã¢â€â‚¬Ã¢â€â‚¬ Delta Resize Handle Ã¢â€â‚¬Ã¢â€â‚¬ */
 
 .rpg-tracker-delta-resize-handle {
     height: 5px;
@@ -2384,7 +2384,7 @@
     z-index: 1;
 }
 
-/* Night footer starfield — related to header stars but offset pattern & timing */
+/* Night footer starfield Ã¢â‚¬â€ related to header stars but offset pattern & timing */
 .rt-footer-starfield {
     display: none;
     position: absolute;
@@ -2513,7 +2513,7 @@
     border-color: var(--rt-accent-dim);
 }
 
-/* Footer location — accent glow tracks day/night cycle via --rt-accent */
+/* Footer location Ã¢â‚¬â€ accent glow tracks day/night cycle via --rt-accent */
 .rt-footer-location-text {
     flex: 1;
     min-width: 0;
@@ -2548,7 +2548,7 @@
     margin-left: 4px;
 }
 
-/* Lorebook Agent footer — mirror State Tracker: nav left, status + prompt right */
+/* Lorebook Agent footer Ã¢â‚¬â€ mirror State Tracker: nav left, status + prompt right */
 #rt-agent-footer {
     justify-content: space-between;
 }
@@ -2750,7 +2750,7 @@
         max-height: 40vh;
     }
 
-    /* Resize is desktop-only — hide handles on mobile/touch */
+    /* Resize is desktop-only Ã¢â‚¬â€ hide handles on mobile/touch */
     .rpg-tracker-panel .rt-resizer-tr,
     .rpg-tracker-panel .rt-resizer-br,
     .rpg-tracker-panel .rt-resizer-bl {
@@ -2827,7 +2827,7 @@
         flex-shrink: 0 !important;
     }
 
-    /* On mobile, collapse action buttons into the ⋯ overflow menu.
+    /* On mobile, collapse action buttons into the Ã¢â€¹Â¯ overflow menu.
        Raw View stays in the header. */
     #rpg-tracker-chat-link-btn,
     #rpg-tracker-enable-btn,
@@ -2891,12 +2891,12 @@
 }
 
 
-/* ── Overflow button (hidden on desktop, shown by mobile media query above) ── */
+/* Ã¢â€â‚¬Ã¢â€â‚¬ Overflow button (hidden on desktop, shown by mobile media query above) Ã¢â€â‚¬Ã¢â€â‚¬ */
 #rt-overflow-btn {
     display: none;
 }
 
-/* ── Lorebook Agent cleanup dropdown (reparented to panel when open) ── */
+/* Ã¢â€â‚¬Ã¢â€â‚¬ Lorebook Agent cleanup dropdown (reparented to panel when open) Ã¢â€â‚¬Ã¢â€â‚¬ */
 .rt-cleanup-dropdown {
     position: absolute;
     z-index: 3100;
@@ -2925,7 +2925,7 @@
     overflow: visible !important;
 }
 
-/* ── Overflow dropdown menu ── */
+/* Ã¢â€â‚¬Ã¢â€â‚¬ Overflow dropdown menu Ã¢â€â‚¬Ã¢â€â‚¬ */
 .rt-overflow-menu {
     position: absolute;
     background: var(--rt-card-bg);
@@ -2987,7 +2987,7 @@
     margin-top: -4px;
 }
 
-/* ── Settings Module List ── */
+/* Ã¢â€â‚¬Ã¢â€â‚¬ Settings Module List Ã¢â€â‚¬Ã¢â€â‚¬ */
 .rt-order-item {
     transition: background 0.2s, opacity 0.2s;
     user-select: none;
@@ -3069,7 +3069,7 @@
     animation: none;
 }
 
-/* ── Character Roll Trigger Button ── */
+/* Ã¢â€â‚¬Ã¢â€â‚¬ Character Roll Trigger Button Ã¢â€â‚¬Ã¢â€â‚¬ */
 .rt-char-roll-trigger {
     background: rgba(120, 80, 220, 0.15) !important;
     border-color: rgba(120, 80, 220, 0.5) !important;
@@ -3082,7 +3082,7 @@
     color: #ddd6fe !important;
 }
 
-/* ── Character Roll Inline Panel ── */
+/* Ã¢â€â‚¬Ã¢â€â‚¬ Character Roll Inline Panel Ã¢â€â‚¬Ã¢â€â‚¬ */
 #rt-char-roll-panel {
     border: 1px solid rgba(120, 80, 220, 0.25);
     border-radius: 6px;
@@ -3172,7 +3172,7 @@
     flex-wrap: wrap;
 }
 
-/* System Prompt Control Room — one scroll region (section list only) */
+/* System Prompt Control Room Ã¢â‚¬â€ one scroll region (section list only) */
 .popup-content:has(.rt-cr-popup-container) {
     display: flex;
     flex-direction: column;
@@ -3308,7 +3308,7 @@ textarea.rt-cr-input {
     min-height: 48px;
 }
 
-/* ── Persona / CR Help Icon (tap/click on mobile; hover title on desktop) ── */
+/* Ã¢â€â‚¬Ã¢â€â‚¬ Persona / CR Help Icon (tap/click on mobile; hover title on desktop) Ã¢â€â‚¬Ã¢â€â‚¬ */
 .rt-cr-help-icon {
     display: inline-flex;
     align-items: center;
@@ -3335,7 +3335,7 @@ textarea.rt-cr-input {
     outline: none;
 }
 
-/* ── Generate Button ── */
+/* Ã¢â€â‚¬Ã¢â€â‚¬ Generate Button Ã¢â€â‚¬Ã¢â€â‚¬ */
 #rt-cr-generate-btn:hover:not(:disabled) {
     background: rgba(120, 80, 220, 0.35) !important;
     border-color: rgba(160, 120, 255, 0.9) !important;
@@ -3435,7 +3435,7 @@ textarea.rt-cr-input {
     color: var(--rt-accent);
 }
 
-/* ── Mobile Layout Fixes ── */
+/* Ã¢â€â‚¬Ã¢â€â‚¬ Mobile Layout Fixes Ã¢â€â‚¬Ã¢â€â‚¬ */
 .rt-footer-toggle-btn {
     display: none; /* Hide on desktop */
 }
@@ -3575,7 +3575,7 @@ textarea.rt-cr-input {
         overflow-y: auto;
     }
 
-    /* Campaign records flow with the panel body — one shared scrollbar */
+    /* Campaign records flow with the panel body Ã¢â‚¬â€ one shared scrollbar */
     #rt-agent-campaign-section {
         flex: 0 0 auto !important;
         min-height: 0 !important;
@@ -3593,7 +3593,7 @@ textarea.rt-cr-input {
 }
 
 
-/* ── Lorebook Agent panel: single scroll region on .rpg-tracker-content.
+/* Ã¢â€â‚¬Ã¢â€â‚¬ Lorebook Agent panel: single scroll region on .rpg-tracker-content.
    Upper drawers and Campaign Records all use natural height so one scrollbar
    reaches the true bottom (no nested flex trap at the campaign header). */
 #rpg-tracker-agent {
@@ -3628,7 +3628,7 @@ textarea.rt-cr-input {
     overflow: visible;
 }
 
-/* Location Images & Visualization — settings sections */
+/* Location Images & Visualization Ã¢â‚¬â€ settings sections */
 .rt-loc-settings-block {
     margin-bottom: 4px;
 }
@@ -3817,7 +3817,7 @@ textarea.rt-cr-input {
     color: #a8e0f0;
 }
 
-/* ── Lorebook Agent view mode switch (Campaign Records / Visualization Mode) ── */
+/* Ã¢â€â‚¬Ã¢â€â‚¬ Lorebook Agent view mode switch (Campaign Records / Visualization Mode) Ã¢â€â‚¬Ã¢â€â‚¬ */
 .rt-agent-view-mode-switch {
     display: inline-flex;
     align-items: stretch;
@@ -3918,7 +3918,7 @@ textarea.rt-cr-input {
     50% { transform: scale(1.15); opacity: 0.75; }
 }
 
-/* ── Connection Settings Panels ── */
+/* Ã¢â€â‚¬Ã¢â€â‚¬ Connection Settings Panels Ã¢â€â‚¬Ã¢â€â‚¬ */
 #rpg_tracker_profile_group,
 #rpg_tracker_ollama_group,
 #rpg_tracker_openai_group {
@@ -3959,7 +3959,7 @@ textarea.rt-cr-input {
     background: rgba(0, 255, 170, 0.15);
 }
 
-/* ── Bar Recoloring ── */
+/* Ã¢â€â‚¬Ã¢â€â‚¬ Bar Recoloring Ã¢â€â‚¬Ã¢â€â‚¬ */
 .rt-hp-bar-wrap[data-recolor-id], 
 .rt-xp-bar-wrap[data-recolor-id] {
     position: relative;
@@ -3977,7 +3977,7 @@ textarea.rt-cr-input {
     transform: scale(0.98);
 }
 
-/* ── Quest Log ── */
+/* Ã¢â€â‚¬Ã¢â€â‚¬ Quest Log Ã¢â€â‚¬Ã¢â€â‚¬ */
 .rt-quest-card {
     background: rgba(255,255,255,0.03);
     border: 1px solid rgba(255,255,255,0.08);
@@ -4176,7 +4176,7 @@ textarea.rt-cr-input {
 .rt-quest-mood-tick-neutral   { left: 33.3%; }
 .rt-quest-mood-tick-deadline  { left: 66.6%; }
 
-/* ── Context Debug Viewer ── */
+/* Ã¢â€â‚¬Ã¢â€â‚¬ Context Debug Viewer Ã¢â€â‚¬Ã¢â€â‚¬ */
 .rpg-debug-viewer {
     position: fixed;
     top: 50px;
@@ -4417,7 +4417,7 @@ textarea.rt-cr-input {
     }
 }
 
-/* ── Panel Collapsed State (Immersion Mode) ─────────────────────────────────── */
+/* Ã¢â€â‚¬Ã¢â€â‚¬ Panel Collapsed State (Immersion Mode) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */
 .rpg-tracker-panel.rt-panel-collapsed {
     height: auto !important;
     min-height: 0 !important;
@@ -4490,7 +4490,7 @@ textarea.rt-cr-input {
 }
 
 
-/* ─── Remove Up/Down Spinners Globally for extension number inputs ─── */
+/* Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Remove Up/Down Spinners Globally for extension number inputs Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */
 .rpg-tracker-panel input[type="number"]::-webkit-outer-spin-button,
 .rpg-tracker-panel input[type="number"]::-webkit-inner-spin-button,
 .rpg-tracker-settings input[type="number"]::-webkit-outer-spin-button,
@@ -4505,7 +4505,7 @@ textarea.rt-cr-input {
 
 
 
-/* ── Character Portrait System ───────────────────────────────────────────── */
+/* Ã¢â€â‚¬Ã¢â€â‚¬ Character Portrait System Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */
 
 /* Outer wrapper: portrait on left, entity content on right */
 .rt-entity-container {
@@ -4636,11 +4636,11 @@ textarea.rt-cr-input {
     opacity: 0.92;
 }
 
-/* ════════════════════════════════════════════════════════════════════════════
-   NPC CAMPAIGN RECORDS — Visual Overhaul
-   ════════════════════════════════════════════════════════════════════════════ */
+/* Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
+   NPC CAMPAIGN RECORDS Ã¢â‚¬â€ Visual Overhaul
+   Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â */
 
-/* ── NPC Folder Header Accent ── */
+/* Ã¢â€â‚¬Ã¢â€â‚¬ NPC Folder Header Accent Ã¢â€â‚¬Ã¢â€â‚¬ */
 .rt-npc-folder-hdr {
     transition: background 0.2s ease;
 }
@@ -4653,7 +4653,7 @@ textarea.rt-cr-input {
     flex-shrink: 0;
 }
 
-/* ── NPC Card Grid ── */
+/* Ã¢â€â‚¬Ã¢â€â‚¬ NPC Card Grid Ã¢â€â‚¬Ã¢â€â‚¬ */
 .rt-npc-card-grid {
     display: flex;
     flex-direction: column;
@@ -4661,7 +4661,7 @@ textarea.rt-cr-input {
     padding: 4px 0;
 }
 
-/* ── NPC Card ── */
+/* Ã¢â€â‚¬Ã¢â€â‚¬ NPC Card Ã¢â€â‚¬Ã¢â€â‚¬ */
 .rt-npc-card {
     display: flex;
     flex-wrap: wrap;
@@ -4691,7 +4691,7 @@ textarea.rt-cr-input {
     background: linear-gradient(135deg, rgba(212, 169, 64, 0.08), rgba(255, 255, 255, 0.03));
 }
 
-/* ── NPC Portrait ── */
+/* Ã¢â€â‚¬Ã¢â€â‚¬ NPC Portrait Ã¢â€â‚¬Ã¢â€â‚¬ */
 .rt-npc-portrait-wrap {
     width: 64px;
     height: 64px;
@@ -4737,7 +4737,7 @@ textarea.rt-cr-input {
     opacity: 1;
 }
 
-/* ── NPC Info Area ── */
+/* Ã¢â€â‚¬Ã¢â€â‚¬ NPC Info Area Ã¢â€â‚¬Ã¢â€â‚¬ */
 .rt-npc-info {
     flex: 1 1 calc(100% - 72px);
     min-width: 0;
@@ -4788,7 +4788,7 @@ textarea.rt-cr-input {
     border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-/* ── NPC Relationship Bars ── */
+/* Ã¢â€â‚¬Ã¢â€â‚¬ NPC Relationship Bars Ã¢â€â‚¬Ã¢â€â‚¬ */
 .rt-npc-bars {
     display: flex;
     flex-direction: column;
@@ -4861,7 +4861,7 @@ textarea.rt-cr-input {
 .rt-npc-bar-value.val-affection-positive { color: #f472b6; }
 .rt-npc-bar-value.val-affection-negative { color: #a855f7; }
 
-/* ── NPC Relationship Tier Badges ── */
+/* Ã¢â€â‚¬Ã¢â€â‚¬ NPC Relationship Tier Badges Ã¢â€â‚¬Ã¢â€â‚¬ */
 .rt-npc-tier-row {
     display: flex;
     gap: 5px;
@@ -4891,7 +4891,7 @@ textarea.rt-cr-input {
 .rt-npc-tier-detailed-label { font-weight: bold; margin-right: 4px; transition: color 0.25s ease; }
 .rt-npc-tier-detailed-hint { opacity: 0.7; color: var(--SmartThemeBodyColor, inherit); }
 
-/* ── NPC Card Actions ── */
+/* Ã¢â€â‚¬Ã¢â€â‚¬ NPC Card Actions Ã¢â€â‚¬Ã¢â€â‚¬ */
 .rt-npc-actions {
     display: flex;
     gap: 4px;
@@ -4946,7 +4946,7 @@ textarea.rt-cr-input {
     color: #ecc050;
 }
 
-/* ── NPC Add Button ── */
+/* Ã¢â€â‚¬Ã¢â€â‚¬ NPC Add Button Ã¢â€â‚¬Ã¢â€â‚¬ */
 .rt-npc-add-btn {
     background: rgba(212, 169, 64, 0.08);
     border: 1px dashed rgba(212, 169, 64, 0.3);
@@ -4969,9 +4969,9 @@ textarea.rt-cr-input {
     color: #ecc050;
 }
 
-/* ════════════════════════════════════════════════════════════════════════════
-   LOCATION IMAGES — Lorebook Agent tree + detail popup
-   ════════════════════════════════════════════════════════════════════════════ */
+/* Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
+   LOCATION IMAGES Ã¢â‚¬â€ Lorebook Agent tree + detail popup
+   Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â */
 
 .rt-loc-folder-hdr .rt-loc-folder-icon {
     color: #5eb8d4;
@@ -5097,7 +5097,7 @@ textarea.rt-cr-input {
     margin-top: 12px;
 }
 
-/* ── Lorebook Agent immersion scene view ── */
+/* Ã¢â€â‚¬Ã¢â€â‚¬ Lorebook Agent immersion scene view Ã¢â€â‚¬Ã¢â€â‚¬ */
 .rt-immersion-root {
     display: flex;
     flex-direction: column;
@@ -5270,7 +5270,7 @@ textarea.rt-cr-input {
     font-style: italic;
 }
 
-/* ── Character Card Picker Popup ── */
+/* Ã¢â€â‚¬Ã¢â€â‚¬ Character Card Picker Popup Ã¢â€â‚¬Ã¢â€â‚¬ */
 .rt-charpicker-overlay {
     position: fixed;
     inset: 0;
@@ -5475,7 +5475,7 @@ textarea.rt-cr-input {
     background: rgba(255, 255, 255, 0.04);
     color: var(--rt-text, #eee);
 }
-/* ── NPC Creator Dialog Tabs ── */
+/* Ã¢â€â‚¬Ã¢â€â‚¬ NPC Creator Dialog Tabs Ã¢â€â‚¬Ã¢â€â‚¬ */
 .rt-npc-creator-tabs {
     display: flex;
     border-bottom: 1px solid rgba(212, 169, 64, 0.15);
@@ -5516,7 +5516,7 @@ textarea.rt-cr-input {
 }
 
 @media screen and (max-width: 800px) {
-    /* Full-viewport modal — absolute fill avoids flex stretch / margin:auto scroll bugs */
+    /* Full-viewport modal Ã¢â‚¬â€ absolute fill avoids flex stretch / margin:auto scroll bugs */
     .rt-charpicker-overlay {
         display: block;
         padding: 0;
@@ -5784,9 +5784,9 @@ textarea.rt-cr-input {
     animation: rt-battery-flash 1s infinite;
 }
 
-/* ── Day/Night Cycle Sky Badge ──────────────────────────────────────────────
+/* Ã¢â€â‚¬Ã¢â€â‚¬ Day/Night Cycle Sky Badge Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
    Pure-CSS sun/moon + starfield badge reflecting in-world time of day, shown
-   in the panel header when the feature is enabled. No image assets — the
+   in the panel header when the feature is enabled. No image assets Ã¢â‚¬â€ the
    celestial body is a radial-gradient disc with a box-shadow glow, and the
    starfield is a handful of fixed dots layered behind it via box-shadow. */
 .rt-daynight-badge {
@@ -5836,7 +5836,7 @@ textarea.rt-cr-input {
     50% { opacity: 0.45; }
 }
 
-/* Sun phases — warm gradient disc, glow intensity/hue shifts across the day. */
+/* Sun phases Ã¢â‚¬â€ warm gradient disc, glow intensity/hue shifts across the day. */
 .rt-sky-dawn .rt-sky-disc {
     background: radial-gradient(circle at 35% 35%, #fff2cc, #ffaa55);
     box-shadow: 0 0 6px 2px rgba(255, 170, 85, 0.55);
@@ -5858,14 +5858,14 @@ textarea.rt-cr-input {
     box-shadow: 0 0 7px 2px rgba(230, 99, 61, 0.6);
 }
 
-/* Moon phases — cool silvery disc, no glow (starfield sits behind it). */
+/* Moon phases Ã¢â‚¬â€ cool silvery disc, no glow (starfield sits behind it). */
 .rt-sky-night .rt-sky-disc,
 .rt-sky-lateNight .rt-sky-disc {
     background: radial-gradient(circle at 35% 35%, #f5f5ff, #9999ee);
     box-shadow: 0 0 4px 1px rgba(153, 153, 238, 0.5);
 }
 
-/* ── Day/Night Cycle — full-panel ambient tint ─────────────────────────────
+/* Ã¢â€â‚¬Ã¢â€â‚¬ Day/Night Cycle Ã¢â‚¬â€ full-panel ambient tint Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
    When rt-daynight-active is set on a panel, phase classes override the theme's
    CSS variables so the entire tracker shifts hue with in-world time. @property
    registrations let the color vars crossfade smoothly between phases. */
@@ -5933,9 +5933,9 @@ textarea.rt-cr-input {
         box-shadow 2s ease;
 }
 
-/* ── Phase palettes ─────────────────────────────────────────────────────── */
+/* Ã¢â€â‚¬Ã¢â€â‚¬ Phase palettes Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */
 
-/* Late night (12 AM – 4:59 AM): deep indigo, cool violet accent */
+/* Late night (12 AM Ã¢â‚¬â€œ 4:59 AM): deep indigo, cool violet accent */
 .rpg-tracker-panel.rt-daynight-active.rt-phase-lateNight {
     --rt-bg: rgba(8, 10, 28, 0.97);
     --rt-text: #c8c8e8;
@@ -5949,7 +5949,7 @@ textarea.rt-cr-input {
     --rt-shadow: 0 8px 32px rgba(0, 0, 20, 0.7), inset 0 0 30px rgba(40, 50, 120, 0.08);
 }
 
-/* Dawn (5 – 6:59 AM): peach horizon, rose-gold warmth */
+/* Dawn (5 Ã¢â‚¬â€œ 6:59 AM): peach horizon, rose-gold warmth */
 .rpg-tracker-panel.rt-daynight-active.rt-phase-dawn {
     --rt-bg: rgba(32, 22, 28, 0.95);
     --rt-text: #ffe8d8;
@@ -5963,7 +5963,7 @@ textarea.rt-cr-input {
     --rt-shadow: 0 8px 28px rgba(40, 20, 10, 0.55), inset 0 0 40px rgba(255, 140, 80, 0.06);
 }
 
-/* Morning (7 – 11:59 AM): fresh golden daylight */
+/* Morning (7 Ã¢â‚¬â€œ 11:59 AM): fresh golden daylight */
 .rpg-tracker-panel.rt-daynight-active.rt-phase-morning {
     --rt-bg: rgba(26, 30, 36, 0.93);
     --rt-text: #f5f0e0;
@@ -5977,7 +5977,7 @@ textarea.rt-cr-input {
     --rt-shadow: 0 8px 28px rgba(30, 25, 10, 0.45);
 }
 
-/* Midday (12 – 1:59 PM): bright high-noon, neutral warm white */
+/* Midday (12 Ã¢â‚¬â€œ 1:59 PM): bright high-noon, neutral warm white */
 .rpg-tracker-panel.rt-daynight-active.rt-phase-midday {
     --rt-bg: rgba(34, 38, 44, 0.91);
     --rt-text: #fafaf5;
@@ -5991,7 +5991,7 @@ textarea.rt-cr-input {
     --rt-shadow: 0 8px 28px rgba(20, 20, 15, 0.4), inset 0 0 20px rgba(255, 255, 200, 0.04);
 }
 
-/* Afternoon (2 – 5:59 PM): warm golden hour building */
+/* Afternoon (2 Ã¢â‚¬â€œ 5:59 PM): warm golden hour building */
 .rpg-tracker-panel.rt-daynight-active.rt-phase-afternoon {
     --rt-bg: rgba(36, 32, 26, 0.93);
     --rt-text: #f2ead8;
@@ -6005,7 +6005,7 @@ textarea.rt-cr-input {
     --rt-shadow: 0 8px 28px rgba(35, 25, 10, 0.5);
 }
 
-/* Sunset (6 – 7:59 PM): orange-crimson warmth */
+/* Sunset (6 Ã¢â‚¬â€œ 7:59 PM): orange-crimson warmth */
 .rpg-tracker-panel.rt-daynight-active.rt-phase-sunset {
     --rt-bg: rgba(38, 20, 16, 0.95);
     --rt-text: #ffd4b8;
@@ -6019,7 +6019,7 @@ textarea.rt-cr-input {
     --rt-shadow: 0 8px 32px rgba(50, 15, 5, 0.6), inset 0 0 35px rgba(255, 80, 40, 0.06);
 }
 
-/* Night (8 – 11:59 PM): cool indigo twilight */
+/* Night (8 Ã¢â‚¬â€œ 11:59 PM): cool indigo twilight */
 .rpg-tracker-panel.rt-daynight-active.rt-phase-night {
     --rt-bg: rgba(12, 16, 34, 0.96);
     --rt-text: #d0d4e8;
@@ -6033,7 +6033,7 @@ textarea.rt-cr-input {
     --rt-shadow: 0 8px 32px rgba(0, 0, 25, 0.65), inset 0 0 25px rgba(60, 70, 150, 0.07);
 }
 
-/* ── User panel background image + day/night tint overlay ─────────────────
+/* Ã¢â€â‚¬Ã¢â€â‚¬ User panel background image + day/night tint overlay Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
    Layer order: ::before = art, ::after = phase scrim, children = UI. */
 .rpg-tracker-panel.rt-has-bg-image {
     --rt-bg-overlay-color: rgba(18, 18, 24, 0.72);
@@ -6105,7 +6105,7 @@ textarea.rt-cr-input {
     --rt-bg-overlay-color: rgba(10, 14, 32, 0.78);
 }
 
-/* Settings ? help icons — tap/click friendly; hover title tooltips still work on desktop */
+/* Settings ? help icons Ã¢â‚¬â€ tap/click friendly; hover title tooltips still work on desktop */
 .rpg-tracker-settings .fa-circle-question[title] {
     cursor: pointer;
     touch-action: manipulation;
@@ -6130,3 +6130,15 @@ textarea.rt-cr-input {
     -webkit-backdrop-filter: none !important;
     background-color: rgba(0, 0, 0, 0.28);
 }
+
+/* Ã¢â€â‚¬Ã¢â€â‚¬ CYOA Choice Block Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */
+
+.mes_text choices {
+    display: block;
+    margin: 14px 0 4px;
+    padding: 0;
+    border-left: 2px solid rgba(120, 80, 220, 0.35);
+    padding-left: 8px;
+}
+
+

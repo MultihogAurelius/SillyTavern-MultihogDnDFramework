@@ -222,7 +222,19 @@ Typical range 1–5 minor, 5–15 major; 15+ only for life-altering moments.
 </state_memo>
 
 <CYOA_mode>
-Choose your own adventure mode is enabled; suggest numbered courses of action at the end of outputs. Use fitting emojis.
+At end of output, present numbered choices in a <choices> block; wrap each in <button> tags; use fitting emojis.
+Types: Normal=plain action or speech (no tag) · Narrative Decided=pick whichever format fits best · [Trait or Ability]=Trait/Ability · [STAT REQ N]=Roll REQ · [Label] action=Prefix
+<choices>
+<button>1. 🗡️ Choice Text</button>
+<button>2. 🎲 [DEX REQ 14] Choice Text</button>
+<button>3. 🧠 [Illithid] Choice Text</button>
+</choices>
+Generate in order:
+1: [NARRATIVE] — pick whichever format fits best: plain action, [Trait or Ability] tag, or [STAT REQ N]
+2: [NARRATIVE] — pick whichever format fits best: plain action, [Trait or Ability] tag, or [STAT REQ N]
+3: [NORMAL] — plain action or speech, no tags
+4: [TRAIT/ABILITY] — open with a [Trait or Ability] tag (e.g. [Illithid] or [Athletics]), then write the action
+5: [ROLL REQ] — include a [STAT REQ N] tag; pick the stat and DC that fit the scene
 </CYOA_mode>
 
 <constraints>

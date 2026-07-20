@@ -2126,10 +2126,11 @@ function formatValueToCurrency(totalCp, detectedCurrency) {
                             <input type="checkbox" id="rt_onboarding_mod_party_bench" />
                             <span>🏕️ Benched Party (Tracks temporarily separated companions)</span>
                         </label>
-                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <div style="display:flex;align-items:center;gap:6px;">
                             <input type="checkbox" id="rt_onboarding_mod_cyoa_mode" />
                             <span>🧭 CYOA Mode (Numbered action choices at end of outputs)</span>
-                        </label>
+                            <button id="rt_onboarding_cyoa_settings_btn" style="background:none;border:1px solid rgba(255,255,255,0.25);border-radius:4px;color:inherit;font-size:0.75em;padding:1px 6px;cursor:pointer;flex-shrink:0;opacity:0.8;" title="CYOA Settings"><i class="fa-solid fa-gear"></i></button>
+                        </div>
                         <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
                             <input type="checkbox" id="rt_onboarding_mod_npc_rel_bars" />
                             <span>💞 Relationship System (BETA)</span>

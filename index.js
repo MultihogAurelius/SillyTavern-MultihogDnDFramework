@@ -1,4 +1,4 @@
-import { EXAMPLES, COLOR_EXAMPLES, DEFAULT_STOCK_PROMPTS, RT_PROMPTS, BLOCK_ICONS, BLOCK_ORDER, PAGE_SIZE, NO_PAGINATE, buildOnboardingXpHint, buildOnboardingTimeHint, buildStartingGearHint, buildOnboardingActiveBlocks, buildCombatAndSkillScalingHint, resolveTimePromptKey, resolveTimePromptDisplayTag } from './constants.js';
+import { EXAMPLES, COLOR_EXAMPLES, DEFAULT_STOCK_PROMPTS, RT_PROMPTS, BLOCK_ICONS, BLOCK_ORDER, PAGE_SIZE, NO_PAGINATE, buildOnboardingXpHint, buildOnboardingTimeHint, buildStartingGearHint, buildOnboardingActiveBlocks, buildCombatAndSkillScalingHint, resolveTimePromptKey, resolveTimePromptDisplayTag, buildCyoaPrompt, DEFAULT_CYOA_SLOTS } from './constants.js';
 import { MODULE_NAME, DEFAULT_MODULES, getSettings, getBarBackground, migrateCustomFields, saveChatState, writeModuleSchemaBackup, applyModuleSchemaBackup, applyDeletedCustomTagTombstones, recordDeletedCustomTags, clearDeletedCustomTagTombstones, saveProfile, deleteProfile, getEffectiveRouterCampaignPrefix, sanitizeCampaignPrefixString, buildNpcInstruction, loadStockPromptsFromProfile, getNpcRelationshipMax, getNpcRelationshipMaxDefault, clampRelationshipValue, relationshipBarPct, getFriendshipTier, getAffectionTier, getRelTierBadgeStyle, getRelTierDetailedStyle, getRelTierDetailedLabelStyle, applyRelTierBadgeElement, sanitizeRouterState, rebuildAllModuleInstructions, adjustAllStoredTemplatesForTimeFormat, DEFAULT_NPC_SECTIONS, DEFAULT_PC_SECTIONS, computeBundledPromptsFingerprint, getDefaultPortraitLocationSystemPrompt, isShippedPortraitLocationSystemPrompt, applyFactoryReset, clearExtensionLocalStorageUiState, stripChatStateGlobalUiPrefs } from './state-manager.js';
 import { sendStateRequest, fetchOllamaModels, fetchOpenAIModels, testOpenAIConnection, getConnectionProfiles, getCurrentCompletionPreset, setCompletionPreset, syncCombatProfile, resetCombatProfileOverride } from './llm-client.js';
 import { getDiceToolName, getDiceCommandName, getDiceCommandAliases, doDiceRoll, registerDiceFunctionTool, registerDiceSlashCommand, installInterceptor, getNarrativeBlocks, onGenerationStarted, onGenerationEnded, ensureRelTagRegex, resetRouterTick, getRouterTick, resetRouterAutoTick, getRouterSchedulerInternals, makeRngQueue, buildRngBlock, RNG_QUEUE_LEN, parseAndApplyNarrativeRelTags } from './narrative-hooks.js';
@@ -14151,6 +14151,353 @@ RULES:
             }
         });
 
+
+        // ── CYOA Clickable Choice Engine ──────────────────────────────────────────
+        // Scans .mes_text blocks for <button> elements inside <choices> and makes
+        // them send their text content as a user message when clicked.
+        // Replicated from st-clickable-inputs approach — no external extension needed.
+
+        function updateCyoaStyle() {
+            const s = getSettings();
+            if (!s.cyoaConfig) return;
+            const _hex = s.cyoaConfig.buttonColor || '#120a28';
+            const _op  = s.cyoaConfig.buttonOpacity ?? 0.9;
+            const _r = parseInt(_hex.slice(1,3),16), _g = parseInt(_hex.slice(3,5),16), _b = parseInt(_hex.slice(5,7),16);
+            const _bg   = `rgba(${_r},${_g},${_b},${_op})`;
+            const _bgHv = `rgba(${Math.min(_r+40,255)},${Math.min(_g+20,255)},${Math.min(_b+60,255)},${Math.min(_op+0.05,1)})`;
+            const _bgAc = `rgba(${Math.min(_r+60,255)},${Math.min(_g+30,255)},${Math.min(_b+80,255)},${Math.min(_op+0.1,1)})`;
+            
+            const css = `
+                .mes_text button:not([class]),
+                .mes_text button[data-cyoa-bound] {
+                    display: block !important;
+                    width: 100% !important;
+                    text-align: left !important;
+                    -webkit-appearance: none !important;
+                    appearance: none !important;
+                    background-color: ${_bg} !important;
+                    background-image: none !important;
+                    border: 1px solid rgba(120, 80, 220, 0.4) !important;
+                    border-radius: 5px !important;
+                    color: var(--SmartThemeBodyColor, #e8e8e8) !important;
+                    font-size: 0.9em !important;
+                    padding: 6px 10px !important;
+                    margin-bottom: 5px !important;
+                    cursor: pointer !important;
+                    transition: background-color 0.15s, border-color 0.15s, transform 0.1s !important;
+                    line-height: 1.4 !important;
+                    font-family: inherit !important;
+                    box-shadow: none !important;
+                    outline: none !important;
+                }
+                .mes_text button:not([class]):hover,
+                .mes_text button[data-cyoa-bound]:hover {
+                    background-color: ${_bgHv} !important;
+                    border-color: rgba(120, 80, 220, 0.7) !important;
+                    transform: translateX(2px) !important;
+                }
+                .mes_text button:not([class]):active,
+                .mes_text button[data-cyoa-bound]:active {
+                    background-color: ${_bgAc} !important;
+                    transform: translateX(1px) !important;
+                }
+                .mes_text button:not([class]):has-text('[REQ'),
+                .mes_text button[data-cyoa-bound]:has-text('[REQ') {
+                    border-left: 3px solid rgba(255, 180, 60, 0.5) !important;
+                }
+            `;
+            let style = document.getElementById('cyoa-dynamic-style');
+            if (!style) {
+                style = document.createElement('style');
+                style.id = 'cyoa-dynamic-style';
+                document.head.appendChild(style);
+            }
+            style.textContent = css;
+        }
+
+        function cyoaBindChoiceButtons() {
+            const s = getSettings();
+            if (!s.cyoaConfig?.useButtonTags) return;
+            if (!s.syspromptModules?.CYOA_mode) return;
+            document.querySelectorAll('#chat .mes_text').forEach(block => {
+                block.querySelectorAll('button:not([data-cyoa-bound])').forEach(btn => {
+                    btn.setAttribute('data-cyoa-bound', 'true');
+
+                    btn.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const text = btn.textContent.trim();
+                        if (!text) return;
+                        const textarea = document.getElementById('send_textarea');
+                        const sendBtn  = document.getElementById('send_but');
+                        if (!textarea || !sendBtn) return;
+                        textarea.value = text;
+                        textarea.dispatchEvent(new Event('input', { bubbles: true }));
+                        sendBtn.click();
+                    });
+                });
+            });
+        }
+
+
+
+        // Re-bind after every generation
+        eventSource.on(event_types.GENERATION_ENDED,  cyoaBindChoiceButtons);
+        eventSource.on(event_types.GENERATION_STOPPED, cyoaBindChoiceButtons);
+        // Also bind on chat load / message swipe
+        eventSource.on(event_types.CHAT_CHANGED, () => setTimeout(cyoaBindChoiceButtons, 300));
+        if (event_types.MESSAGE_SWIPED) eventSource.on(event_types.MESSAGE_SWIPED, cyoaBindChoiceButtons);
+        // Initial bind for existing chat history
+        setTimeout(cyoaBindChoiceButtons, 500);
+        setTimeout(updateCyoaStyle, 500);
+
+        // ── CYOA Settings Popup ───────────────────────────────────────────────────
+
+        function buildCyoaSlotRow(slot, idx) {
+            const typeOpts = [
+                ['narrative', '🌀 Narrative Decided'],
+                ['normal',    '💬 Normal'],
+                ['trait',     '⚡ Trait/Ability'],
+                ['roll',      '🎲 Roll REQ'],
+                ['prefix',    '🏷️ Prefix'],
+            ].map(([v, l]) => `<option value="${v}"${slot.type === v ? ' selected' : ''}>${l}</option>`).join('');
+
+            const labelVal = slot.label || '';
+            const hasInput = slot.type === 'trait' || slot.type === 'roll' || slot.type === 'prefix';
+            const placeholder = slot.type === 'trait'  ? 'Ability name (e.g. Illithid) — optional'
+                              : slot.type === 'roll'   ? 'Stat (e.g. DEX) — optional, AI picks DC'
+                              : slot.type === 'prefix' ? 'Label (e.g. [Attack] or [Timeskip])'
+                              : '';
+
+            return `<div class="cyoa-slot-row" data-idx="${idx}" style="display:flex;align-items:center;gap:5px;margin-bottom:5px;">
+                <span style="width:20px;text-align:right;font-size:11px;opacity:0.5;flex-shrink:0;">${idx + 1}.</span>
+                <select class="text_pole cyoa-slot-type" style="width:145px;font-size:11px;height:24px;padding:2px 4px;flex-shrink:0;">${typeOpts}</select>
+                <div class="cyoa-slot-input" style="flex:1;display:${hasInput ? 'block' : 'none'}">
+                    <input type="text" class="text_pole cyoa-slot-label" placeholder="${placeholder}" value="${labelVal}" style="width:100%;font-size:11px;height:24px;padding:2px 6px;box-sizing:border-box;" />
+                </div>
+                <button class="cyoa-slot-del" style="background:rgba(200,50,50,0.15);border:1px solid rgba(200,50,50,0.4);border-radius:4px;color:rgba(255,120,120,0.9);font-size:11px;padding:1px 7px;cursor:pointer;flex-shrink:0;" title="Remove slot">×</button>
+            </div>`;
+        }
+
+        function readSlotsFromPopup(container) {
+            return Array.from(container.querySelectorAll('.cyoa-slot-row')).map(row => {
+                const type  = row.querySelector('.cyoa-slot-type').value;
+                const label = row.querySelector('.cyoa-slot-label')?.value?.trim() || '';
+                return { type, ...(label ? { label } : {}) };
+            });
+        }
+
+        function readConfigFromPopup(popupEl) {
+            return {
+                slots:        readSlotsFromPopup(popupEl),
+                useEmojis:    !!popupEl.querySelector('#cyoa-use-emojis')?.checked,
+                useXmlTag:    !!popupEl.querySelector('#cyoa-use-xml')?.checked,
+                useButtonTags: !!popupEl.querySelector('#cyoa-use-buttons')?.checked,
+            };
+        }
+
+        function regeneratePromptPreview(popupEl) {
+            const ta = popupEl.querySelector('#cyoa-prompt-textarea');
+            if (!ta) return;
+            ta.value = buildCyoaPrompt(readConfigFromPopup(popupEl));
+        }
+
+
+        function showCyoaSettingsPopup() {
+            const s = getSettings();
+            if (!s.cyoaConfig) s.cyoaConfig = {};
+            const cfg = s.cyoaConfig;
+
+            const slots = Array.isArray(cfg.slots) && cfg.slots.length ? cfg.slots : DEFAULT_CYOA_SLOTS;
+            const checked = (v) => v !== false ? 'checked' : '';
+            const { Popup, POPUP_TYPE, POPUP_RESULT: PR } = SillyTavern.getContext();
+
+            const initialPrompt = cfg.customPromptText?.trim() || buildCyoaPrompt(cfg);
+
+            const currentSlotsStr = JSON.stringify(slots);
+            const presetMatches = Object.entries(cfg.presets || {}).find(([k, v]) => JSON.stringify(v) === currentSlotsStr);
+            const activePreset = presetMatches ? presetMatches[0] : '';
+
+            const html = `
+            <div style="font-family:inherit;max-width:560px;min-width:380px;">
+                <div style="font-size:15px;font-weight:bold;margin-bottom:12px;color:var(--SmartThemeBodyColor, #eee);">⚙️ CYOA Mode Settings</div>
+
+                <div style="font-size:11px;font-weight:bold;opacity:0.6;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Presets</div>
+                <div style="display:flex;gap:5px;margin-bottom:12px;align-items:center;">
+                    <button id="cyoa-reset-slots" style="background:rgba(200,150,50,0.15);border:1px solid rgba(200,150,50,0.4);border-radius:4px;color:var(--SmartThemeBodyColor,#eee);padding:2px 8px;cursor:pointer;font-size:11px;" title="Reset all slots to default configuration">↺</button>
+                    <select id="cyoa-preset-select" class="text_pole" style="flex:1;font-size:11px;height:24px;">
+                        <option value="">-- Select Preset --</option>
+                        ${Object.keys(cfg.presets || {}).map(k => `<option value="${k}" ${k === activePreset ? 'selected' : ''}>${k}</option>`).join('')}
+                    </select>
+                    <button id="cyoa-preset-save" style="background:rgba(120,80,220,0.15);border:1px solid rgba(120,80,220,0.4);border-radius:4px;color:var(--SmartThemeBodyColor,#eee);padding:2px 8px;cursor:pointer;font-size:11px;" title="Save current slots as preset">💾 Save</button>
+                    <button id="cyoa-preset-del" style="background:rgba(200,50,50,0.15);border:1px solid rgba(200,50,50,0.4);border-radius:4px;color:rgba(255,120,120,0.9);padding:2px 8px;cursor:pointer;font-size:11px;" title="Delete selected preset">🗑️ Del</button>
+                </div>
+
+                <div style="font-size:11px;font-weight:bold;opacity:0.6;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Choice Slots</div>
+                <div id="cyoa-slot-list" style="max-height:230px;overflow-y:auto;padding-right:4px;">
+                    ${slots.map((sl, i) => buildCyoaSlotRow(sl, i)).join('')}
+                </div>
+                <button id="cyoa-add-slot" style="margin-top:6px;width:100%;background:rgba(120,80,220,0.15);border:1px dashed rgba(120,80,220,0.5);border-radius:5px;color:var(--SmartThemeBodyColor,#eee);padding:4px 0;cursor:pointer;font-size:12px;">+ Add Choice</button>
+
+                <div style="margin-top:14px;font-size:11px;font-weight:bold;opacity:0.6;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Format Options</div>
+                <div style="display:flex;flex-direction:column;gap:5px;padding-left:4px;">
+                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;">
+                        <input type="checkbox" id="cyoa-use-emojis" ${checked(cfg.useEmojis)} /> Use fitting emojis
+                    </label>
+                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;">
+                        <input type="checkbox" id="cyoa-use-xml" ${checked(cfg.useXmlTag)} /> Wrap in &lt;choices&gt; XML tag
+                    </label>
+                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;">
+                        <input type="checkbox" id="cyoa-use-buttons" ${checked(cfg.useButtonTags)} /> Wrap each choice in &lt;button&gt; tags (click-to-send)
+                    </label>
+                    <label style="display:flex;align-items:center;gap:8px;font-size:12px;margin-top:2px;">
+                        <span style="opacity:0.8;">Button colour</span>
+                        <input type="color" id="cyoa-btn-color" value="${cfg.buttonColor || '#120a28'}" style="width:32px;height:22px;padding:1px 2px;border-radius:4px;border:1px solid rgba(255,255,255,0.2);background:none;cursor:pointer;" />
+                        <input type="range" id="cyoa-btn-opacity" min="0" max="100" value="${Math.round((cfg.buttonOpacity ?? 0.9) * 100)}" style="flex:1;max-width:90px;accent-color:rgba(120,80,220,0.8);" />
+                        <span id="cyoa-btn-opacity-label" style="font-size:10px;opacity:0.6;min-width:28px;">${Math.round((cfg.buttonOpacity ?? 0.9) * 100)}%</span>
+                        <span id="cyoa-btn-preview" style="display:inline-block;width:24px;height:18px;border-radius:3px;border:1px solid rgba(255,255,255,0.25);background:${cfg.buttonColor || '#120a28'};"></span>
+                    </label>
+                </div>
+
+                <div style="margin-top:14px;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
+                        <span style="font-size:11px;font-weight:bold;opacity:0.6;text-transform:uppercase;letter-spacing:0.05em;">CYOA Prompt</span>
+                        <button id="cyoa-reset-prompt" style="font-size:11px;background:none;border:1px solid rgba(255,255,255,0.2);border-radius:4px;color:inherit;padding:2px 10px;cursor:pointer;opacity:0.7;" title="Regenerate from slots above">↺ Regenerate</button>
+                    </div>
+                    <div style="font-size:10px;opacity:0.5;margin-bottom:5px;">Live preview — edits are saved on Apply. Changing slots/format auto-regenerates.</div>
+                    <textarea id="cyoa-prompt-textarea" class="text_pole" rows="10" style="width:100%;font-size:11px;font-family:monospace;resize:vertical;background:rgba(0,0,0,0.3);box-sizing:border-box;">${initialPrompt}</textarea>
+                </div>
+            </div>`;
+
+            const popup = new Popup(html, POPUP_TYPE.CONFIRM, '', { okButton: 'Apply', cancelButton: 'Cancel' });
+
+            // popup.dlg is the actual <dialog> element — available immediately after construction,
+            // persists on the object even after ST removes the element from the document.
+            const dlg = popup.dlg;
+
+            // Wire up all interactivity directly on dlg — no requestAnimationFrame needed
+            if (dlg) {
+                dlg.addEventListener('change', (e) => {
+                    if (e.target.classList.contains('cyoa-slot-type')) {
+                        const row = e.target.closest('.cyoa-slot-row');
+                        if (!row) return;
+                        const t = e.target.value;
+                        const hasInput = t === 'trait' || t === 'roll' || t === 'prefix';
+                        const inputDiv = row.querySelector('.cyoa-slot-input');
+                        inputDiv.style.display = hasInput ? 'block' : 'none';
+                        const lbl = inputDiv.querySelector('.cyoa-slot-label');
+                        if (lbl) lbl.placeholder = t === 'trait'  ? 'Ability name (e.g. Illithid) — optional'
+                                                 : t === 'roll'   ? 'Stat (e.g. DEX) — optional, AI picks DC'
+                                                 : t === 'prefix' ? 'Label (e.g. [Attack] or [Timeskip])'
+                                                 : '';
+                        regeneratePromptPreview(dlg);
+                    }
+                    if (e.target.matches('#cyoa-use-emojis, #cyoa-use-xml, #cyoa-use-buttons')) {
+                        regeneratePromptPreview(dlg);
+                    }
+                    if (e.target.id === 'cyoa-preset-select') {
+                        const name = e.target.value;
+                        if (!name) return;
+                        const freshS = getSettings();
+                        const pSlots = freshS.cyoaConfig.presets?.[name];
+                        if (!pSlots) return;
+                        const list = dlg.querySelector('#cyoa-slot-list');
+                        list.innerHTML = pSlots.map((sl, i) => buildCyoaSlotRow(sl, i)).join('');
+                        regeneratePromptPreview(dlg);
+                    }
+                });
+
+                dlg.addEventListener('input', (e) => {
+                    if (e.target.classList.contains('cyoa-slot-label')) {
+                        regeneratePromptPreview(dlg);
+                    }
+                    // Live colour preview
+                    if (e.target.id === 'cyoa-btn-color' || e.target.id === 'cyoa-btn-opacity') {
+                        const hex = dlg.querySelector('#cyoa-btn-color')?.value || '#120a28';
+                        const pct = parseInt(dlg.querySelector('#cyoa-btn-opacity')?.value ?? '90');
+                        const label = dlg.querySelector('#cyoa-btn-opacity-label');
+                        const preview = dlg.querySelector('#cyoa-btn-preview');
+                        if (label) label.textContent = pct + '%';
+                        if (preview) preview.style.background = hex + Math.round(pct / 100 * 255).toString(16).padStart(2, '0');
+                    }
+                });
+
+                dlg.addEventListener('click', (e) => {
+                    if (e.target.classList.contains('cyoa-slot-del')) {
+                        const list = dlg.querySelector('#cyoa-slot-list');
+                        if (list.querySelectorAll('.cyoa-slot-row').length <= 1) return;
+                        e.target.closest('.cyoa-slot-row').remove();
+                        list.querySelectorAll('.cyoa-slot-row').forEach((r, i) => {
+                            r.dataset.idx = i;
+                            r.querySelector('span').textContent = `${i + 1}.`;
+                        });
+                        regeneratePromptPreview(dlg);
+                    }
+                    if (e.target.id === 'cyoa-add-slot') {
+                        const list = dlg.querySelector('#cyoa-slot-list');
+                        list.insertAdjacentHTML('beforeend', buildCyoaSlotRow({ type: 'narrative' }, list.querySelectorAll('.cyoa-slot-row').length));
+                        regeneratePromptPreview(dlg);
+                    }
+                    if (e.target.id === 'cyoa-reset-slots') {
+                        if (!confirm('Reset all choice slots to the default configuration?')) return;
+                        const list = dlg.querySelector('#cyoa-slot-list');
+                        list.innerHTML = DEFAULT_CYOA_SLOTS.map((sl, i) => buildCyoaSlotRow(sl, i)).join('');
+                        regeneratePromptPreview(dlg);
+                        const sel = dlg.querySelector('#cyoa-preset-select');
+                        if (sel) sel.value = '';
+                    }
+                    if (e.target.id === 'cyoa-reset-prompt') {
+                        regeneratePromptPreview(dlg);
+                    }
+                    if (e.target.id === 'cyoa-preset-save') {
+                        const name = prompt('Enter a name for this preset:');
+                        if (!name) return;
+                        const freshS = getSettings();
+                        if (!freshS.cyoaConfig.presets) freshS.cyoaConfig.presets = {};
+                        freshS.cyoaConfig.presets[name] = readSlotsFromPopup(dlg);
+                        saveSettings();
+                        toastr.success(`Preset "${name}" saved!`, 'CYOA');
+                        const sel = dlg.querySelector('#cyoa-preset-select');
+                        if (sel) {
+                            sel.innerHTML = '<option value="">-- Select Preset --</option>' + Object.keys(freshS.cyoaConfig.presets).map(k => `<option value="${k}" ${k===name?'selected':''}>${k}</option>`).join('');
+                        }
+                    }
+                    if (e.target.id === 'cyoa-preset-del') {
+                        const sel = dlg.querySelector('#cyoa-preset-select');
+                        const name = sel?.value;
+                        if (!name) return;
+                        if (!confirm(`Delete preset "${name}"?`)) return;
+                        const freshS = getSettings();
+                        if (freshS.cyoaConfig.presets) {
+                            delete freshS.cyoaConfig.presets[name];
+                            saveSettings();
+                            toastr.success(`Preset "${name}" deleted!`, 'CYOA');
+                            sel.innerHTML = '<option value="">-- Select Preset --</option>' + Object.keys(freshS.cyoaConfig.presets).map(k => `<option value="${k}">${k}</option>`).join('');
+                        }
+                    }
+                });
+            }
+
+            popup.show().then((result) => {
+                if (result !== PR.YES && result !== 1) return;
+
+                // dlg is still valid (ST keeps the object alive) — read directly from it
+                const freshS = getSettings();
+                if (!freshS.cyoaConfig) freshS.cyoaConfig = {};
+                freshS.cyoaConfig.slots          = readSlotsFromPopup(dlg);
+                freshS.cyoaConfig.useEmojis      = !!dlg.querySelector('#cyoa-use-emojis')?.checked;
+                freshS.cyoaConfig.useXmlTag      = !!dlg.querySelector('#cyoa-use-xml')?.checked;
+                freshS.cyoaConfig.useButtonTags  = !!dlg.querySelector('#cyoa-use-buttons')?.checked;
+                freshS.cyoaConfig.buttonColor    = dlg.querySelector('#cyoa-btn-color')?.value || '#120a28';
+                freshS.cyoaConfig.buttonOpacity  = (parseInt(dlg.querySelector('#cyoa-btn-opacity')?.value ?? '90') / 100);
+                freshS.cyoaConfig.customPromptText = dlg.querySelector('#cyoa-prompt-textarea')?.value?.trim() || '';
+
+                saveSettings();
+                updateCyoaStyle();
+                scheduleAutoApply();
+            });
+        }
+
         // ── Sysprompt Section Toggles ──
         const _syspromptModDefs = [
             { key: 'loot', id: 'rpg_sysprompt_mod_loot' },
@@ -14192,6 +14539,10 @@ RULES:
         });
         // Disable any toggle whose section is currently unlocked for Game Systems customization.
         syncAllNarratorTogglesForUnlockState();
+
+        // ── CYOA Settings Cog Buttons ──
+        document.getElementById('rpg_cyoa_settings_btn')?.addEventListener('click', () => showCyoaSettingsPopup());
+        document.getElementById('rt_onboarding_cyoa_settings_btn')?.addEventListener('click', () => showCyoaSettingsPopup());
 
         // Deadlines Toggle
         const deadlinesCb = /** @type {HTMLInputElement} */ (document.getElementById('rpg_quests_deadlines'));

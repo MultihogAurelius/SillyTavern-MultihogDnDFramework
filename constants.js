@@ -546,7 +546,19 @@ Typical range 1–5 minor, 5–15 major; 15+ only for life-altering moments.
 </state_memo>
 
 <CYOA_mode>
-Choose your own adventure mode is enabled; suggest numbered courses of action at the end of outputs. Use fitting emojis.
+At end of output, present numbered choices in a <choices> block; wrap each in <button> tags; use fitting emojis.
+Types: Normal=plain action or speech (no tag) · Narrative Decided=pick whichever format fits best · [Trait or Ability]=Trait/Ability · [STAT REQ N]=Roll REQ · [Label] action=Prefix
+<choices>
+<button>1. 🗡️ Choice Text</button>
+<button>2. 🎲 [DEX REQ 14] Choice Text</button>
+<button>3. 🧠 [Illithid] Choice Text</button>
+</choices>
+Generate in order:
+1: [NARRATIVE] — pick whichever format fits best: plain action, [Trait or Ability] tag, or [STAT REQ N]
+2: [NARRATIVE] — pick whichever format fits best: plain action, [Trait or Ability] tag, or [STAT REQ N]
+3: [NORMAL] — plain action or speech, no tags
+4: [TRAIT/ABILITY] — open with a [Trait or Ability] tag (e.g. [Illithid] or [Athletics]), then write the action
+5: [ROLL REQ] — include a [STAT REQ N] tag; pick the stat and DC that fit the scene
 </CYOA_mode>
 
 <constraints>
@@ -787,7 +799,19 @@ Typical range 1–5 minor, 5–15 major; 15+ only for life-altering moments.
 </state_memo>
 
 <CYOA_mode>
-Choose your own adventure mode is enabled; suggest numbered courses of action at the end of outputs. Use fitting emojis.
+At end of output, present numbered choices in a <choices> block; wrap each in <button> tags; use fitting emojis.
+Types: Normal=plain action or speech (no tag) · Narrative Decided=pick whichever format fits best · [Trait or Ability]=Trait/Ability · [STAT REQ N]=Roll REQ · [Label] action=Prefix
+<choices>
+<button>1. 🗡️ Choice Text</button>
+<button>2. 🎲 [DEX REQ 14] Choice Text</button>
+<button>3. 🧠 [Illithid] Choice Text</button>
+</choices>
+Generate in order:
+1: [NARRATIVE] — pick whichever format fits best: plain action, [Trait or Ability] tag, or [STAT REQ N]
+2: [NARRATIVE] — pick whichever format fits best: plain action, [Trait or Ability] tag, or [STAT REQ N]
+3: [NORMAL] — plain action or speech, no tags
+4: [TRAIT/ABILITY] — open with a [Trait or Ability] tag (e.g. [Illithid] or [Athletics]), then write the action
+5: [ROLL REQ] — include a [STAT REQ N] tag; pick the stat and DC that fit the scene
 </CYOA_mode>
 
 <constraints>
@@ -805,6 +829,83 @@ No uses left on a resource/spell/ability/HD → state they can't do that, prompt
 </inventory_and_resource_constraints>
 </constraints>`,
 };
+
+// ── CYOA prompt builder ──────────────────────────────────────────────────────
+
+export const DEFAULT_CYOA_SLOTS = [
+    { type: 'narrative' },
+    { type: 'narrative' },
+    { type: 'normal' },
+    { type: 'trait', label: '' },
+    { type: 'roll', label: '', dc: 14 },
+];
+
+/**
+ * Builds the CYOA_mode inner prompt text from a cyoaConfig object.
+ * Compact format — no redundant type descriptions, just the reference line + format block + slot list.
+ * @param {object} config  settings.cyoaConfig
+ * @returns {string}
+ */
+export function buildCyoaPrompt(config = {}) {
+    const slots = Array.isArray(config.slots) && config.slots.length > 0
+        ? config.slots
+        : DEFAULT_CYOA_SLOTS;
+    const useEmojis    = config.useEmojis    !== false;
+    const useXmlTag    = config.useXmlTag    !== false;
+    const useButtonTags = config.useButtonTags !== false;
+
+    const btn = (s) => useButtonTags ? `<button>${s}</button>` : s;
+
+    const intro = `[END OF OUTPUT REQUIREMENT]
+You MUST ALWAYS end your response with exactly ${slots.length} choices for the user. NEVER forget the choices. This is a strict requirement.
+${useXmlTag ? 'Enclose all choices inside a single <choices> XML block.' : ''}
+${useButtonTags ? 'Wrap every single choice in a <button> tag.' : ''}
+${useEmojis ? 'Prefix each choice text with a fitting emoji.' : ''}`;
+
+    const typeLine = `Choice types available:
+- NORMAL: Plain action/speech (e.g. "Open the door")
+- NARRATIVE: Pick whichever format fits best based on context
+- TRAIT/ABILITY: Prefix with [Trait Name] (e.g. "[Illithid] Read his mind")
+- ROLL REQ: Prefix with [STAT REQ N] where N is difficulty (e.g. "[DEX REQ 14] Dodge the attack")
+- PREFIX: Prefix with a specific bracketed label (e.g. "[Attack] Swing the sword")`;
+
+    const formatBlock = `Example formatting:
+${useXmlTag ? '<choices>\n' : ''}${btn('1. \ud83d\udde1\ufe0f Confront the guard.')}
+${btn('2. \ud83c\udfb2 [DEX REQ 14] Try to sneak past.')}
+${btn('3. \ud83e\udde0 [Illithid] Dominate his mind.')}${useXmlTag ? '\n</choices>' : ''}`;
+
+    const slotLines = slots.map((slot, i) => {
+        const num = i + 1;
+        const e = useEmojis ? '🗺️ ' : ''; // Example emoji placeholder
+        switch (slot.type) {
+            case 'normal':
+                return `${num}. MUST be NORMAL (plain text, no tags).`;
+            case 'roll': {
+                const stat = slot.label?.trim();
+                return stat
+                    ? `${num}. MUST be a ROLL REQ for ${stat}. Format: "${e}[${stat} REQ N] action" (you choose the DC for N).`
+                    : `${num}. MUST be a ROLL REQ. Choose an appropriate stat and DC. Format: "${e}[STAT REQ N] action".`;
+            }
+            case 'trait': {
+                const name = slot.label?.trim();
+                return name
+                    ? `${num}. MUST use TRAIT/ABILITY [${name}]. Format: "${e}[${name}] action text".`
+                    : `${num}. MUST use a relevant TRAIT/ABILITY tag. Format: "${e}[Trait Name] action text".`;
+            }
+            case 'prefix': {
+                const label = slot.label?.trim();
+                return label
+                    ? `${num}. MUST begin with the exact prefix [${label}]. Format: "${e}[${label}] action text".`
+                    : `${num}. MUST begin with a thematic [PREFIX] of your choice. Format: "${e}[Prefix] action text".`;
+            }
+            case 'narrative':
+            default:
+                return `${num}. NARRATIVE (Choose whichever format fits the story best).`;
+        }
+    }).join('\n');
+
+    return `${intro}\n\n${typeLine}\n\n${formatBlock}\n\nSTRICT GENERATION ORDER:\nYou must generate exactly ${slots.length} choices following these exact rules:\n${slotLines}`;
+}
 
 /** Cumulative XP required to reach each level (index 0 = Level 1). */
 export const XP_LEVEL_THRESHOLDS = [0, 300, 900, 2700, 6500, 14000, 23000, 34000, 48000, 64000];

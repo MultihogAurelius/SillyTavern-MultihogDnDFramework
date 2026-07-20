@@ -16,7 +16,7 @@ import { getSettings, getNpcRelationshipMax, buildRelationshipTrackingSysprompt,
 import { sendStateRequest, restoreUserMacro } from './llm-client.js';
 import { escapeHtml } from './memo-processor.js';
 import { refreshOrderList } from './ui-editors.js';
-import { QUESTS_NARRATOR, DEFAULT_STOCK_PROMPTS, resolveTimePromptKey } from './constants.js';
+import { QUESTS_NARRATOR, DEFAULT_STOCK_PROMPTS, resolveTimePromptKey, buildCyoaPrompt } from './constants.js';
 import { getSortableDelay } from '../../../utils.js';
 import { POPUP_RESULT } from '../../../popup.js';
 import { openManageGameCartridges } from './game-cartridges.js';
@@ -395,6 +395,11 @@ export function transformBaseSectionContent(tag, innerContent, settings) {
     const mods = settings.syspromptModules || {};
     const d100Mode = !!settings.diceD100Mode;
 
+    if (tag === 'CYOA_mode') {
+        const cfg = settings.cyoaConfig || {};
+        const promptText = cfg.customPromptText?.trim() || buildCyoaPrompt(cfg);
+        return `<CYOA_mode>\n${promptText}\n</CYOA_mode>`;
+    }
     if (tag === 'random_events' && !(settings.rngEnabled && settings.diceFunctionTool)) {
         innerContent = innerContent.replace(/\s*Batch both RollTheDice calls together;[^.]*\./g, '');
     }
