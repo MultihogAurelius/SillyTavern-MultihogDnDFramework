@@ -15125,7 +15125,10 @@ RULES:
                 <div style="display:flex;flex-direction:column;gap:8px;min-width:360px;">
                     <div style="font-size:12px;opacity:0.75;">This exports the selected preset, “${escapeCyoaPresetHtml(presetName)}”. Share the JSON or import it on another installation.</div>
                     <textarea id="cyoa-preset-export-json" readonly rows="12" class="text_pole" style="font-family:monospace;font-size:11px;resize:vertical;width:100%;">${escapedJson}</textarea>
-                    <button id="cyoa-preset-export-copy" class="menu_button interactable" style="width:100%;"><i class="fa-solid fa-copy"></i> Copy to Clipboard</button>
+                    <div style="display:flex;gap:8px;">
+                        <button id="cyoa-preset-export-copy" class="menu_button interactable" style="flex:1;"><i class="fa-solid fa-copy"></i> Copy to Clipboard</button>
+                        <button id="cyoa-preset-export-download" class="menu_button interactable" style="flex:1;"><i class="fa-solid fa-file-download"></i> Export .json</button>
+                    </div>
                 </div>`, { okButton: 'Done', cancelButton: false });
             setTimeout(() => {
                 document.getElementById('cyoa-preset-export-copy')?.addEventListener('click', async () => {
@@ -15136,6 +15139,18 @@ RULES:
                         console.error('[RPG Tracker] CYOA preset clipboard copy failed:', err);
                         toastr.error('Could not copy automatically. Please select the text manually.', 'CYOA');
                     }
+                });
+                document.getElementById('cyoa-preset-export-download')?.addEventListener('click', () => {
+                    const blob = new Blob([json], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    const safeName = presetName.toLowerCase().trim().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'preset';
+                    link.href = url;
+                    link.download = `multihog_cyoa_preset_${safeName}.json`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(url);
                 });
             }, 50);
         }
