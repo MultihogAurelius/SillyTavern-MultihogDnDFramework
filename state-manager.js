@@ -873,6 +873,8 @@ You may be asked to use Markers: ((PLS)), ((B)), ((XB)), ((BDG)), ((HGT)). These
         chatLinkEnabled: true,
         chatStates: {},
         quests: [],
+        /** Narrator <narrative> pacing mode: normal | high_agency | downtime. */
+        narrativePacing: 'normal',
         syspromptModules: {
             loot: true,
             random_events: true,
@@ -1490,6 +1492,7 @@ const CARTRIDGE_PAYLOAD_KEYS = [
     'customSyspromptLibrary',
     'syspromptSectionOrder',
     'syspromptModules',
+    'narrativePacing',
     'npcRelationshipBars',
     'rngEnabled',
     'diceFunctionTool',
@@ -1553,7 +1556,7 @@ export const CARTRIDGE_PAYLOAD_GROUPS = [
         description: 'Extractor prompt, module toggles, block order, stock prompts, RNG & time-format flags',
         keys: [
             'systemPromptTemplate', 'modules', 'blockOrder', 'stockPrompts',
-            'syspromptModules', 'syspromptSectionOrder', 'customSyspromptLibrary',
+            'syspromptModules', 'narrativePacing', 'syspromptSectionOrder', 'customSyspromptLibrary',
             'rngEnabled', 'diceFunctionTool', 'diceD100Mode',
             'rngToolD20', 'rngToolD100', 'rngQueueD20', 'rngQueueD100',
             'use24hTime', 'useDdMmYyFormat',
@@ -2520,6 +2523,7 @@ export function writeModuleSchemaBackup(chatId) {
             // stock prompts / narrator toggles self-heal on the next boot.
             stockPrompts: JSON.parse(JSON.stringify(s.stockPrompts || {})),
             syspromptModules: JSON.parse(JSON.stringify(s.syspromptModules || {})),
+            narrativePacing: s.narrativePacing || 'normal',
         };
         localStorage.setItem(MODULE_SCHEMA_BACKUP_KEY, JSON.stringify(payload));
     } catch (err) {
@@ -2552,10 +2556,13 @@ export function applyModuleSchemaBackup(preferredChatId) {
         const backupStockPrompts = JSON.stringify(backup.stockPrompts || {});
         const liveSyspromptModules = JSON.stringify(s.syspromptModules || {});
         const backupSyspromptModules = JSON.stringify(backup.syspromptModules || {});
+        const liveNarrativePacing = s.narrativePacing || 'normal';
+        const backupNarrativePacing = backup.narrativePacing || 'normal';
         const alreadyMatched = liveTags === backupTags && liveOrder === backupOrder
             && (!backup.chatId || partTags === backupTags)
             && (!backup.stockPrompts || liveStockPrompts === backupStockPrompts)
-            && (!backup.syspromptModules || liveSyspromptModules === backupSyspromptModules);
+            && (!backup.syspromptModules || liveSyspromptModules === backupSyspromptModules)
+            && liveNarrativePacing === backupNarrativePacing;
         if (alreadyMatched) return false;
 
         // Always restore live schema from the last known-good in-memory snapshot.
@@ -2572,6 +2579,7 @@ export function applyModuleSchemaBackup(preferredChatId) {
         if (backup.syspromptModules && typeof backup.syspromptModules === 'object') {
             s.syspromptModules = { ...s.syspromptModules, ...JSON.parse(JSON.stringify(backup.syspromptModules)) };
         }
+        s.narrativePacing = backupNarrativePacing;
 
         if (backup.chatId) {
             if (!s.chatStates) s.chatStates = {};
@@ -2689,10 +2697,16 @@ export function saveChatState(chatId, opts = {}) {
     }
     const s = getSettings();
     if (!s.chatStates) s.chatStates = {};
+    // This stamp belongs to the specific chat snapshot. The top-level timestamp is
+    // shared by every chat, so it cannot safely decide whether this chat's disk memo
+    // is newer than a browser-local recovery snapshot.
+    const memoPersistedAt = Date.now();
+    s.memoPersistedAt = memoPersistedAt;
     // Preserve fields that are written outside the normal save cycle (e.g. campaignBooks)
     const existing = s.chatStates[chatId] || {};
     s.chatStates[chatId] = {
         currentMemo:  s.currentMemo,
+        memoPersistedAt,
         memoHistory:  JSON.parse(JSON.stringify(s.memoHistory)),
         lastDelta:    s.lastDelta || '',
         customPortraits: JSON.parse(JSON.stringify(s.customPortraits || {})),

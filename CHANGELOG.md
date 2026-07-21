@@ -2,6 +2,14 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [5.9.97] - 2026-07-21
+
+### Added
+- **Narrative pacing**: Narrator Configuration now offers exclusive Normal, High-Agency, and Downtime/Slice of Life modes, each generating its corresponding `<narrative>` instruction block. Includes an in-app explanation dialog.
+
+### Fixed
+- **Memo recovery**: recovery timestamps are now stored per chat, preventing a newer save for one chat from suppressing recovery for another. The recovery dialog now displays the same chat-specific timestamp it uses for its decision.
+
 ## [5.9.95] - 2026-07-21
 
 ### Changed

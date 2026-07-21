@@ -184,13 +184,15 @@ async function checkLocalMemoRecovery(chatId) {
             return;
         }
 
-        // Cross-browser / cross-device case: another session already wrote a memo to the
-        // shared disk settings.json that is as new as or newer than what THIS browser last
-        // saw live (e.g. played on Chrome, then opened Firefox/mobile). That's normal
-        // syncing, not a lost save from THIS browser — do not offer to overwrite it with
-        // our older local copy. Only prompt when the local backup is actually ahead of the
-        // last known-good disk write (the real "reload aborted the save" case).
-        const diskStamp = Number(s.memoPersistedAt) || 0;
+        // Cross-browser / cross-device case: another session already wrote THIS chat's
+        // memo to disk after this browser last saw it live. That is normal syncing, not a
+        // lost save from this browser — do not offer to overwrite it with an older local
+        // copy. Chat-linked state must use its own stamp here: the top-level stamp is
+        // shared by every chat and can have been advanced by an unrelated chat.
+        const diskChatState = s.chatStates?.[chatId];
+        const diskStamp = diskChatState
+            ? (Number(diskChatState.memoPersistedAt) || 0)
+            : (Number(s.memoPersistedAt) || 0);
         const localStamp = Number(entry.ts) || 0;
         if (diskStamp > 0 && diskStamp >= localStamp) {
             console.warn('[RPG Tracker] Memo recovery skipped: disk memo is same age or newer than local backup', {
@@ -213,7 +215,10 @@ async function checkLocalMemoRecovery(chatId) {
         prompted = true;
         _rtRecoveryPromptActive = true;
         const localWhen = formatRecoveryTimestamp(entry.ts);
-        const diskWhen = formatRecoveryTimestamp(s.memoPersistedAt);
+        const diskWhen = formatRecoveryTimestamp(diskStamp);
+        const diskLabel = diskStamp > 0
+            ? 'Disk version (this chat)'
+            : 'Disk version (this chat; no saved timestamp)';
         const explainerText = diskStamp > 0
             ? `This browser has a newer local copy of the STATE MEMO for this chat than what's currently on disk. This can happen if the page reloaded before SillyTavern finished writing settings.json.`
             : `This browser has a local copy of the STATE MEMO for this chat that differs from what's currently on disk, and disk has no save timestamp to compare against. This can happen if the page reloaded before SillyTavern finished writing settings.json.`;
@@ -223,7 +228,7 @@ async function checkLocalMemoRecovery(chatId) {
             <p style="margin:10px 0; padding:8px 10px; background:rgba(255,255,255,0.05); border-radius:6px; font-size:0.95em;">
                 <b>Local backup</b> (this browser)<br>
                 ${entry.currentMemo.length.toLocaleString()} chars · ${escapeHtml(localWhen)}<br><br>
-                <b>Disk version</b> (settings.json)<br>
+                <b>${diskLabel}</b><br>
                 ${diskMemo.length.toLocaleString()} chars · ${escapeHtml(diskWhen)}
             </p>
             <p style="margin-top:10px; padding:8px 10px; border-left:3px solid #f0ad4e; background:rgba(240,173,78,0.12); border-radius:4px;">
@@ -2962,6 +2967,22 @@ async function showRngExplanation() {
 /**
  * Renders and shows the Quests Hardcore systems explanation popup.
  */
+async function showNarrativePacingExplanation() {
+    const { Popup } = SillyTavern.getContext();
+    const card = (title, body) => `
+            <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 12px 14px; margin-bottom: 12px; text-align: left;">
+                <div style="font-size: 1em; font-weight: bold; margin-bottom: 6px;">${title}</div>
+                <div style="font-size: 0.9em; line-height: 1.5; opacity: 0.88;">${body}</div>
+            </div>`;
+    const popupBody = `
+            <div style="font-size: 0.9em; line-height: 1.5; max-width: 480px; text-align: left;">
+                ${card('Normal', 'Balanced narration. The narrator may lightly paraphrase or expand your dialogue and actions when it fits your character.')}
+                ${card('High-Agency Mode', 'Keeps outputs short to moderate in length, leaving more room for you to respond and direct the scene.')}
+                ${card('Downtime/Slice of Life Mode', 'Uses a relaxed pace and avoids forcing action-heavy or “save the world” plots. Best for everyday life, character moments, and low-stakes roleplay.')}
+            </div>`;
+    await Popup.show.confirm('Narrative Pacing Explained', popupBody, RT_HELP_POPUP_OPTS);
+}
+
 async function showQuestsHardcoreExplanation() {
     const { Popup } = SillyTavern.getContext();
     const card = (icon, title, body, sub = false) => `
@@ -12628,6 +12649,10 @@ async function runPortraitMigrationIfNeeded() {
             e.stopPropagation();
             showRngExplanation();
         });
+        $('.rt-narrative-pacing-help').on('click', (e) => {
+            e.stopPropagation();
+            showNarrativePacingExplanation();
+        });
 
         $('#rpg_tracker_router_docs_btn').on('click', (e) => {
             e.stopPropagation();
@@ -15295,6 +15320,24 @@ RULES:
                 $('#rpg_quests_options').toggle(val);
             }
         });
+
+        // ── Narrative pacing ──────────────────────────────────────────────────
+        const validNarrativePacing = new Set(['normal', 'high_agency', 'downtime']);
+        const syncNarrativePacingUi = () => {
+            const mode = validNarrativePacing.has(getSettings().narrativePacing)
+                ? getSettings().narrativePacing
+                : 'normal';
+            $(`input[name="rpg_narrative_pacing"][value="${mode}"]`).prop('checked', true);
+        };
+        syncNarrativePacingUi();
+        $('input[name="rpg_narrative_pacing"]').on('change', function () {
+            const mode = String($(this).val());
+            if (!validNarrativePacing.has(mode)) return;
+            getSettings().narrativePacing = mode;
+            saveSettings();
+            scheduleAutoApply();
+            refreshRenderedView();
+        });
         // Disable any toggle whose section is currently unlocked for Game Systems customization.
         syncAllNarratorTogglesForUnlockState();
 
@@ -16815,6 +16858,10 @@ RULES:
             }
             $(`input[name="rpg_sysprompt_rng_mode"][value="${currentRngMode}"]`).prop('checked', true);
             syncRngToolsUi(s);
+            const narrativePacing = ['normal', 'high_agency', 'downtime'].includes(s.narrativePacing)
+                ? s.narrativePacing
+                : 'normal';
+            $(`input[name="rpg_narrative_pacing"][value="${narrativePacing}"]`).prop('checked', true);
 
             // General toggles
             $('#rpg_tracker_enabled').prop('checked', !!s.enabled);
