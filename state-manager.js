@@ -1492,6 +1492,7 @@ const CARTRIDGE_PAYLOAD_KEYS = [
     'customSyspromptLibrary',
     'syspromptSectionOrder',
     'syspromptModules',
+    'cyoaConfig',
     'narrativePacing',
     'npcRelationshipBars',
     'rngEnabled',
@@ -1561,6 +1562,12 @@ export const CARTRIDGE_PAYLOAD_GROUPS = [
             'rngToolD20', 'rngToolD100', 'rngQueueD20', 'rngQueueD100',
             'use24hTime', 'useDdMmYyFormat',
         ],
+    },
+    {
+        id: 'cyoa',
+        label: 'CYOA Mode',
+        description: 'Choice-slot setup, custom prompt, button appearance, and saved CYOA presets',
+        keys: ['cyoaConfig'],
     },
     {
         id: 'gameSystems',

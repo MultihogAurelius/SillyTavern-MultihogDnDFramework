@@ -3638,6 +3638,18 @@ export function bindRenderedCardEvents(el, memo, isDetachedContext = false, onRe
         });
     });
 
+    // The onboarding panel is rendered dynamically, after the static settings
+    // controls have been bound. Route its CYOA cog through the popup hook instead.
+    const onboardingCyoaSettingsBtn = el.querySelector('#rt_onboarding_cyoa_settings_btn');
+    if (onboardingCyoaSettingsBtn && !onboardingCyoaSettingsBtn._bound) {
+        onboardingCyoaSettingsBtn._bound = true;
+        onboardingCyoaSettingsBtn.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            globalThis._rpgOpenCyoaSettings?.();
+        });
+    }
+
     // Genre tab toggle listener & persistent preference save
     const genreSelect = el.querySelector('#rt-onboarding-genre');
     const genreGroups = {
@@ -14968,6 +14980,20 @@ RULES:
 
         // ── CYOA Settings Popup ───────────────────────────────────────────────────
 
+        function escapeCyoaSlotAttribute(value) {
+            return String(value || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+
+        function buildCyoaSlotInput(type, slot = {}) {
+            if (type === 'custom') {
+                const text = slot.text || [slot.left, slot.right].filter(Boolean).join(' ');
+                return `<input type="text" class="text_pole cyoa-slot-custom-text" placeholder="Entire choice text…" value="${escapeCyoaSlotAttribute(text)}" style="width:100%;font-size:11px;height:24px;padding:2px 6px;box-sizing:border-box;" />`;
+            }
+            const placeholder = type === 'trait' ? 'Ability name (e.g. Illithid) — optional'
+                : type === 'prefix' ? 'Label (e.g. [Attack] or [Timeskip])' : '';
+            return `<input type="text" class="text_pole cyoa-slot-label" placeholder="${placeholder}" value="${escapeCyoaSlotAttribute(slot.label)}" style="width:100%;font-size:11px;height:24px;padding:2px 6px;box-sizing:border-box;" />`;
+        }
+
         function buildCyoaSlotRow(slot, idx) {
             const slotType = slot.type === 'roll' ? 'narrative' : slot.type;
             const typeOpts = [
@@ -14975,19 +15001,16 @@ RULES:
                 ['normal',    '💬 Normal'],
                 ['trait',     '⚡ Trait/Ability'],
                 ['prefix',    '🏷️ Prefix'],
+                ['custom',    'User-defined'],
             ].map(([v, l]) => `<option value="${v}"${slotType === v ? ' selected' : ''}>${l}</option>`).join('');
 
-            const labelVal = slot.label || '';
-            const hasInput = slotType === 'trait' || slotType === 'prefix';
-            const placeholder = slotType === 'trait'  ? 'Ability name (e.g. Illithid) — optional'
-                              : slotType === 'prefix' ? 'Label (e.g. [Attack] or [Timeskip])'
-                              : '';
+            const hasInput = slotType === 'trait' || slotType === 'prefix' || slotType === 'custom';
 
             return `<div class="cyoa-slot-row" data-idx="${idx}" style="display:flex;align-items:center;gap:5px;margin-bottom:5px;">
                 <span style="width:20px;text-align:right;font-size:11px;opacity:0.5;flex-shrink:0;">${idx + 1}.</span>
                 <select class="text_pole cyoa-slot-type" style="width:145px;font-size:11px;height:24px;padding:2px 4px;flex-shrink:0;">${typeOpts}</select>
                 <div class="cyoa-slot-input" style="flex:1;display:${hasInput ? 'block' : 'none'}">
-                    <input type="text" class="text_pole cyoa-slot-label" placeholder="${placeholder}" value="${labelVal}" style="width:100%;font-size:11px;height:24px;padding:2px 6px;box-sizing:border-box;" />
+                    ${buildCyoaSlotInput(slotType, slot)}
                 </div>
                 <button class="cyoa-slot-del" style="background:rgba(200,50,50,0.15);border:1px solid rgba(200,50,50,0.4);border-radius:4px;color:rgba(255,120,120,0.9);font-size:11px;padding:1px 7px;cursor:pointer;flex-shrink:0;" title="Remove slot">×</button>
             </div>`;
@@ -14997,6 +15020,10 @@ RULES:
             return Array.from(container.querySelectorAll('.cyoa-slot-row')).map(row => {
                 let type  = row.querySelector('.cyoa-slot-type').value;
                 if (type === 'roll') type = 'narrative';
+                if (type === 'custom') {
+                    const text = row.querySelector('.cyoa-slot-custom-text')?.value?.trim() || '';
+                    return { type, ...(text ? { text } : {}) };
+                }
                 const label = row.querySelector('.cyoa-slot-label')?.value?.trim() || '';
                 return { type, ...(label ? { label } : {}) };
             });
@@ -15062,6 +15089,95 @@ RULES:
             if (swatch) swatch.style.background = hex + Math.round(pct / 100 * 255).toString(16).padStart(2, '0');
         }
 
+        const CYOA_PRESET_EXPORT_FORMAT = 'multihog-cyoa-preset';
+
+        function escapeCyoaPresetHtml(value) {
+            return String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        function refreshCyoaPresetSelect(dlg, selectedName = '') {
+            const select = dlg?.querySelector('#cyoa-preset-select');
+            if (!select) return;
+            const presets = getSettings().cyoaConfig?.presets || {};
+            select.innerHTML = '<option value="">-- Select Preset --</option>'
+                + Object.keys(presets).map(name => `<option value="${escapeCyoaPresetHtml(name)}" ${name === selectedName ? 'selected' : ''}>${escapeCyoaPresetHtml(name)}</option>`).join('');
+        }
+
+        function showCyoaPresetExportPopup(presetName, visibleSlots = null) {
+            const presets = getSettings().cyoaConfig?.presets || {};
+            // Export the rows currently visible in the editor. This includes unsaved
+            // Prefix/Trait text, rather than exporting an older stored snapshot.
+            const slots = Array.isArray(visibleSlots) ? visibleSlots : presets[presetName];
+            if (!presetName || !Array.isArray(slots)) {
+                toastr.warning('Select a preset to export first.', 'CYOA');
+                return;
+            }
+            const json = JSON.stringify({
+                format: CYOA_PRESET_EXPORT_FORMAT,
+                version: 1,
+                exportedAt: new Date().toISOString(),
+                name: presetName,
+                slots,
+            }, null, 2);
+            const escapedJson = escapeCyoaPresetHtml(json);
+            const { Popup } = SillyTavern.getContext();
+            Popup.show.confirm('📤 Export CYOA Presets', `
+                <div style="display:flex;flex-direction:column;gap:8px;min-width:360px;">
+                    <div style="font-size:12px;opacity:0.75;">This exports the selected preset, “${escapeCyoaPresetHtml(presetName)}”. Share the JSON or import it on another installation.</div>
+                    <textarea id="cyoa-preset-export-json" readonly rows="12" class="text_pole" style="font-family:monospace;font-size:11px;resize:vertical;width:100%;">${escapedJson}</textarea>
+                    <button id="cyoa-preset-export-copy" class="menu_button interactable" style="width:100%;"><i class="fa-solid fa-copy"></i> Copy to Clipboard</button>
+                </div>`, { okButton: 'Done', cancelButton: false });
+            setTimeout(() => {
+                document.getElementById('cyoa-preset-export-copy')?.addEventListener('click', async () => {
+                    try {
+                        await navigator.clipboard.writeText(json);
+                        toastr.success(`CYOA preset "${presetName}" copied to clipboard!`, 'CYOA');
+                    } catch (err) {
+                        console.error('[RPG Tracker] CYOA preset clipboard copy failed:', err);
+                        toastr.error('Could not copy automatically. Please select the text manually.', 'CYOA');
+                    }
+                });
+            }, 50);
+        }
+
+        async function importCyoaPresets() {
+            const { Popup } = SillyTavern.getContext();
+            let value = '';
+            const content = `
+                <div style="display:flex;flex-direction:column;gap:8px;min-width:360px;">
+                    <div style="font-size:12px;opacity:0.75;">Paste one exported CYOA preset. It will be added without overwriting an existing preset.</div>
+                    <textarea id="cyoa-preset-import-json" rows="12" class="text_pole" style="font-family:monospace;font-size:11px;resize:vertical;width:100%;" placeholder='{"format":"multihog-cyoa-preset", ...}'></textarea>
+                </div>`;
+            setTimeout(() => {
+                document.getElementById('cyoa-preset-import-json')?.addEventListener('input', (event) => { value = event.target.value; });
+            }, 50);
+            const result = await Popup.show.confirm('📥 Import CYOA Presets', content, { okButton: 'Import', cancelButton: 'Cancel' });
+            if (!result || !value.trim()) return null;
+
+            let parsed;
+            try { parsed = JSON.parse(value); } catch (_) {
+                toastr.error('Could not parse that as JSON.', 'CYOA');
+                return null;
+            }
+            if (parsed?.format !== CYOA_PRESET_EXPORT_FORMAT || typeof parsed.name !== 'string' || !Array.isArray(parsed.slots)) {
+                toastr.error('That is not a recognized CYOA preset export.', 'CYOA');
+                return null;
+            }
+
+            const config = getSettings().cyoaConfig || (getSettings().cyoaConfig = {});
+            if (!config.presets || typeof config.presets !== 'object') config.presets = {};
+            const baseName = parsed.name.trim().slice(0, 100) || 'Imported Preset';
+            let name = baseName;
+            let suffix = 2;
+            while (Object.prototype.hasOwnProperty.call(config.presets, name)) name = `${baseName} (${suffix++})`;
+            // Keep the full slot object intact: label and custom text are part of
+            // the preset's definition and must round-trip exactly through export/import.
+            config.presets[name] = parsed.slots.map(slot => slot?.type === 'roll' ? { ...slot, type: 'narrative' } : { ...slot });
+            saveSettings();
+            toastr.success(`CYOA preset "${name}" imported!`, 'CYOA');
+            return { name, slots: config.presets[name] };
+        }
+
         function showCyoaSettingsPopup() {
             const s = getSettings();
             if (!s.cyoaConfig) s.cyoaConfig = {};
@@ -15095,7 +15211,10 @@ RULES:
                         <option value="">-- Select Preset --</option>
                         ${Object.keys(cfg.presets || {}).map(k => `<option value="${k}" ${k === activePreset ? 'selected' : ''}>${k}</option>`).join('')}
                     </select>
-                    <button id="cyoa-preset-save" style="background:rgba(120,80,220,0.15);border:1px solid rgba(120,80,220,0.4);border-radius:4px;color:var(--SmartThemeBodyColor,#eee);padding:2px 8px;cursor:pointer;font-size:11px;" title="Save current slots as preset">💾 Save</button>
+                    <button id="cyoa-preset-save" style="background:rgba(120,80,220,0.15);border:1px solid rgba(120,80,220,0.4);border-radius:4px;color:var(--SmartThemeBodyColor,#eee);padding:2px 8px;cursor:pointer;font-size:11px;" title="Save over the selected preset">💾 Save</button>
+                    <button id="cyoa-preset-save-as" style="background:rgba(120,80,220,0.15);border:1px solid rgba(120,80,220,0.4);border-radius:4px;color:var(--SmartThemeBodyColor,#eee);padding:2px 8px;cursor:pointer;font-size:11px;" title="Save current slots as a new preset">Save As…</button>
+                    <button id="cyoa-preset-export" style="background:rgba(70,150,220,0.15);border:1px solid rgba(70,150,220,0.4);border-radius:4px;color:var(--SmartThemeBodyColor,#eee);padding:2px 8px;cursor:pointer;font-size:11px;" title="Export selected CYOA preset">📤</button>
+                    <button id="cyoa-preset-import" style="background:rgba(70,150,220,0.15);border:1px solid rgba(70,150,220,0.4);border-radius:4px;color:var(--SmartThemeBodyColor,#eee);padding:2px 8px;cursor:pointer;font-size:11px;" title="Import one CYOA preset">📥</button>
                     <button id="cyoa-preset-del" style="background:rgba(200,50,50,0.15);border:1px solid rgba(200,50,50,0.4);border-radius:4px;color:rgba(255,120,120,0.9);padding:2px 8px;cursor:pointer;font-size:11px;" title="Delete selected preset">🗑️ Del</button>
                 </div>
 
@@ -15186,13 +15305,10 @@ RULES:
                         const row = e.target.closest('.cyoa-slot-row');
                         if (!row) return;
                         const t = e.target.value;
-                        const hasInput = t === 'trait' || t === 'prefix';
+                        const hasInput = t === 'trait' || t === 'prefix' || t === 'custom';
                         const inputDiv = row.querySelector('.cyoa-slot-input');
                         inputDiv.style.display = hasInput ? 'block' : 'none';
-                        const lbl = inputDiv.querySelector('.cyoa-slot-label');
-                        if (lbl) lbl.placeholder = t === 'trait'  ? 'Ability name (e.g. Illithid) — optional'
-                                                 : t === 'prefix' ? 'Label (e.g. [Attack] or [Timeskip])'
-                                                 : '';
+                        if (hasInput) inputDiv.innerHTML = buildCyoaSlotInput(t);
                         regeneratePromptPreview(dlg);
                     }
                     if (e.target.id === 'cyoa-text-theme') {
@@ -15231,7 +15347,8 @@ RULES:
                 });
 
                 dlg.addEventListener('input', (e) => {
-                    if (e.target.classList.contains('cyoa-slot-label')) {
+                    if (e.target.classList.contains('cyoa-slot-label')
+                        || e.target.classList.contains('cyoa-slot-custom-text')) {
                         regeneratePromptPreview(dlg);
                     }
                     // Live colour preview
@@ -15300,17 +15417,43 @@ RULES:
                         regeneratePromptPreview(dlg);
                     }
                     if (e.target.id === 'cyoa-preset-save') {
-                        const name = prompt('Enter a name for this preset:');
-                        if (!name) return;
+                        const name = dlg.querySelector('#cyoa-preset-select')?.value;
+                        if (!name) {
+                            toastr.warning('Select a preset to save, or use Save As… to create one.', 'CYOA');
+                            return;
+                        }
                         const freshS = getSettings();
                         if (!freshS.cyoaConfig.presets) freshS.cyoaConfig.presets = {};
                         freshS.cyoaConfig.presets[name] = readSlotsFromPopup(dlg);
                         saveSettings();
+                        toastr.success(`Preset "${name}" updated!`, 'CYOA');
+                        refreshCyoaPresetSelect(dlg, name);
+                    }
+                    if (e.target.id === 'cyoa-preset-save-as') {
+                        const name = prompt('Enter a name for this preset:')?.trim();
+                        if (!name) return;
+                        const freshS = getSettings();
+                        if (!freshS.cyoaConfig.presets) freshS.cyoaConfig.presets = {};
+                        if (freshS.cyoaConfig.presets[name] && !confirm(`Overwrite preset "${name}"?`)) return;
+                        freshS.cyoaConfig.presets[name] = readSlotsFromPopup(dlg);
+                        saveSettings();
                         toastr.success(`Preset "${name}" saved!`, 'CYOA');
-                        const sel = dlg.querySelector('#cyoa-preset-select');
-                        if (sel) {
-                            sel.innerHTML = '<option value="">-- Select Preset --</option>' + Object.keys(freshS.cyoaConfig.presets).map(k => `<option value="${k}" ${k===name?'selected':''}>${k}</option>`).join('');
-                        }
+                        refreshCyoaPresetSelect(dlg, name);
+                    }
+                    if (e.target.id === 'cyoa-preset-export') {
+                        showCyoaPresetExportPopup(
+                            dlg.querySelector('#cyoa-preset-select')?.value,
+                            readSlotsFromPopup(dlg),
+                        );
+                    }
+                    if (e.target.id === 'cyoa-preset-import') {
+                        void importCyoaPresets().then((imported) => {
+                            if (!imported) return;
+                            refreshCyoaPresetSelect(dlg, imported.name);
+                            const list = dlg.querySelector('#cyoa-slot-list');
+                            if (list) list.innerHTML = imported.slots.map((slot, index) => buildCyoaSlotRow(slot, index)).join('');
+                            regeneratePromptPreview(dlg);
+                        });
                     }
                     if (e.target.id === 'cyoa-preset-del') {
                         const sel = dlg.querySelector('#cyoa-preset-select');
@@ -15417,6 +15560,7 @@ RULES:
         syncAllNarratorTogglesForUnlockState();
 
         // ── CYOA Settings Cog Buttons ──
+        globalThis._rpgOpenCyoaSettings = showCyoaSettingsPopup;
         document.getElementById('rpg_cyoa_settings_btn')?.addEventListener('click', () => showCyoaSettingsPopup());
         document.getElementById('rt_onboarding_cyoa_settings_btn')?.addEventListener('click', () => showCyoaSettingsPopup());
 
@@ -17043,6 +17187,9 @@ RULES:
             if (typeof globalThis._rpgRenderAgentCustomTags === 'function') {
                 globalThis._rpgRenderAgentCustomTags();
             }
+            // Cartridges can replace the CYOA setup, including its visual theme.
+            // Rebuild the live style block so loaded button colours apply immediately.
+            updateCyoaStyle();
         }
         globalThis._rpgSyncSettingsUi = syncSettingsUi;
 

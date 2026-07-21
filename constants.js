@@ -955,7 +955,8 @@ export function buildCyoaPrompt(config = {}) {
 - NORMAL: Plain action/speech (e.g. "Open the door")
 - NARRATIVE-DECIDED: Pick whichever format fits best based on context
 - TRAIT/ABILITY: Prefix with [Trait Name] (e.g. "[Illithid] Read his mind")
-- PREFIX: Prefix with a specific bracketed label (e.g. "[Attack] Swing the sword")`;
+- PREFIX: Prefix with a specific bracketed label (e.g. "[Attack] Swing the sword")
+- USER-DEFINED: Use the exact complete choice text specified for that choice`;
 
     // Style examples stay rich on purpose; counts may differ from STRICT GENERATION ORDER.
     const examples = `EXAMPLES:
@@ -999,6 +1000,11 @@ ${wrapBlock([
                 return label
                     ? `${num}. MUST begin with the exact prefix [${label}].`
                     : `${num}. MUST begin with a thematic [PREFIX] of your choice.`;
+            }
+            case 'custom': {
+                const text = slot.text?.trim() || [slot.left, slot.right].filter(Boolean).join(' ').trim();
+                if (text) return `${num}. MUST be ${JSON.stringify(text)}.`;
+                return `${num}. USER-DEFINED (no custom text entered; choose an appropriate format).`;
             }
             case 'narrative':
             default:

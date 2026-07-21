@@ -2,6 +2,19 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [6.0.15] - 2026-07-21
+
+### Added
+- **CYOA Game Cartridge support**: cartridges can now save and selectively load the complete CYOA setup, including its prompt, appearance, slots, and saved presets.
+- **Individual CYOA preset sharing**: export and import one selected preset at a time. Imported presets immediately load into the editor with their type settings and text intact.
+- **User-defined CYOA choices**: a choice slot can now specify its complete freeform line.
+
+### Changed
+- **CYOA presets**: split Save into Save (update selected preset) and Save As… (create or deliberately overwrite a named preset).
+
+### Fixed
+- **Startup CYOA settings cog**: now opens the CYOA settings popup from the dynamically rendered Narrator Configuration drawer.
+
 ## [6.0.1] - 2026-07-21
 
 ### Added
