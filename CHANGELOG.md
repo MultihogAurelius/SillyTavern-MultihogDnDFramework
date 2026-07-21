@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [5.9.95] - 2026-07-21
+
+### Changed
+- **First-turn status footer reminder**: now respects System Prompt Control Room — if `<end_of_output_footer>` is disabled, nothing is injected. When enabled, injects only the live section's format (the part after "with"), including unlocked overrides and Main-prompt transforms.
+
 ## [5.9.32] - 2026-07-21
 
 ### Fixed

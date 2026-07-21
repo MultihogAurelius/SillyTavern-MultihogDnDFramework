@@ -31,27 +31,73 @@ function substituteLoreMacros(content) {
 }
 
 /**
- * Stealth end-of-output footer reminder for the first user turn of a chat.
- * System prompt alone is often ignored; placing this once near the bottom of
- * early context improves compliance for the rest of the session.
+ * Resolve Control Room / unlocked state for `<end_of_output_footer>`.
  * @param {object} settings
- * @returns {string}
+ * @returns {{ enabled: boolean, inner: string }}
  */
-function buildEndOfOutputFooterReminder(settings) {
-    let block = `<end_of_output_footer>
-ALWAYS end every output (even after tool chains) with:
+function resolveEndOfOutputFooterSection(settings) {
+    const library = settings.customSyspromptLibrary || [];
+    const override = library.find(p => p.origin === 'unlocked_base' && p.baseTag === 'end_of_output_footer');
+    if (override) {
+        const raw = String(override.content || '').trim();
+        const innerMatch = raw.match(/<end_of_output_footer>([\s\S]*?)<\/end_of_output_footer>/i);
+        return { enabled: !!override.enabled, inner: (innerMatch ? innerMatch[1] : raw).trim() };
+    }
+
+    const enabled = settings.syspromptModules?.end_of_output_footer !== false;
+    if (!enabled) return { enabled: false, inner: '' };
+
+    // Prefer the live Main prompt (already Control-Room-assembled + time-format transforms).
+    const mainTa = /** @type {HTMLTextAreaElement|null} */ (document.getElementById('main_prompt_quick_edit_textarea'));
+    const mainVal = mainTa?.value || '';
+    const liveMatch = mainVal.match(/<end_of_output_footer>([\s\S]*?)<\/end_of_output_footer>/i);
+    if (liveMatch) return { enabled: true, inner: liveMatch[1].trim() };
+
+    // Fallback: shipped default body with the same time/date transforms as transformBaseSectionContent.
+    let inner = `ALWAYS end every output (even after tool chains) with:
 *(Status: [HP]) | (XP: [current]/[next level]) | (Location: [Main, Sub, Sub-sub, etc])*
 *Level [X] | [HH:MM AM/PM], Day [X]*
-Footer shows ONLY {{user}}'s HP/XP/level/location — never party/NPC status or names.
+Footer shows ONLY {{user}}'s HP/XP/level/location — never party/NPC status or names.`;
+    if (settings.use24hTime) {
+        inner = inner.replace(/\[HH:MM AM\/PM\]/g, '[HH:MM] (24-hour clock, NO AM/PM)');
+    }
+    if (settings.useDdMmYyFormat) {
+        inner = inner.replace(/Day\s+\[X\]/g, '[DD/MM/YYYY]');
+    }
+    return { enabled: true, inner };
+}
+
+/**
+ * Take only the footer format that follows the first "with" in the section body.
+ * @param {string} inner
+ * @returns {string}
+ */
+function extractFooterFormatAfterWith(inner) {
+    if (!inner) return '';
+    const m = String(inner).match(/\bwith\b\s*:?\s*([\s\S]*)/i);
+    return (m ? m[1] : '').trim();
+}
+
+/**
+ * Stealth end-of-output footer reminder for the first user turn of a chat.
+ * Honors System Prompt Control Room enable/disable and uses the live section's
+ * format (the part after "with") instead of a hardcoded template.
+ * @param {object} settings
+ * @returns {string} empty when footer section is disabled or has no format
+ */
+function buildEndOfOutputFooterReminder(settings) {
+    const { enabled, inner } = resolveEndOfOutputFooterSection(settings);
+    if (!enabled) return '';
+
+    const afterWith = extractFooterFormatAfterWith(inner);
+    if (!afterWith) return '';
+
+    const block = `<end_of_output_footer>
+ALWAYS end every output (even after tool chains) with:
+${afterWith}
 </end_of_output_footer>
 
 `;
-    if (settings?.use24hTime) {
-        block = block.replace(/\[HH:MM AM\/PM\]/g, '[HH:MM] (24-hour clock, NO AM/PM)');
-    }
-    if (settings?.useDdMmYyFormat) {
-        block = block.replace(/Day\s+\[X\]/g, '[DD/MM/YYYY]');
-    }
     return substituteLoreMacros(block);
 }
 
@@ -786,9 +832,15 @@ export function installInterceptor() {
 
             // Once per chat: reinforce the status footer on the first user turn only
             // (near the bottom of early context — system prompt alone is often ignored).
+            // Honors Control Room: disabled <end_of_output_footer> → no reminder.
             if (shouldInjectEndOfOutputFooterReminder(chat, content)) {
-                injections += buildEndOfOutputFooterReminder(settings);
-                if (settings.debugMode) console.log('[RPG Tracker] End-of-output footer reminder injected (first user turn).');
+                const footerReminder = buildEndOfOutputFooterReminder(settings);
+                if (footerReminder) {
+                    injections += footerReminder;
+                    if (settings.debugMode) console.log('[RPG Tracker] End-of-output footer reminder injected (first user turn).');
+                } else if (settings.debugMode) {
+                    console.log('[RPG Tracker] End-of-output footer reminder skipped (disabled or empty format).');
+                }
             }
         }
 
