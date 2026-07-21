@@ -442,6 +442,23 @@ export function transformBaseSectionContent(tag, innerContent, settings) {
         return `<rng_system>\n${fallbackText.trim()}\n</rng_system>`;
     }
 
+    // Hybrid RNG is context-switched by index.js after the State Tracker updates
+    // [COMBAT]. Keep only the active mechanic in the narrator's prompt: live tool
+    // rolls outside combat, then the pre-seeded queue during combat.
+    if (tag === 'rng_system' && settings.rngEnabled && settings.diceFunctionTool) {
+        const combatMatch = (settings.currentMemo || '').match(/\[COMBAT\]([\s\S]*?)\[\/COMBAT\]/i);
+        const combatBody = combatMatch?.[1]?.trim() || '';
+        const inCombat = !!combatBody && !/^END_COMBAT$/i.test(combatBody);
+        const dieWord = d100Mode ? 'd100' : 'd20';
+        const toolName = d100Mode ? 'RollTheDiceD100' : 'RollTheDice';
+        if (!inCombat) {
+            return `<rng_system>\nFor each roll, call ${toolName} with the DC included in the tool parameters; set the DC before seeing the result. Output the DC, roll, and success/failure in parentheses. In combat, prefer batching multiple rolls into a single tool call for efficiency.\n</rng_system>`;
+        }
+
+        const queueName = d100Mode ? '[RNG_QUEUE_d100 v7.0]' : '[RNG_QUEUE v7.0]';
+        return `<rng_system>\n${queueName} is the sole RNG mechanic — internal physics, never revealed or explained.\n<rng_queue_instructions>\nPop lines in order (1, 2, 3...). Each line has labeled dice (${dieWord}=, d4=, d6=, d8=, d10=, d12=). Queue length 12, wraps on exhaustion.\n- ${dieWord} = attacks/checks. Damage dice = matching label on the same line.\n- Always fold in ability scores/proficiency. Reveal a roll only right before it appears in the narrative.\n</rng_queue_instructions>\n\nROLL FORMAT (strict):\n- Attack: *(Attack: 12 [Roll] + 1 [Mod] = 13 vs AC 14)*\n- Save / effect: *(Dexterity Save: 12 [Roll] + 3 [Mod] = 15 vs DC 14)*\n- Damage: *(Damage: d10 + 3 → 8 piercing)*\n\nDC SCALE: Trivial 8 | Easy 14 | Moderate 18 | Hard 23 | Severe 28 | Near-impossible 33+\n\nUnknown skill bonuses: judge from background/archetype + situational mods.\n[FALLBACK]: No queue provided → simulate a fair ${dieWord} internally, same ROLL FORMAT.\n</rng_system>`;
+    }
+
     if (tag === 'quests') {
         let instruction = QUESTS_NARRATOR;
         if (!mods.questsFrustration) {

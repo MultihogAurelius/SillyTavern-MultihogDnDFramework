@@ -13,7 +13,7 @@
  */
 
 import { getSettings, hydrateWorldProgressionFromChatState, persistWorldProgressionTimer, persistRouterLastRunWatermark, getNpcRelationshipMax, clampRelationshipValue, relationshipBarPct, getFriendshipTier, getAffectionTier, applyRelTierBadgeElement, saveChatState, getActiveChatId } from './state-manager.js';
-import { syncCombatProfile } from './llm-client.js';
+import { syncCombatProfile, isCombatActive } from './llm-client.js';
 import { parseQuestsFromMemo, extractCurrentTimeStr, cleanMessageContent, formatInWorldTime, memoForGmContext } from './memo-processor.js';
 import { runRouterPass, saveSceneToLorebook, scanAssistantOutputForKeywords, parseInWorldMinutes, runWorldProgressionPass, updateLorebookEntry, getLorebookManifest, rollbackRouterPass, isRouterRunning } from './router.js';
 import { logTransaction } from './debug-viewer.js';
@@ -489,6 +489,29 @@ export function registerDiceFunctionTool() {
     }
 }
 
+/**
+ * Keeps function-tool visibility aligned with managed hybrid RNG context.
+ * During combat the queue is the only mechanic, so remove the dice schemas;
+ * outside combat restore the user's configured dice tools.
+ */
+export function syncDiceFunctionToolForRngContext(memo, manageHybrid = false) {
+    if (!manageHybrid || !isCombatActive(memo)) {
+        registerDiceFunctionTool();
+        return;
+    }
+
+    try {
+        const { unregisterFunctionTool } = SillyTavern.getContext();
+        if (!unregisterFunctionTool) return;
+        unregisterFunctionTool('RollTheDice');
+        unregisterFunctionTool('RollTheDiceD100');
+        unregisterFunctionTool('FatbodyRollTheDice');
+        unregisterFunctionTool('MultihogRollTheDice');
+    } catch (e) {
+        console.warn('[RPG Tracker] Failed to unregister combat-disabled dice tools:', e);
+    }
+}
+
 export function registerDiceSlashCommand() {
     const { SlashCommand, SlashCommandParser, ARGUMENT_TYPE, SlashCommandArgument, SlashCommandNamedArgument } = SillyTavern.getContext();
     if (!SlashCommand || !SlashCommandParser) return;
@@ -795,7 +818,12 @@ export function installInterceptor() {
             const relBlock = await buildNpcRelationsBlock(settings);
             if (relBlock) injections += relBlock;
 
-            if (settings.rngEnabled) {
+            // Hybrid mode uses live tool calls outside combat and the queue only
+            // while [COMBAT] is active. Queue-only mode continues to inject it for
+            // every response, preserving its existing behavior.
+            const injectRngQueue = settings.rngEnabled
+                && (!settings.diceFunctionTool || isCombatActive(settings.currentMemo));
+            if (injectRngQueue) {
                 if (settings.rngQueueD20 && !content.includes(RNG_QUEUE_TAG_D20)) {
                     const queue = makeRngQueue(RNG_QUEUE_LEN, false);
                     injections += buildRngBlock(queue, false);
@@ -1963,6 +1991,12 @@ export async function onGenerationEnded() {
             await syncCombatProfile(getSettings().currentMemo, settings);
         } catch (e) {
             console.warn('[RPG Tracker] Combat profile sync failed:', e);
+        }
+
+        try {
+            await globalThis._rpgSyncDynamicRngPrompt?.(getSettings().currentMemo, settings);
+        } catch (e) {
+            console.warn('[RPG Tracker] Dynamic RNG prompt sync failed:', e);
         }
 
         // Re-check scene art after State Tracker may have updated location in memo.

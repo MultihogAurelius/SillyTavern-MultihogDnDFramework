@@ -2,6 +2,15 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [6.0.1] - 2026-07-21
+
+### Added
+- **Dynamic hybrid RNG**: Pre-Seeded + Tool Calls now exposes only RollTheDice outside active `[COMBAT]`, then switches to only the RNG Queue in combat. The prompt, queue injection, and function-tool schema switch together.
+
+### Changed
+- **Hybrid RNG combat format**: restored the readable strict attack/AC, save/DC, and damage roll presentation.
+- **Hybrid loot**: batches the main loot and quality rolls, discarding the quality roll when no loot is found.
+
 ## [6.0.05] - 2026-07-21
 
 ### Changed
