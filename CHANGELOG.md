@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [6.0.05] - 2026-07-21
+
+### Changed
+- **Lorebook Agent QUEST prompt**: now records quests only when the player unambiguously begins pursuing them; mentions, offers, and deliberation alone do not qualify. Delivered through Prompt Defaults Updated so customized prompts remain intact.
+
 ## [6.0.0] - 2026-07-21
 
 ### Changed
