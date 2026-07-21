@@ -7,6 +7,7 @@ All notable changes to the **Multihog D&D Framework** will be documented in this
 ### Changed
 - **Startup narrator controls**: Narrator Configuration is now a top-level drawer directly beneath **Other Ways to Begin**, with the same pacing selector and explanation available from the main settings.
 - **Startup drawers**: refreshed the visual treatment for **Other Ways to Begin** and Narrator Configuration for clearer hierarchy and better visibility.
+- **RNG recommendations**: clarified the recommended RNG mode for CYOA and non-CYOA play in both Narrator Configuration views.
 
 ## [5.9.97] - 2026-07-21
 

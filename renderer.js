@@ -2094,15 +2094,15 @@ function formatValueToCurrency(totalCp, detectedCurrency) {
                     <div style="display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; padding-left: 5px;">
                         <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
                             <input type="radio" name="rt_onboarding_rng_mode" value="hybrid" id="rt_onboarding_rng_hybrid" />
-                            <span>Pre-Seeded + Tool Calls</span>
+                            <span>Pre-Seeded + Tool Calls (Recommended without CYOA Mode)</span>
                         </label>
                         <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
                             <input type="radio" name="rt_onboarding_rng_mode" value="legacy" id="rt_onboarding_rng_legacy" />
-                            <span>Pre-Seeded Only</span>
+                            <span>Pre-Seeded Only (Recommended with CYOA Mode)</span>
                         </label>
                         <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
                             <input type="radio" name="rt_onboarding_rng_mode" value="none" id="rt_onboarding_rng_none" />
-                            <span>No RNG (LLM makes up numbers)</span>
+                            <span>No RNG (LLM makes up numbers, not recommended)</span>
                         </label>
                     </div>
 
