@@ -2,6 +2,14 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [6.0.0] - 2026-07-21
+
+### Changed
+- **Narrator Configuration defaults**: new installs enable all optional components, use Normal pacing, and select Pre-Seeded Only RNG by default.
+- **Instant Action**: now honors the active Narrator Configuration instead of overriding component and RNG choices.
+- **Relationship System**: removed the beta label and clarified that it tracks each NPC's friendship and affection toward the player.
+- **Startup header**: replaced the scroll icon with a mirrored fencer-and-shield crest.
+
 ## [5.9.99] - 2026-07-21
 
 ### Fixed

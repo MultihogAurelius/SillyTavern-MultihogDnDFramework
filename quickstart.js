@@ -1,4 +1,4 @@
-import { getSettings, buildNpcInstruction } from './state-manager.js';
+import { getSettings } from './state-manager.js';
 import {
     getArchetypesForGenre,
     generateQuickStartCharacter,
@@ -61,68 +61,9 @@ function setQuickStartBusy(rootEl, disabled) {
 }
 
 /**
- * Force-enable Instant Action systems and Pre-Seeded Only RNG, then apply sysprompt.
+ * Apply the player's current Narrator Configuration before Instant Action begins.
  */
-async function enableQuickStartSystems() {
-    const s = getSettings();
-    if (!s.syspromptModules) s.syspromptModules = {};
-    if (!s.modules) s.modules = {};
-
-    s.syspromptModules.loot = true;
-    s.syspromptModules.random_events = true;
-    s.syspromptModules.resting = true;
-    s.syspromptModules.party_bench = true;
-    s.syspromptModules.CYOA_mode = true;
-
-    s.modules['benched party'] = true;
-    s.modules.party = true;
-
-    s.npcRelationshipBars = true;
-    if (s.routerModules?.npc) {
-        s.routerModules.npc.instruction = buildNpcInstruction(s.npcMajorWords, s.npcMinorWords, false);
-    }
-
-    // Pre-Seeded Only (legacy radio)
-    s.rngEnabled = true;
-    s.diceFunctionTool = false;
-    if (s.diceD100Mode) {
-        s.rngToolD20 = false;
-        s.rngToolD100 = false;
-        s.rngQueueD20 = false;
-        s.rngQueueD100 = true;
-    } else {
-        s.rngToolD20 = false;
-        s.rngToolD100 = false;
-        s.rngQueueD20 = true;
-        s.rngQueueD100 = false;
-    }
-
-    // Sync onboarding / settings UI if present
-    const modIds = {
-        loot: '#rt_onboarding_mod_loot',
-        random_events: '#rt_onboarding_mod_random_events',
-        resting: '#rt_onboarding_mod_resting',
-        party_bench: '#rt_onboarding_mod_party_bench',
-        CYOA_mode: '#rt_onboarding_mod_cyoa_mode',
-    };
-    for (const [key, sel] of Object.entries(modIds)) {
-        const cb = /** @type {HTMLInputElement|null} */ (document.querySelector(sel));
-        if (cb) cb.checked = true;
-        const settingsCb = /** @type {HTMLInputElement|null} */ (document.querySelector(`#rpg_sysprompt_mod_${key === 'CYOA_mode' ? 'cyoa_mode' : key}`));
-        if (settingsCb) settingsCb.checked = true;
-    }
-    const relOnb = /** @type {HTMLInputElement|null} */ (document.getElementById('rt_onboarding_mod_npc_rel_bars'));
-    if (relOnb) relOnb.checked = true;
-    const relSettings = document.getElementById('rpg_sysprompt_mod_npc_rel_bars');
-    if (relSettings) /** @type {HTMLInputElement} */ (relSettings).checked = true;
-    const relTracker = document.getElementById('rpg_tracker_npc_rel_bars');
-    if (relTracker) /** @type {HTMLInputElement} */ (relTracker).checked = true;
-
-    const legacyRadio = /** @type {HTMLInputElement|null} */ (document.querySelector('input[name="rpg_sysprompt_rng_mode"][value="legacy"]'));
-    if (legacyRadio) legacyRadio.checked = true;
-    const onbLegacy = /** @type {HTMLInputElement|null} */ (document.getElementById('rt_onboarding_rng_legacy'));
-    if (onbLegacy) onbLegacy.checked = true;
-
+async function applyQuickStartConfiguration() {
     saveSettings();
     await autoApplySysprompt(true);
 
@@ -165,7 +106,7 @@ export async function runQuickStart(genre, rootEl = null) {
 
     try {
         setQuickStartStatus(root, 'Enabling systems…');
-        await enableQuickStartSystems();
+        await applyQuickStartConfiguration();
 
         const s = getSettings();
         s.onboardingGenre = validGenre;

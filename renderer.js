@@ -1746,7 +1746,11 @@ function formatValueToCurrency(totalCp, detectedCurrency) {
 
             return `<div class="rt-empty" style="text-align: left; align-items: flex-start; padding: 12px; gap: 10px; overflow-y: auto;">
                 <div style="text-align: center; width: 100%; margin-bottom: 2px; flex-shrink: 0;">
-                    <div class="rt-empty-icon" style="font-size: 1.7em; margin-bottom: 0;">📜</div>
+                    <div class="rt-empty-icon rt-onboarding-crest" aria-label="Fencers guarding a shield">
+                        <span class="rt-onboarding-crest-fencer" aria-hidden="true">🤺</span>
+                        <span class="rt-onboarding-crest-shield" aria-hidden="true">🛡️</span>
+                        <span class="rt-onboarding-crest-fencer rt-onboarding-crest-fencer-mirrored" aria-hidden="true">🤺</span>
+                    </div>
                     <div style="font-size: 16px; font-weight: bold; color: var(--rt-text);">Multihog D&D Framework</div>
                 </div>
 
@@ -1757,7 +1761,7 @@ function formatValueToCurrency(totalCp, detectedCurrency) {
 
                 <div class="rt-quickstart" id="rt-quickstart">
                     <div class="rt-quickstart-title">⚡ Instant Action</div>
-                    <div class="rt-quickstart-sub">Fully automated — pick a genre and the extension enables everything, rolls your character, builds your persona &amp; Player Card, then starts the adventure for you. No other setup needed.</div>
+                    <div class="rt-quickstart-sub">Fully automated — pick a genre and the extension uses your Narrator Configuration, rolls your character, builds your persona &amp; Player Card, then starts the adventure for you.</div>
                     <div class="rt-quickstart-genres" role="group" aria-label="Quick Start genre">
                         <button type="button" class="rt-quickstart-genre-btn" data-genre="fantasy">⚔️ Fantasy</button>
                         <button type="button" class="rt-quickstart-genre-btn" data-genre="realistic">🏙️ Modern</button>
@@ -2161,7 +2165,7 @@ function formatValueToCurrency(totalCp, detectedCurrency) {
                         </div>
                         <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
                             <input type="checkbox" id="rt_onboarding_mod_npc_rel_bars" />
-                            <span>💞 Relationship System (BETA)</span>
+                            <span>💞 Relationship System (tracks each NPC's friendship and affection toward you)</span>
                         </label>
                     </div>
 
