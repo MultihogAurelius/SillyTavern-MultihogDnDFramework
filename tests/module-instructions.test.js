@@ -6,6 +6,10 @@ import {
     DEFAULT_MODULES,
     getSettings,
     FACTORY_SETTINGS_VERSION,
+    computeBundledPromptsFingerprint,
+    computeBundledPromptsFingerprintForSnapshot,
+    buildBundledPromptsSnapshot,
+    adjustPromptTimestamps,
 } from '../state-manager.js';
 import { testExtensionSettings } from './setup.js';
 
@@ -49,5 +53,42 @@ describe('getSettings fresh install', () => {
         expect(s.settingsVersion).toBe(FACTORY_SETTINGS_VERSION);
         expect(s.routerModules?.npc?.tag).toBe('NPC');
         expect(typeof s.routerModules?.npc?.instruction).toBe('string');
+    });
+});
+
+describe('shipped prompt fingerprint', () => {
+    it('ignores the user-selected date and clock display format', () => {
+        for (const key of Object.keys(testExtensionSettings)) {
+            delete testExtensionSettings[key];
+        }
+        const settings = getSettings();
+        settings.useDdMmYyFormat = false;
+        settings.use24hTime = false;
+        const fingerprint = computeBundledPromptsFingerprint();
+
+        settings.useDdMmYyFormat = true;
+        expect(computeBundledPromptsFingerprint()).toBe(fingerprint);
+
+        settings.use24hTime = true;
+        expect(computeBundledPromptsFingerprint()).toBe(fingerprint);
+
+        const legacyCalendarSnapshot = structuredClone(buildBundledPromptsSnapshot());
+        legacyCalendarSnapshot.lorebook.modules.npc.instruction = legacyCalendarSnapshot.lorebook.modules.npc.instruction
+            .replace('Day 1', '01/01/2026')
+            .replaceAll('Day N', 'DD/MM/YYYY');
+        expect(computeBundledPromptsFingerprintForSnapshot(legacyCalendarSnapshot)).toBe(fingerprint);
+
+        const legacyClockSnapshot = structuredClone(buildBundledPromptsSnapshot());
+        legacyClockSnapshot.tracker.stockPrompts.time = legacyClockSnapshot.tracker.stockPrompts.time
+            .replaceAll('HH:MM AM/PM', 'HH:MM AM/PM AM/PM AM/PM');
+        expect(computeBundledPromptsFingerprintForSnapshot(legacyClockSnapshot)).toBe(fingerprint);
+    });
+
+    it('repairs repeated AM/PM placeholders when changing time format', () => {
+        const legacy = 'Current Time: HH:MM AM/PM AM/PM AM/PM, Day N';
+        expect(adjustPromptTimestamps(legacy, { useDdMmYyFormat: false, use24hTime: false }))
+            .toBe('Current Time: HH:MM AM/PM, Day N');
+        expect(adjustPromptTimestamps(legacy, { useDdMmYyFormat: false, use24hTime: true }))
+            .toBe('Current Time: HH:MM, Day N');
     });
 });

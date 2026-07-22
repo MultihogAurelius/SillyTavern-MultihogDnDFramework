@@ -16,9 +16,9 @@ import {
     refreshQuestPrompt,
     syncMemoView,
     bindRenderedCardEvents,
-    _sectionPages,
+    sectionPages as _sectionPages,
     rebuildNpcInstructionIfNeeded
-} from './index.js';
+} from './runtime-bridge.js';
 import { renderMemoAsCards, MARKER_TYPE_MAP, getMarkerLibraryKeys } from './renderer.js';
 
 export function handleCategorySettings(tag, targetEl) {
@@ -1680,4 +1680,3 @@ function openSectionEditor(targetType) {
     render();
     overlay.showModal();
 }
-

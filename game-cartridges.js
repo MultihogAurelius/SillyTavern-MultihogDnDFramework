@@ -17,7 +17,7 @@ import {
     saveSettings,
     refreshRenderedView,
     autoApplySysprompt,
-} from './index.js';
+} from './runtime-bridge.js';
 import { syncAllNarratorTogglesForUnlockState } from './game-systems.js';
 
 const CARTRIDGE_FORMAT = 'multihog-game-cartridge';

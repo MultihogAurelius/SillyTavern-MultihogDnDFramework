@@ -1,5 +1,5 @@
 import { getSettings, getActiveChatId, getEffectiveRouterCampaignPrefix } from './state-manager.js';
-import { saveSettings } from './index.js';
+import { saveSettings } from './runtime-bridge.js';
 import { sendStateRequest } from './llm-client.js';
 import { parseMemoBlocks } from './renderer.js';
 import { escapeHtml, memoForGmContext } from './memo-processor.js';

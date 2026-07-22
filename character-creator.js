@@ -3,7 +3,7 @@ import { sendStateRequest } from './llm-client.js';
 import { buildOnboardingXpHint, buildOnboardingTimeHint, buildStartingGearHint, buildOnboardingActiveBlocks, buildCombatAndSkillScalingHint } from './constants.js';
 import { escapeHtml } from './memo-processor.js';
 import { getRequestHeaders } from '../../../../script.js';
-import { saveSettings, sendDirectPrompt, refreshAgentManifestNow, refreshRenderedView, syncTimeFormatSettingsUi } from './index.js';
+import { saveSettings, sendDirectPrompt, refreshAgentManifestNow, refreshRenderedView, syncTimeFormatSettingsUi } from './runtime-bridge.js';
 import { openPcSectionEditor } from './ui-editors.js';
 
 const _CR_CLASS_LISTS = {

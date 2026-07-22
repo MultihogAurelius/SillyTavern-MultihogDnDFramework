@@ -5,14 +5,40 @@
 import { DEFAULT_STOCK_PROMPTS, RT_PROMPTS } from '../../constants.js';
 import { DEFAULT_MODULES } from './default-modules.js';
 import { buildDefaultSettings } from './defaults.js';
+import { adjustPromptTimestamps } from './router-utils.js';
 
-function hashPromptBundle(str) {
+function hashPromptBundle(str) {
     let h = 5381;
     for (let i = 0; i < str.length; i++) {
         h = ((h << 5) + h) ^ str.charCodeAt(i);
     }
     return (h >>> 0).toString(16);
-}
+}
+
+/**
+ * Shipped-prompt upgrade detection must not depend on a user's selected
+ * calendar or clock display. Those preferences intentionally rewrite example
+ * timestamps in live/generated templates, but do not constitute a new shipped
+ * prompt release. Store and compare the stable Day N / 12-hour representation.
+ * @param {any} value
+ * @returns {any}
+ */
+export function normalizeBundledPromptsSnapshot(value) {
+    const canonicalFormat = { useDdMmYyFormat: false, use24hTime: false };
+    if (typeof value === 'string') {
+        // Module builders historically use both "Day X" and "Day N" for the
+        // same illustrative placeholder. Calendar conversion normalizes to N,
+        // so do the same for the canonical shipped-default representation.
+        return adjustPromptTimestamps(value, canonicalFormat).replace(/Day X/g, 'Day N');
+    }
+    if (Array.isArray(value)) return value.map(normalizeBundledPromptsSnapshot);
+    if (value && typeof value === 'object') {
+        return Object.fromEntries(
+            Object.entries(value).map(([key, child]) => [key, normalizeBundledPromptsSnapshot(child)]),
+        );
+    }
+    return value;
+}
 
 /**
  * Structured snapshot of all factory-shipped prompt defaults.
@@ -38,7 +64,7 @@ export function buildBundledPromptsSnapshot() {
             format: def.format || '',
         };
     }
-    return {
+    return normalizeBundledPromptsSnapshot({
         sysprompt: {
             main: RT_PROMPTS['sysprompt.txt'] || '',
             legacy: RT_PROMPTS['sysprompt_legacy.txt'] || '',
@@ -57,7 +83,7 @@ export function buildBundledPromptsSnapshot() {
             worldProgressionSystemPrompt: defaults.worldProgressionSystemPrompt || '',
             worldProgressionSkeletonSystemPrompt: defaults.worldProgressionSkeletonSystemPrompt || '',
         },
-    };
+    });
 }
 
 /** Category ids used by the Prompt Defaults Updated dialog. */
@@ -240,9 +266,19 @@ export function getPromptCategoryImpactBadge(oldSnap, newSnap, liveSettings, cat
  * extension update warrants the prompt-reset dialog (version bumps alone are not enough).
  * @returns {string}
  */
-export function computeBundledPromptsFingerprint() {
-    return hashPromptBundle(JSON.stringify(buildBundledPromptsSnapshot()));
-}
+export function computeBundledPromptsFingerprint() {
+    return computeBundledPromptsFingerprintForSnapshot(buildBundledPromptsSnapshot());
+}
+
+/**
+ * Computes a format-neutral fingerprint for either a current or legacy
+ * persisted shipped-default snapshot.
+ * @param {ReturnType<typeof buildBundledPromptsSnapshot>|Record<string, any>} snapshot
+ * @returns {string}
+ */
+export function computeBundledPromptsFingerprintForSnapshot(snapshot) {
+    return hashPromptBundle(JSON.stringify(normalizeBundledPromptsSnapshot(snapshot)));
+}
 
 /**
  * The list of settings fields that make up a Game Cartridge's "payload" —

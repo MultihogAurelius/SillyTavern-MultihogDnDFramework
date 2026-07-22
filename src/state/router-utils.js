@@ -130,7 +130,13 @@ export function adjustPromptTimestamps(prompt, settings) {
         }
     }
 
-    return result;
+    // Make repeated format toggles idempotent. Older templates can contain
+    // "HH:MM AM/PM AM/PM" (or more repetitions) because a broad HH:MM
+    // replacement also matched the start of an already-suffixed placeholder.
+    // Collapse those legacy forms while producing the requested clock format.
+    return is24h
+        ? result.replace(/HH:MM(?:\s+AM\/PM)+/g, 'HH:MM')
+        : result.replace(/HH:MM(?:\s+AM\/PM)*/g, 'HH:MM AM/PM');
 }
 
 /**
