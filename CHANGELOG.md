@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [6.0.23] - 2026-07-23
+
+### Changed
+- **Rendering Tags Library button**: refreshed the library trigger with an arcane gradient, swatchbook emblem, live-preview subtitle, shimmer hover, and reduced-motion support.
+
 ## [6.0.22] - 2026-07-23
 
 ### Changed

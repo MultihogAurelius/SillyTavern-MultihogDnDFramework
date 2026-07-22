@@ -765,8 +765,12 @@
                         <button id="rpg_tracker_add_custom_field" class="menu_button interactable" style="flex: 1;"><i class="fa-solid fa-plus"></i> Add Custom (Manual)</button>
                         <button id="rpg_tracker_add_custom_field_ai" class="menu_button interactable" style="flex: 1; background: rgba(180, 100, 255, 0.15); border-color: rgba(180, 100, 255, 0.4);"><i class="fa-solid fa-wand-magic-sparkles"></i> Add Custom (AI)</button>
                     </div>
-                    <div class="flex-container gap-1" style="margin-top: 4px;">
-                        <button id="rt_btn_tag_library" class="menu_button interactable" style="flex: 1; background: rgba(50, 150, 255, 0.15); border-color: rgba(50, 150, 255, 0.4);"><i class="fa-solid fa-swatchbook"></i> Rendering Tags Library</button>
+                    <div class="flex-container gap-1" style="margin-top: 6px;">
+                        <button id="rt_btn_tag_library" class="menu_button interactable rt-tag-library-button" aria-label="Open Rendering Tags Library">
+                            <span class="rt-tag-library-icon" aria-hidden="true"><i class="fa-solid fa-swatchbook"></i></span>
+                            <span class="rt-tag-library-copy"><span>Rendering Tags Library</span><small>Live previews · color alchemy</small></span>
+                            <span class="rt-tag-library-sparkle" aria-hidden="true">✦</span>
+                        </button>
                     </div>
                     <div class="flex-container gap-1" style="margin-top: 4px;">
                         <button id="rpg_tracker_export_all_modules" class="menu_button interactable" style="flex: 1; font-size: 11px;">Export</button>

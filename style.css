@@ -2282,6 +2282,118 @@
 
 /* Ã¢â€â‚¬Ã¢â€â‚¬ Universal Rendering Tags Ã¢â€â‚¬Ã¢â€â‚¬ */
 
+/* Rendering Tags Library — a small portal into the framework's visual toolkit. */
+.rt-tag-library-button {
+    flex: 1;
+    position: relative;
+    isolation: isolate;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 50px;
+    overflow: hidden;
+    padding: 8px 12px !important;
+    color: #e8f7ff !important;
+    text-align: left;
+    border: 1px solid rgba(112, 211, 255, 0.62) !important;
+    border-radius: 9px !important;
+    background:
+        radial-gradient(circle at 9% 120%, rgba(63, 220, 255, 0.30), transparent 40%),
+        radial-gradient(circle at 94% -20%, rgba(221, 120, 255, 0.32), transparent 42%),
+        linear-gradient(110deg, rgba(19, 68, 122, 0.94), rgba(77, 36, 125, 0.88)) !important;
+    box-shadow: 0 3px 12px rgba(37, 124, 255, 0.20), inset 0 1px rgba(255, 255, 255, 0.18);
+    transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease, filter 160ms ease;
+}
+.rt-tag-library-button::before,
+.rt-tag-library-button::after {
+    position: absolute;
+    z-index: 0;
+    content: '';
+    pointer-events: none;
+}
+.rt-tag-library-button::before {
+    inset: 1px;
+    border-radius: 7px;
+    background: linear-gradient(100deg, rgba(255,255,255,0.12), transparent 38%, rgba(255,255,255,0.08));
+}
+.rt-tag-library-button::after {
+    top: -28px;
+    right: 14%;
+    width: 56px;
+    height: 96px;
+    opacity: 0.34;
+    transform: rotate(27deg);
+    background: linear-gradient(90deg, transparent, #fff, transparent);
+    filter: blur(8px);
+    transition: transform 300ms ease;
+}
+.rt-tag-library-button:hover,
+.rt-tag-library-button:focus-visible {
+    color: #fff !important;
+    border-color: rgba(178, 236, 255, 0.95) !important;
+    filter: saturate(1.2) brightness(1.08);
+    transform: translateY(-1px);
+    box-shadow: 0 7px 20px rgba(57, 135, 255, 0.35), 0 0 14px rgba(215, 104, 255, 0.20), inset 0 1px rgba(255, 255, 255, 0.24);
+}
+.rt-tag-library-button:hover::after,
+.rt-tag-library-button:focus-visible::after {
+    transform: translateX(-170px) rotate(27deg);
+}
+.rt-tag-library-button:active { transform: translateY(0); }
+.rt-tag-library-button > * { position: relative; z-index: 1; }
+.rt-tag-library-icon {
+    display: inline-grid;
+    flex: 0 0 31px;
+    width: 31px;
+    height: 31px;
+    place-items: center;
+    color: #d8f5ff;
+    font-size: 15px;
+    border: 1px solid rgba(212, 248, 255, 0.38);
+    border-radius: 8px;
+    background: linear-gradient(145deg, rgba(123, 236, 255, 0.32), rgba(170, 90, 255, 0.25));
+    box-shadow: 0 0 12px rgba(94, 220, 255, 0.24), inset 0 1px rgba(255,255,255,0.25);
+}
+.rt-tag-library-copy {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+    gap: 1px;
+    font-size: 12px;
+    font-weight: 800;
+    line-height: 1.15;
+    letter-spacing: 0.015em;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.32);
+}
+.rt-tag-library-copy small {
+    overflow: hidden;
+    color: rgba(218, 245, 255, 0.76);
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-overflow: ellipsis;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+.rt-tag-library-sparkle {
+    flex: 0 0 auto;
+    color: #fff2b6;
+    font-size: 17px;
+    line-height: 1;
+    text-shadow: 0 0 9px #fff4af, 0 0 15px rgba(134, 218, 255, 0.8);
+    animation: rt-tag-library-twinkle 2.6s ease-in-out infinite;
+}
+@keyframes rt-tag-library-twinkle {
+    0%, 100% { opacity: 0.62; transform: scale(0.84) rotate(0deg); }
+    50% { opacity: 1; transform: scale(1.12) rotate(18deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .rt-tag-library-button,
+    .rt-tag-library-button::after { transition: none; }
+    .rt-tag-library-sparkle { animation: none; }
+}
+
 /* Objective checkboxes */
 .rt-objective {
     display: flex;
