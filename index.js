@@ -28,6 +28,7 @@ import { createMemoRecoveryManager } from './src/features/recovery/memo-recovery
 import { runtimeState } from './src/app/runtime-state.js';
 import { createPanel as buildPanel } from './src/ui/panel/panel-builder.js';
 import { createChatStateLoader } from './src/features/chat/chat-state-loader.js';
+import { restoreEscapedCyoaChoiceMarkup } from './src/ui/panel/cyoa-markup.js';
 
 export { RENDERING_TAGS_LIBRARY };
 export { bindRenderedCardEvents };
@@ -7080,6 +7081,14 @@ RULES:
          * @param {ParentNode} root
          */
         function flattenCyoaChoiceBlocks(root) {
+            // Some ST renderers/sanitizers show custom XML-like tags as literal
+            // `&lt;choices&gt;` / `&lt;button&gt;` text. Restore only complete multi-choice
+            // blocks, then continue through the normal DOM-button path below.
+            if (root instanceof HTMLElement) {
+                const restoredHtml = restoreEscapedCyoaChoiceMarkup(root.innerHTML);
+                if (restoredHtml !== root.innerHTML) root.innerHTML = restoredHtml;
+            }
+
             // 1) Convert any <choices>…</choices> into <div class="rt-cyoa-choices">.
             root.querySelectorAll('choices').forEach((choicesEl) => {
                 const buttons = Array.from(choicesEl.querySelectorAll('button'));
