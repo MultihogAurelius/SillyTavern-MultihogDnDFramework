@@ -207,16 +207,16 @@ async function checkLocalMemoRecovery(chatId) {
         if (typeof Popup === 'function') {
             const popup = new Popup(popupContent, POPUP_TYPE?.CONFIRM ?? 1, '', {
                 okButton: 'Restore',
-                cancelButton: 'Keep disk version',
+                cancelButton: 'Keep disk version (keep what\'s visible right now)',
                 leftAlign: true,
                 animation: 'none',
             });
-            popup.dlg?.classList.add('rt-memo-recovery-popup');
+            popup.dlg?.classList.add('rt-recovery-popup');
             result = await popup.show();
         } else {
             result = await ctx.callGenericPopup(popupContent, ctx.POPUP_TYPE?.CONFIRM ?? 1, '', {
                 okButton: 'Restore',
-                cancelButton: 'Keep disk version',
+                cancelButton: 'Keep disk version (keep what\'s visible right now)',
                 leftAlign: true,
                 animation: 'none',
             });
@@ -266,6 +266,9 @@ async function confirmLocalSettingsRecovery(backup) {
         <p><b>Browser configuration differs from settings.json.</b></p>
         <p>This browser has a saved local configuration snapshot from ${escapeHtml(localWhen)} that does not match the disk version. It may be a save that was interrupted—or an older cache from another browser session.</p>
         <p style="margin:10px 0;padding:8px 10px;border-left:3px solid #f0ad4e;background:rgba(240,173,78,0.12);border-radius:4px;">This includes tracker fields, narrator settings, stock prompts, and <b>CYOA settings and presets</b>. Nothing will be restored automatically.</p>
+        <p style="margin:10px 0;padding:8px 10px;border-left:3px solid #f0ad4e;background:rgba(240,173,78,0.12);border-radius:4px;">
+            <b>Look behind this dialog</b> (background is left unblurred on purpose). Use the tracker / chat UI you can see to judge whether local looks newer or staler than disk, then choose.
+        </p>
         <p>Restore this browser's local configuration?</p>
     </div>`;
     try {
@@ -273,15 +276,16 @@ async function confirmLocalSettingsRecovery(backup) {
         if (typeof Popup === 'function') {
             const popup = new Popup(content, POPUP_TYPE?.CONFIRM ?? 1, '', {
                 okButton: 'Restore local configuration',
-                cancelButton: 'Keep disk configuration',
+                cancelButton: 'Keep disk configuration (keep what\'s visible right now)',
                 leftAlign: true,
                 animation: 'none',
             });
+            popup.dlg?.classList.add('rt-recovery-popup');
             return !!await popup.show();
         }
         return !!await ctx.callGenericPopup?.(content, ctx.POPUP_TYPE?.CONFIRM ?? 1, '', {
             okButton: 'Restore local configuration',
-            cancelButton: 'Keep disk configuration',
+            cancelButton: 'Keep disk configuration (keep what\'s visible right now)',
             leftAlign: true,
             animation: 'none',
         });
