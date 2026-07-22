@@ -5,6 +5,7 @@
 import { BLOCK_ORDER } from '../../constants.js';
 import { getNpcRelationshipMax } from './relationship-math.js';
 import { getSettings, stripChatStateGlobalUiPrefs } from './settings.js';
+import { snapshotStockPromptsForProfile } from './profiles.js';
 
 /** Active chat id — prefer tracker-tracked id over raw ST context. */
 export function getActiveChatId() {
