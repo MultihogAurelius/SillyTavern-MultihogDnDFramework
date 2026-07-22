@@ -36,13 +36,18 @@ describe('((BARREL))', () => {
     });
 });
 
-describe('colored pill tags', () => {
-    it('lists and renders pink, orange, and purple variants', () => {
-        expect(getMarkerLibraryKeys()).toEqual(expect.arrayContaining(['PILLPINK', 'PILLORANGE', 'PILLPURPLE']));
-        expect(tryRenderMarker('((PILLPINK)) Smitten', 'NPC')).toContain('rt-pill-pink');
-        expect(tryRenderMarker('((PILLORANGE)) Alert', 'NPC')).toContain('rt-pill-orange');
-        expect(tryRenderMarker('((PILLPURPLE)) Cursed', 'NPC')).toContain('rt-pill-purple');
-        expect(tryRenderMarker('((PLSPINK)) Smitten', 'NPC')).toContain('rt-pill-pink');
+describe('universal tag colors', () => {
+    it('applies named color suffixes dynamically without listing color variants', () => {
+        expect(getMarkerLibraryKeys()).toEqual(expect.arrayContaining(['PILL', 'BAR', 'PROGRESS']));
+        expect(getMarkerLibraryKeys()).not.toEqual(expect.arrayContaining(['PILLPINK', 'BARRED', 'PROGRESSGREEN']));
+        expect(tryRenderMarker('((PILLPINK)) Smitten', 'NPC').toLowerCase()).toContain('color:pink');
+        expect(tryRenderMarker('((BARRED)) 12/20', 'NPC').toLowerCase()).toContain('background:red');
+        expect(tryRenderMarker('((PROGRESSGOLDENROD)) 3/5', 'NPC').toLowerCase()).toContain('background:goldenrod');
+    });
+
+    it('accepts named and hexadecimal colors through the explicit override syntax', () => {
+        expect(tryRenderMarker('((PILLS - rebeccapurple)) Smitten', 'NPC')).toContain('color:rebeccapurple');
+        expect(tryRenderMarker('((PILL - #ff69b4)) Smitten', 'NPC')).toContain('color:#ff69b4');
     });
 });
 

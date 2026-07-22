@@ -2,13 +2,17 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [6.0.21] - 2026-07-23
+
+### Changed
+- **Universal tag colors**: use a named-color suffix with any tag (such as `((PILLPINK))`, `((BARRED))`, or `((PROGRESSGOLDENROD))`) instead of maintaining individual color variants. Exact named or hexadecimal colors remain available through `((TAG - COLOR))`.
+
 ## [6.0.20] - 2026-07-23
 
 ### Added
 - **Freeform NPC tracker cards**: `((NPC)) Name:` now starts a PARTY-style card inside any tracker block, with unrestricted follow-up fields and rendering tags. A matching Lorebook Agent portrait is used automatically, including case-only name differences.
 - **Signed rendering bar**: `((BARREL))` renders generic positive/negative values around a centre-zero marker. It accepts both `value/max` and explicit signed ranges such as `value/-max..+max`, without requiring any specific field name.
 - **BARREL customization**: click either half of a `((BARREL))` to recolor that direction independently, or set its positive and negative colors inline with `((BARREL - #RRGGBB #RRGGBB))`.
-- **More colored pills**: `((PILLPINK))`, `((PILLORANGE))`, and `((PILLPURPLE))` join the existing red, green, and blue pill styles.
 - **Marker tab stops**: place `|x` immediately before a marker to start it at `x%` of the row (including at the beginning of a line), e.g. `((PILLGREEN)) Friendly |50 ((PILLS)) In Love`. The legacy `||` shorthand still creates equal columns.
 
 ## [6.0.17] - 2026-07-22

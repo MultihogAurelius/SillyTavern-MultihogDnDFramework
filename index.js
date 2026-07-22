@@ -6357,7 +6357,7 @@ ${existingFieldsContext.trim()}
 The user wants to create a new custom tracking field. Their description:
 "${description}"
 
-Available rendering tags (MUST use at least one in the template). Tags can be placed inline (e.g., 'Health: ((BAR)) 50/100'). Pill tags optionally support parenthesis text for descriptions (e.g. 'Status: ((PILLS)) Sleeping (Unconscious)'). Any tag optionally supports an inline color override, e.g. 'Status: ((PILLS - #E5FFCC)) Sleeping' (use sparingly, only when the user specifically wants custom colors):
+Available rendering tags (MUST use at least one in the template). Tags can be placed inline (e.g., 'Health: ((BAR)) 50/100'). Pill tags optionally support parenthesis text for descriptions (e.g. 'Status: ((PILLS)) Sleeping (Unconscious)'). Any tag can use a named-color suffix (e.g. 'Status: ((PILLPINK)) Smitten' or 'Health: ((BARRED)) 50/100') or an inline override (e.g. 'Status: ((PILLS - #E5FFCC)) Sleeping'). Use custom colors only when the field benefits from them:
 ${RENDERING_TAGS_LIBRARY.map(t => '- ' + t).join('\n')}
 
 Return ONLY a valid JSON object with these fields:
@@ -6598,7 +6598,7 @@ RULES:
 
             let html = `<div class="rpg-tracker-panel ${themeClass}" style="display:flex; flex-direction:column; gap:8px; max-height:60vh; overflow-y:auto; padding-right:10px; position:relative; top:auto; right:auto; width:100%; height:auto; background:transparent; border:none; box-shadow:none; resize:none;">`;
             html += `<div style="font-size:0.85em; opacity:0.85; padding:6px 8px; border:1px solid rgba(255,221,136,0.3); border-radius:6px; background:rgba(255,221,136,0.06);">
-                💡 Any tag above supports an optional inline color override: <code>((TAG - #RRGGBB))</code> (e.g. <code>((PLS - #E5FFCC))</code>). Bar-type tags (<code>((BAR))</code>, <code>((XPBAR))</code>, <code>((PROGRESS))</code>) also support a two-color gradient: <code>((BAR - #E5FFCC #003300))</code>.
+                💡 Color any tag with a named-color suffix, e.g. <code>((PILLPINK))</code>, <code>((BARRED))</code>, or <code>((PROGRESSGOLDENROD))</code>. For an exact named or hex color, use <code>((TAG - COLOR))</code> (e.g. <code>((PILLS - rebeccapurple))</code> or <code>((PLS - #E5FFCC))</code>). Bar-type tags (<code>((BAR))</code>, <code>((XPBAR))</code>, <code>((PROGRESS))</code>) additionally support a two-color gradient: <code>((BAR - #E5FFCC #003300))</code>.
             </div>`;
             for (let i = 0; i < RENDERING_TAGS_LIBRARY.length; i++) {
                 const item = RENDERING_TAGS_LIBRARY[i];

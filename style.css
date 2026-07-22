@@ -2119,45 +2119,6 @@
     color: rgb(52, 152, 219);
 }
 
-.rt-pill-pink {
-    background: rgba(244, 114, 182, 0.1);
-    border-color: rgba(244, 114, 182, 0.3);
-}
-.rt-pill-pink:hover, .rt-pill-pink.active {
-    background: rgba(244, 114, 182, 0.22);
-    border-color: rgba(251, 146, 204, 0.6);
-}
-.rt-pill-pink .rt-unit-icon {
-    background: rgba(244, 114, 182, 0.2);
-    color: rgb(251, 146, 204);
-}
-
-.rt-pill-orange {
-    background: rgba(249, 115, 22, 0.1);
-    border-color: rgba(249, 115, 22, 0.3);
-}
-.rt-pill-orange:hover, .rt-pill-orange.active {
-    background: rgba(249, 115, 22, 0.22);
-    border-color: rgba(251, 146, 60, 0.6);
-}
-.rt-pill-orange .rt-unit-icon {
-    background: rgba(249, 115, 22, 0.2);
-    color: rgb(251, 146, 60);
-}
-
-.rt-pill-purple {
-    background: rgba(168, 85, 247, 0.1);
-    border-color: rgba(168, 85, 247, 0.3);
-}
-.rt-pill-purple:hover, .rt-pill-purple.active {
-    background: rgba(168, 85, 247, 0.22);
-    border-color: rgba(192, 132, 252, 0.6);
-}
-.rt-pill-purple .rt-unit-icon {
-    background: rgba(168, 85, 247, 0.2);
-    color: rgb(192, 132, 252);
-}
-
 .rt-entity-sub-line {
     font-size: 0.88em;
     opacity: 0.8;

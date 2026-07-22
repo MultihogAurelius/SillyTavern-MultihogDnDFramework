@@ -9,6 +9,11 @@ import { BLOCK_ICONS, BLOCK_ORDER, PAGE_SIZE, NO_PAGINATE, renderStartingGearTie
 const DEFAULT_HP_COLOR = '#00ffaa';
 const DEFAULT_XP_COLOR = 'linear-gradient(90deg, #0088ff, #00d4ff)';
 
+/** CSS tint for any browser-supported solid color token (named or hexadecimal). */
+function makeColorTintStyle(color, backgroundPct = 12, borderPct = 40) {
+    return `background:color-mix(in srgb, ${color} ${backgroundPct}%, transparent);border-color:color-mix(in srgb, ${color} ${borderPct}%, transparent);color:${color};`;
+}
+
 /**
  * Extracts a time-of-day emoji + accent color from any free-form string containing
  * an "HH:MM[ AM/PM]" clock pattern (e.g. a [TIME] block line, or a "Current Time" string).
@@ -116,7 +121,7 @@ export function renderDayNightBadge(str) {
             case 'pills':
                 return `<div class="rt-entity-sub-line rt-units-container">${labelHtml} ${renderPills(value, rule.color)}</div>`;
             case 'badge': {
-                const badgeColorStyle = rule.color ? ` style="background:${rule.color}22;border-color:${rule.color}66;color:${rule.color};"` : '';
+                const badgeColorStyle = rule.color ? ` style="${makeColorTintStyle(rule.color)}"` : '';
                 return `<div class="rt-entity-sub-line rt-units-container">${labelHtml} <span class="rt-unit-pill no-desc"${badgeColorStyle}><span class="rt-unit-name">${escapeHtmlWithColor(value)}</span></span></div>`;
             }
             case 'highlight': {
@@ -249,7 +254,7 @@ export function renderDayNightBadge(str) {
                 return `<div class="rt-objective ${statusClass}">${labelHtml}<span class="rt-obj-icon">${icon}</span> <span class="rt-obj-text">${escapeHtmlWithColor(cleanVal)}</span></div>`;
             }
             case 'reward': {
-                const rewardStyle = rule.color ? ` style="color:${rule.color};border-color:${rule.color}66;"` : '';
+                const rewardStyle = rule.color ? ` style="${makeColorTintStyle(rule.color, 0, 40)}"` : '';
                 return `<div class="rt-entity-sub-line"><span class="rt-reward-chip"${rewardStyle}>${labelHtml ? labelHtml + ' ' : ''}🎁 ${escapeHtmlWithColor(value)}</span></div>`;
             }
             case 'difficulty': {
@@ -465,7 +470,7 @@ export function renderDayNightBadge(str) {
             case 'pill_colored': {
                 // A custom color override replaces the fixed buff/debuff/magic class entirely.
                 const pClass = rule.color ? '' : (rule.pillClass || '');
-                const colorStyle = rule.color ? ` style="background:${rule.color}1a;border-color:${rule.color}66;color:${rule.color};"` : '';
+                const colorStyle = rule.color ? ` style="${makeColorTintStyle(rule.color)}"` : '';
                 const pillHtml = splitSmart(value).map(p => {
                     p = p.trim();
                     const descMatch = p.match(/^(.*?)\s*\((.*?)\)$/);
@@ -480,17 +485,17 @@ export function renderDayNightBadge(str) {
             }
             case 'badge_colored': {
                 const bColor = rule.color || '#fff';
-                return `<div class="rt-entity-sub-line">${labelHtml}<span class="rt-difficulty-badge" style="background:${bColor}22; color:${bColor}; border:1px solid ${bColor}55;">${escapeHtmlWithColor(value)}</span></div>`;
+                return `<div class="rt-entity-sub-line">${labelHtml}<span class="rt-difficulty-badge" style="${makeColorTintStyle(bColor)}">${escapeHtmlWithColor(value)}</span></div>`;
             }
             case 'coin': {
                 const cColor = rule.color || '#fff';
                 const icon = rule.icon || '🪙';
-                return `<div class="rt-entity-sub-line">${labelHtml}<span class="rt-coin-badge" style="color:${cColor}; border-color:${cColor}44;">${icon} ${escapeHtmlWithColor(value)}</span></div>`;
+                return `<div class="rt-entity-sub-line">${labelHtml}<span class="rt-coin-badge" style="${makeColorTintStyle(cColor, 0, 27)}">${icon} ${escapeHtmlWithColor(value)}</span></div>`;
             }
             case 'dice_roll': {
                 // value is something like "1d20+5 = 18"
                 const diceStyle = rule.color
-                    ? `background:${rule.color}22; border:1px solid ${rule.color}66; color:${rule.color};`
+                    ? makeColorTintStyle(rule.color)
                     : 'background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2);';
                 return `<div class="rt-entity-sub-line">${labelHtml}<span class="rt-dice-roll" style="${diceStyle} padding:2px 6px; border-radius:4px; font-family:monospace; display:inline-flex; align-items:center; gap:4px;"><i class="fa-solid fa-dice-d20" style="opacity:0.7"></i> ${escapeHtmlWithColor(value)}</span></div>`;
             }
@@ -577,15 +582,10 @@ export function renderDayNightBadge(str) {
     // Shared marker type map used by tokenizeMarkers and tryRenderMarker.
     export const MARKER_TYPE_MAP = {
         PILLS:{ renderType: 'pills', example: 'Status (Hover for details), Condition (Another detail)' }, PLS:{ renderType: 'pills', example: 'Status (Hover for details)', aliasOf: 'PILLS' },
-        BAR:{ renderType: 'hp_bar', example: '50/100 (Red HP/Standing)' }, B:{ renderType: 'hp_bar', example: '50/100 (Red HP/Standing)', aliasOf: 'BAR' }, HPBAR:{ renderType: 'hp_bar', example: '50/100 (Red HP/Standing)', aliasOf: 'BAR' }, HPB:{ renderType: 'hp_bar', example: '50/100 (Red HP/Standing)', aliasOf: 'BAR' }, HP: { renderType: 'hp_bar', example: '50/100 (Red HP/Standing)', aliasOf: 'BAR' },
+        PILL:{ renderType: 'pill_colored', example: 'Status (Single colored pill)' },
+        BAR:{ renderType: 'hp_bar', example: '50/100 (Colored resource bar)' }, B:{ renderType: 'hp_bar', example: '50/100 (Colored resource bar)', aliasOf: 'BAR' }, HPBAR:{ renderType: 'hp_bar', example: '50/100 (Red HP/Standing)', aliasOf: 'BAR' }, HPB:{ renderType: 'hp_bar', example: '50/100 (Red HP/Standing)', aliasOf: 'BAR' }, HP: { renderType: 'hp_bar', example: '50/100 (Red HP/Standing)', aliasOf: 'BAR' },
         BARREL:{ renderType: 'barrel', example: 'Trust: -38/150 (signed centre-zero bar; click each side to recolor)' },
         NPC:{ renderType: 'npc', example: 'Gandolf: (freeform NPC card; uses a matching Lorebook Agent portrait)' },
-        BARRED:{ renderType: 'hp_bar', color: 'linear-gradient(90deg,#e74c3c,#c0392b)', example: '50/100 (Crimson Blood)' },
-        BARBLUE:{ renderType: 'hp_bar', color: 'linear-gradient(90deg,#3498db,#2980b9)', example: '50/100 (Blue Mana/Mana)' },
-        BARGREEN:{ renderType: 'hp_bar', color: 'linear-gradient(90deg,#2ecc71,#27ae60)', example: '50/100 (Green Stamina)' },
-        BARYELLOW:{ renderType: 'hp_bar', color: 'linear-gradient(90deg,#f1c40f,#f39c12)', example: '50/100 (Yellow Energy)' },
-        BARPURPLE:{ renderType: 'hp_bar', color: 'linear-gradient(90deg,#9b59b6,#8e44ad)', example: '50/100 (Purple Void)' },
-        BARORANGE:{ renderType: 'hp_bar', color: 'linear-gradient(90deg,#e67e22,#d35400)', example: '50/100 (Orange Heat)' },
         XPBAR:{ renderType: 'xp_bar', example: '450/1000 Level 3 (XP/Progress)' }, XB:{ renderType: 'xp_bar', example: '450/1000 Level 3 (XP/Progress)', aliasOf: 'XPBAR' },
         TEXT:{ renderType: 'text', example: 'Some text (Plain)' },
         BADGE:{ renderType: 'badge', example: 'Neutral (Reputation badge)' }, BDG:{ renderType: 'badge', example: 'Neutral (Reputation badge)', aliasOf: 'BADGE' },
@@ -594,22 +594,6 @@ export function renderDayNightBadge(str) {
         REWARD:{ renderType: 'reward', example: '500 XP (Loot reward badge)' },
         DIFFICULTY:{ renderType: 'difficulty', example: 'Hard (Difficulty star badge)' },
         PROGRESS:{ renderType: 'progress', example: '3/5 (Fraction progress)' },
-        PROGRESSRED:{ renderType: 'progress', color: '#e74c3c', example: '3/5 (Red fraction progress)' },
-        PROGRESSBLUE:{ renderType: 'progress', color: '#3498db', example: '3/5 (Blue fraction progress)' },
-        PROGRESSGREEN:{ renderType: 'progress', color: '#2ecc71', example: '3/5 (Green fraction progress)' },
-        PROGRESSYELLOW:{ renderType: 'progress', color: '#f1c40f', example: '3/5 (Yellow fraction progress)' },
-        PROGRESSPURPLE:{ renderType: 'progress', color: '#9b59b6', example: '3/5 (Purple fraction progress)' },
-        PROGRESSORANGE:{ renderType: 'progress', color: '#e67e22', example: '3/5 (Orange fraction progress)' },
-        PROGRESSCYAN:{ renderType: 'progress', color: '#00ffff', example: '3/5 (Cyan fraction progress)' },
-        PILLRED:{ renderType: 'pill_colored', pillClass: 'rt-pill-debuff', example: 'Stunned (Cannot take actions)' },
-        PILLGREEN:{ renderType: 'pill_colored', pillClass: 'rt-pill-buff', example: 'Focused (Clear minded, no distractions)' },
-        PILLBLUE:{ renderType: 'pill_colored', pillClass: 'rt-pill-magic', example: 'Shielded (Absorbs 10 damage)' },
-        PILLPINK:{ renderType: 'pill_colored', pillClass: 'rt-pill-pink', example: 'Smitten (Thinking of you)' },
-        PILLORANGE:{ renderType: 'pill_colored', pillClass: 'rt-pill-orange', example: 'Alert (On guard)' },
-        PILLPURPLE:{ renderType: 'pill_colored', pillClass: 'rt-pill-purple', example: 'Cursed (Dark magic)' },
-        PLSPINK:{ renderType: 'pill_colored', pillClass: 'rt-pill-pink', example: 'Smitten (Thinking of you)', aliasOf: 'PILLPINK' },
-        PLSORANGE:{ renderType: 'pill_colored', pillClass: 'rt-pill-orange', example: 'Alert (On guard)', aliasOf: 'PILLORANGE' },
-        PLSPURPLE:{ renderType: 'pill_colored', pillClass: 'rt-pill-purple', example: 'Cursed (Dark magic)', aliasOf: 'PILLPURPLE' },
         WARNING:{ renderType: 'badge_colored', color: '#f1c40f', example: 'Caution (Amber badge)' },
         DANGER:{ renderType: 'badge_colored', color: '#e74c3c', example: 'Hostile (Red badge)' },
         SUCCESS:{ renderType: 'badge_colored', color: '#2ecc71', example: 'Active (Green badge)' },
@@ -644,21 +628,21 @@ export function renderDayNightBadge(str) {
     }
 
     // Regex that matches the NEXT ((MARKER)) token anywhere in a string.
-    // Used iteratively by tokenizeMarkers. Supports an optional inline color
-    // override suffix: ((TAG - #HEX)) for a solid color, or
-    // ((TAG - #HEX1 #HEX2)) for a two-color gradient (bar-like types only).
-    // Restricted to 6-digit #RRGGBB hex: several render paths concatenate an
-    // alpha suffix directly onto the color string (e.g. `${color}22`), which
-    // only produces valid CSS when the base color is exactly 6 hex digits.
+    // Any base marker can take a named CSS color directly as a suffix
+    // (`((PILLPINK))`, `((BARRED))`) or a delimited color override
+    // (`((PILL - rebeccapurple))`, `((BAR - #ff6699))`).
     const HEX_COLOR_PATTERN = '#[0-9a-fA-F]{6}';
-    export const MARKER_TOKEN_RE = new RegExp(`\\(\\((${Object.keys(MARKER_TYPE_MAP).join('|')})(?:\\s*-\\s*(${HEX_COLOR_PATTERN})(?:\\s+(${HEX_COLOR_PATTERN}))?)?\\)\\)`, 'i');
+    const NAMED_COLOR_PATTERN = '[a-zA-Z]+';
+    const MARKER_COLOR_PATTERN = `(?:${HEX_COLOR_PATTERN}|${NAMED_COLOR_PATTERN})`;
+    const MARKER_BASE_PATTERN = Object.keys(MARKER_TYPE_MAP).sort((a, b) => b.length - a.length).join('|');
+    export const MARKER_TOKEN_RE = new RegExp(`\\(\\((${MARKER_BASE_PATTERN})(?:(${NAMED_COLOR_PATTERN}))?(?:\\s*-\\s*(${MARKER_COLOR_PATTERN})(?:\\s+(${MARKER_COLOR_PATTERN}))?)?\\)\\)`, 'i');
 
     /** Render types whose default color is already a gradient/gradient-friendly bar fill. */
     const GRADIENT_CAPABLE_RENDER_TYPES = new Set(['hp_bar', 'xp_bar', 'progress']);
 
-    /** Strictly validates a 6-digit #RRGGBB hex color to prevent CSS injection and malformed alpha-suffix concatenation. */
-    function isValidHexColor(str) {
-        return /^#[0-9a-fA-F]{6}$/.test(str || '');
+    /** Strictly validates an allowed CSS color token to prevent CSS injection. */
+    function isValidMarkerColor(str) {
+        return /^#[0-9a-fA-F]{6}$/.test(str || '') || /^[a-zA-Z]+$/.test(str || '');
     }
 
     /**
@@ -669,12 +653,12 @@ export function renderDayNightBadge(str) {
      * Invalid hex values are ignored entirely, falling back to the base rule's color.
      */
     function applyMarkerColorOverride(baseRule, color1, color2) {
-        if (!isValidHexColor(color1)) return baseRule;
+        if (!isValidMarkerColor(color1)) return baseRule;
         const rule = { ...baseRule };
         if (rule.renderType === 'barrel') {
             rule.positiveColor = color1;
-            rule.negativeColor = color2 && isValidHexColor(color2) ? color2 : color1;
-        } else if (color2 && isValidHexColor(color2) && GRADIENT_CAPABLE_RENDER_TYPES.has(rule.renderType)) {
+            rule.negativeColor = color2 && isValidMarkerColor(color2) ? color2 : color1;
+        } else if (color2 && isValidMarkerColor(color2) && GRADIENT_CAPABLE_RENDER_TYPES.has(rule.renderType)) {
             rule.color = `linear-gradient(90deg, ${color1}, ${color2})`;
         } else {
             rule.color = color1;
@@ -703,12 +687,17 @@ export function renderDayNightBadge(str) {
 
             const preText = remaining.slice(0, m.index).trim();
             const markerType = m[1].toUpperCase();
-            const colorArg1 = m[2] || null;
-            const colorArg2 = m[3] || null;
+            const colorSuffix = m[2] || null;
+            const colorArg1 = m[3] || null;
+            const colorArg2 = m[4] || null;
             remaining = remaining.slice(m.index + m[0].length).trimStart();
 
             const baseRule = MARKER_TYPE_MAP[markerType] || { renderType: 'text' };
-            const rule = colorArg1 ? applyMarkerColorOverride(baseRule, colorArg1, colorArg2) : baseRule;
+            const rule = colorArg1
+                ? applyMarkerColorOverride(baseRule, colorArg1, colorArg2)
+                : colorSuffix
+                    ? applyMarkerColorOverride(baseRule, colorSuffix)
+                    : baseRule;
 
             segments.push({ preText, markerType, rule });
         }
@@ -1064,7 +1053,7 @@ export function renderDayNightBadge(str) {
     };
 
     const renderPills = (text, customColor = null) => {
-        const colorStyle = customColor ? ` style="background:${customColor}1a;border-color:${customColor}66;color:${customColor};"` : '';
+        const colorStyle = customColor ? ` style="${makeColorTintStyle(customColor)}"` : '';
         return splitSmart(text).map(t => {
             // Detect buff/debuff prefix
             let pillClass = 'rt-unit-pill';
@@ -1413,9 +1402,9 @@ function formatValueToCurrency(totalCp, detectedCurrency) {
                     const explicitType = mm ? MARKER_TYPE_MAP[markerCode] : null;
                     let line = mm ? mm[2].trim() : rawLine;
 
-                    // Detect inline hp-bar marker: "Entity Name ((BARGREEN)) 12/20"
-                    // Uses tokenizeMarkers (the same engine used for sub-field lines) so ALL
-                    // color-variant bar markers (BARGREEN, BARRED, BARPURPLE, etc.) work here,
+                    // Detect inline hp-bar marker: "Entity Name ((BARGREEN)) 12/20".
+                    // Uses tokenizeMarkers (the same engine used for sub-field lines) so
+                    // dynamically colored bar markers (for example ((BARRED))) work here,
                     // not just the handful in the old hardcoded regex.
                     // Only fires when the marker is NOT at line-start (MARKER_RX already handles that).
                     let inlineEntityName = null;
@@ -1426,7 +1415,7 @@ function formatValueToCurrency(totalCp, detectedCurrency) {
                             inlineEntityName = segs[0].preText.trim();
                             inlineBarRule    = segs[0].rule;          // carries color, renderType, etc.
                             line = segs[0].content.trim();            // just the value: "12/20" or "HP: 12/20"
-                            markerCode = segs[0].markerType;          // e.g. "BARGREEN"
+                            markerCode = segs[0].markerType;          // e.g. "BAR" from ((BARGREEN))
                         }
                     }
 
@@ -1455,13 +1444,13 @@ function formatValueToCurrency(totalCp, detectedCurrency) {
 
                     if (hpMatch) {
                         const [, nameRaw, curRaw, maxRaw, rest] = hpMatch;
-                        // inlineEntityName takes priority (set when "Name ((BARGREEN)) x/y" format used)
+                        // inlineEntityName takes priority (set when "Name ((BARGREEN)) x/y" is used)
                         const name = (inlineEntityName || nameRaw || '').trim();
                         const cur = Number(curRaw.replace(/,/g, ''));
                         const max = maxRaw ? Number(maxRaw.replace(/,/g, '')) : undefined;
                         const hasMax = max !== undefined;
                         const pct = hasMax ? Math.max(0, Math.min(100, (cur / max) * 100)) : 100;
-                        // If an inline color-bar rule was detected (e.g. ((BARGREEN))), use its
+                        // If an inline colored-bar rule was detected (e.g. ((BARGREEN))), use its
                         // color directly — don't override it with the damage-based red/yellow/green.
                         const hpColor = inlineBarRule?.color
                             ? inlineBarRule.color
