@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [6.0.79] - 2026-07-24
+
+### Fixed
+- **World Skeleton entries**: preserves model-supplied titles when descriptions contain hyphens or metadata such as “Parties involved,” and the default prompt now requires a strict title/content layout.
+
 ## [6.0.78] - 2026-07-24
 
 ### Fixed

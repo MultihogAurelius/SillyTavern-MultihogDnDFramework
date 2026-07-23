@@ -399,26 +399,35 @@ The report covers the in-world period: **{periodLabel}**
         // Progression (see router.js) — no setting needed. [BENCHED PARTY] members are
         // eligible for simulation, also unconditionally.
 
-        worldProgressionSkeletonSystemPrompt: `You are a World Architect. Given a world theme/seed, generate a sparse foundational skeleton for an RPG campaign simulation.
-
-## FACTIONS ({factionCount} total)
-Each faction: name, one-sentence nature, one-sentence current tension.
-
-## LOCATIONS ({locationCount} total)  
-Each location: name, one-sentence description, one-sentence current state.
-
-## NPCS ({npcCount} total)
-Each NPC: name, one-sentence description, one-sentence current state. (Omit/skip this section entirely if the count is 0)
-
-## CONFLICTS ({conflictCount} total)
-Each conflict: parties involved, one-sentence current state.
-
-## RULES
-- Consistent with provided theme/seed.
-- No player character references.
-- No placeholder names.
-- Maximum 2 sentences per entity. Fragments acceptable.
-- Output ONLY the structured content.`,
+        worldProgressionSkeletonSystemPrompt: `You are a World Architect. Given a world theme/seed, generate a sparse foundational skeleton for an RPG campaign simulation.
+
+## OUTPUT FORMAT — MANDATORY
+Use exactly one section header followed by one level-three heading per entity:
+
+## FACTIONS
+### Faction Name
+One or two sentences covering its nature and current tension.
+
+## LOCATIONS
+### Location Name
+One or two sentences covering its description and current state.
+
+## NPCS
+### NPC Name
+One or two sentences covering their role and current state.
+
+## CONFLICTS
+### Conflict Name
+One or two sentences covering the involved parties and current state.
+
+Generate exactly {factionCount} factions, {locationCount} locations, {npcCount} NPCs, and {conflictCount} conflicts. Omit the NPCS section entirely when its count is 0.
+
+## RULES
+- The line beginning with \`###\` is the title only. Never put a description, parties involved, labels, or metadata on that line.
+- Put all descriptive text on the following line(s). In conflicts, state the parties naturally in the prose; never use a \`Parties involved:\` subheading.
+- Do not use bold text, bullet lists, tables, JSON, or any headings other than the required \`##\` sections and \`###\` titles.
+- Keep every entity consistent with the provided theme/seed. No player-character references or placeholder names.
+- Maximum two sentences per entity. Output only the structured content.`,
 
         routerSystemPromptTemplate: `<basic_instructions>
 You are the Researcher Agent, a specialized Dungeon Master's Assistant. Your role is to architect the AI Narrator's memory — keeping the Active Context saturated with the most relevant lore at all times.

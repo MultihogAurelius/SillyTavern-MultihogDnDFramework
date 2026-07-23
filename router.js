@@ -4221,9 +4221,11 @@ function parseSkeletonOutput(rawText) {
             continue;
         }
 
-        // 3. Check for list items like * **Name**: description
+        // 3. Bold names are explicit entry titles. A plain `Name: description`
+        // line is only a title when no entry is open; otherwise it is ordinary
+        // content such as `Parties involved:` or a hyphenated description.
         let listMatch = line.match(listRegexBold);
-        if (!listMatch) {
+        if (!listMatch && !currentItem) {
             listMatch = line.match(listRegexPlain);
         }
         if (listMatch) {
