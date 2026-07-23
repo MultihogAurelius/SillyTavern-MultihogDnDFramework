@@ -1376,6 +1376,9 @@ export function createPanel(dependencies) {
                                 bookNameLowerFull.endsWith('_locations') || bookNameLowerFull.endsWith('_location');
                             const useLocImageView = isLocBook && !!layoutS.locationImages;
 
+                            const isWorldBook = displayNameLower === 'world' ||
+                                bookNameLowerFull.endsWith('_world');
+
                             const folder = document.createElement('div');
                             folder.style.cssText = 'flex-shrink: 0; margin-bottom: 2px;';
 
@@ -1386,6 +1389,7 @@ export function createPanel(dependencies) {
                             folderHdr.innerHTML = `
                             ${useNpcCardView ? '<span class="rt-npc-folder-icon">👤</span>' : ''}
                             ${useLocImageView ? '<span class="rt-loc-folder-icon">🗺️</span>' : ''}
+                            ${isWorldBook ? '<span class="rt-world-folder-icon">🌍</span>' : ''}
                             <span class="rt-mf-icon" style="font-size:9px; opacity:0.5; width:10px; flex-shrink:0; font-family:monospace;">${isOpen ? '▼' : '▶'}</span>
                             <span style="font-weight:bold; font-size:11px; flex:1; color:var(--rt-text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(displayName)}</span>
                             <span style="font-size:9px; opacity:0.45; color:var(--rt-text-muted); flex-shrink:0;">${activeCount}/${items.length} (${totalTokens}t)</span>
