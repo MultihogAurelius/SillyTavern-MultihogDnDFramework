@@ -560,10 +560,11 @@ export function saveSettings(force = false, delay = 0) {
         const chatId0 = runtimeState.currentChatId || SillyTavern.getContext()?.chatId || null;
         writeModuleSchemaBackup(chatId0);
         if (s0.chatLinkEnabled && chatId0 && !isPortraitMigrationLocked()) {
-            // Keep chatStates partition aligned with live schema without nesting saveSettings.
+            // Keep the per-chat module presentation aligned without nesting saveSettings.
+            // Custom tracker definitions themselves are global and are intentionally
+            // not copied into a chat snapshot.
             const existing = s0.chatStates?.[chatId0];
             if (existing) {
-                existing.customFields = JSON.parse(JSON.stringify(s0.customFields || []));
                 existing.blockOrder = JSON.parse(JSON.stringify(s0.blockOrder || []));
                 existing.modules = JSON.parse(JSON.stringify(s0.modules || {}));
             }

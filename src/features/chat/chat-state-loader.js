@@ -39,7 +39,8 @@ export function createChatStateLoader({
     if (saved.modules) s.modules = { ...s.modules, ...saved.modules };
     if (saved.blockOrder) s.blockOrder = JSON.parse(JSON.stringify(saved.blockOrder));
     if (saved.stockPrompts) s.stockPrompts = loadStockPromptsFromProfile(saved.stockPrompts);
-    if (saved.customFields) s.customFields = JSON.parse(JSON.stringify(saved.customFields));
+    // Custom tracker definitions are global framework configuration. Chat Link
+    // restores a chat's state, never its private copy of the module library.
     s.customPortraits = JSON.parse(JSON.stringify(saved.customPortraits || {}));
     s.customLocationImages = JSON.parse(JSON.stringify(saved.customLocationImages || {}));
     // Restore persisted quests (incl. completed) so the UI can display them

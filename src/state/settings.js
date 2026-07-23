@@ -42,7 +42,7 @@ export function getSettings() {
     }
 }
 
-function getSettingsInternal(extensionSettings) {
+function getSettingsInternal(extensionSettings) {
     const defaults = buildDefaultSettings();
 
     if (!extensionSettings[MODULE_NAME]) {
@@ -63,7 +63,28 @@ function getSettingsInternal(extensionSettings) {
         }
     }
     
-    const s = extensionSettings[MODULE_NAME];
+    const s = extensionSettings[MODULE_NAME];
+
+    // Custom tracker definitions are framework configuration, not chat state.
+    // Older Chat Link snapshots kept a separate customFields list per chat, so a
+    // module created in one chat appeared to vanish when another chat was loaded.
+    // Merge those legacy lists once, then leave definitions global going forward.
+    if (s.customFieldsGlobalizedVersion !== 1) {
+        const fields = Array.isArray(s.customFields) ? s.customFields : [];
+        const seenTags = new Set(fields.map(field => String(field?.tag || '').toUpperCase()).filter(Boolean));
+        for (const snapshot of Object.values(s.chatStates || {})) {
+            if (!snapshot || typeof snapshot !== 'object') continue;
+            for (const field of Array.isArray(snapshot.customFields) ? snapshot.customFields : []) {
+                const tag = String(field?.tag || '').toUpperCase();
+                if (!tag || seenTags.has(tag)) continue;
+                fields.push(JSON.parse(JSON.stringify(field)));
+                seenTags.add(tag);
+            }
+            delete snapshot.customFields;
+        }
+        s.customFields = fields;
+        s.customFieldsGlobalizedVersion = 1;
+    }
 
     // Load UI collapse and open/close states from localStorage to prevent expensive saveSettings/disk I/O calls
     if (localStorage.getItem('rpg_tracker_collapsed') !== null) {

@@ -206,8 +206,6 @@ export function getPendingModuleSchemaBackup() {
         const backupTags = JSON.stringify(backup.customFields.map(f => f.tag));
         const liveOrder = JSON.stringify(s.blockOrder || []);
         const backupOrder = JSON.stringify(backup.blockOrder);
-        const partition = backup.chatId ? s.chatStates?.[backup.chatId] : null;
-        const partTags = JSON.stringify((partition?.customFields || []).map(f => f.tag));
         const liveStockPrompts = JSON.stringify(s.stockPrompts || {});
         const backupStockPrompts = JSON.stringify(backup.stockPrompts || {});
         const liveSyspromptModules = JSON.stringify(s.syspromptModules || {});
@@ -217,7 +215,6 @@ export function getPendingModuleSchemaBackup() {
         const liveCyoaConfig = JSON.stringify(s.cyoaConfig || {});
         const backupCyoaConfig = JSON.stringify(backup.cyoaConfig || {});
         const alreadyMatched = liveTags === backupTags && liveOrder === backupOrder
-            && (!backup.chatId || partTags === backupTags)
             && (!backup.stockPrompts || liveStockPrompts === backupStockPrompts)
             && (!backup.syspromptModules || liveSyspromptModules === backupSyspromptModules)
             && liveNarrativePacing === backupNarrativePacing
@@ -263,21 +260,8 @@ export function applyModuleSchemaBackup(preferredChatId, backupOverride = null) 
             s.cyoaConfig = JSON.parse(JSON.stringify(backup.cyoaConfig));
         }
 
-        if (backup.chatId) {
-            if (!s.chatStates) s.chatStates = {};
-            const existing = s.chatStates[backup.chatId] || {};
-            s.chatStates[backup.chatId] = {
-                ...existing,
-                customFields: JSON.parse(JSON.stringify(backup.customFields)),
-                blockOrder: JSON.parse(JSON.stringify(backup.blockOrder)),
-                modules: backup.modules
-                    ? { ...(existing.modules || {}), ...JSON.parse(JSON.stringify(backup.modules)) }
-                    : existing.modules,
-            };
-        }
-
-        // preferredChatId is reserved for callers that only want to heal the active chat;
-        // we still repair backup.chatId's partition above so loadChatState sees good data.
+        // Custom tracker definitions are global. Do not reintroduce a per-chat
+        // copy while recovering a write-ahead backup.
         void preferredChatId;
 
         return true;
@@ -317,7 +301,6 @@ export function saveChatState(chatId, opts = {}) {
         modules:      JSON.parse(JSON.stringify(s.modules)),
         blockOrder:   JSON.parse(JSON.stringify(s.blockOrder  || BLOCK_ORDER)),
         stockPrompts: snapshotStockPromptsForProfile(s.stockPrompts),
-        customFields: JSON.parse(JSON.stringify(s.customFields || [])),
         quests:       JSON.parse(JSON.stringify(s.quests || [])), // persist full array (incl. completed) for cross-session UI display
         historyIndex: s.historyIndex ?? -1,
         activeRouterKeys: JSON.parse(JSON.stringify(s.activeRouterKeys || [])),
