@@ -7511,6 +7511,17 @@ RULES:
             }, delayMs);
         }
 
+        // The State Tracker's async GENERATION_ENDED handler is registered before
+        // this UI listener. Expose the DOM-only finalizer so it can run before the
+        // tracker starts its network pass, rather than making CYOA styling wait for it.
+        function finalizeCyoaNarratorRender({ stopped = false } = {}) {
+            setCyoaGenerating(false);
+            scheduleCyoaBind(0);
+            scheduleCyoaBind(250);
+            if (!stopped) scheduleCyoaBind(800);
+        }
+        globalThis._rpgFinalizeCyoaNarratorRender = finalizeCyoaNarratorRender;
+
         if (event_types.GENERATION_STARTED) {
             eventSource.on(event_types.GENERATION_STARTED, (...args) => {
                 // ST passes dryRun as the last arg — ignore prompt-build dry runs
@@ -7521,15 +7532,10 @@ RULES:
         }
         // Re-bind after every generation (ST may re-render HTML slightly later)
         eventSource.on(event_types.GENERATION_ENDED, () => {
-            setCyoaGenerating(false);
-            scheduleCyoaBind(0);
-            scheduleCyoaBind(250);
-            scheduleCyoaBind(800);
+            finalizeCyoaNarratorRender();
         });
         eventSource.on(event_types.GENERATION_STOPPED, () => {
-            setCyoaGenerating(false);
-            scheduleCyoaBind(0);
-            scheduleCyoaBind(250);
+            finalizeCyoaNarratorRender({ stopped: true });
         });
         // Also bind on chat load / message swipe
         eventSource.on(event_types.CHAT_CHANGED, () => scheduleCyoaBind(300));

@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [6.0.81] - 2026-07-24
+
+### Fixed
+- **CYOA choice rendering**: bracketed mechanics such as DCs and modifiers now decorate immediately after narration ends, without waiting for the State Tracker pass.
+
 ## [6.0.80] - 2026-07-24
 
 ### Fixed

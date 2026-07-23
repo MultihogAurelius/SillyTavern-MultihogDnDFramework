@@ -1984,6 +1984,13 @@ export function resetRouterAutoTick(reason = 'manual') {
  */
 export async function onGenerationEnded() {
     _rpgIsGenerating = false;
+    // CYOA decoration is independent of tracker state. Finalize it before this
+    // handler awaits scanning or a State Tracker model pass.
+    try {
+        globalThis._rpgFinalizeCyoaNarratorRender?.();
+    } catch (error) {
+        console.warn('[RPG Tracker] CYOA render finalization failed:', error);
+    }
     const settings = getSettings();
 
     const isStateRunning = typeof globalThis._rpgStateModelRunning === 'function' && globalThis._rpgStateModelRunning();
