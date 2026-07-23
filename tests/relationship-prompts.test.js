@@ -3,7 +3,9 @@ import { buildStateTrackerRelationshipCommandInstruction } from '../src/state/re
 
 describe('State Tracker relationship instruction', () => {
     it('uses the built-in instruction when no custom instruction is configured', () => {
-        expect(buildStateTrackerRelationshipCommandInstruction(100, false)).toContain('RELATIONSHIP DELTA COMMANDS');
+        const instruction = buildStateTrackerRelationshipCommandInstruction(100, false);
+        expect(instruction).toContain('RELATIONSHIP DELTA COMMANDS');
+        expect(instruction).toContain("intent to award relationship points is clear");
     });
 
     it('uses a custom instruction and resolves its supported placeholders', () => {

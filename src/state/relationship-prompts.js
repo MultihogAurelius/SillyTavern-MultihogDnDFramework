@@ -83,11 +83,13 @@ Friendship +5 Exact NPC Name
 Affection -2 Exact NPC Name
 [/RELATIONS]
 
-Only convert annotations in this exact narrator form:
+Typical narrator annotations look like:
 *(Friendship: Marcus +10 — saved his life in the alley)*
 *(Affection: Elena +2 — she seemed touched by the compliment)*
 
-Each command is one line: axis first (Friendship or Affection), signed whole-number delta second, then the exact NPC name. Copy the axis, NPC name, and signed delta from each annotation exactly; discard only its explanation. Do not add reasons, bullets, punctuation, or any other text inside the block. If there are no explicit annotations, do not output a [RELATIONS] block. Each command is clamped to -${m} through +${m}.`;
+Record a delta when the narrator's intent to award relationship points is clear, even if its punctuation, wording, capitalization, spacing, or surrounding formatting is slightly different from these examples. Do not invent a relationship award when that intent is unclear.
+
+Each command is one line: axis first (Friendship or Affection), signed whole-number delta second, then the NPC name. Preserve the intended axis, NPC, and delta; discard only the explanation. Do not add reasons, bullets, punctuation, or any other text inside the block. If there are no clear narrator relationship awards, do not output a [RELATIONS] block. Each command is clamped to -${m} through +${m}.`;
 }
 
 /**

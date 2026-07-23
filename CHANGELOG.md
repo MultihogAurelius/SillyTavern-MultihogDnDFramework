@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [6.0.77] - 2026-07-24
+
+### Changed
+- **Relationship-delta recognition**: State Tracker now accepts clear narrator point awards with minor wording, punctuation, capitalization, spacing, or formatting variations.
+
 ## [6.0.76] - 2026-07-24
 
 ### Added
