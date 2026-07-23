@@ -132,8 +132,7 @@ export function buildDefaultSettings() {
 IGNORE NARRATIVE FLUFF: Do not track temporary dialogue or actions. Only track persistent state changes.
 INTEGRATION: Track all durations stated by the narrative (e.g. 'poisoned for 3 turns'). Decrement by 1 each round in [COMBAT]. For out-of-combat/time-based durations, calculate the delta between the current [TIME] and the [TIME] in the PRIOR MEMO.
 CREATION: You MAY create a section that did not exist in the Prior Memo when the narrative warrants it based on your enabled modules.
-DELETION: To REMOVE a section entirely, you MUST output: \`[TAG]REMOVED[/TAG]\`.
-RELATIONSHIPS: Never create a relationship section (e.g., [RELATIONSHIPS]) in the memo. When the separate relationship-command instruction is present, report qualifying deltas only through its [RELATIONS] command block.
+DELETION: To REMOVE a section entirely, you MUST output: \`[TAG]REMOVED[/TAG]\`.
 </core_directives>
 
 <modules>

@@ -539,32 +539,19 @@ function getSettingsInternal(extensionSettings) {
     // sysprompt / agent prompt upgrades run ONLY via the post-update "Prompt Defaults
     // Updated" dialog (or Auto-Update Prompts on Upgrade) — once per fingerprint change.
 
-    // ── MIGRATION: Block RELATIONSHIPS section in State Tracker core prompt ───────
+    // Older releases embedded tracker-storage implementation details into the core
+    // prompt. Relationship command handling belongs to the parser, not the model.
     if (s.systemPromptTemplate) {
-        s.systemPromptTemplate = s.systemPromptTemplate.replace(
+        const legacyRelationshipDirectives = [
             'NO RELATIONSHIPS: Never track relationships, and never create a relationship section (e.g., [RELATIONSHIPS]). NPC relationships are handled by a separate, dedicated system.',
-            'RELATIONSHIPS: Never create a relationship section (e.g., [RELATIONSHIPS]) in the memo. When the separate relationship-command instruction is present, report qualifying deltas only through its [RELATIONS] command block.'
-        );
-        if (s.systemPromptTemplate.includes('Never track relationships or reputation')) {
-            s.systemPromptTemplate = s.systemPromptTemplate.replace(
-                'NO RELATIONSHIPS: Never track relationships or reputation, and never create a relationship or reputation section (e.g., [RELATIONSHIPS] or [REPUTATION]). NPC relationships are handled by a separate, dedicated system.',
-                'RELATIONSHIPS: Never create a relationship section (e.g., [RELATIONSHIPS]) in the memo. When the separate relationship-command instruction is present, report qualifying deltas only through its [RELATIONS] command block.'
-            );
-        }
-        if (!s.systemPromptTemplate.includes('RELATIONSHIPS: Never create a relationship section')) {
-            if (s.systemPromptTemplate.includes('DELETION: To REMOVE a section entirely, you MUST output: `[TAG]REMOVED[/TAG]`.')) {
-                s.systemPromptTemplate = s.systemPromptTemplate.replace(
-                    'DELETION: To REMOVE a section entirely, you MUST output: `[TAG]REMOVED[/TAG]`.',
-                    'DELETION: To REMOVE a section entirely, you MUST output: `[TAG]REMOVED[/TAG]`.\nRELATIONSHIPS: Never create a relationship section (e.g., [RELATIONSHIPS]) in the memo. When the separate relationship-command instruction is present, report qualifying deltas only through its [RELATIONS] command block.'
-                );
-            } else if (s.systemPromptTemplate.includes('DELETION: To REMOVE a section entirely, you MUST output: \\`[TAG]REMOVED[/TAG]\\`.')) {
-                s.systemPromptTemplate = s.systemPromptTemplate.replace(
-                    'DELETION: To REMOVE a section entirely, you MUST output: \\`[TAG]REMOVED[/TAG]\\`.',
-                    'DELETION: To REMOVE a section entirely, you MUST output: \\`[TAG]REMOVED[/TAG]\\`.\nRELATIONSHIPS: Never create a relationship section (e.g., [RELATIONSHIPS]) in the memo. When the separate relationship-command instruction is present, report qualifying deltas only through its [RELATIONS] command block.'
-                );
-            }
-        }
-    }
+            'NO RELATIONSHIPS: Never track relationships or reputation, and never create a relationship or reputation section (e.g., [RELATIONSHIPS] or [REPUTATION]). NPC relationships are handled by a separate, dedicated system.',
+            'RELATIONSHIPS: Never create a relationship section (e.g., [RELATIONSHIPS]) in the memo. When the separate relationship-command instruction is present, report qualifying deltas only through its [RELATIONS] command block.',
+        ];
+        for (const directive of legacyRelationshipDirectives) {
+            s.systemPromptTemplate = s.systemPromptTemplate.replace(directive, '');
+        }
+        s.systemPromptTemplate = s.systemPromptTemplate.replace(/\n{3,}/g, '\n\n');
+    }
 
     // Location scene prompt defaults: keep textarea variant aligned with present-NPC toggle (v5.5.6+)
     // 5.5.7 also migrates the original 5.5.0 "establishing shot" factory text.

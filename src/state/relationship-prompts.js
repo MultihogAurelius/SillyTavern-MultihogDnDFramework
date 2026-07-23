@@ -75,9 +75,9 @@ export function buildStateTrackerRelationshipCommandInstruction(max, isFullConte
     }
 
     return `## RELATIONSHIP DELTA COMMANDS
-Relationship bars are enabled. Do NOT add relationship data to the memo itself. ${fullAuditRule}
+${fullAuditRule}
 
-Keep the normal State Memo output exactly as usual. After it, append this block only when there is at least one qualifying change:
+Emit this block only when there is at least one qualifying change:
 [RELATIONS]
 Friendship +5 Exact NPC Name
 Affection -2 Exact NPC Name

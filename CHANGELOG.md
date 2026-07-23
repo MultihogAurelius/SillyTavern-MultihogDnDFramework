@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [6.0.75] - 2026-07-24
+
+### Changed
+- **State Tracker relationship instruction**: removes memo-storage implementation details; the tracker is now instructed only on relationship-delta criteria and command syntax.
+
 ## [6.0.74] - 2026-07-23
 
 ### Added
