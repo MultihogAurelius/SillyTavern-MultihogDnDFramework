@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [6.0.24] - 2026-07-23
+
+### Fixed
+- **Custom mechanics across chats**: Chat Link no longer treats custom tracker definitions as chat-private. Modules created in one chat now appear in every chat, while existing legacy chat-only modules are merged into the global library on upgrade.
+
 ## [6.0.23] - 2026-07-23
 
 ### Changed
