@@ -113,17 +113,20 @@ These are recommendations, not rules — experiment. Different models shine for 
 
 ---
 
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/829b233c-19f0-407b-99a8-f58e80573a0a" width="500" alt="Lorebook Agent" />
-  <br>
-  <strong>Lorebook Agent</strong>
-</p>
-
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/de2f7522-e3ff-4153-8a3f-d38ca49ceca7" width="500" alt="Lorebook Agent" />
-  <br>
-  <strong>Relationship system within Lorebook Agent</strong>
-</p>
+<table border="0">
+  <tr>
+    <td align="center" valign="top">
+      <img src="https://github.com/user-attachments/assets/829b233c-19f0-407b-99a8-f58e80573a0a" width="100%" alt="Lorebook Agent" />
+      <br>
+      <strong>Lorebook Agent</strong>
+    </td>
+    <td align="center" valign="top">
+      <img src="https://github.com/user-attachments/assets/de2f7522-e3ff-4153-8a3f-d38ca49ceca7" width="100%" alt="Lorebook Agent" />
+      <br>
+      <strong>Relationship system within Lorebook Agent</strong>
+    </td>
+  </tr>
+</table>
 
 ---
 
