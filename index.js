@@ -2885,6 +2885,8 @@ async function showPortraitSettingsMenu(entityName, onRefresh, npcContent = null
                 let dragStartX  = 0, dragStartY  = 0;
                 let dragStartPX = 0, dragStartPY = 0;
                 let badgeTimer  = null;
+                let maxW = 800; // will be set in initView
+                let maxH = 600; // will be set in initView
                 const MIN_SCALE = 1;
                 const MAX_SCALE = 8;
 
@@ -2908,14 +2910,13 @@ async function showPortraitSettingsMenu(entityName, onRefresh, npcContent = null
                  *   (pan range = 0 .. wrapSize - scaledSize, i.e. the full image is reachable)
                  * - if smaller: center it
                  */
-                function clampPan(newPX, newPY) {
+                function clampPan(newPX, newPY, wrapW, wrapH) {
                     const scaledW = natW * scale;
                     const scaledH = natH * scale;
-                    const wrapW   = wrap.offsetWidth;
-                    const wrapH   = wrap.offsetHeight;
+                    wrapW = wrapW ?? wrap.offsetWidth;
+                    wrapH = wrapH ?? wrap.offsetHeight;
                     let x = newPX, y = newPY;
                     if (scaledW >= wrapW) {
-                        // image is wider than container: left edge <= 0, right edge >= wrapW
                         x = Math.min(0, Math.max(wrapW - scaledW, x));
                     } else {
                         x = (wrapW - scaledW) / 2;
@@ -2930,21 +2931,45 @@ async function showPortraitSettingsMenu(entityName, onRefresh, npcContent = null
 
                 /**
                  * Zoom to newScale keeping the wrapper-space point (cx, cy) fixed.
-                 * Math: newPan = cx - (newScale/scale) * (cx - pan)
+                 * Also resizes the wrapper to match the zoom up to maxW/maxH, 
+                 * and compensates for the popup re-centering layout shift.
                  */
                 function zoomAt(cx, cy, newScale) {
+                    const oldW = wrap.offsetWidth;
+                    const oldH = wrap.offsetHeight;
+                    
                     newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, newScale));
                     const sf = newScale / scale;
                     scale    = newScale;
+                    
+                    const newW = Math.min(maxW, Math.round(natW * scale));
+                    const newH = Math.min(maxH, Math.round(natH * scale));
+                    wrap.style.width  = newW + 'px';
+                    wrap.style.height = newH + 'px';
+                    
+                    // The popup is centered, so expanding it shifts its top-left corner
+                    const shiftX = (newW - oldW) / 2;
+                    const shiftY = (newH - oldH) / 2;
+                    
+                    // Compensate the anchor point and current pan for the coordinate system shift
+                    const adjCx = cx + shiftX;
+                    const adjCy = cy + shiftY;
+                    const adjPanX = panX + shiftX;
+                    const adjPanY = panY + shiftY;
+                    
                     [panX, panY] = clampPan(
-                        cx - sf * (cx - panX),
-                        cy - sf * (cy - panY)
+                        adjCx - sf * (adjCx - adjPanX),
+                        adjCy - sf * (adjCy - adjPanY),
+                        newW, newH
                     );
+                    
                     if (scale <= MIN_SCALE) { panX = 0; panY = 0; }
                 }
 
                 function resetZoom(animated) {
                     scale = 1; panX = 0; panY = 0;
+                    wrap.style.width  = natW + 'px';
+                    wrap.style.height = natH + 'px';
                     applyTransform(animated);
                     showBadge();
                 }
@@ -2952,9 +2977,9 @@ async function showPortraitSettingsMenu(entityName, onRefresh, npcContent = null
                 /** Size the wrapper and image to the constrained display dimensions, then init pan. */
                 function initView() {
                     if (!img.naturalWidth) return;
-                    const parentW = wrap.parentElement ? wrap.parentElement.offsetWidth - 20 : window.innerWidth * 0.9;
-                    const maxW    = Math.min(window.innerWidth * 0.80, parentW);
-                    const maxH    = window.innerHeight * 0.70;
+                    const parentW = wrap.parentElement ? wrap.parentElement.offsetWidth - 20 : window.innerWidth * 0.85;
+                    maxW = Math.min(window.innerWidth * 0.85, parentW);
+                    maxH = window.innerHeight * 0.80;
                     const ratio   = img.naturalWidth / img.naturalHeight;
                     let dispW     = img.naturalWidth;
                     let dispH     = img.naturalHeight;
