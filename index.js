@@ -560,10 +560,11 @@ export function saveSettings(force = false, delay = 0) {
         const chatId0 = runtimeState.currentChatId || SillyTavern.getContext()?.chatId || null;
         writeModuleSchemaBackup(chatId0);
         if (s0.chatLinkEnabled && chatId0 && !isPortraitMigrationLocked()) {
-            // Keep chatStates partition aligned with live schema without nesting saveSettings.
+            // Keep the per-chat module presentation aligned without nesting saveSettings.
+            // Custom tracker definitions themselves are global and are intentionally
+            // not copied into a chat snapshot.
             const existing = s0.chatStates?.[chatId0];
             if (existing) {
-                existing.customFields = JSON.parse(JSON.stringify(s0.customFields || []));
                 existing.blockOrder = JSON.parse(JSON.stringify(s0.blockOrder || []));
                 existing.modules = JSON.parse(JSON.stringify(s0.modules || {}));
             }
@@ -2773,13 +2774,16 @@ async function showPortraitSettingsMenu(entityName, onRefresh, npcContent = null
     const refresh = onRefresh || refreshRenderedView;
     const s = getSettings();
     const currentSrc = lookupCustomPortraitSrc(s, entityName);
+    const zoomWrapperId = `rt-portrait-zoom-wrap-${Date.now()}`;
+    const zoomImgId     = `rt-portrait-zoom-img-${Date.now()}`;
+    const zoomBadgeId   = `rt-portrait-zoom-badge-${Date.now()}`;
     const previewHtml = currentSrc
-        ? `<img src="${currentSrc}" style="max-width:128px;max-height:128px;border-radius:6px;display:block;margin:0 auto 10px;"/>`
+        ? `<div id="${zoomWrapperId}" style="position:relative;overflow:hidden;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.4);cursor:zoom-in;user-select:none;margin:0 auto 12px;line-height:0;"><img id="${zoomImgId}" src="${currentSrc}" style="position:absolute;top:0;left:0;display:block;max-width:none;max-height:none;transform-origin:0 0;will-change:transform;"/><div id="${zoomBadgeId}" style="position:absolute;bottom:8px;right:10px;background:rgba(0,0,0,0.55);color:#fff;font-size:11px;padding:2px 7px;border-radius:10px;pointer-events:none;opacity:0;transition:opacity 0.3s;">100%</div></div>`
         : `<div style="text-align:center;opacity:0.5;margin-bottom:10px;">No portrait set</div>`;
     const inputId = `rt-portrait-url-${Date.now()}`;
     const fileId = `rt-portrait-file-${Date.now()}`;
     const browseBtnId = `rt-portrait-browse-${Date.now()}`;
-    const popupContent = `<div style="padding:10px;min-width:270px;">
+    const popupContent = `<div style="padding:10px;box-sizing:border-box;width:100%;">
             <b style="display:block;margin-bottom:8px;">Set Portrait — ${entityName}</b>
             ${previewHtml}
             <label style="display:block;margin-bottom:4px;font-size:0.85em;opacity:0.8;">Image URL (https://…)</label>
@@ -2793,7 +2797,7 @@ async function showPortraitSettingsMenu(entityName, onRefresh, npcContent = null
     const ctx = SillyTavern.getContext();
     if (!ctx.callGenericPopup) { toastr['warning']('Popup API not available.', 'RPG Tracker'); return; }
     const popupOpts = {
-        okButton: 'Apply', cancelButton: 'Cancel', wide: false,
+        okButton: 'Apply', cancelButton: 'Cancel', wide: !!currentSrc,
         customButtons: [
             { text: '🤖 AI Generate', result: 4, classes: ['menu_button'] },
         ],
@@ -2862,6 +2866,252 @@ async function showPortraitSettingsMenu(entityName, onRefresh, npcContent = null
         }
 
         document.addEventListener('paste', popupPasteHandler);
+
+        // ── Zoom & Pan for portrait preview ──────────────────────────────────
+        if (currentSrc) {
+            const wrap  = document.getElementById(zoomWrapperId);
+            const img   = document.getElementById(zoomImgId);
+            const badge = document.getElementById(zoomBadgeId);
+            if (wrap && img && badge) {
+                // panX/panY = image top-left position in wrapper coords.
+                // At scale=1 with no pan, image is at (0,0) and wrapper is sized to match.
+                let scale    = 1;
+                let panX     = 0;
+                let panY     = 0;
+                let natW     = 0;   // image display width at scale=1
+                let natH     = 0;   // image display height at scale=1
+                let isDragging  = false;
+                let didDrag     = false;
+                let dragStartX  = 0, dragStartY  = 0;
+                let dragStartPX = 0, dragStartPY = 0;
+                let badgeTimer  = null;
+                let maxW = 800; // will be set in initView
+                let maxH = 600; // will be set in initView
+                const MIN_SCALE = 1;
+                const MAX_SCALE = 8;
+
+                /** Apply the current transform and cursor style. */
+                function applyTransform(animated) {
+                    img.style.transition = animated ? 'transform 0.22s ease' : 'none';
+                    img.style.transform  = `translate(${panX}px,${panY}px) scale(${scale})`;
+                    wrap.style.cursor    = scale > 1 ? (isDragging ? 'grabbing' : 'grab') : 'zoom-in';
+                }
+
+                function showBadge() {
+                    badge.textContent  = Math.round(scale * 100) + '%';
+                    badge.style.opacity = '1';
+                    clearTimeout(badgeTimer);
+                    badgeTimer = setTimeout(() => { badge.style.opacity = '0'; }, 1400);
+                }
+
+                /**
+                 * Clamp panX/panY so:
+                 * - if the scaled image is wider/taller than the wrapper: keep it filling the wrapper
+                 *   (pan range = 0 .. wrapSize - scaledSize, i.e. the full image is reachable)
+                 * - if smaller: center it
+                 */
+                function clampPan(newPX, newPY, wrapW, wrapH) {
+                    const scaledW = natW * scale;
+                    const scaledH = natH * scale;
+                    wrapW = wrapW ?? wrap.offsetWidth;
+                    wrapH = wrapH ?? wrap.offsetHeight;
+                    let x = newPX, y = newPY;
+                    if (scaledW >= wrapW) {
+                        x = Math.min(0, Math.max(wrapW - scaledW, x));
+                    } else {
+                        x = (wrapW - scaledW) / 2;
+                    }
+                    if (scaledH >= wrapH) {
+                        y = Math.min(0, Math.max(wrapH - scaledH, y));
+                    } else {
+                        y = (wrapH - scaledH) / 2;
+                    }
+                    return [x, y];
+                }
+
+                /**
+                 * Zoom to newScale keeping the wrapper-space point (cx, cy) fixed.
+                 * Also resizes the wrapper to match the zoom up to maxW/maxH, 
+                 * and compensates for the popup re-centering layout shift.
+                 */
+                function zoomAt(cx, cy, newScale) {
+                    const oldW = wrap.offsetWidth;
+                    const oldH = wrap.offsetHeight;
+                    
+                    newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, newScale));
+                    const sf = newScale / scale;
+                    scale    = newScale;
+                    
+                    const newW = Math.min(maxW, Math.round(natW * scale));
+                    const newH = Math.min(maxH, Math.round(natH * scale));
+                    wrap.style.width  = newW + 'px';
+                    wrap.style.height = newH + 'px';
+                    
+                    // The popup is centered, so expanding it shifts its top-left corner
+                    const shiftX = (newW - oldW) / 2;
+                    const shiftY = (newH - oldH) / 2;
+                    
+                    // Compensate the anchor point and current pan for the coordinate system shift
+                    const adjCx = cx + shiftX;
+                    const adjCy = cy + shiftY;
+                    const adjPanX = panX + shiftX;
+                    const adjPanY = panY + shiftY;
+                    
+                    [panX, panY] = clampPan(
+                        adjCx - sf * (adjCx - adjPanX),
+                        adjCy - sf * (adjCy - adjPanY),
+                        newW, newH
+                    );
+                    
+                    if (scale <= MIN_SCALE) { panX = 0; panY = 0; }
+                }
+
+                function resetZoom(animated) {
+                    scale = 1; panX = 0; panY = 0;
+                    wrap.style.width  = natW + 'px';
+                    wrap.style.height = natH + 'px';
+                    applyTransform(animated);
+                    showBadge();
+                }
+
+                /** Size the wrapper and image to the constrained display dimensions, then init pan. */
+                function initView() {
+                    if (!img.naturalWidth) return;
+                    const parentW = wrap.parentElement ? wrap.parentElement.offsetWidth - 20 : window.innerWidth * 0.85;
+                    maxW = Math.min(window.innerWidth * 0.85, parentW);
+                    maxH = window.innerHeight * 0.80;
+                    const ratio   = img.naturalWidth / img.naturalHeight;
+                    let dispW     = img.naturalWidth;
+                    let dispH     = img.naturalHeight;
+                    if (dispW > maxW) { dispW = maxW; dispH = dispW / ratio; }
+                    if (dispH > maxH) { dispH = maxH; dispW = dispH * ratio; }
+                    natW = Math.round(dispW);
+                    natH = Math.round(dispH);
+                    // Lock the image's pixel size so transforms don't fight CSS constraints
+                    img.style.width  = natW + 'px';
+                    img.style.height = natH + 'px';
+                    // Size the wrapper to exactly match — panX=0,panY=0 means image fills wrapper
+                    wrap.style.width  = natW + 'px';
+                    wrap.style.height = natH + 'px';
+                    panX = 0; panY = 0;
+                    applyTransform(false);
+                }
+
+                img.addEventListener('load', initView);
+                if (img.complete && img.naturalWidth) initView();
+
+                // ── Scroll to zoom, cursor-anchored ──
+                wrap.addEventListener('wheel', (ev) => {
+                    ev.preventDefault();
+                    ev.stopPropagation();
+                    const rect = wrap.getBoundingClientRect();
+                    const cx   = ev.clientX - rect.left;
+                    const cy   = ev.clientY - rect.top;
+                    zoomAt(cx, cy, scale * (ev.deltaY > 0 ? 0.88 : 1.12));
+                    applyTransform(false);
+                    showBadge();
+                }, { passive: false });
+
+                // ── Click to zoom in at cursor, or reset if already zoomed ──
+                wrap.addEventListener('click', (ev) => {
+                    if (didDrag) { didDrag = false; return; }
+                    const rect = wrap.getBoundingClientRect();
+                    const cx   = ev.clientX - rect.left;
+                    const cy   = ev.clientY - rect.top;
+                    if (scale <= MIN_SCALE) {
+                        zoomAt(cx, cy, 2.5);
+                        applyTransform(true);
+                    } else {
+                        resetZoom(true);
+                    }
+                    showBadge();
+                });
+
+                // ── Double-click to reset ──
+                wrap.addEventListener('dblclick', (ev) => {
+                    ev.stopPropagation();
+                    resetZoom(true);
+                });
+
+                // ── Drag to pan ──
+                wrap.addEventListener('mousedown', (ev) => {
+                    if (scale <= 1) return;
+                    isDragging   = true;
+                    didDrag      = false;
+                    dragStartX   = ev.clientX;
+                    dragStartY   = ev.clientY;
+                    dragStartPX  = panX;
+                    dragStartPY  = panY;
+                    applyTransform(false);
+                    ev.preventDefault();
+                });
+
+                const onMouseMove = (ev) => {
+                    if (!isDragging) return;
+                    const dx = ev.clientX - dragStartX;
+                    const dy = ev.clientY - dragStartY;
+                    if (Math.abs(dx) > 2 || Math.abs(dy) > 2) didDrag = true;
+                    [panX, panY] = clampPan(dragStartPX + dx, dragStartPY + dy);
+                    applyTransform(false);
+                };
+
+                const onMouseUp = () => {
+                    if (!isDragging) return;
+                    isDragging = false;
+                    applyTransform(false);
+                };
+
+                document.addEventListener('mousemove', onMouseMove);
+                document.addEventListener('mouseup',   onMouseUp);
+
+                // ── Pinch-to-zoom (touch) ──
+                let lastPinchDist = null;
+                wrap.addEventListener('touchstart', (ev) => {
+                    if (ev.touches.length === 2) {
+                        const dx = ev.touches[0].clientX - ev.touches[1].clientX;
+                        const dy = ev.touches[0].clientY - ev.touches[1].clientY;
+                        lastPinchDist = Math.hypot(dx, dy);
+                    }
+                }, { passive: true });
+
+                wrap.addEventListener('touchmove', (ev) => {
+                    if (ev.touches.length === 2 && lastPinchDist !== null) {
+                        ev.preventDefault();
+                        const dx   = ev.touches[0].clientX - ev.touches[1].clientX;
+                        const dy   = ev.touches[0].clientY - ev.touches[1].clientY;
+                        const dist = Math.hypot(dx, dy);
+                        const rect  = wrap.getBoundingClientRect();
+                        const midX  = (ev.touches[0].clientX + ev.touches[1].clientX) / 2 - rect.left;
+                        const midY  = (ev.touches[0].clientY + ev.touches[1].clientY) / 2 - rect.top;
+                        zoomAt(midX, midY, scale * (dist / lastPinchDist));
+                        applyTransform(false);
+                        showBadge();
+                        lastPinchDist = dist;
+                    }
+                }, { passive: false });
+
+                wrap.addEventListener('touchend', () => { lastPinchDist = null; }, { passive: true });
+
+                // ── Cleanup when popup is dismissed ──
+                const origPopupCleanup = () => {
+                    document.removeEventListener('mousemove', onMouseMove);
+                    document.removeEventListener('mouseup',   onMouseUp);
+                    clearTimeout(badgeTimer);
+                };
+                setTimeout(() => {
+                    const popup = wrap.closest('.popup, .dialogue_popup, [class*="popup"]');
+                    if (popup) {
+                        const closeBtn = popup.querySelector('.popup-close, .menu_button[data-result="0"], button[data-result]');
+                        if (closeBtn) closeBtn.addEventListener('click', origPopupCleanup, { once: true });
+                    }
+                    const observer = new MutationObserver(() => {
+                        if (!document.contains(wrap)) { origPopupCleanup(); observer.disconnect(); }
+                    });
+                    observer.observe(document.body, { childList: true, subtree: true });
+                }, 50);
+            }
+        }
+        // ─────────────────────────────────────────────────────────────────────
     }, 0);
 
     const result = await ctx.callGenericPopup(popupContent, ctx.POPUP_TYPE?.CONFIRM ?? 1, '', popupOpts);

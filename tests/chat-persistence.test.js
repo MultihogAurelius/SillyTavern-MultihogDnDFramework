@@ -25,4 +25,22 @@ describe('saveChatState', () => {
         expect(Object.keys(part.stockPrompts).length).toBeGreaterThan(1);
         expect(snapshotStockPromptsForProfile({ character: 'x' }).character).toBe('x');
     });
+
+    it('keeps custom tracker definitions global while preserving legacy chat-linked modules', () => {
+        const s = getSettings();
+        s.customFields = [];
+        delete s.customFieldsGlobalizedVersion;
+        s.chatStates = {
+            alpha: { customFields: [{ tag: 'ALPHA_TRACKER', label: 'Alpha', enabled: true }] },
+            beta: { customFields: [{ tag: 'BETA_TRACKER', label: 'Beta', enabled: true }] },
+        };
+
+        const migrated = getSettings();
+        expect(migrated.customFields.map(field => field.tag)).toEqual(['ALPHA_TRACKER', 'BETA_TRACKER']);
+        expect(migrated.chatStates.alpha.customFields).toBeUndefined();
+        expect(migrated.chatStates.beta.customFields).toBeUndefined();
+
+        saveChatState('fresh-chat', { skipDiskWrite: true });
+        expect(migrated.chatStates['fresh-chat'].customFields).toBeUndefined();
+    });
 });
