@@ -2785,7 +2785,7 @@ async function showPortraitSettingsMenu(entityName, onRefresh, npcContent = null
     const zoomImgId     = `rt-portrait-zoom-img-${Date.now()}`;
     const zoomBadgeId   = `rt-portrait-zoom-badge-${Date.now()}`;
     const previewHtml = currentSrc
-        ? `<div id="${zoomWrapperId}" style="text-align:center;margin-bottom:12px;overflow:hidden;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.4);cursor:zoom-in;user-select:none;position:relative;"><img id="${zoomImgId}" src="${currentSrc}" style="max-width:min(100%,80vw);max-height:70vh;width:auto;height:auto;display:inline-block;object-fit:contain;transform-origin:0 0;transition:transform 0.05s linear;will-change:transform;"/><div id="${zoomBadgeId}" style="position:absolute;bottom:8px;right:10px;background:rgba(0,0,0,0.55);color:#fff;font-size:11px;padding:2px 7px;border-radius:10px;pointer-events:none;opacity:0;transition:opacity 0.3s;">100%</div></div>`
+        ? `<div id="${zoomWrapperId}" style="position:relative;overflow:hidden;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.4);cursor:zoom-in;user-select:none;margin:0 auto 12px;line-height:0;"><img id="${zoomImgId}" src="${currentSrc}" style="position:absolute;top:0;left:0;display:block;max-width:none;max-height:none;transform-origin:0 0;will-change:transform;"/><div id="${zoomBadgeId}" style="position:absolute;bottom:8px;right:10px;background:rgba(0,0,0,0.55);color:#fff;font-size:11px;padding:2px 7px;border-radius:10px;pointer-events:none;opacity:0;transition:opacity 0.3s;">100%</div></div>`
         : `<div style="text-align:center;opacity:0.5;margin-bottom:10px;">No portrait set</div>`;
     const inputId = `rt-portrait-url-${Date.now()}`;
     const fileId = `rt-portrait-file-${Date.now()}`;
@@ -2880,89 +2880,151 @@ async function showPortraitSettingsMenu(entityName, onRefresh, npcContent = null
             const img   = document.getElementById(zoomImgId);
             const badge = document.getElementById(zoomBadgeId);
             if (wrap && img && badge) {
-                let scale  = 1;
-                let tx     = 0;   // translate X
-                let ty     = 0;   // translate Y
-                let isDragging = false;
-                let dragStartX = 0, dragStartY = 0;
-                let dragStartTx = 0, dragStartTy = 0;
-                let badgeTimer = null;
-
+                // panX/panY = image top-left position in wrapper coords.
+                // At scale=1 with no pan, image is at (0,0) and wrapper is sized to match.
+                let scale    = 1;
+                let panX     = 0;
+                let panY     = 0;
+                let natW     = 0;   // image display width at scale=1
+                let natH     = 0;   // image display height at scale=1
+                let isDragging  = false;
+                let didDrag     = false;
+                let dragStartX  = 0, dragStartY  = 0;
+                let dragStartPX = 0, dragStartPY = 0;
+                let badgeTimer  = null;
                 const MIN_SCALE = 1;
                 const MAX_SCALE = 8;
 
-                /** Clamp pan so the image never leaves the container on either axis */
-                function clampTranslate(newTx, newTy) {
-                    const iw = img.offsetWidth  * scale;
-                    const ih = img.offsetHeight * scale;
-                    const cw = wrap.offsetWidth;
-                    const ch = wrap.offsetHeight;
-                    // When zoomed, we can pan up to (scaledSize - containerSize) in each direction
-                    const maxTx = Math.max(0, (iw - cw) / 2 + (iw > cw ? 0 : 0));
-                    const maxTy = Math.max(0, (ih - ch) / 2);
-                    // Simple clamp: keep image edge from passing container edge
-                    const minX = Math.min(0, cw - iw);
-                    const minY = Math.min(0, ch - ih);
-                    return [
-                        Math.max(minX, Math.min(0, newTx)),
-                        Math.max(minY, Math.min(0, newTy)),
-                    ];
-                }
-
-                function applyTransform() {
-                    img.style.transform = `translate(${tx}px,${ty}px) scale(${scale})`;
-                    wrap.style.cursor = scale > 1 ? (isDragging ? 'grabbing' : 'grab') : 'zoom-in';
+                /** Apply the current transform and cursor style. */
+                function applyTransform(animated) {
+                    img.style.transition = animated ? 'transform 0.22s ease' : 'none';
+                    img.style.transform  = `translate(${panX}px,${panY}px) scale(${scale})`;
+                    wrap.style.cursor    = scale > 1 ? (isDragging ? 'grabbing' : 'grab') : 'zoom-in';
                 }
 
                 function showBadge() {
-                    badge.textContent = Math.round(scale * 100) + '%';
+                    badge.textContent  = Math.round(scale * 100) + '%';
                     badge.style.opacity = '1';
                     clearTimeout(badgeTimer);
-                    badgeTimer = setTimeout(() => { badge.style.opacity = '0'; }, 1200);
+                    badgeTimer = setTimeout(() => { badge.style.opacity = '0'; }, 1400);
                 }
 
-                function resetZoom() {
-                    scale = 1; tx = 0; ty = 0;
-                    img.style.transition = 'transform 0.25s ease';
-                    applyTransform();
-                    setTimeout(() => { img.style.transition = 'transform 0.05s linear'; }, 260);
+                /**
+                 * Clamp panX/panY so:
+                 * - if the scaled image is wider/taller than the wrapper: keep it filling the wrapper
+                 *   (pan range = 0 .. wrapSize - scaledSize, i.e. the full image is reachable)
+                 * - if smaller: center it
+                 */
+                function clampPan(newPX, newPY) {
+                    const scaledW = natW * scale;
+                    const scaledH = natH * scale;
+                    const wrapW   = wrap.offsetWidth;
+                    const wrapH   = wrap.offsetHeight;
+                    let x = newPX, y = newPY;
+                    if (scaledW >= wrapW) {
+                        // image is wider than container: left edge <= 0, right edge >= wrapW
+                        x = Math.min(0, Math.max(wrapW - scaledW, x));
+                    } else {
+                        x = (wrapW - scaledW) / 2;
+                    }
+                    if (scaledH >= wrapH) {
+                        y = Math.min(0, Math.max(wrapH - scaledH, y));
+                    } else {
+                        y = (wrapH - scaledH) / 2;
+                    }
+                    return [x, y];
+                }
+
+                /**
+                 * Zoom to newScale keeping the wrapper-space point (cx, cy) fixed.
+                 * Math: newPan = cx - (newScale/scale) * (cx - pan)
+                 */
+                function zoomAt(cx, cy, newScale) {
+                    newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, newScale));
+                    const sf = newScale / scale;
+                    scale    = newScale;
+                    [panX, panY] = clampPan(
+                        cx - sf * (cx - panX),
+                        cy - sf * (cy - panY)
+                    );
+                    if (scale <= MIN_SCALE) { panX = 0; panY = 0; }
+                }
+
+                function resetZoom(animated) {
+                    scale = 1; panX = 0; panY = 0;
+                    applyTransform(animated);
                     showBadge();
                 }
 
-                // Scroll to zoom, anchored to cursor position
+                /** Size the wrapper and image to the constrained display dimensions, then init pan. */
+                function initView() {
+                    if (!img.naturalWidth) return;
+                    const parentW = wrap.parentElement ? wrap.parentElement.offsetWidth - 20 : window.innerWidth * 0.9;
+                    const maxW    = Math.min(window.innerWidth * 0.80, parentW);
+                    const maxH    = window.innerHeight * 0.70;
+                    const ratio   = img.naturalWidth / img.naturalHeight;
+                    let dispW     = img.naturalWidth;
+                    let dispH     = img.naturalHeight;
+                    if (dispW > maxW) { dispW = maxW; dispH = dispW / ratio; }
+                    if (dispH > maxH) { dispH = maxH; dispW = dispH * ratio; }
+                    natW = Math.round(dispW);
+                    natH = Math.round(dispH);
+                    // Lock the image's pixel size so transforms don't fight CSS constraints
+                    img.style.width  = natW + 'px';
+                    img.style.height = natH + 'px';
+                    // Size the wrapper to exactly match — panX=0,panY=0 means image fills wrapper
+                    wrap.style.width  = natW + 'px';
+                    wrap.style.height = natH + 'px';
+                    panX = 0; panY = 0;
+                    applyTransform(false);
+                }
+
+                img.addEventListener('load', initView);
+                if (img.complete && img.naturalWidth) initView();
+
+                // ── Scroll to zoom, cursor-anchored ──
                 wrap.addEventListener('wheel', (ev) => {
                     ev.preventDefault();
                     ev.stopPropagation();
                     const rect = wrap.getBoundingClientRect();
-                    const mouseX = ev.clientX - rect.left;  // cursor in container space
-                    const mouseY = ev.clientY - rect.top;
-                    const delta  = ev.deltaY > 0 ? -0.12 : 0.12;
-                    const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, scale + delta * scale));
-                    // Adjust translate so the point under the cursor stays fixed
-                    const scaleFactor = newScale / scale;
-                    const newTx = mouseX - scaleFactor * (mouseX - tx);
-                    const newTy = mouseY - scaleFactor * (mouseY - ty);
-                    scale = newScale;
-                    [tx, ty] = scale <= MIN_SCALE ? [0, 0] : clampTranslate(newTx, newTy);
-                    applyTransform();
+                    const cx   = ev.clientX - rect.left;
+                    const cy   = ev.clientY - rect.top;
+                    zoomAt(cx, cy, scale * (ev.deltaY > 0 ? 0.88 : 1.12));
+                    applyTransform(false);
                     showBadge();
                 }, { passive: false });
 
-                // Double-click to reset
-                wrap.addEventListener('dblclick', (ev) => {
-                    ev.preventDefault();
-                    resetZoom();
+                // ── Click to zoom in at cursor, or reset if already zoomed ──
+                wrap.addEventListener('click', (ev) => {
+                    if (didDrag) { didDrag = false; return; }
+                    const rect = wrap.getBoundingClientRect();
+                    const cx   = ev.clientX - rect.left;
+                    const cy   = ev.clientY - rect.top;
+                    if (scale <= MIN_SCALE) {
+                        zoomAt(cx, cy, 2.5);
+                        applyTransform(true);
+                    } else {
+                        resetZoom(true);
+                    }
+                    showBadge();
                 });
 
-                // Drag to pan
+                // ── Double-click to reset ──
+                wrap.addEventListener('dblclick', (ev) => {
+                    ev.stopPropagation();
+                    resetZoom(true);
+                });
+
+                // ── Drag to pan ──
                 wrap.addEventListener('mousedown', (ev) => {
                     if (scale <= 1) return;
-                    isDragging = true;
-                    dragStartX  = ev.clientX;
-                    dragStartY  = ev.clientY;
-                    dragStartTx = tx;
-                    dragStartTy = ty;
-                    applyTransform();
+                    isDragging   = true;
+                    didDrag      = false;
+                    dragStartX   = ev.clientX;
+                    dragStartY   = ev.clientY;
+                    dragStartPX  = panX;
+                    dragStartPY  = panY;
+                    applyTransform(false);
                     ev.preventDefault();
                 });
 
@@ -2970,20 +3032,21 @@ async function showPortraitSettingsMenu(entityName, onRefresh, npcContent = null
                     if (!isDragging) return;
                     const dx = ev.clientX - dragStartX;
                     const dy = ev.clientY - dragStartY;
-                    [tx, ty] = clampTranslate(dragStartTx + dx, dragStartTy + dy);
-                    applyTransform();
+                    if (Math.abs(dx) > 2 || Math.abs(dy) > 2) didDrag = true;
+                    [panX, panY] = clampPan(dragStartPX + dx, dragStartPY + dy);
+                    applyTransform(false);
                 };
 
                 const onMouseUp = () => {
                     if (!isDragging) return;
                     isDragging = false;
-                    applyTransform();
+                    applyTransform(false);
                 };
 
                 document.addEventListener('mousemove', onMouseMove);
                 document.addEventListener('mouseup',   onMouseUp);
 
-                // Pinch-to-zoom (touch)
+                // ── Pinch-to-zoom (touch) ──
                 let lastPinchDist = null;
                 wrap.addEventListener('touchstart', (ev) => {
                     if (ev.touches.length === 2) {
@@ -2999,11 +3062,11 @@ async function showPortraitSettingsMenu(entityName, onRefresh, npcContent = null
                         const dx   = ev.touches[0].clientX - ev.touches[1].clientX;
                         const dy   = ev.touches[0].clientY - ev.touches[1].clientY;
                         const dist = Math.hypot(dx, dy);
-                        const factor = dist / lastPinchDist;
-                        const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, scale * factor));
-                        scale = newScale;
-                        if (scale <= MIN_SCALE) { tx = 0; ty = 0; }
-                        applyTransform();
+                        const rect  = wrap.getBoundingClientRect();
+                        const midX  = (ev.touches[0].clientX + ev.touches[1].clientX) / 2 - rect.left;
+                        const midY  = (ev.touches[0].clientY + ev.touches[1].clientY) / 2 - rect.top;
+                        zoomAt(midX, midY, scale * (dist / lastPinchDist));
+                        applyTransform(false);
                         showBadge();
                         lastPinchDist = dist;
                     }
@@ -3011,20 +3074,18 @@ async function showPortraitSettingsMenu(entityName, onRefresh, npcContent = null
 
                 wrap.addEventListener('touchend', () => { lastPinchDist = null; }, { passive: true });
 
-                // Cleanup mouse listeners when popup is dismissed
+                // ── Cleanup when popup is dismissed ──
                 const origPopupCleanup = () => {
                     document.removeEventListener('mousemove', onMouseMove);
                     document.removeEventListener('mouseup',   onMouseUp);
                     clearTimeout(badgeTimer);
                 };
-                // Attach cleanup to any popup close button found nearby
                 setTimeout(() => {
                     const popup = wrap.closest('.popup, .dialogue_popup, [class*="popup"]');
                     if (popup) {
                         const closeBtn = popup.querySelector('.popup-close, .menu_button[data-result="0"], button[data-result]');
                         if (closeBtn) closeBtn.addEventListener('click', origPopupCleanup, { once: true });
                     }
-                    // Fallback: clean up when popup is removed from DOM
                     const observer = new MutationObserver(() => {
                         if (!document.contains(wrap)) { origPopupCleanup(); observer.disconnect(); }
                     });
