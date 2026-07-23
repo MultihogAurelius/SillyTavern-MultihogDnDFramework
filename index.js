@@ -53,25 +53,22 @@ let _prefixDeriveTimer = null; // Pending CHAT_CHANGED → prefix-derivation tim
 let _sessionBootstrapChatId = null;
 let _bootstrapSyncPromise = null;
 
-// ─── localStorage recovery net (survives lost/raced settings.json writes) ───
-// ST's own saveSettings() POSTs settings.json via a plain (non-keepalive) fetch. If the
-// tab reloads/closes before that request lands — which races unload on every browser —
-// the disk copy silently reverts to whatever was last actually written, and with it the
-// memo/quests/etc. localStorage.setItem() is synchronous and cannot be cancelled by
-// navigation, so mirroring the live memo there on every save gives us a same-browser
-// safety net independent of that race. Not a substitute for the disk save; a recovery net.
-const memoRecovery = createMemoRecoveryManager({
+// Legacy browser-local recovery remains in the source tree for possible future use,
+// but is deliberately inactive. It must never compare, restore, or override the disk
+// state during normal operation.
+const LEGACY_LOCAL_RECOVERY_ENABLED = false;
+const memoRecovery = LEGACY_LOCAL_RECOVERY_ENABLED ? createMemoRecoveryManager({
     getSettings,
     saveSettings: (...args) => saveSettings(...args),
     updateUIMemo: (...args) => updateUIMemo(...args),
     refreshRenderedView: (...args) => refreshRenderedView(...args),
     syncMemoView: (...args) => syncMemoView(...args),
     escapeHtml,
-});
-const snapshotMemoToLocalStorage = (...args) => memoRecovery.snapshotMemoToLocalStorage(...args);
-const ensureLocalMemoRecovery = (...args) => memoRecovery.ensureLocalMemoRecovery(...args);
-const confirmLocalSettingsRecovery = (...args) => memoRecovery.confirmLocalSettingsRecovery(...args);
-const markMemoPersistedByCurrentBrowser = (...args) => memoRecovery.markMemoPersistedByCurrentBrowser(...args);
+}) : null;
+const snapshotMemoToLocalStorage = (...args) => memoRecovery?.snapshotMemoToLocalStorage(...args);
+const ensureLocalMemoRecovery = (...args) => memoRecovery?.ensureLocalMemoRecovery(...args);
+const confirmLocalSettingsRecovery = (...args) => memoRecovery?.confirmLocalSettingsRecovery(...args);
+const markMemoPersistedByCurrentBrowser = (...args) => memoRecovery?.markMemoPersistedByCurrentBrowser(...args);
 
 let _pillDeselectHandler = null;
 globalThis._rpgRenderRouterUI = () => { if (typeof runtimeState.renderRouterUI === 'function') runtimeState.renderRouterUI(); };
@@ -5226,7 +5223,7 @@ async function runPortraitMigrationIfNeeded() {
         // auto-image-gen / immersion / connection settings from a stale snapshot.
         const strippedTombstones = applyDeletedCustomTagTombstones();
         const strippedGlobalUi = stripChatStateGlobalUiPrefs(settings);
-        const pendingSettingsBackup = getPendingModuleSchemaBackup();
+        const pendingSettingsBackup = LEGACY_LOCAL_RECOVERY_ENABLED ? getPendingModuleSchemaBackup() : null;
         const healedFromBackup = pendingSettingsBackup && await confirmLocalSettingsRecovery(pendingSettingsBackup)
             ? applyModuleSchemaBackup(bootChatId, pendingSettingsBackup)
             : false;
@@ -5249,14 +5246,14 @@ async function runPortraitMigrationIfNeeded() {
         // BEFORE any boot-time save can mirror the (possibly stale) disk memo over the
         // recovery evidence. Runs regardless of chatLinkEnabled — the top-level currentMemo
         // can go stale from a lost disk write either way.
-        if (bootChatId) {
+        if (LEGACY_LOCAL_RECOVERY_ENABLED && bootChatId) {
             await ensureLocalMemoRecovery(bootChatId);
-        } else {
+        } else if (LEGACY_LOCAL_RECOVERY_ENABLED) {
             console.warn('[RPG Tracker] Memo recovery deferred: no boot chatId');
             setTimeout(() => {
-                if (!memoRecovery.isBootCheckDone()) {
+                if (!memoRecovery?.isBootCheckDone()) {
                     console.warn('[RPG Tracker] Memo recovery gate opened after timeout (no chat yet)');
-                    memoRecovery.markBootCheckDone();
+                    memoRecovery?.markBootCheckDone();
                 }
             }, 20000);
         }

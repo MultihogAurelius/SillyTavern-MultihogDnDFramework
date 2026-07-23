@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [6.0.72] - 2026-07-23
+
+### Changed
+- **Legacy browser recovery**: retained in the source code but disabled. The tracker no longer creates, compares, prompts for, or restores browser-local recovery copies.
+
 ## [6.0.71] - 2026-07-23
 
 ### Added

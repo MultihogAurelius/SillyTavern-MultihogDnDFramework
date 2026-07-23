@@ -423,11 +423,11 @@
                                 </label>
                                 <button id="rpg_tracker_btn_force_checkpoint" class="menu_button interactable"
                                     style="width: 100%; margin-top: 6px; background: rgba(0, 180, 120, 0.18); border-color: #00b478;"
-                                    title="Force-writes SillyTavern settings.json to disk RIGHT NOW (awaits the save while this page stays open). Also refreshes the local memo recovery backup. Use this after important changes so the next F5/settings rollback lands on this known-good state instead of an older snapshot.">
+                                    title="Force-writes SillyTavern settings.json to disk RIGHT NOW (awaits the save while this page stays open). It does not use or restore browser-local recovery data.">
                                     <i class="fa-solid fa-floppy-disk"></i> Force Disk Checkpoint
                                 </button>
                                 <small style="display: block; margin-top: 4px; opacity: 0.65; font-size: 0.78em; line-height: 1.25;">
-                                    Keeps the tab open until the toast confirms — that write becomes the rollback baseline if a later reload aborts a save.
+                                    Keeps the tab open until the toast confirms. Browser-local recovery is disabled.
                                 </small>
                                 <button id="rpg_tracker_btn_upgrade_changed_prompts" class="menu_button interactable rt-prompt-upgrade-pending"
                                     style="display:none; width: 100%; margin-top: 6px;"

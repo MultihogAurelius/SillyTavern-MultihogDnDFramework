@@ -7,6 +7,10 @@ import { getNpcRelationshipMax } from './relationship-math.js';
 import { getSettings, stripChatStateGlobalUiPrefs } from './settings.js';
 import { snapshotStockPromptsForProfile } from './profiles.js';
 
+// Kept only so legacy recovery code can be re-enabled deliberately. Normal tracker
+// operation must not create or consume a browser-local recovery copy.
+const LEGACY_BROWSER_SCHEMA_BACKUP_ENABLED = false;
+
 /** Active chat id — prefer tracker-tracked id over raw ST context. */
 export function getActiveChatId() {
     const ctx = SillyTavern.getContext();
@@ -166,6 +170,7 @@ export function applyDeletedCustomTagTombstones() {
  * @param {string|null|undefined} chatId
  */
 export function writeModuleSchemaBackup(chatId) {
+    if (!LEGACY_BROWSER_SCHEMA_BACKUP_ENABLED) return;
     try {
         const s = getSettings();
         const payload = {
@@ -195,6 +200,7 @@ export function writeModuleSchemaBackup(chatId) {
  * @returns {object|null}
  */
 export function getPendingModuleSchemaBackup() {
+    if (!LEGACY_BROWSER_SCHEMA_BACKUP_ENABLED) return null;
     try {
         const raw = localStorage.getItem(MODULE_SCHEMA_BACKUP_KEY);
         if (!raw) return null;
@@ -234,6 +240,7 @@ export function getPendingModuleSchemaBackup() {
  * @returns {boolean} true if a backup was applied
  */
 export function applyModuleSchemaBackup(preferredChatId, backupOverride = null) {
+    if (!LEGACY_BROWSER_SCHEMA_BACKUP_ENABLED) return false;
     try {
         const backup = backupOverride || getPendingModuleSchemaBackup();
         if (!backup) return false;
