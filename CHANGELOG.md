@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [6.0.76] - 2026-07-24
+
+### Added
+- **Relationship prompt reset**: the State Tracker relationship-instruction editor now has a Reset to built-in button.
+
 ## [6.0.75] - 2026-07-24
 
 ### Changed
