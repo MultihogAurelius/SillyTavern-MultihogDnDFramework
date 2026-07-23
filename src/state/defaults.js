@@ -98,6 +98,9 @@ export function buildDefaultSettings() {
         locationImages: false,
         npcRelationshipBars: true,
         npcRelationshipUpdateMode: 'regex',
+        // Optional editable instruction for State Tracker relationship commands.
+        // Blank uses the built-in prompt.
+        npcRelationshipStateTrackerPrompt: '',
         npcRelationshipToast: true,
         stateTrackerSwipeRollback: true,        // auto-roll back State Tracker memo on swipe           // emit toast notification when relationship values change
         npcRelationshipValues: {},

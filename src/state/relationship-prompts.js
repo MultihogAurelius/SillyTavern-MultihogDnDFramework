@@ -59,13 +59,20 @@ Starting value guidelines:
  * State Tracker instruction for tag-based, code-applied relationship changes.
  * @param {number} [max]
  * @param {boolean} [isFullContext]
+ * @param {string} [customPrompt]
  * @returns {string}
  */
-export function buildStateTrackerRelationshipCommandInstruction(max, isFullContext = false) {
+export function buildStateTrackerRelationshipCommandInstruction(max, isFullContext = false, customPrompt = '') {
     const m = max ?? getNpcRelationshipMax();
     const fullAuditRule = isFullContext
         ? 'This is a full-history audit, so do not emit a [RELATIONS] block. Do not replay historical relationship changes.'
         : 'The GM narrator is authoritative for relationship points. Only convert its explicit relationship annotations; never infer, award, adjust, or omit a delta yourself.';
+
+    if (typeof customPrompt === 'string' && customPrompt.trim()) {
+        return customPrompt.trim()
+            .replaceAll('{{max}}', String(m))
+            .replaceAll('{{full_audit_rule}}', fullAuditRule);
+    }
 
     return `## RELATIONSHIP DELTA COMMANDS
 Relationship bars are enabled. Do NOT add relationship data to the memo itself. ${fullAuditRule}

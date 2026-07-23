@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [6.0.74] - 2026-07-23
+
+### Added
+- **Editable State Tracker relationship instruction**: the Relationship System settings cog now lets users customize the prompt used for State Tracker relationship updates.
+
 ## [6.0.73] - 2026-07-23
 
 ### Added

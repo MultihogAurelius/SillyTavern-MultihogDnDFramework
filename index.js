@@ -1866,7 +1866,11 @@ async function runStateModelPass(narrativeOutput, isFullContext = false, overrid
         const modulesText = buildModulesInstructionText(settings);
         let systemPrompt = settings.systemPromptTemplate.replace('{{modulesText}}', modulesText);
         if (settings.npcRelationshipBars && getRelationshipUpdateMode(settings) === RELATIONSHIP_UPDATE_MODES.STATE_TRACKER) {
-            systemPrompt += `\n\n${buildStateTrackerRelationshipCommandInstruction(getNpcRelationshipMax(settings), isFullContext)}`;
+            systemPrompt += `\n\n${buildStateTrackerRelationshipCommandInstruction(
+                getNpcRelationshipMax(settings),
+                isFullContext,
+                settings.npcRelationshipStateTrackerPrompt,
+            )}`;
         }
         if (settings.useDdMmYyFormat) {
             systemPrompt = systemPrompt
@@ -8167,6 +8171,13 @@ RULES:
         async function showRelationshipSettingsPopup() {
             const settings = getSettings();
             const mode = getRelationshipUpdateMode(settings);
+            const configuredPrompt = typeof settings.npcRelationshipStateTrackerPrompt === 'string'
+                ? settings.npcRelationshipStateTrackerPrompt
+                : '';
+            const displayedPrompt = configuredPrompt || buildStateTrackerRelationshipCommandInstruction(
+                getNpcRelationshipMax(settings),
+                false,
+            );
             const { Popup, POPUP_TYPE, POPUP_RESULT: PR } = SillyTavern.getContext();
             const html = `<div style="min-width:360px;padding:4px 2px;">
                 <div style="font-size:15px;font-weight:700;margin-bottom:8px;">Relationship Update Method</div>
@@ -8181,6 +8192,9 @@ RULES:
                     <strong> State Tracker Tags</strong>
                     <div style="font-size:11px;opacity:.7;margin:5px 0 0 23px;">State Tracker emits a temporary <code>[RELATIONS]</code> block and code applies its lines.</div>
                 </label>
+                <label style="display:block;margin-top:14px;font-size:12px;font-weight:700;">State Tracker relationship instruction</label>
+                <div style="font-size:11px;opacity:.7;margin:4px 0 6px;">Used only with State Tracker Tags. Edit what the tracker should expect and output. Leave blank to restore the built-in instruction. Optional placeholders: <code>{{max}}</code> and <code>{{full_audit_rule}}</code>.</div>
+                <textarea id="rpg_relationship_state_tracker_prompt" rows="13" style="width:100%;resize:vertical;box-sizing:border-box;font-family:var(--mainFontFamily, monospace);font-size:11px;line-height:1.35;">${escapeHtml(displayedPrompt)}</textarea>
             </div>`;
             const popup = new Popup(html, POPUP_TYPE.CONFIRM, '', { okButton: 'Apply', cancelButton: 'Cancel' });
             const result = await popup.show();
@@ -8189,6 +8203,8 @@ RULES:
             settings.npcRelationshipUpdateMode = selected === RELATIONSHIP_UPDATE_MODES.STATE_TRACKER
                 ? RELATIONSHIP_UPDATE_MODES.STATE_TRACKER
                 : RELATIONSHIP_UPDATE_MODES.REGEX;
+            const promptField = popup.dlg?.querySelector('#rpg_relationship_state_tracker_prompt');
+            settings.npcRelationshipStateTrackerPrompt = promptField?.value.trim() || '';
             saveSettings();
             scheduleAutoApply();
         }
