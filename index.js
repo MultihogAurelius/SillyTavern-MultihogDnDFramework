@@ -2781,13 +2781,16 @@ async function showPortraitSettingsMenu(entityName, onRefresh, npcContent = null
     const refresh = onRefresh || refreshRenderedView;
     const s = getSettings();
     const currentSrc = lookupCustomPortraitSrc(s, entityName);
+    const zoomWrapperId = `rt-portrait-zoom-wrap-${Date.now()}`;
+    const zoomImgId     = `rt-portrait-zoom-img-${Date.now()}`;
+    const zoomBadgeId   = `rt-portrait-zoom-badge-${Date.now()}`;
     const previewHtml = currentSrc
-        ? `<img src="${currentSrc}" style="max-width:128px;max-height:128px;border-radius:6px;display:block;margin:0 auto 10px;"/>`
+        ? `<div id="${zoomWrapperId}" style="text-align:center;margin-bottom:12px;overflow:hidden;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.4);cursor:zoom-in;user-select:none;position:relative;"><img id="${zoomImgId}" src="${currentSrc}" style="max-width:min(100%,80vw);max-height:70vh;width:auto;height:auto;display:inline-block;object-fit:contain;transform-origin:0 0;transition:transform 0.05s linear;will-change:transform;"/><div id="${zoomBadgeId}" style="position:absolute;bottom:8px;right:10px;background:rgba(0,0,0,0.55);color:#fff;font-size:11px;padding:2px 7px;border-radius:10px;pointer-events:none;opacity:0;transition:opacity 0.3s;">100%</div></div>`
         : `<div style="text-align:center;opacity:0.5;margin-bottom:10px;">No portrait set</div>`;
     const inputId = `rt-portrait-url-${Date.now()}`;
     const fileId = `rt-portrait-file-${Date.now()}`;
     const browseBtnId = `rt-portrait-browse-${Date.now()}`;
-    const popupContent = `<div style="padding:10px;min-width:270px;">
+    const popupContent = `<div style="padding:10px;box-sizing:border-box;width:100%;">
             <b style="display:block;margin-bottom:8px;">Set Portrait — ${entityName}</b>
             ${previewHtml}
             <label style="display:block;margin-bottom:4px;font-size:0.85em;opacity:0.8;">Image URL (https://…)</label>
@@ -2801,7 +2804,7 @@ async function showPortraitSettingsMenu(entityName, onRefresh, npcContent = null
     const ctx = SillyTavern.getContext();
     if (!ctx.callGenericPopup) { toastr['warning']('Popup API not available.', 'RPG Tracker'); return; }
     const popupOpts = {
-        okButton: 'Apply', cancelButton: 'Cancel', wide: false,
+        okButton: 'Apply', cancelButton: 'Cancel', wide: !!currentSrc,
         customButtons: [
             { text: '🤖 AI Generate', result: 4, classes: ['menu_button'] },
         ],
@@ -2870,6 +2873,166 @@ async function showPortraitSettingsMenu(entityName, onRefresh, npcContent = null
         }
 
         document.addEventListener('paste', popupPasteHandler);
+
+        // ── Zoom & Pan for portrait preview ──────────────────────────────────
+        if (currentSrc) {
+            const wrap  = document.getElementById(zoomWrapperId);
+            const img   = document.getElementById(zoomImgId);
+            const badge = document.getElementById(zoomBadgeId);
+            if (wrap && img && badge) {
+                let scale  = 1;
+                let tx     = 0;   // translate X
+                let ty     = 0;   // translate Y
+                let isDragging = false;
+                let dragStartX = 0, dragStartY = 0;
+                let dragStartTx = 0, dragStartTy = 0;
+                let badgeTimer = null;
+
+                const MIN_SCALE = 1;
+                const MAX_SCALE = 8;
+
+                /** Clamp pan so the image never leaves the container on either axis */
+                function clampTranslate(newTx, newTy) {
+                    const iw = img.offsetWidth  * scale;
+                    const ih = img.offsetHeight * scale;
+                    const cw = wrap.offsetWidth;
+                    const ch = wrap.offsetHeight;
+                    // When zoomed, we can pan up to (scaledSize - containerSize) in each direction
+                    const maxTx = Math.max(0, (iw - cw) / 2 + (iw > cw ? 0 : 0));
+                    const maxTy = Math.max(0, (ih - ch) / 2);
+                    // Simple clamp: keep image edge from passing container edge
+                    const minX = Math.min(0, cw - iw);
+                    const minY = Math.min(0, ch - ih);
+                    return [
+                        Math.max(minX, Math.min(0, newTx)),
+                        Math.max(minY, Math.min(0, newTy)),
+                    ];
+                }
+
+                function applyTransform() {
+                    img.style.transform = `translate(${tx}px,${ty}px) scale(${scale})`;
+                    wrap.style.cursor = scale > 1 ? (isDragging ? 'grabbing' : 'grab') : 'zoom-in';
+                }
+
+                function showBadge() {
+                    badge.textContent = Math.round(scale * 100) + '%';
+                    badge.style.opacity = '1';
+                    clearTimeout(badgeTimer);
+                    badgeTimer = setTimeout(() => { badge.style.opacity = '0'; }, 1200);
+                }
+
+                function resetZoom() {
+                    scale = 1; tx = 0; ty = 0;
+                    img.style.transition = 'transform 0.25s ease';
+                    applyTransform();
+                    setTimeout(() => { img.style.transition = 'transform 0.05s linear'; }, 260);
+                    showBadge();
+                }
+
+                // Scroll to zoom, anchored to cursor position
+                wrap.addEventListener('wheel', (ev) => {
+                    ev.preventDefault();
+                    ev.stopPropagation();
+                    const rect = wrap.getBoundingClientRect();
+                    const mouseX = ev.clientX - rect.left;  // cursor in container space
+                    const mouseY = ev.clientY - rect.top;
+                    const delta  = ev.deltaY > 0 ? -0.12 : 0.12;
+                    const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, scale + delta * scale));
+                    // Adjust translate so the point under the cursor stays fixed
+                    const scaleFactor = newScale / scale;
+                    const newTx = mouseX - scaleFactor * (mouseX - tx);
+                    const newTy = mouseY - scaleFactor * (mouseY - ty);
+                    scale = newScale;
+                    [tx, ty] = scale <= MIN_SCALE ? [0, 0] : clampTranslate(newTx, newTy);
+                    applyTransform();
+                    showBadge();
+                }, { passive: false });
+
+                // Double-click to reset
+                wrap.addEventListener('dblclick', (ev) => {
+                    ev.preventDefault();
+                    resetZoom();
+                });
+
+                // Drag to pan
+                wrap.addEventListener('mousedown', (ev) => {
+                    if (scale <= 1) return;
+                    isDragging = true;
+                    dragStartX  = ev.clientX;
+                    dragStartY  = ev.clientY;
+                    dragStartTx = tx;
+                    dragStartTy = ty;
+                    applyTransform();
+                    ev.preventDefault();
+                });
+
+                const onMouseMove = (ev) => {
+                    if (!isDragging) return;
+                    const dx = ev.clientX - dragStartX;
+                    const dy = ev.clientY - dragStartY;
+                    [tx, ty] = clampTranslate(dragStartTx + dx, dragStartTy + dy);
+                    applyTransform();
+                };
+
+                const onMouseUp = () => {
+                    if (!isDragging) return;
+                    isDragging = false;
+                    applyTransform();
+                };
+
+                document.addEventListener('mousemove', onMouseMove);
+                document.addEventListener('mouseup',   onMouseUp);
+
+                // Pinch-to-zoom (touch)
+                let lastPinchDist = null;
+                wrap.addEventListener('touchstart', (ev) => {
+                    if (ev.touches.length === 2) {
+                        const dx = ev.touches[0].clientX - ev.touches[1].clientX;
+                        const dy = ev.touches[0].clientY - ev.touches[1].clientY;
+                        lastPinchDist = Math.hypot(dx, dy);
+                    }
+                }, { passive: true });
+
+                wrap.addEventListener('touchmove', (ev) => {
+                    if (ev.touches.length === 2 && lastPinchDist !== null) {
+                        ev.preventDefault();
+                        const dx   = ev.touches[0].clientX - ev.touches[1].clientX;
+                        const dy   = ev.touches[0].clientY - ev.touches[1].clientY;
+                        const dist = Math.hypot(dx, dy);
+                        const factor = dist / lastPinchDist;
+                        const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, scale * factor));
+                        scale = newScale;
+                        if (scale <= MIN_SCALE) { tx = 0; ty = 0; }
+                        applyTransform();
+                        showBadge();
+                        lastPinchDist = dist;
+                    }
+                }, { passive: false });
+
+                wrap.addEventListener('touchend', () => { lastPinchDist = null; }, { passive: true });
+
+                // Cleanup mouse listeners when popup is dismissed
+                const origPopupCleanup = () => {
+                    document.removeEventListener('mousemove', onMouseMove);
+                    document.removeEventListener('mouseup',   onMouseUp);
+                    clearTimeout(badgeTimer);
+                };
+                // Attach cleanup to any popup close button found nearby
+                setTimeout(() => {
+                    const popup = wrap.closest('.popup, .dialogue_popup, [class*="popup"]');
+                    if (popup) {
+                        const closeBtn = popup.querySelector('.popup-close, .menu_button[data-result="0"], button[data-result]');
+                        if (closeBtn) closeBtn.addEventListener('click', origPopupCleanup, { once: true });
+                    }
+                    // Fallback: clean up when popup is removed from DOM
+                    const observer = new MutationObserver(() => {
+                        if (!document.contains(wrap)) { origPopupCleanup(); observer.disconnect(); }
+                    });
+                    observer.observe(document.body, { childList: true, subtree: true });
+                }, 50);
+            }
+        }
+        // ─────────────────────────────────────────────────────────────────────
     }, 0);
 
     const result = await ctx.callGenericPopup(popupContent, ctx.POPUP_TYPE?.CONFIRM ?? 1, '', popupOpts);
