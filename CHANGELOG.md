@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [6.0.70] - 2026-07-23
+
+### Fixed
+- **Emergency rollback release**: restores the proven 6.0.23 persistence behavior so installs affected by the unavailable disk-state endpoint can update normally and retain their existing tracker data.
+
 ## [6.0.23] - 2026-07-23
 
 ### Changed
