@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [6.0.78] - 2026-07-24
+
+### Fixed
+- **Relationship prompt reset**: keeps the Reset to built-in control compact and horizontal.
+
 ## [6.0.77] - 2026-07-24
 
 ### Changed
