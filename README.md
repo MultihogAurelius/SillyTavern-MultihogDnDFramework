@@ -119,6 +119,12 @@ These are recommendations, not rules — experiment. Different models shine for 
   <strong>Lorebook Agent</strong>
 </p>
 
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/de2f7522-e3ff-4153-8a3f-d38ca49ceca7" width="500" alt="Lorebook Agent" />
+  <br>
+  <strong>Relationship system within Lorebook Agent</strong>
+</p>
+
 ---
 
 ## Got a Question or Ideas?
