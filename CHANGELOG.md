@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [6.0.73] - 2026-07-23
+
+### Added
+- **Portrait popup controls**: adaptive full-size portrait viewing with cursor-anchored zoom, pan clamping, and a wrapper that expands with the image.
+
 ## [6.0.72] - 2026-07-23
 
 ### Changed
