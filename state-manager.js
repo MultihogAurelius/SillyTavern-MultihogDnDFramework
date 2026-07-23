@@ -12,6 +12,7 @@ export * from './src/state/versions.js';
 export * from './src/state/relationship-math.js';
 export * from './src/state/relationship-dom.js';
 export * from './src/state/relationship-prompts.js';
+export * from './src/state/relationship-commands.js';
 export * from './src/state/portrait-prompts.js';
 export * from './src/state/module-instructions.js';
 export * from './src/state/default-modules.js';

@@ -808,7 +808,7 @@ async function injectAsSillyTavernPersona(name, description) {
 
     await setUserAvatar(avatarId);
     setPersonaDescription();
-    SillyTavern.getContext().saveSettingsDebounced();
+    await saveSettings();
     await getUserAvatars(true, avatarId);
     return avatarId;
 }

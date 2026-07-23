@@ -245,7 +245,7 @@ export function handleRecolor(barId, currentBg, targetEl) {
         const ss = getSettings();
         if (!ss.barColors) ss.barColors = {};
         ss.barColors[barId] = { ...cfg };
-        // Persist immediately; ST's saveSettingsDebounced still coalesces disk I/O.
+        // Persist immediately through the tracker-owned checkpoint service.
         // Visual preview below is instant via refreshRenderedView().
         saveSettings();
         refreshRenderedView();

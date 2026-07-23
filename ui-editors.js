@@ -750,8 +750,7 @@ export function openPromptEditor(blockTag, title, currentText, defaultText, onSa
         if (!isNaN(ps) && ps >= 1) {
             s.modulePageSizes[blockTag.toUpperCase()] = ps;
         }
-        // Apply text first, then persist — never saveSettings() before onSave, or a
-        // raced ST disk write can capture the pre-edit stockPrompts and "undo" the save.
+        // Apply text first, then persist so the checkpoint captures the completed edit.
         onSave(textEl.value);
         close();
     };

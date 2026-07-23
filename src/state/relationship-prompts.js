@@ -4,6 +4,22 @@
 
 import { getNpcRelationshipMax, relPctOfMax } from './relationship-math.js';
 
+export const RELATIONSHIP_UPDATE_MODES = {
+    REGEX: 'regex',
+    STATE_TRACKER: 'state_tracker',
+};
+
+/**
+ * Keeps existing campaigns on the original narrator-regex behavior unless they
+ * explicitly select the State Tracker command mode.
+ * @param {any} settings
+ */
+export function getRelationshipUpdateMode(settings) {
+    return settings?.npcRelationshipUpdateMode === RELATIONSHIP_UPDATE_MODES.STATE_TRACKER
+        ? RELATIONSHIP_UPDATE_MODES.STATE_TRACKER
+        : RELATIONSHIP_UPDATE_MODES.REGEX;
+}
+
 export function buildNpcRelationshipInstruction(max) {
     const m = max ?? getNpcRelationshipMax();
     const p = (f) => relPctOfMax(f, m);
@@ -40,6 +56,34 @@ Starting value guidelines:
 }
 
 /**
+ * State Tracker instruction for tag-based, code-applied relationship changes.
+ * @param {number} [max]
+ * @param {boolean} [isFullContext]
+ * @returns {string}
+ */
+export function buildStateTrackerRelationshipCommandInstruction(max, isFullContext = false) {
+    const m = max ?? getNpcRelationshipMax();
+    const fullAuditRule = isFullContext
+        ? 'This is a full-history audit, so do not emit a [RELATIONS] block. Do not replay historical relationship changes.'
+        : 'The GM narrator is authoritative for relationship points. Only convert its explicit relationship annotations; never infer, award, adjust, or omit a delta yourself.';
+
+    return `## RELATIONSHIP DELTA COMMANDS
+Relationship bars are enabled. Do NOT add relationship data to the memo itself. ${fullAuditRule}
+
+Keep the normal State Memo output exactly as usual. After it, append this block only when there is at least one qualifying change:
+[RELATIONS]
+Friendship +5 Exact NPC Name
+Affection -2 Exact NPC Name
+[/RELATIONS]
+
+Only convert annotations in this exact narrator form:
+*(Friendship: Marcus +10 — saved his life in the alley)*
+*(Affection: Elena +2 — she seemed touched by the compliment)*
+
+Each command is one line: axis first (Friendship or Affection), signed whole-number delta second, then the exact NPC name. Copy the axis, NPC name, and signed delta from each annotation exactly; discard only its explanation. Do not add reasons, bullets, punctuation, or any other text inside the block. If there are no explicit annotations, do not output a [RELATIONS] block. Each command is clamped to -${m} through +${m}.`;
+}
+
+/**
  * Narrator sysprompt <relationship_tracking> block — scale line tied to configured max.
  * Delta guide magnitudes stay absolute (same point awards at any range width).
  * @param {number} [max]
@@ -58,38 +102,7 @@ DO NOT EMIT when: the interaction has no emotional weight (buying supplies, dire
 
 INLINE ANNOTATION (visible — place immediately after the triggering moment):
 *(Friendship: Marcus +10 — saved his life in the alley)*
-*(Affection: Elena +2 — she seemed touched by the compliment)*
-
-FRIENDSHIP scale (guides, not hard rules):
-+1/+2 ... Casual warmth, shared laugh, pleasant campfire talk, small kindness
-+2/+5 ... Compliment, meaningful help, bonding over shared memories or interests
-+5/+10 .. Surviving danger together, heartfelt conversation, completing a shared goal
-+10/+15 . Defending/protecting them, act of loyalty, keeping a difficult promise
-+15/+25 . Saving their life, major self-sacrifice
-+25/+30 . Blood oath, brotherhood/sisterhood pact
--1/-3 ... Dismissiveness, mild rudeness, forgetting something important to them
--3/-5 ... Small broken promise, ignoring them in a group, letting them down
--5/-10 .. Insult, belittling, disrespecting their values or beliefs
--10/-20 . Public humiliation, badmouthing them (if overheard)
--20/-30 . Abandoning them in danger, breaking a major promise
--40/-60 . Betraying them to an enemy
-
-AFFECTION scale (guides, not hard rules):
-+1 ...... Subtle kind gesture, noticing a small detail about them
-+2/+3 ... Sincere compliment on appearance, wit, or spirit; flirtatious banter (if receptive)
-+5/+10 .. Meaningful gift, intimate conversation, shared vulnerability, romantic gesture
-+10/+20 . Protective act in romantic context, vulnerable confession of feelings
-+20/+30 . Romantic proposal (if receptive)
--1/-2 ... Awkward or tone-deaf comment, mild social blunder
--2/-3 ... Cold or dismissive behavior
--5/-10 .. Public rejection or embarrassment
--8/-15 .. Flirting with someone else in their presence
--40/-60 . Romantic betrayal or cheating
-
-Typical range: 1-5 for minor moments, 5-15 for major events. Only use 15+ for life-altering ones.
-
-EXAMPLE — end of a response where {{user}} complimented Elena:
-*(Affection: Elena +2 — she seemed genuinely moved by the words)*`;
+*(Affection: Elena +2 — she seemed touched by the compliment)*`;
 }
 
 /**

@@ -3,6 +3,7 @@ import { sendStateRequest, sendAgentTurn } from './llm-client.js';
 import { getRequestHeaders } from '../../../../script.js';
 import { extractCurrentTimeStr, cleanMessageContent, parseInWorldTime, formatInWorldTime, findNthUserMessageStartIdx, formatAgentChatLogFromIndex, sanitizeLorebookRecordContent } from './memo-processor.js';
 import { recordSchedulerEvent } from './swipe-scheduler-debug.js';
+import { saveSettings } from './src/app/runtime-bridge.js';
 
 let _routerRunning = false;
 let _routerNormalRunCount = 0; // tracks completed normal (non-cleanup) passes for auto-cleanup interval
@@ -347,7 +348,7 @@ export async function runRouterPass(narrativeOutput, manualPrompt = null, custom
         let basicSummary = '';
 
         if (stripSkeletonFromRouterPools()) {
-            ctx.saveSettingsDebounced();
+            void saveSettings();
         }
 
         async function fetchArchiveBooks() {
@@ -384,7 +385,7 @@ export async function runRouterPass(narrativeOutput, manualPrompt = null, custom
                 historyLen: settings.routerHistory.length,
                 isManual,
             });
-            ctx.saveSettingsDebounced();
+            void saveSettings();
         }
         let activeEntriesFull = [];
         let newlyTriggeredFull = [];
@@ -2038,7 +2039,7 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
             }
         }
 
-        ctx.saveSettingsDebounced();
+        void saveSettings();
         document.dispatchEvent(new CustomEvent('rt_lore_agent_updated'));
     }
 
@@ -2355,7 +2356,7 @@ export async function rollbackRouterPass(index = 0) {
         if (snapshot.routerLastRunChatLength !== undefined) {
             persistRouterLastRunWatermark(snapshot.routerLastRunChatLength);
         } else {
-            ctx.saveSettingsDebounced();
+            void saveSettings();
         }
 
         document.dispatchEvent(new CustomEvent('rt_lore_agent_updated'));
@@ -2410,7 +2411,7 @@ export async function reapplyRouterPass(prePassSnapshot, postPassState) {
         if (postPassState.routerLastRunChatLength !== undefined) {
             persistRouterLastRunWatermark(postPassState.routerLastRunChatLength);
         } else {
-            SillyTavern.getContext().saveSettingsDebounced();
+            void saveSettings();
         }
 
         document.dispatchEvent(new CustomEvent('rt_lore_agent_updated'));
@@ -2683,7 +2684,7 @@ Output a JSON object:
                 reason: `Saved scene: ${data.desc} -> ${lorebookName} (${data.id})`
             });
             settings.activeRouterKeys.push(newId);
-            ctx.saveSettingsDebounced();
+            void saveSettings();
             document.dispatchEvent(new CustomEvent('rt_lore_agent_updated'));
             
             (/** @type {any} */ (toastr)).success(`Saved scene: ${data.desc}`, 'Lorebook Agent');
@@ -3035,7 +3036,7 @@ export async function scanAssistantOutputForKeywords(narrativeText, opts = {}) {
     settings.activeRouterKeys = [...currentActive];
     settings.keywordActivatedKeys = [...currentKeyword];
     settings.lastKeywordTriggeredKeys = newlyTriggered;
-    ctx.saveSettingsDebounced();
+    void saveSettings();
 
     if (settings.debugMode && newlyTriggered.length > 0) {
         console.log('[RPG Tracker] Keyword scanner activated:', newlyTriggered);
@@ -3447,7 +3448,7 @@ export async function purgeWorldHistoryForChat(opts = {}) {
     }
 
     persistWorldProgressionTimer();
-    SillyTavern.getContext().saveSettingsDebounced();
+    void saveSettings();
     if (settings.chatLinkEnabled && chatId) {
         saveChatState(chatId);
     }
@@ -4107,7 +4108,7 @@ ${historicalDump}`;
 
         if (anyBreadcrumbWritten) {
             settings.currentMemo = memoForBreadcrumbs;
-            ctx.saveSettingsDebounced();
+            void saveSettings();
         }
     }
 
@@ -4521,7 +4522,7 @@ export async function runSkeletonGenerationPass(atmosphereSummary, append = fals
         const existing = new Set(settings.chatStates[chatId].campaignBooks || []);
         existing.add(skeletonBookName);
         settings.chatStates[chatId].campaignBooks = [...existing];
-        ctx.saveSettingsDebounced();
+        void saveSettings();
     }
 
     // Refresh the SillyTavern UI so it updates immediately without F5

@@ -12,12 +12,13 @@
  * circular import. This will be cleaned up when index.js is split.
  */
 
-import { getSettings, hydrateWorldProgressionFromChatState, persistWorldProgressionTimer, persistRouterLastRunWatermark, getNpcRelationshipMax, clampRelationshipValue, relationshipBarPct, getFriendshipTier, getAffectionTier, applyRelTierBadgeElement, saveChatState, getActiveChatId } from './state-manager.js';
+import { getSettings, hydrateWorldProgressionFromChatState, persistWorldProgressionTimer, persistRouterLastRunWatermark, getNpcRelationshipMax, clampRelationshipValue, relationshipBarPct, getFriendshipTier, getAffectionTier, applyRelTierBadgeElement, showRelationshipFloatFeedback, saveChatState, getActiveChatId, getRelationshipUpdateMode, RELATIONSHIP_UPDATE_MODES } from './state-manager.js';
 import { syncCombatProfile, isCombatActive } from './llm-client.js';
 import { parseQuestsFromMemo, extractCurrentTimeStr, cleanMessageContent, formatInWorldTime, memoForGmContext } from './memo-processor.js';
 import { runRouterPass, saveSceneToLorebook, scanAssistantOutputForKeywords, parseInWorldMinutes, runWorldProgressionPass, updateLorebookEntry, getLorebookManifest, rollbackRouterPass, isRouterRunning } from './router.js';
 import { logTransaction } from './debug-viewer.js';
 import { recordSchedulerEvent } from './swipe-scheduler-debug.js';
+import { saveSettings } from './src/app/runtime-bridge.js';
 
 /** Resolve ST macros (e.g. {{user}}) in lore text at injection time — storage keeps macros verbatim. */
 function substituteLoreMacros(content) {
@@ -1410,13 +1411,9 @@ function clearRouterSwipeMarkers(msg) {
 }
 
 /**
- * Scans the most recent AI message for inline relationship annotations:
- *   (Friendship: Name +X ...) or (Affection: Name -X ...)
- * Parses field, NPC name, and delta, then applies them directly to
- * relationship values in settings. The "reason" portion after the delta is ignored.
- * This replaces the old lorebook-agent-as-middleman approach.
+ * Handles memo, relationship, and Lorebook Agent rollback when a message is edited or swiped.
  */
-export async function parseAndApplyNarrativeRelTags() {
+export async function handleRelationshipSwipeChange() {
     if (_rpgIsGenerating) {
         recordSchedulerEvent('rel_tags_skipped', { reason: 'is_generating' });
         return;
@@ -1426,7 +1423,7 @@ export async function parseAndApplyNarrativeRelTags() {
     const ctx = SillyTavern.getContext();
     const chat = ctx.chat;
     if (!chat || !chat.length) {
-        console.log('[RPG Tracker] parseAndApplyNarrativeRelTags: ABORT - No chat found.');
+        console.log('[RPG Tracker] Relationship swipe handler: ABORT - No chat found.');
         return;
     }
 
@@ -1439,20 +1436,30 @@ export async function parseAndApplyNarrativeRelTags() {
         }
     }
     if (!lastAiMsg) {
-        console.log('[RPG Tracker] parseAndApplyNarrativeRelTags: ABORT - No last AI message found.');
+        console.log('[RPG Tracker] Relationship swipe handler: ABORT - No last AI message found.');
+        return;
+    }
+
+    if (getRelationshipUpdateMode(settings) === RELATIONSHIP_UPDATE_MODES.REGEX) {
+        await applyNarrativeRelationshipRegex(lastAiMsg, settings, ctx);
+        await maybeRollbackRouterPassForSwipe(lastAiMsg);
         return;
     }
     
-    let anyChanged = false;
-    let anyStateChanged = false;
+    // Relationship commands have their own swipe data.  Do not involve the
+    // State Tracker memo rollback here.
+    const relSwipeResult = settings.npcRelationshipBars
+        ? applyRelationshipSwipeRollback(lastAiMsg, settings)
+        : { anyChanged: false };
+    await maybeRollbackRouterPassForSwipe(lastAiMsg);
+    if (relSwipeResult.anyChanged) persistRelationshipCommandChanges(ctx, settings);
+    return;
 
-    // --- 1. STATE TRACKER SWIPE ROLLBACK & RESTORE ---
-    const memoSwipeResult = applyMemoSwipeRollback(lastAiMsg, settings);
-    anyStateChanged = memoSwipeResult.anyChanged;
+    /*
 
     const triggerUIUpdate = () => {
         if (typeof ctx.saveChatDebounced === 'function') ctx.saveChatDebounced();
-        ctx.saveSettingsDebounced?.();
+        void saveSettings();
         refreshRelationshipBarsDOM(settings);
         // Force a synchronous chat-state snapshot so relationship deltas and memo
         // changes are not lost if the user closes the page before the debounce fires.
@@ -1467,7 +1474,7 @@ export async function parseAndApplyNarrativeRelTags() {
 
     const triggerStateOnlyUIUpdate = () => {
         if (typeof ctx.saveChatDebounced === 'function') ctx.saveChatDebounced();
-        ctx.saveSettingsDebounced?.();
+        void saveSettings();
         if (settings.chatLinkEnabled) {
             const chatId = getActiveChatId();
             if (chatId) saveChatState(chatId);
@@ -1475,7 +1482,7 @@ export async function parseAndApplyNarrativeRelTags() {
     };
 
     // If Relationship Bars are disabled, we only handle State Tracker swipe updates
-    console.log('[RPG Tracker] parseAndApplyNarrativeRelTags: STARTING. Bars enabled:', !!settings.npcRelationshipBars);
+    console.log('[RPG Tracker] Relationship swipe handler: bars enabled:', !!settings.npcRelationshipBars);
     if (!settings.npcRelationshipBars) {
         await maybeRollbackRouterPassForSwipe(lastAiMsg);
         if (anyStateChanged) {
@@ -1502,6 +1509,11 @@ export async function parseAndApplyNarrativeRelTags() {
     // --- 2b. LOREBOOK AGENT "RUN EVERY" SWIPE ROLLBACK ---
     await maybeRollbackRouterPassForSwipe(lastAiMsg);
 
+    // Relationship deltas are now received from the State Tracker as structured
+    // commands. Never inspect narrator prose here.
+    if (anyChanged || anyStateChanged) triggerUIUpdate();
+    return;
+
     const swipeId = lastAiMsg.swipe_id ?? 0;
     const relMax = getNpcRelationshipMax(settings);
     const text = cleanMessageContent(lastAiMsg);
@@ -1511,15 +1523,12 @@ export async function parseAndApplyNarrativeRelTags() {
         return;
     }
 
-    // --- 2. EARLY RETURNS (After Rollback) ---
-    // Match: (Friendship: Name +X ...) or (Affection: Name -X ...)
-    // Also handles the asterisk-wrapped variant: *(Friendship: Name +X ...)*
-    // Removed \b because depending on formatting/characters it can fail
-    const relRegex = /\*?\(\s*(friendship|affection)\s*:\s*(.+?)\s+([+-]?\d+)[^)]*\)\*?/gi;
+    // The narrator regex parser was removed. The State Tracker now emits
+    // [RELATIONS] lines, which are parsed by relationship-commands.js.
     let match;
     const matches = [];
 
-    while ((match = relRegex.exec(text)) !== null) {
+    while (false) {
         const rawStr = match[0];
         const field = match[1].toLowerCase();
         const name = match[2].trim();
@@ -1597,7 +1606,142 @@ export async function parseAndApplyNarrativeRelTags() {
 
     if (anyChanged) {
         triggerUIUpdate();
-        SillyTavern.getContext().saveSettingsDebounced?.();
+        void saveSettings();
+    }
+    */
+}
+
+
+/**
+ * Original narrator annotation path: parse relationship deltas directly from
+ * the newest AI message and apply them to the code-owned NPC relationship data.
+ */
+async function applyNarrativeRelationshipRegex(lastAiMsg, settings, ctx) {
+    const swipeResult = applyRelationshipSwipeRollback(lastAiMsg, settings);
+    if (swipeResult.bailEarly) {
+        if (swipeResult.anyChanged) persistRelationshipCommandChanges(ctx, settings);
+        return;
+    }
+
+    const text = cleanMessageContent(lastAiMsg);
+    if (!text) return;
+
+    const swipeId = lastAiMsg.swipe_id ?? 0;
+    const relMax = getNpcRelationshipMax(settings);
+    const relRegex = /\*?\(\s*(friendship|affection)\s*:\s*(.+?)\s+([+-]?\d+)[^)]*\)\*?/gi;
+    let match;
+    let anyChanged = swipeResult.anyChanged;
+
+    while ((match = relRegex.exec(text)) !== null) {
+        const field = match[1].toLowerCase();
+        const npc = match[2].trim();
+        const delta = parseInt(match[3], 10);
+        const rawTag = match[0];
+        if (!npc || !Number.isFinite(delta) || delta === 0) continue;
+        if (lastAiMsg.extra.rpgProcessedTags[swipeId].includes(rawTag)) continue;
+
+        const resolvedId = await fuzzyResolveNpcName(npc);
+        if (!resolvedId) continue;
+        if (!settings.npcRelationshipValues) settings.npcRelationshipValues = {};
+        if (!settings.npcRelationshipValues[resolvedId]) settings.npcRelationshipValues[resolvedId] = { friendship: 0, affection: 0 };
+
+        const previousValue = settings.npcRelationshipValues[resolvedId][field] ?? 0;
+        const newValue = clampRelationshipValue(previousValue + delta, relMax);
+        const actualAppliedDelta = newValue - previousValue;
+        settings.npcRelationshipValues[resolvedId][field] = newValue;
+
+        if (!settings.npcRelationshipLog) settings.npcRelationshipLog = {};
+        if (!Array.isArray(settings.npcRelationshipLog[resolvedId])) settings.npcRelationshipLog[resolvedId] = [];
+        const logTimestamp = Date.now();
+        settings.npcRelationshipLog[resolvedId].unshift({ timestamp: logTimestamp, field, delta, newValue, source: 'narrative' });
+        if (settings.npcRelationshipLog[resolvedId].length > 50) settings.npcRelationshipLog[resolvedId].length = 50;
+
+        lastAiMsg.extra.rpgRollbackData[swipeId].push({ npcId: resolvedId, field, actualAppliedDelta, expectedValue: newValue, logTimestamp });
+        lastAiMsg.extra.rpgProcessedTags[swipeId].push(rawTag);
+
+        if (settings.npcRelationshipToast !== false) {
+            showRelationshipFloatFeedback({ npc, field, delta });
+        }
+        anyChanged = true;
+    }
+
+    if (anyChanged) persistRelationshipCommandChanges(ctx, settings);
+}
+
+/**
+ * Applies the temporary relationship commands emitted by the State Tracker.
+ * Commands are not stored; only the existing relationship value rollback record is.
+ * @param {Array<{type: string, npc: string, field: 'friendship'|'affection', delta: number}>} commands
+ */
+export async function applyStateTrackerRelationshipCommands(commands) {
+    if (!Array.isArray(commands) || !commands.length) return;
+
+    const settings = getSettings();
+    if (!settings.npcRelationshipBars) return;
+    const ctx = SillyTavern.getContext();
+    const lastAiMsg = [...(ctx.chat || [])].reverse().find(message => !message.is_user && !message.is_system);
+    if (!lastAiMsg) return;
+
+    const swipeResult = applyRelationshipSwipeRollback(lastAiMsg, settings);
+    if (swipeResult.bailEarly) {
+        if (swipeResult.anyChanged) persistRelationshipCommandChanges(ctx, settings);
+        return;
+    }
+
+    const swipeId = lastAiMsg.swipe_id ?? 0;
+    const relMax = getNpcRelationshipMax(settings);
+    let anyChanged = swipeResult.anyChanged;
+
+    for (const command of commands) {
+        const resolvedId = command.npc.includes('::') ? command.npc : await fuzzyResolveNpcName(command.npc);
+        if (!resolvedId) {
+            console.warn(`[RPG Tracker] State Tracker relationship command could not resolve NPC "${command.npc}".`);
+            continue;
+        }
+
+        if (!settings.npcRelationshipValues) settings.npcRelationshipValues = {};
+        if (!settings.npcRelationshipValues[resolvedId]) settings.npcRelationshipValues[resolvedId] = { friendship: 0, affection: 0 };
+
+        const previousValue = settings.npcRelationshipValues[resolvedId][command.field] ?? 0;
+        const newValue = clampRelationshipValue(previousValue + command.delta, relMax);
+        const actualAppliedDelta = newValue - previousValue;
+        settings.npcRelationshipValues[resolvedId][command.field] = newValue;
+
+        if (!settings.npcRelationshipLog) settings.npcRelationshipLog = {};
+        if (!Array.isArray(settings.npcRelationshipLog[resolvedId])) settings.npcRelationshipLog[resolvedId] = [];
+        const logTimestamp = Date.now();
+        settings.npcRelationshipLog[resolvedId].unshift({
+            timestamp: logTimestamp,
+            field: command.field,
+            delta: command.delta,
+            newValue,
+            source: 'state_tracker',
+        });
+        if (settings.npcRelationshipLog[resolvedId].length > 50) settings.npcRelationshipLog[resolvedId].length = 50;
+
+        lastAiMsg.extra.rpgRollbackData[swipeId].push({
+            npcId: resolvedId,
+            field: command.field,
+            actualAppliedDelta,
+            expectedValue: newValue,
+            logTimestamp,
+        });
+        if (settings.npcRelationshipToast !== false) {
+            showRelationshipFloatFeedback({ npc: command.npc, field: command.field, delta: command.delta });
+        }
+        anyChanged = true;
+    }
+
+    if (anyChanged) persistRelationshipCommandChanges(ctx, settings);
+}
+
+function persistRelationshipCommandChanges(ctx, settings) {
+    if (typeof ctx.saveChatDebounced === 'function') ctx.saveChatDebounced();
+    void saveSettings();
+    refreshRelationshipBarsDOM(settings);
+    if (settings.chatLinkEnabled) {
+        const chatId = getActiveChatId();
+        if (chatId) saveChatState(chatId);
     }
 }
 
@@ -1706,53 +1850,6 @@ function refreshRelationshipBarsDOM(settings) {
         }
     }
 }
-
-/**
- * Ensures a SillyTavern Regex Script exists to visually hide [REL: ...] tags from the
- * rendered chat display. The tag remains in the raw message text (editable by pressing
- * the edit button), so our parser and metadata deduplication continue to work. This
- * only affects the visual render — it replaces the match with an empty string on
- * "AI Output" and "Alter Chat Display" so the user never sees the raw tag in the
- * conversation flow.
- */
-export function ensureRelTagRegex() {
-    try {
-        const ctx = SillyTavern.getContext();
-        const extSettings = ctx.extensionSettings;
-        if (!extSettings) return;
-
-        // The regex extension stores scripts in extensionSettings.regex
-        if (!extSettings.regex) extSettings.regex = [];
-        const scripts = extSettings.regex;
-
-        // Legacy [REL:] tag hider (for old messages that may still contain them)
-        const SCRIPT_NAME = 'Hide REL Tags [RPG Tracker]';
-        if (!scripts.some(s => s.scriptName === SCRIPT_NAME)) {
-            scripts.push({
-                scriptName: SCRIPT_NAME,
-                findRegex: '/\\[REL:\\s*[^\\]]+\\]/g',
-                replaceString: '',
-                trimStrings: [],
-                placement: [
-                    1, // AI_OUTPUT
-                ],
-                disabled: false,
-                markdownOnly: false,
-                promptOnly: false,
-                runOnEdit: true,
-                substituteRegex: false,
-                minDepth: null,
-                maxDepth: null,
-            });
-            console.log('[RPG Tracker] Registered REL tag hiding regex script.');
-        }
-
-        ctx.saveSettingsDebounced?.();
-    } catch (e) {
-        console.warn('[RPG Tracker] Could not register REL tag regex:', e);
-    }
-}
-
 
 // ── Narrative collector ────────────────────────────────────────────────────────
 
@@ -1958,22 +2055,12 @@ export async function onGenerationEnded() {
         }
     }
 
-    // Step 1b: Parse (Friendship/Affection: Name ±X) tags from the narrative AI's output
-    // and apply relationship deltas directly — no lorebook agent middleman.
-    // Fired in the background without awaiting so the UI "Send" button reappears instantly.
     if (settings.enabled) {
-        // Step 1b: Parse (Friendship/Affection: Name ±X) tags from the narrative AI's output
-        // and apply relationship deltas directly — no lorebook agent middleman.
-        // Fired in the background without awaiting so the UI "Send" button reappears instantly.
-        if (settings.npcRelationshipBars) {
-            try {
-                parseAndApplyNarrativeRelTags(); // Removed await for speed
-            } catch (e) {
-                console.warn('[RPG Tracker] Narrative relationship tag parsing failed:', e);
-            }
+        if (settings.npcRelationshipBars && getRelationshipUpdateMode(settings) === RELATIONSHIP_UPDATE_MODES.REGEX) {
+            await handleRelationshipSwipeChange();
         }
 
-        // Step 2: State Tracker pass — throttled by stateTrackerRunEvery.
+        // State Tracker pass — throttled by stateTrackerRunEvery.
         const stateRunEvery = settings.stateTrackerRunEvery || 1;
         _stateTrackerAutoTick++;
         if (_stateTrackerAutoTick >= stateRunEvery) {

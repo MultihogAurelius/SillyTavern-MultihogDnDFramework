@@ -1,8 +1,8 @@
 import { EXAMPLES, COLOR_EXAMPLES, DEFAULT_STOCK_PROMPTS, RT_PROMPTS, BLOCK_ICONS, BLOCK_ORDER, PAGE_SIZE, NO_PAGINATE, buildOnboardingXpHint, buildOnboardingTimeHint, buildStartingGearHint, buildOnboardingActiveBlocks, buildCombatAndSkillScalingHint, resolveTimePromptKey, resolveTimePromptDisplayTag, buildCyoaPrompt, DEFAULT_CYOA_SLOTS, refreshCyoaConfigToShipped } from './constants.js';
-import { MODULE_NAME, DEFAULT_MODULES, getSettings, getBarBackground, migrateCustomFields, saveChatState, writeModuleSchemaBackup, getPendingModuleSchemaBackup, applyModuleSchemaBackup, applyDeletedCustomTagTombstones, recordDeletedCustomTags, clearDeletedCustomTagTombstones, saveProfile, deleteProfile, getEffectiveRouterCampaignPrefix, sanitizeCampaignPrefixString, buildNpcInstruction, loadStockPromptsFromProfile, getNpcRelationshipMax, getNpcRelationshipMaxDefault, clampRelationshipValue, relationshipBarPct, getFriendshipTier, getAffectionTier, getRelTierBadgeStyle, getRelTierDetailedStyle, getRelTierDetailedLabelStyle, applyRelTierBadgeElement, sanitizeRouterState, rebuildAllModuleInstructions, adjustAllStoredTemplatesForTimeFormat, DEFAULT_NPC_SECTIONS, DEFAULT_PC_SECTIONS, computeBundledPromptsFingerprint, computeBundledPromptsFingerprintForSnapshot, normalizeBundledPromptsSnapshot, buildBundledPromptsSnapshot, getSnapshotCategoryBlocks, getPromptCategoryImpactBadge, PROMPT_DEFAULTS_CATEGORIES, PROMPT_DEFAULTS_CATEGORY_LABELS, getDefaultPortraitLocationSystemPrompt, isShippedPortraitLocationSystemPrompt, applyFactoryReset, clearExtensionLocalStorageUiState, stripChatStateGlobalUiPrefs } from './state-manager.js';
+import { MODULE_NAME, DEFAULT_MODULES, getSettings, getBarBackground, migrateCustomFields, saveChatState, writeModuleSchemaBackup, getPendingModuleSchemaBackup, applyModuleSchemaBackup, applyDeletedCustomTagTombstones, recordDeletedCustomTags, clearDeletedCustomTagTombstones, saveProfile, deleteProfile, getEffectiveRouterCampaignPrefix, sanitizeCampaignPrefixString, buildNpcInstruction, loadStockPromptsFromProfile, getNpcRelationshipMax, getNpcRelationshipMaxDefault, clampRelationshipValue, relationshipBarPct, getFriendshipTier, getAffectionTier, getRelTierBadgeStyle, getRelTierDetailedStyle, getRelTierDetailedLabelStyle, applyRelTierBadgeElement, sanitizeRouterState, rebuildAllModuleInstructions, adjustAllStoredTemplatesForTimeFormat, DEFAULT_NPC_SECTIONS, DEFAULT_PC_SECTIONS, computeBundledPromptsFingerprint, computeBundledPromptsFingerprintForSnapshot, normalizeBundledPromptsSnapshot, buildBundledPromptsSnapshot, getSnapshotCategoryBlocks, getPromptCategoryImpactBadge, PROMPT_DEFAULTS_CATEGORIES, PROMPT_DEFAULTS_CATEGORY_LABELS, getDefaultPortraitLocationSystemPrompt, isShippedPortraitLocationSystemPrompt, applyFactoryReset, clearExtensionLocalStorageUiState, stripChatStateGlobalUiPrefs, buildStateTrackerRelationshipCommandInstruction, extractStateTrackerRelationshipCommands, getRelationshipUpdateMode, RELATIONSHIP_UPDATE_MODES } from './state-manager.js';
 import { diffTextLines, diffHasChanges } from './prompt-diff.js';
 import { sendStateRequest, fetchOllamaModels, fetchOpenAIModels, testOpenAIConnection, getConnectionProfiles, getCurrentCompletionPreset, setCompletionPreset, syncCombatProfile, resetCombatProfileOverride, isCombatActive } from './llm-client.js';
-import { getDiceToolName, getDiceCommandName, getDiceCommandAliases, doDiceRoll, registerDiceFunctionTool, syncDiceFunctionToolForRngContext, registerDiceSlashCommand, installInterceptor, getNarrativeBlocks, onGenerationStarted, onGenerationEnded, ensureRelTagRegex, resetRouterTick, getRouterTick, resetRouterAutoTick, getRouterSchedulerInternals, makeRngQueue, buildRngBlock, RNG_QUEUE_LEN, parseAndApplyNarrativeRelTags } from './narrative-hooks.js';
+import { getDiceToolName, getDiceCommandName, getDiceCommandAliases, doDiceRoll, registerDiceFunctionTool, syncDiceFunctionToolForRngContext, registerDiceSlashCommand, installInterceptor, getNarrativeBlocks, onGenerationStarted, onGenerationEnded, handleRelationshipSwipeChange, applyStateTrackerRelationshipCommands, resetRouterTick, getRouterTick, resetRouterAutoTick, getRouterSchedulerInternals, makeRngQueue, buildRngBlock, RNG_QUEUE_LEN } from './narrative-hooks.js';
 import { deduplicateMemo, mergeMemo, computeDelta, escapeHtml, escapeRegex, highlightParens, cleanToolCallMessage, cleanMessageContent, getLastUserAction, buildLorebookContext, buildModulesInstructionText, buildModuleFormatInstruction, parseQuestsFromMemo, syncQuestsFromMemo, syncQuestsToMemo, writeQuestsToMemo, getQuestMood, extractCurrentTimeStr, stripArchivedQuestsFromMemo, stripCompletedQuestsFromMemo, applyQuestSyncAndStripMemo, isArchivedQuestStatus, removeArchivedQuest, parseInWorldTime, formatInWorldTime, sanitizeLorebookRecordContent, memoForTrackerContext, memoForGmContext } from './memo-processor.js';
 import { renderSubFieldByRule, tryRenderMarker, renderCustomBlockLine, stripMemoHtml, escapeHtmlWithColor, parseMemoBlocks, getPageSize, loadCollapsed, saveCollapsed, loadDetached, saveDetached, blockToItems, renderMemoAsCards, renderTabModeView, renderQuestLog, renderLorebookTerminal, loadActiveTab, saveActiveTab, getTimeOfDayInfo, renderDayNightBadge, MARKER_TYPE_MAP, getMarkerLibraryKeys, loadBenchedExpanded, saveBenchedExpanded } from './renderer.js';
 import { unregisterLogQuestTool, checkQuestDeadlines, renderQuestsAsPlainText } from './quests.js';
@@ -1868,6 +1868,9 @@ async function runStateModelPass(narrativeOutput, isFullContext = false, overrid
 
         const modulesText = buildModulesInstructionText(settings);
         let systemPrompt = settings.systemPromptTemplate.replace('{{modulesText}}', modulesText);
+        if (settings.npcRelationshipBars && getRelationshipUpdateMode(settings) === RELATIONSHIP_UPDATE_MODES.STATE_TRACKER) {
+            systemPrompt += `\n\n${buildStateTrackerRelationshipCommandInstruction(getNpcRelationshipMax(settings), isFullContext)}`;
+        }
         if (settings.useDdMmYyFormat) {
             systemPrompt = systemPrompt
                 .replace(/\[Day\s+X,\s+HH:MM\]/g, '[DD/MM/YYYY, HH:MM]')
@@ -2040,8 +2043,12 @@ async function runStateModelPass(narrativeOutput, isFullContext = false, overrid
             if (result && typeof result === 'string') {
                 if (settings.debugMode) console.log(`[RPG Tracker] Raw Result (Chunk ${i + 1}):`, result);
 
-                let cleanedOutput = result;
-                const memoBlocks = [...result.matchAll(/<memo>([\s\S]*?)<\/memo>/gi)];
+                const relationshipResult = getRelationshipUpdateMode(settings) === RELATIONSHIP_UPDATE_MODES.STATE_TRACKER
+                    ? extractStateTrackerRelationshipCommands(result)
+                    : { memo: result, commands: [] };
+                const relationshipCommands = relationshipResult.commands;
+                let cleanedOutput = relationshipResult.memo;
+                const memoBlocks = [...cleanedOutput.matchAll(/<memo>([\s\S]*?)<\/memo>/gi)];
                 if (memoBlocks.length > 0) {
                     cleanedOutput = memoBlocks[memoBlocks.length - 1][1].trim();
                 } else {
@@ -2056,6 +2063,9 @@ async function runStateModelPass(narrativeOutput, isFullContext = false, overrid
 
                 // ── FULL COMMIT: treat this chunk as a completed turn ──
                 lastDelta = commitChunkResult(merged, memoBeforeThisChunk);
+                if (relationshipCommands.length) {
+                    await applyStateTrackerRelationshipCommands(relationshipCommands);
+                }
 
                 // Stamp the pre-commit memo snapshot and result on the message for swipe rollback/restore
                 if (getSettings().stateTrackerSwipeRollback !== false) {
@@ -5201,11 +5211,8 @@ async function runPortraitMigrationIfNeeded() {
         eventSource.on(event_types.GENERATION_STARTED, onGenerationStarted);
         eventSource.on(event_types.GENERATION_ENDED, onGenerationEnded);
         eventSource.on(event_types.GENERATION_STOPPED, onGenerationEnded);
-        if (event_types.MESSAGE_EDITED) eventSource.on(event_types.MESSAGE_EDITED, parseAndApplyNarrativeRelTags);
-        if (event_types.MESSAGE_SWIPED) eventSource.on(event_types.MESSAGE_SWIPED, parseAndApplyNarrativeRelTags);
-
-        // Auto-register the visual [REL:] tag hiding regex script
-        ensureRelTagRegex();
+        if (event_types.MESSAGE_EDITED) eventSource.on(event_types.MESSAGE_EDITED, handleRelationshipSwipeChange);
+        if (event_types.MESSAGE_SWIPED) eventSource.on(event_types.MESSAGE_SWIPED, handleRelationshipSwipeChange);
 
         // ─── Chat Link ───
         // Bootstrap: restore state for whichever chat is already open (before CHAT_CHANGED can fire).
@@ -7910,6 +7917,36 @@ RULES:
         globalThis._rpgOpenCyoaSettings = showCyoaSettingsPopup;
         document.getElementById('rpg_cyoa_settings_btn')?.addEventListener('click', () => showCyoaSettingsPopup());
         document.getElementById('rt_onboarding_cyoa_settings_btn')?.addEventListener('click', () => showCyoaSettingsPopup());
+
+        async function showRelationshipSettingsPopup() {
+            const settings = getSettings();
+            const mode = getRelationshipUpdateMode(settings);
+            const { Popup, POPUP_TYPE, POPUP_RESULT: PR } = SillyTavern.getContext();
+            const html = `<div style="min-width:360px;padding:4px 2px;">
+                <div style="font-size:15px;font-weight:700;margin-bottom:8px;">Relationship Update Method</div>
+                <div style="font-size:12px;opacity:.75;margin-bottom:14px;">Select one method. The inactive method receives no instructions and does not run.</div>
+                <label style="display:block;padding:10px;margin-bottom:8px;border:1px solid rgba(255,255,255,.16);border-radius:7px;cursor:pointer;">
+                    <input type="radio" name="rpg_relationship_update_mode" value="regex" ${mode === RELATIONSHIP_UPDATE_MODES.REGEX ? 'checked' : ''}>
+                    <strong> Narrator Regex</strong>
+                    <div style="font-size:11px;opacity:.7;margin:5px 0 0 23px;">Parses <code>(Friendship: Name +X)</code> annotations from the narrator output.</div>
+                </label>
+                <label style="display:block;padding:10px;border:1px solid rgba(255,255,255,.16);border-radius:7px;cursor:pointer;">
+                    <input type="radio" name="rpg_relationship_update_mode" value="state_tracker" ${mode === RELATIONSHIP_UPDATE_MODES.STATE_TRACKER ? 'checked' : ''}>
+                    <strong> State Tracker Tags</strong>
+                    <div style="font-size:11px;opacity:.7;margin:5px 0 0 23px;">State Tracker emits a temporary <code>[RELATIONS]</code> block and code applies its lines.</div>
+                </label>
+            </div>`;
+            const popup = new Popup(html, POPUP_TYPE.CONFIRM, '', { okButton: 'Apply', cancelButton: 'Cancel' });
+            const result = await popup.show();
+            if (result !== PR.YES && result !== 1) return;
+            const selected = popup.dlg?.querySelector('input[name="rpg_relationship_update_mode"]:checked')?.value;
+            settings.npcRelationshipUpdateMode = selected === RELATIONSHIP_UPDATE_MODES.STATE_TRACKER
+                ? RELATIONSHIP_UPDATE_MODES.STATE_TRACKER
+                : RELATIONSHIP_UPDATE_MODES.REGEX;
+            saveSettings();
+            scheduleAutoApply();
+        }
+        document.getElementById('rpg_relationship_settings_btn')?.addEventListener('click', () => void showRelationshipSettingsPopup());
 
         // Deadlines Toggle
         const deadlinesCb = /** @type {HTMLInputElement} */ (document.getElementById('rpg_quests_deadlines'));

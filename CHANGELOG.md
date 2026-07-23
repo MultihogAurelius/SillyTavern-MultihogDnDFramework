@@ -2,6 +2,14 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [6.0.71] - 2026-07-23
+
+### Added
+- **Relationship update methods**: choose between narrator annotations and State Tracker relationship commands, with dedicated settings and live relationship feedback.
+
+### Fixed
+- **Persistence rollback**: removes the unavailable server disk-state endpoint and restores the established SillyTavern save and recovery behavior.
+
 ## [6.0.70] - 2026-07-23
 
 ### Fixed

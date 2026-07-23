@@ -5183,6 +5183,104 @@ textarea.rt-cr-input {
 .rt-barrel-value-negative { color: #ef4444; }
 .rt-barrel-value-zero { color: var(--rt-text-muted); }
 
+/* ── Relationship float feedback (Friendship / Affection awards) ── */
+.rt-rel-float-layer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 40;
+    overflow: hidden;
+    border-radius: inherit;
+}
+.rt-rel-float {
+    position: absolute;
+    right: calc(10px + var(--rt-rel-float-x, 0px));
+    top: calc(50% - var(--rt-rel-float-y, 0px));
+    bottom: auto;
+    display: inline-flex;
+    align-items: baseline;
+    justify-content: flex-end;
+    gap: 5px;
+    max-width: calc(100% - 20px);
+    font-weight: 800;
+    font-size: 15px;
+    letter-spacing: 0.2px;
+    white-space: nowrap;
+    line-height: 1.15;
+    text-shadow:
+        0 0 10px currentColor,
+        0 2px 6px rgba(0, 0, 0, 0.75);
+    animation: rt-rel-float-up 2.6s ease-out forwards;
+    will-change: transform, opacity;
+}
+.rt-rel-float-icon {
+    font-size: 18px;
+    line-height: 1;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.55));
+}
+.rt-rel-float-delta {
+    font-family: var(--rt-font-mono, ui-monospace, monospace);
+    font-size: 17px;
+    font-variant-numeric: tabular-nums;
+}
+.rt-rel-float-label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    opacity: 0.9;
+}
+.rt-rel-float-npc {
+    font-size: 11px;
+    font-weight: 600;
+    opacity: 0.72;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.rt-rel-float-npc::before {
+    content: '·';
+    margin-right: 5px;
+    opacity: 0.5;
+}
+
+/* Friendship — green / red */
+.rt-rel-float--friendship.rt-rel-float--positive { color: #4ade80; }
+.rt-rel-float--friendship.rt-rel-float--negative { color: #f87171; }
+
+/* Affection — pink / purple */
+.rt-rel-float--affection.rt-rel-float--positive { color: #f472b6; }
+.rt-rel-float--affection.rt-rel-float--negative { color: #c084fc; }
+
+@keyframes rt-rel-float-up {
+    0% {
+        opacity: 0;
+        transform: translateY(calc(-50% + 18px)) scale(0.88);
+    }
+    12% {
+        opacity: 1;
+        transform: translateY(-50%) scale(1);
+    }
+    70% {
+        opacity: 1;
+    }
+    100% {
+        opacity: 0;
+        transform: translateY(calc(-50% - 110px)) scale(1);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .rt-rel-float {
+        animation: rt-rel-float-fade 2.2s ease-out forwards;
+    }
+    @keyframes rt-rel-float-fade {
+        0% { opacity: 0; transform: translateY(-50%); }
+        15% { opacity: 1; transform: translateY(-50%); }
+        100% { opacity: 0; transform: translateY(-50%); }
+    }
+}
+
 /* Ã¢â€â‚¬Ã¢â€â‚¬ NPC Relationship Tier Badges Ã¢â€â‚¬Ã¢â€â‚¬ */
 .rt-npc-tier-row {
     display: flex;
@@ -6495,14 +6593,6 @@ textarea.rt-cr-input {
 #rpg_tracker_btn_upgrade_changed_prompts.rt-prompt-upgrade-pending:hover {
     background: rgba(240, 98, 48, 0.38) !important;
     border-color: #ffaa66 !important;
-}
-
-/* Recovery confirms: keep background readable so user can judge if UI looks stale */
-.popup.rt-recovery-popup[open]::backdrop,
-.popup.rt-memo-recovery-popup[open]::backdrop {
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-    background-color: rgba(0, 0, 0, 0.28);
 }
 
 /* ── CYOA Choice Block ─────────────────────────────────────────────────────── */

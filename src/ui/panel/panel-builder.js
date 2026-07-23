@@ -1452,14 +1452,14 @@ export function createPanel(dependencies) {
                                     <div style="font-size:10px;color:rgba(255,255,255,0.35);margin-bottom:14px;">Shows Friendship/Affection tracking bars on NPC cards and popups. Also adds relationship fields to the AI instruction.</div>
 
                                     <div style="margin-bottom:6px;display:flex;align-items:center;gap:10px;">
-                                        <label style="font-size:12px;color:rgba(255,255,255,0.7);flex:1;">Show Relationship Toast Notifications</label>
+                                        <label style="font-size:12px;color:rgba(255,255,255,0.7);flex:1;">Show Relationship Float Feedback</label>
                                         <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
                                             <input type="checkbox" id="rt-npc-rel-toast" ${curS.npcRelationshipToast !== false ? 'checked' : ''}
                                                 style="width:16px;height:16px;accent-color:#d4a940;cursor:pointer;">
                                             <span style="font-size:11px;color:rgba(255,255,255,0.5);">${curS.npcRelationshipToast !== false ? 'Enabled' : 'Disabled'}</span>
                                         </label>
                                     </div>
-                                    <div style="font-size:10px;color:rgba(255,255,255,0.35);margin-bottom:14px;">Emits a toast notification in the bottom-right corner when friendship or affection values change.</div>
+                                    <div style="font-size:10px;color:rgba(255,255,255,0.35);margin-bottom:14px;">Shows a floating Friendship/Affection graphic that rises and fades when those values change.</div>
 
                                     <div style="margin-bottom:14px;">
                                         <label style="font-size:12px;color:rgba(255,255,255,0.7);display:block;margin-bottom:4px;">"Add as is" Import Mode</label>
@@ -1794,7 +1794,8 @@ export function createPanel(dependencies) {
                                             <div style="position:absolute;left:50%;top:0;bottom:0;width:1px;background:var(--SmartThemeBorderColor, rgba(128,128,128,0.25));"></div>
                                             <div id="rt-npc-detail-${type}-fill" style="position:absolute;top:0;bottom:0;border-radius:6px;background:${bgColor};${isPos ? `left:50%;width:${pct}%;` : `right:50%;width:${pct}%;`}transition:width 0.3s ease;"></div>
                                         </div>
-                                        <span id="rt-npc-detail-${type}-text" style="font-size:15px;font-weight:bold;text-align:right;color:${valColor};font-family:monospace;">${clamped > 0 ? '+' : ''}${clamped}</span>
+                                        <input type="number" id="rt-npc-detail-${type}-input" min="-${relMax}" max="${relMax}" step="1" value="${clamped}"
+                                            aria-label="${label} value" style="width:52px;box-sizing:border-box;font-size:14px;font-weight:bold;text-align:right;color:${valColor};font-family:monospace;background:rgba(0,0,0,.18);border:1px solid var(--SmartThemeBorderColor, rgba(128,128,128,.35));border-radius:4px;padding:2px 4px;">
                                         <div></div>
                                         <div></div>
                                         <input type="range" id="rt-npc-detail-${type}-slider" min="-${relMax}" max="${relMax}" value="${clamped}" step="1"
@@ -2073,9 +2074,9 @@ export function createPanel(dependencies) {
                                     const bindSlider = (type) => {
                                         const slider = popupDom.querySelector(`#rt-npc-detail-${type}-slider`);
                                         const fill = popupDom.querySelector(`#rt-npc-detail-${type}-fill`);
-                                        const text = popupDom.querySelector(`#rt-npc-detail-${type}-text`);
+                                        const input = popupDom.querySelector(`#rt-npc-detail-${type}-input`);
                                         const tierEl = popupDom.querySelector(`#rt-npc-detail-${type}-tier`);
-                                        if (!slider || !fill || !text) return;
+                                        if (!slider || !fill || !input) return;
 
                                         let originalValue = parseInt(slider.value, 10) || 0;
 
@@ -2093,14 +2094,16 @@ export function createPanel(dependencies) {
                                             const bgColor = isPos ? colorPos : colorNeg;
                                             fill.style.background = bgColor;
 
-                                            text.textContent = (val > 0 ? '+' : '') + val;
-                                            text.style.color = val === 0 ? 'var(--SmartThemeEmColor, inherit)' : bgColor;
+                                            input.value = String(val);
+                                            input.style.color = val === 0 ? 'var(--SmartThemeEmColor, inherit)' : bgColor;
 
                                             if (tierEl) tierEl.innerHTML = renderRelTierDetailed(type, val, relMax);
                                         });
 
                                         slider.addEventListener('change', () => {
                                             const val = clampRelationshipValue(parseInt(slider.value, 10) || 0, getNpcRelationshipMax(s));
+                                            slider.value = String(val);
+                                            input.value = String(val);
                                             if (val === originalValue) return;
 
                                             // Update the setting
@@ -2148,6 +2151,25 @@ export function createPanel(dependencies) {
                                                 const tierBadge = cardEl.querySelector(`.rt-npc-tier-badge.${type}`);
                                                 if (tierBadge) applyRelTierBadgeElement(tierBadge, type, val, getNpcRelationshipMax(s));
                                             }
+                                        });
+
+                                        input.addEventListener('input', () => {
+                                            const typed = Number(input.value);
+                                            if (!Number.isFinite(typed)) return;
+                                            const val = clampRelationshipValue(Math.trunc(typed), getNpcRelationshipMax(s));
+                                            slider.value = String(val);
+                                            slider.dispatchEvent(new Event('input'));
+                                        });
+
+                                        input.addEventListener('change', () => {
+                                            const typed = Number(input.value);
+                                            const val = Number.isFinite(typed)
+                                                ? clampRelationshipValue(Math.trunc(typed), getNpcRelationshipMax(s))
+                                                : originalValue;
+                                            input.value = String(val);
+                                            slider.value = String(val);
+                                            slider.dispatchEvent(new Event('input'));
+                                            slider.dispatchEvent(new Event('change'));
                                         });
                                     };
 
@@ -4628,7 +4650,7 @@ Rules:
                     const v = parseInt(/** @type {HTMLInputElement} */(e.target).value) || 300;
                     s.routerCleanupTokenThreshold = Math.max(50, Math.min(5000, v));
                         /** @type {HTMLInputElement} */ (e.target).value = String(s.routerCleanupTokenThreshold);
-                    SillyTavern.getContext().saveSettingsDebounced();
+                    void saveSettings();
                 });
             }
 
@@ -4639,7 +4661,7 @@ Rules:
                     const v = parseInt(/** @type {HTMLInputElement} */(e.target).value);
                     s.routerCleanupEvery = isNaN(v) ? 0 : Math.max(0, Math.min(100, v));
                         /** @type {HTMLInputElement} */ (e.target).value = String(s.routerCleanupEvery);
-                    SillyTavern.getContext().saveSettingsDebounced();
+                    void saveSettings();
                 });
             }
 
@@ -4650,7 +4672,7 @@ Rules:
                     s.routerCleanupUseThreshold = cleanupUseThresholdChk.checked;
                     cleanupThresholdRow.style.opacity = cleanupUseThresholdChk.checked ? '1' : '0.35';
                     cleanupThresholdRow.style.pointerEvents = cleanupUseThresholdChk.checked ? 'auto' : 'none';
-                    SillyTavern.getContext().saveSettingsDebounced();
+                    void saveSettings();
                 });
             }
         }
@@ -4934,7 +4956,7 @@ Rules:
         // Day/night tint + badge update live as the user edits (esp. [TIME] changes in Raw view)
         refreshDayNightCycleFromMemo(newText);
 
-        // Persist immediately — ST's saveSettingsDebounced still coalesces disk writes.
+        // Persist immediately through the tracker-owned checkpoint service.
         _rawMemoDirty = true;
         settings.currentMemo = applyQuestSyncAndStripMemo(newText);
         _rawMemoDirty = false;

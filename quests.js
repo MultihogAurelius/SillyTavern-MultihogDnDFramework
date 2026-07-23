@@ -5,6 +5,7 @@
 
 import { getSettings } from './state-manager.js';
 import { parseQuestsFromMemo, writeQuestsToMemo, parseInWorldTime, isArchivedQuestStatus, questHasEffectiveDeadline, isEmergentQuest } from './memo-processor.js';
+import { saveSettings } from './src/app/runtime-bridge.js';
 
 /**
  * Unregisters the deprecated LogQuest tool if it was left registered from a prior version.
@@ -105,7 +106,7 @@ export function checkQuestDeadlines() {
             settings.quests = list;
         }
         writeQuestsToMemo(settings.quests);
-        SillyTavern.getContext().saveSettingsDebounced();
+        void saveSettings();
     }
 }
 

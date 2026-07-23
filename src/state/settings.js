@@ -540,23 +540,27 @@ function getSettingsInternal(extensionSettings) {
     // Updated" dialog (or Auto-Update Prompts on Upgrade) — once per fingerprint change.
 
     // ── MIGRATION: Block RELATIONSHIPS section in State Tracker core prompt ───────
-    if (s.systemPromptTemplate) {
-        if (s.systemPromptTemplate.includes('Never track relationships or reputation')) {
+    if (s.systemPromptTemplate) {
+        s.systemPromptTemplate = s.systemPromptTemplate.replace(
+            'NO RELATIONSHIPS: Never track relationships, and never create a relationship section (e.g., [RELATIONSHIPS]). NPC relationships are handled by a separate, dedicated system.',
+            'RELATIONSHIPS: Never create a relationship section (e.g., [RELATIONSHIPS]) in the memo. When the separate relationship-command instruction is present, report qualifying deltas only through its [RELATIONS] command block.'
+        );
+        if (s.systemPromptTemplate.includes('Never track relationships or reputation')) {
             s.systemPromptTemplate = s.systemPromptTemplate.replace(
                 'NO RELATIONSHIPS: Never track relationships or reputation, and never create a relationship or reputation section (e.g., [RELATIONSHIPS] or [REPUTATION]). NPC relationships are handled by a separate, dedicated system.',
-                'NO RELATIONSHIPS: Never track relationships, and never create a relationship section (e.g., [RELATIONSHIPS]). NPC relationships are handled by a separate, dedicated system.'
+                'RELATIONSHIPS: Never create a relationship section (e.g., [RELATIONSHIPS]) in the memo. When the separate relationship-command instruction is present, report qualifying deltas only through its [RELATIONS] command block.'
             );
         }
-        if (!s.systemPromptTemplate.includes('NO RELATIONSHIPS')) {
+        if (!s.systemPromptTemplate.includes('RELATIONSHIPS: Never create a relationship section')) {
             if (s.systemPromptTemplate.includes('DELETION: To REMOVE a section entirely, you MUST output: `[TAG]REMOVED[/TAG]`.')) {
                 s.systemPromptTemplate = s.systemPromptTemplate.replace(
                     'DELETION: To REMOVE a section entirely, you MUST output: `[TAG]REMOVED[/TAG]`.',
-                    'DELETION: To REMOVE a section entirely, you MUST output: `[TAG]REMOVED[/TAG]`.\nNO RELATIONSHIPS: Never track relationships, and never create a relationship section (e.g., [RELATIONSHIPS]). NPC relationships are handled by a separate, dedicated system.'
+                    'DELETION: To REMOVE a section entirely, you MUST output: `[TAG]REMOVED[/TAG]`.\nRELATIONSHIPS: Never create a relationship section (e.g., [RELATIONSHIPS]) in the memo. When the separate relationship-command instruction is present, report qualifying deltas only through its [RELATIONS] command block.'
                 );
             } else if (s.systemPromptTemplate.includes('DELETION: To REMOVE a section entirely, you MUST output: \\`[TAG]REMOVED[/TAG]\\`.')) {
                 s.systemPromptTemplate = s.systemPromptTemplate.replace(
                     'DELETION: To REMOVE a section entirely, you MUST output: \\`[TAG]REMOVED[/TAG]\\`.',
-                    'DELETION: To REMOVE a section entirely, you MUST output: \\`[TAG]REMOVED[/TAG]\\`.\nNO RELATIONSHIPS: Never track relationships, and never create a relationship section (e.g., [RELATIONSHIPS]). NPC relationships are handled by a separate, dedicated system.'
+                    'DELETION: To REMOVE a section entirely, you MUST output: \\`[TAG]REMOVED[/TAG]\\`.\nRELATIONSHIPS: Never create a relationship section (e.g., [RELATIONSHIPS]) in the memo. When the separate relationship-command instruction is present, report qualifying deltas only through its [RELATIONS] command block.'
                 );
             }
         }

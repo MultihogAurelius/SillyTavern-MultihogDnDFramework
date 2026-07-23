@@ -552,7 +552,10 @@
                                 <label class="checkbox_label" style="flex:1;"><input type="checkbox" id="rpg_sysprompt_mod_cyoa_mode" /><span>🧭 CYOA Mode</span></label>
                                 <button id="rpg_cyoa_settings_btn" class="menu_button interactable" style="padding:1px 7px;font-size:11px;flex-shrink:0;" title="CYOA Settings"><i class="fa-solid fa-gear"></i></button>
                                 </div>
-                                <label class="checkbox_label"><input type="checkbox" id="rpg_sysprompt_mod_npc_rel_bars" /><span>💞 Relationship System</span></label>
+                                <div style="display:flex;align-items:center;gap:4px;">
+                                <label class="checkbox_label" style="flex:1;"><input type="checkbox" id="rpg_sysprompt_mod_npc_rel_bars" /><span>💞 Relationship System</span></label>
+                                <button id="rpg_relationship_settings_btn" class="menu_button interactable" style="padding:1px 7px;font-size:11px;flex-shrink:0;" title="Relationship System Settings"><i class="fa-solid fa-gear"></i></button>
+                                </div>
                             </div>
                             <button id="rpg_tracker_btn_update_sysprompt_general" class="menu_button interactable"
                                 style="width: 100%; margin-top: 6px; background: rgba(0, 200, 140, 0.18); border-color: #00c88c;"
@@ -989,8 +992,8 @@
 
                                     <label class="checkbox_label">
                                         <input id="rpg_tracker_npc_rel_toast" type="checkbox" />
-                                        <span>Show Relationship Toast Notifications</span>
-                                        <i class="fa-solid fa-circle-question interactable" style="font-size: 0.85em; opacity: 0.7; margin-left: 4px;" title="Emits a toast notification in the bottom-right corner when friendship or affection values change."></i>
+                                        <span>Show Relationship Float Feedback</span>
+                                        <i class="fa-solid fa-circle-question interactable" style="font-size: 0.85em; opacity: 0.7; margin-left: 4px;" title="Shows a floating Friendship/Affection graphic that rises and fades when those values change."></i>
                                     </label>
 
                                     <label style="font-size: 11px; opacity: 0.7;">Default Relationship Max for new chats (± range)</label>
