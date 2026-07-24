@@ -17,6 +17,7 @@ import { loadPanelGeometry, loadDeltaHeight, makeDraggable, makeResizableTR, mak
 import { applyCustomTheme, openThemeWizard, refreshSavedThemesList, handleRecolor, undoThemeChange } from './theme-manager.js';
 import { showCharacterRollPanel, showPcImportPanel, handleCharacterCreatorGenerate, generatePersonaBio, showPersonaConfirmOverlay, extractCharNameFromMemo } from './character-creator.js';
 import { bindQuickStartEvents } from './quickstart.js';
+import { bindTutorialBot, openTutorialBot } from './tutorial-bot.js';
 import { handleCategorySettings, openCustomFieldEditor, openPromptEditor, refreshOrderList, exportModules, importModulesFromJson, openNpcSectionEditor, openPcSectionEditor } from './ui-editors.js';
 import { openGameSystemWizard, openManageGameSystems, openSystemPromptControlRoom, syncAllNarratorTogglesForUnlockState, extractTopLevelSections, normalizeSectionOrder, getSectionRowDescriptor, transformBaseSectionContent, isBlankSectionContent, isSectionUnlocked } from './game-systems.js';
 import { openManageGameCartridges, promptAndSaveCurrentAsCartridge } from './game-cartridges.js';
@@ -1751,31 +1752,95 @@ function onChatChanged(newChatId) {
 
 
 /**
- * Syncs the 🔗/🔓 icon in the panel header and the settings checkbox
- * to reflect the current chatLinkEnabled state.
+ * Syncs the settings checkbox to reflect the current chatLinkEnabled state.
  */
 function updateChatLinkUI() {
     const s = getSettings();
-    const on = s.chatLinkEnabled;
-
-    const btn = document.getElementById('rpg-tracker-chat-link-btn');
-    const footerBtn = document.getElementById('rpg-tracker-chat-link-footer-btn');
-    const linkTitle = on
-        ? `Chat Link ON — state is bound to the active chat\n(Click to unlock / use global state)`
-        : `Chat Link OFF — using global state\n(Click to re-lock to current chat)`;
-    const linkLabel = on ? '🔗 Link' : '🔓 Unlinked';
-
-    if (btn) {
-        btn.textContent = on ? '🔗' : '🔓';
-        btn.title = linkTitle;
-    }
-    if (footerBtn) {
-        footerBtn.textContent = linkLabel;
-        footerBtn.title = linkTitle;
-    }
-
     const cb = document.getElementById('rpg_tracker_chat_link_enabled');
-    if (cb instanceof HTMLInputElement) cb.checked = on;
+    if (cb instanceof HTMLInputElement) cb.checked = !!s.chatLinkEnabled;
+}
+
+/**
+ * Enable/disable Chat-Linked Mode (settings toggle). Handles restore/overwrite conflicts.
+ * @param {boolean} turningOn
+ * @returns {Promise<boolean>} true if the new state was applied
+ */
+async function applyChatLinkToggle(turningOn) {
+    const { Popup, POPUP_RESULT } = SillyTavern.getContext();
+    const s = getSettings();
+
+    if (turningOn && runtimeState.currentChatId) {
+        const saved = s.chatStates?.[runtimeState.currentChatId];
+        const liveContent = (s.currentMemo || '').trim();
+        const savedContent = (saved?.currentMemo || '').trim();
+
+        const liveKeys = [...(s.activeRouterKeys || [])].sort();
+        const savedKeys = [...(saved?.activeRouterKeys || [])].sort();
+        const keysChanged = JSON.stringify(liveKeys) !== JSON.stringify(savedKeys);
+
+        const hasConflict = (savedContent && liveContent && liveContent !== savedContent)
+            || (savedKeys.length > 0 && liveKeys.length > 0 && keysChanged);
+
+        if (hasConflict && saved) {
+            const body = `
+                <div style="text-align: left;">
+                    <p><b>Conflict Detected:</b> This chat has a saved state (memo or lore keys), but your current session is not empty.</p>
+                    <p style="font-size: 0.9em; opacity: 0.8; margin-top: 10px;">
+                        <b>RESTORE:</b> Use the chat's saved state. (Current session moved to history)<br>
+                        <b>OVERWRITE:</b> Keep current session and save it to this chat. (Old chat data moved to history)
+                    </p>
+                </div>`;
+
+            const choice = await Popup.show.confirm('⚠️ Chat Link Conflict', body, {
+                okButton: 'RESTORE',
+                cancelButton: 'OVERWRITE',
+                customButtons: [
+                    {
+                        text: 'CANCEL',
+                        result: POPUP_RESULT.CANCELLED,
+                        appendAtEnd: true,
+                    },
+                ],
+            });
+
+            if (choice === POPUP_RESULT.AFFIRMATIVE) {
+                if (s.currentMemo) {
+                    saved.memoHistory = saved.memoHistory || [];
+                    saved.memoHistory.unshift({
+                        memo: s.currentMemo,
+                        delta: s.lastDelta,
+                        timestamp: Date.now(),
+                        label: 'Global Edit (Pre-Link)',
+                    });
+                    if (saved.memoHistory.length > 50) saved.memoHistory.length = 50;
+                }
+                loadChatState(runtimeState.currentChatId);
+                toastr['success']('Chat Link ON — restored saved state.', 'RPG Tracker');
+            } else if (choice === POPUP_RESULT.NEGATIVE) {
+                if (saved.currentMemo) {
+                    s.memoHistory.unshift(saved.currentMemo);
+                    if (s.memoHistory.length > 50) s.memoHistory.length = 50;
+                }
+                saveChatState(runtimeState.currentChatId);
+                toastr['success']('Chat Link ON — current state saved to chat.', 'RPG Tracker');
+            } else {
+                return false;
+            }
+        } else {
+            const found = loadChatState(runtimeState.currentChatId);
+            if (!found) saveChatState(runtimeState.currentChatId);
+            toastr['success']('Chat Link ON — state bound to this chat.', 'RPG Tracker');
+        }
+    } else if (turningOn) {
+        toastr['success']('Chat Link ON', 'RPG Tracker');
+    } else {
+        toastr['info']('Chat Link OFF — using global state.', 'RPG Tracker');
+    }
+
+    s.chatLinkEnabled = turningOn;
+    saveSettings();
+    updateChatLinkUI();
+    return true;
 }
 
 /**
@@ -4222,6 +4287,8 @@ async function runPortraitMigrationIfNeeded() {
         rebuildNpcInstructionIfNeeded,
         applyPortraitData,
         bindQuickStartEvents,
+        bindTutorialBot,
+        openTutorialBot,
         blockToItems,
         buildCombatAndSkillScalingHint,
         buildNpcInstruction,
@@ -5387,27 +5454,12 @@ async function runPortraitMigrationIfNeeded() {
             registerDiceFunctionTool();
         });
 
-        $('#rpg_tracker_chat_link_enabled').prop('checked', !!settings.chatLinkEnabled).on('change', function () {
-            const s = getSettings();
+        $('#rpg_tracker_chat_link_enabled').prop('checked', !!settings.chatLinkEnabled).on('change', async function () {
             const turningOn = !!$(this).prop('checked');
-
-            // If we're turning it on from the settings menu, just simulate the button click logic
-            // but keep it simple here. The panel button is the primary toggle.
-            s.chatLinkEnabled = turningOn;
-            saveSettings();
-            updateChatLinkUI();
-
-            if (turningOn && runtimeState.currentChatId) {
-                const saved = s.chatStates?.[runtimeState.currentChatId];
-                if (saved && saved.currentMemo && s.currentMemo && s.currentMemo !== saved.currentMemo) {
-                    // In settings we'll just do the safe silent restore if they checked the box
-                    // because async confirms in jQuery 'change' events can be janky.
-                    // The panel button handles the explicit decision better.
-                    loadChatState(runtimeState.currentChatId);
-                } else {
-                    const found = loadChatState(runtimeState.currentChatId);
-                    if (!found) saveChatState(runtimeState.currentChatId);
-                }
+            const applied = await applyChatLinkToggle(turningOn);
+            if (!applied) {
+                // Conflict cancelled — revert checkbox to previous state
+                $(this).prop('checked', !turningOn);
             }
         });
 
@@ -5422,6 +5474,10 @@ async function runPortraitMigrationIfNeeded() {
                 saveSettings();
                 toastr['success'](`Cleared ${count} chat state(s).`, 'RPG Tracker');
             }
+        });
+
+        $('#rpg_tracker_tutorial_help').on('click', function () {
+            openTutorialBot();
         });
 
         $('#rpg_tracker_purge_all_portraits').on('click', async function () {

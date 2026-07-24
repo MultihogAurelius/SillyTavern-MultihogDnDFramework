@@ -757,15 +757,257 @@
     transition: color 0.2s, background 0.2s; transition-timing-function: cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
-.rpg-tracker-icon-btn:hover {
-    color: var(--rt-accent);
-    background: var(--rt-accent-bg);
+/* Hover chrome only for fine pointers — touch devices keep :hover stuck after tap */
+@media (hover: hover) and (pointer: fine) {
+    .rpg-tracker-icon-btn:hover {
+        color: var(--rt-accent);
+        background: var(--rt-accent-bg);
+    }
 }
 
 .rpg-tracker-icon-btn.active {
     color: var(--rt-accent);
     background: var(--rt-accent-bg);
     box-shadow: inset 0 0 0 1px var(--rt-accent-dim);
+}
+
+.rpg-tracker-icon-btn.rt-tutorial-help-btn:focus {
+    outline: none;
+}
+
+.rpg-tracker-icon-btn.rt-tutorial-help-btn:focus-visible {
+    outline: 1px solid var(--rt-accent-dim, rgba(255, 255, 255, 0.35));
+    outline-offset: 1px;
+}
+
+/* HELP header button — slightly wider text label */
+.rpg-tracker-icon-btn.rt-tutorial-help-btn {
+    font-size: 0.65em;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    padding: 0 6px;
+    min-width: auto;
+}
+
+/* ── Tutorial Bot (panel morph) ─────────────────────────────────────────── */
+.rt-panel-mode-pane.rt-tutorial-mode {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.rt-tutorial-view {
+    display: none;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+    box-sizing: border-box;
+    color: var(--rt-text);
+    background: transparent;
+}
+
+.rpg-tracker-panel.rt-tutorial-active .rt-tutorial-view {
+    display: flex;
+}
+
+.rt-tutorial-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--rt-border, rgba(255, 255, 255, 0.1));
+}
+
+.rt-tutorial-title {
+    flex: 1;
+    font-size: 0.85em;
+    font-weight: 700;
+    opacity: 0.85;
+    letter-spacing: 0.02em;
+    min-width: 0;
+}
+
+.rt-tutorial-messages {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.rt-tutorial-msg {
+    max-width: 92%;
+    padding: 8px 10px;
+    border-radius: 8px;
+    font-size: 0.92em;
+    line-height: 1.45;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.rt-tutorial-msg-user {
+    align-self: flex-end;
+    background: var(--rt-accent-bg, rgba(100, 160, 255, 0.12));
+    border-color: var(--rt-accent-dim, rgba(100, 160, 255, 0.25));
+}
+
+.rt-tutorial-msg-bot {
+    align-self: flex-start;
+    background: rgba(0, 0, 0, 0.22);
+}
+
+.rt-tutorial-msg-label {
+    font-size: 0.7em;
+    font-weight: 700;
+    opacity: 0.55;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 4px;
+}
+
+.rt-tutorial-msg-body code {
+    font-family: Consolas, Monaco, monospace;
+    font-size: 0.9em;
+    padding: 0 3px;
+    border-radius: 3px;
+    background: rgba(0, 0, 0, 0.35);
+}
+
+.rt-tutorial-msg-body {
+    overflow-wrap: anywhere;
+}
+
+.rt-tutorial-msg-body > *:first-child {
+    margin-top: 0;
+}
+
+.rt-tutorial-msg-body > *:last-child {
+    margin-bottom: 0;
+}
+
+.rt-tutorial-msg-body p {
+    margin: 0.45em 0;
+}
+
+.rt-tutorial-msg-body h1,
+.rt-tutorial-msg-body h2,
+.rt-tutorial-msg-body h3,
+.rt-tutorial-msg-body h4 {
+    margin: 0.75em 0 0.35em;
+    font-weight: 700;
+    line-height: 1.3;
+    color: var(--rt-accent, inherit);
+}
+
+.rt-tutorial-msg-body h1 { font-size: 1.2em; }
+.rt-tutorial-msg-body h2 { font-size: 1.1em; }
+.rt-tutorial-msg-body h3 { font-size: 1.05em; }
+.rt-tutorial-msg-body h4 { font-size: 1em; }
+
+.rt-tutorial-msg-body ul,
+.rt-tutorial-msg-body ol {
+    margin: 0.4em 0;
+    padding-left: 1.35em;
+}
+
+.rt-tutorial-msg-body li {
+    margin: 0.2em 0;
+}
+
+.rt-tutorial-msg-body li > p {
+    margin: 0.15em 0;
+}
+
+.rt-tutorial-msg-body pre {
+    margin: 0.5em 0;
+    padding: 8px 10px;
+    border-radius: 6px;
+    overflow-x: auto;
+    background: rgba(0, 0, 0, 0.35);
+    font-size: 0.88em;
+}
+
+.rt-tutorial-msg-body pre code {
+    padding: 0;
+    background: transparent;
+}
+
+.rt-tutorial-msg-body strong {
+    font-weight: 700;
+}
+
+.rt-tutorial-msg-body em {
+    font-style: italic;
+}
+
+.rt-tutorial-msg-body a {
+    color: var(--rt-accent, #8ab4ff);
+}
+
+.rt-tutorial-msg-body blockquote {
+    margin: 0.5em 0;
+    padding: 0.2em 0 0.2em 0.75em;
+    border-left: 3px solid var(--rt-accent-dim, rgba(255, 255, 255, 0.25));
+    opacity: 0.9;
+}
+
+.rt-tutorial-msg-body table {
+    border-collapse: collapse;
+    margin: 0.5em 0;
+    font-size: 0.9em;
+    width: 100%;
+}
+
+.rt-tutorial-msg-body th,
+.rt-tutorial-msg-body td {
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    padding: 4px 6px;
+    text-align: left;
+}
+
+.rt-tutorial-pending .rt-tutorial-msg-body {
+    opacity: 0.65;
+    font-style: italic;
+}
+
+.rt-tutorial-composer {
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+    flex-shrink: 0;
+    padding: 8px 10px 10px;
+    border-top: 1px solid var(--rt-border, rgba(255, 255, 255, 0.1));
+    box-sizing: border-box;
+}
+
+.rt-tutorial-input {
+    flex: 1;
+    min-width: 0;
+    resize: none;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(0, 0, 0, 0.28);
+    color: var(--rt-text, #e0e0e0);
+    padding: 8px 10px;
+    font-family: inherit;
+    font-size: 0.92em;
+    line-height: 1.35;
+    outline: none;
+    box-sizing: border-box;
+}
+
+.rt-tutorial-input:focus {
+    border-color: var(--rt-accent-dim, rgba(100, 160, 255, 0.4));
+}
+
+.rt-tutorial-send:disabled {
+    opacity: 0.45;
+    cursor: wait;
 }
 
 .rpg-tracker-content {
@@ -3092,9 +3334,8 @@
         flex-shrink: 0 !important;
     }
 
-    /* On mobile, collapse action buttons into the Ã¢â€¹Â¯ overflow menu.
+    /* On mobile, collapse action buttons into the overflow menu.
        Raw View stays in the header. */
-    #rpg-tracker-chat-link-btn,
     #rpg-tracker-enable-btn,
     #rt-agent-router-enable-btn,
     #rpg-tracker-update-btn,
@@ -3103,10 +3344,18 @@
         display: none !important;
     }
 
-    /* Dedicated header buttons on mobile */
+    /* Dedicated header buttons on mobile — Raw View gets a larger tap target */
     #rpg-tracker-view-btn {
         display: flex !important;
         flex-shrink: 0 !important;
+        align-items: center;
+        justify-content: center;
+        min-width: 44px !important;
+        min-height: 44px !important;
+        padding: 8px 12px !important;
+        font-size: 1.45em !important;
+        line-height: 1 !important;
+        border-radius: 8px !important;
     }
 
     .rt-footer-prompt-btn {
@@ -3119,11 +3368,6 @@
         display: none !important;
     }
     .rpg-tracker-header-left .rt-header-title-mobile {
-        display: inline-block !important;
-    }
-
-    /* Chat Link: moved to the footer utility row / drawer (hidden in header above) */
-    #rpg-tracker-chat-link-footer-btn {
         display: inline-block !important;
     }
 
@@ -3724,11 +3968,6 @@ textarea.rt-cr-input {
 /* Ã¢â€â‚¬Ã¢â€â‚¬ Mobile Layout Fixes Ã¢â€â‚¬Ã¢â€â‚¬ */
 .rt-footer-toggle-btn {
     display: none; /* Hide on desktop */
-}
-
-/* Chat Link footer button: desktop uses header button; mobile uses footer */
-#rpg-tracker-chat-link-footer-btn {
-    display: none;
 }
 
 @media (max-width: 600px) {

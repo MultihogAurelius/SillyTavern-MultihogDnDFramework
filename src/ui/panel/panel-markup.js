@@ -14,7 +14,7 @@ export function buildPanelMarkup({ settings, agentPanelCollapsedClass }) {
                 </div>
                 <div class="rpg-tracker-header-center" id="rpg-tracker-pause-banner"></div>
                 <div class="rpg-tracker-header-right">
-                    <button class="rpg-tracker-icon-btn" id="rpg-tracker-chat-link-btn" style="font-size:13px;" title="Chat Link ON">🔗</button>
+                    <button class="rpg-tracker-icon-btn rt-tutorial-help-btn" id="rpg-tracker-help-btn" title="Tutorial Bot (HELP)">HELP</button>
                     <button class="rpg-tracker-icon-btn" id="rpg-tracker-view-btn" title="Toggle rendered view">⊞</button>
                     <button class="rpg-tracker-icon-btn" id="rpg-tracker-enable-btn" title="${settings.enabled ? 'Disable State Tracker' : 'Enable State Tracker'}" style="${settings.enabled ? '' : 'opacity:0.4;'}" >⏻</button>
                     <button class="rpg-tracker-icon-btn" id="rpg-tracker-update-btn" title="Update State Now">🔄</button>
@@ -73,6 +73,7 @@ export function buildPanelMarkup({ settings, agentPanelCollapsedClass }) {
                 <div class="rt-panel-mode-pane" id="rt-panel-tracker-pane">
                 <textarea class="rpg-tracker-memo-area" id="rpg-tracker-memo">${settings.currentMemo}</textarea>
                 <div class="rpg-tracker-render-view" id="rpg-tracker-render" style="display:none;"></div>
+                <div class="rt-tutorial-view" id="rt-tutorial-view" style="display:none;" aria-label="Tutorial Bot chat"></div>
                 </div>
                 <div class="rt-panel-mode-pane" id="rt-panel-agent-pane" style="display:none;">
             <div class="rpg-tracker-panel rpg-tracker-agent-panel rt-agent-integrated ${agentPanelCollapsedClass}${settings.trackerTheme || 'rt-theme-native'}" id="rpg-tracker-agent">
@@ -342,7 +343,6 @@ export function buildPanelMarkup({ settings, agentPanelCollapsedClass }) {
                     <div id="rt-footer-location" class="rt-footer-location-text" title="Current Location (Main, Sub)"></div>
                 </div>
                 <div class="flex-container gap-1 alignitemscenter rt-utility-footer-group">
-                    <button class="rpg-tracker-nav-btn" id="rpg-tracker-chat-link-footer-btn" title="Chat Link ON" style="padding: 1px 8px; font-size: 0.85em;">🔗 Link</button>
                     <span id="rpg-tracker-count">~${Math.round(settings.currentMemo.length / 2.62)} tokens</span>
                     <button class="rpg-tracker-nav-btn" id="rpg-tracker-delta-btn" title="Toggle change log" style="padding: 1px 5px; font-size: 0.692em; opacity: 0.8; margin-left: 5px;">δ</button>
                     <button class="rpg-tracker-nav-btn" id="rpg-tracker-memo-clear" style="padding: 1px 5px; font-size: 0.692em; opacity: 0.8; margin-left: 5px;" title="Clear memo and history">CLEAR</button>

@@ -2,6 +2,19 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [6.1.0] - 2026-07-24
+
+### Added
+- **Tutorial Bot**: in-panel HELP chat that morphs the State Tracker into a multi-turn instructor. Answers from `docs/multihogDnDdoc.md` via the State Tracker LLM connection. Open from the tracker **HELP** button or **General & Visuals → Tutorial Bot (HELP)**. Chat persists across reloads until Clear; replies render Markdown (showdown).
+- **Framework documentation**: `docs/multihogDnDdoc.md` (tutorial knowledge base) covering setup, turn flow, RNG, modules, Lorebook Agent, World Progression, and more.
+
+### Changed
+- **Chat Link**: removed header/footer icons from the State Tracker panel; toggle and conflict handling live in **General & Visuals** only.
+- **Mobile Raw View**: larger tap target for the Raw/Rendered view toggle.
+
+### Fixed
+- **Mobile HELP button**: no longer stays green after closing Tutorial Bot (sticky touch hover/focus).
+
 ## [6.0.85] - 2026-07-24
 
 ### Added

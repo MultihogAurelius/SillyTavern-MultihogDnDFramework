@@ -4,6 +4,7 @@ import { wireAgentWorldProgression } from './panel-world-progression.js';
 import { wireAgentActivity } from './panel-agent-activity.js';
 import { buildPanelMarkup } from './panel-markup.js';
 import { createSceneViewController } from './panel-scene-view.js';
+import { bindTutorialBot } from '../../../tutorial-bot.js';
 
 /** Builds and wires the tracker panel. Dependencies stay explicit to avoid entry-module cycles. */
 export function createPanel(dependencies) {
@@ -213,104 +214,7 @@ export function createPanel(dependencies) {
         });
     }
 
-    // ── Chat Link Toggle ──
-    const chatLinkBtn = panel.querySelector('#rpg-tracker-chat-link-btn');
-    if (chatLinkBtn) {
-        chatLinkBtn.addEventListener('click', async (e) => {
-            e.stopPropagation();
-            const { Popup, POPUP_RESULT } = SillyTavern.getContext();
-            const s = getSettings();
-            const turningOn = !s.chatLinkEnabled;
-
-            if (turningOn && runtimeState.currentChatId) {
-                const saved = s.chatStates?.[runtimeState.currentChatId];
-                const liveContent = (s.currentMemo || '').trim();
-                const savedContent = (saved?.currentMemo || '').trim();
-
-                const liveKeys = s.activeRouterKeys || [];
-                const savedKeys = saved?.activeRouterKeys || [];
-                const keysChanged = JSON.stringify(liveKeys.sort()) !== JSON.stringify(savedKeys.sort());
-
-                // Show conflict if EITHER content or keys are different
-                const hasConflict = (savedContent && liveContent && liveContent !== savedContent) || (savedKeys.length > 0 && liveKeys.length > 0 && keysChanged);
-
-                if (hasConflict) {
-                    const body = `
-                            <div style="text-align: left;">
-                                <p><b>Conflict Detected:</b> This chat has a saved state (memo or lore keys), but your current session is not empty.</p>
-                                <p style="font-size: 0.9em; opacity: 0.8; margin-top: 10px;">
-                                    <b>RESTORE:</b> Use the chat's saved state. (Current session moved to history)<br>
-                                    <b>OVERWRITE:</b> Keep current session and save it to this chat. (Old chat data moved to history)
-                                </p>
-                            </div>`;
-
-                    const choice = await Popup.show.confirm('⚠️ Chat Link Conflict', body, {
-                        okButton: 'RESTORE',
-                        cancelButton: 'OVERWRITE',
-                        customButtons: [
-                            {
-                                text: 'CANCEL',
-                                result: POPUP_RESULT.CANCELLED,
-                                appendAtEnd: true,
-                            }
-                        ],
-                    });
-
-                    if (choice === POPUP_RESULT.AFFIRMATIVE) {
-                        // User wants to Restore
-                        if (s.currentMemo) {
-                            saved.memoHistory = saved.memoHistory || [];
-                            saved.memoHistory.unshift({
-                                memo: s.currentMemo,
-                                delta: s.lastDelta,
-                                timestamp: Date.now(),
-                                label: 'Global Edit (Pre-Link)'
-                            });
-                            if (saved.memoHistory.length > 50) saved.memoHistory.length = 50;
-                        }
-                        loadChatState(runtimeState.currentChatId);
-                        toastr['success']('Chat Link ON — restored saved state.', 'RPG Tracker');
-                    } else if (choice === POPUP_RESULT.NEGATIVE) {
-                        // User wants to Overwrite
-                        if (saved.currentMemo) {
-                            s.memoHistory.unshift(saved.currentMemo);
-                            if (s.memoHistory.length > 50) s.memoHistory.length = 50;
-                        }
-                        saveChatState(runtimeState.currentChatId);
-                        toastr['success']('Chat Link ON — current state saved to chat.', 'RPG Tracker');
-                    } else {
-                        // User closed the modal or hit escape — cancel the toggle
-                        return;
-                    }
-                } else {
-                    // No conflict or chat was empty
-                    saveChatState(runtimeState.currentChatId);
-                    toastr['success']('Chat Link ON — state bound to this chat.', 'RPG Tracker');
-                }
-            } else if (turningOn) {
-                // Normal lock (empty or new chat)
-                if (runtimeState.currentChatId) {
-                    const found = loadChatState(runtimeState.currentChatId);
-                    if (!found) saveChatState(runtimeState.currentChatId);
-                }
-                toastr['success']('Chat Link ON', 'RPG Tracker');
-            } else {
-                toastr['info']('Chat Link OFF — using global state.', 'RPG Tracker');
-            }
-
-            s.chatLinkEnabled = turningOn;
-            saveSettings();
-            updateChatLinkUI();
-        });
-    }
-
-    const chatLinkFooterBtn = panel.querySelector('#rpg-tracker-chat-link-footer-btn');
-    if (chatLinkFooterBtn && chatLinkBtn) {
-        chatLinkFooterBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            chatLinkBtn.click();
-        });
-    }
+    // Chat Link toggle lives in extension settings (General & Visuals) only.
 
     // ── Router Agent UI ──
     const agentPanel = /** @type {HTMLElement} */ (panel.querySelector('#rpg-tracker-agent'));
@@ -5066,6 +4970,12 @@ Rules:
             return;
         }
 
+        // Tutorial mode owns the tracker body — do not flip memo/render visibility
+        if (panel.classList.contains('rt-tutorial-active')) {
+            updateAgentBtnUI();
+            return;
+        }
+
         const taEl = panel.querySelector('#rpg-tracker-memo');
         const rvEl = panel.querySelector('#rpg-tracker-render');
         const viewBtnEl = panel.querySelector('#rpg-tracker-view-btn');
@@ -5428,5 +5338,7 @@ Rules:
     });
 
     syncMemoView();
+
+    bindTutorialBot(/** @type {HTMLElement} */ (panel));
 
 }
