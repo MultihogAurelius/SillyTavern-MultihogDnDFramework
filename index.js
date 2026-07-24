@@ -7918,7 +7918,7 @@ RULES:
                         const hasInput = t === 'trait' || t === 'prefix' || t === 'custom';
                         const inputDiv = row.querySelector('.cyoa-slot-input');
                         inputDiv.style.display = hasInput ? 'block' : 'none';
-                        if (hasInput) inputDiv.innerHTML = buildCyoaSlotInput(t);
+                        if (hasInput) { const _tpl = document.createElement('template'); _tpl.innerHTML = buildCyoaSlotInput(t); inputDiv.replaceChildren(_tpl.content.cloneNode(true)); }
                         regeneratePromptPreview(dlg);
                     }
                     if (e.target.id === 'cyoa-text-theme') {
