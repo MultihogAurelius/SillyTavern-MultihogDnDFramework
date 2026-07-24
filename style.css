@@ -3379,10 +3379,16 @@
 
 .rt-cr-row-grip {
     opacity: 0.35;
-    width: 14px;
+    width: 34px;
+    min-height: 36px;
     text-align: center;
-    pointer-events: none;
     flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    /* The grip is the sole reorder handle. Let every other part of the row scroll normally. */
+    pointer-events: auto;
+    touch-action: none;
 }
 
 .rt-cr-row-icon {
@@ -3444,6 +3450,18 @@
     min-height: 0;
 }
 
+/*
+ * The class is applied when the Control Room opens. Keep this selector beside
+ * the :has() version above: some older Android WebViews do not support :has(),
+ * which otherwise lets the list expand the whole dialog instead of scrolling
+ * inside it.
+ */
+.popup.rt-cr-dialogue-popup .popup-content {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
 .rt-cr-popup-container {
     display: flex;
     flex-direction: column;
@@ -3460,6 +3478,9 @@
     min-height: 0;
     overflow-y: auto;
     padding-right: 10px;
+    overscroll-behavior: contain;
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
 }
 
 @media screen and (max-width: 800px) {

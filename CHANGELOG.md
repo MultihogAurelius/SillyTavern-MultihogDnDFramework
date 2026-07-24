@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [6.0.83] - 2026-07-24
+
+### Fixed
+- **System Prompt Control Room on mobile**: section scrolling no longer competes with reordering. Swipe anywhere in a row to scroll; long-press and drag the enlarged grip to reorder. The contained list also works on Android browsers that do not support the CSS selector previously used to identify this popup.
+
 ## [6.0.82] - 2026-07-24
 
 ### Fixed

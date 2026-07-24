@@ -2611,6 +2611,11 @@ export async function openSystemPromptControlRoom() {
         const container = document.getElementById('rt-cr-container');
         if (!container) return;
 
+        // Do not rely only on CSS :has() to identify this popup. Older Android
+        // WebViews can lack :has() support, leaving the list without a bounded
+        // flex parent and making the entire dialog painfully scroll instead.
+        container.closest('.popup')?.classList.add('rt-cr-dialogue-popup');
+
         const customSyspromptCb = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_tracker_custom_sysprompt'));
         const customSyspromptDetails = document.getElementById('rt-cr-custom-sysprompt-details');
         if (customSyspromptCb) {
@@ -2639,6 +2644,11 @@ export async function openSystemPromptControlRoom() {
             }
             $list.sortable({
                 items: '.rt-cr-row',
+                // Dragging is deliberately restricted to the visible grip. On
+                // touch devices, a swipe anywhere else in a row is therefore
+                // always a normal list scroll; a deliberate long-press on the
+                // grip is required before reordering can begin.
+                handle: '.rt-cr-row-grip',
                 cancel: 'input, textarea, button, select, option, label, a',
                 delay: getSortableDelay(),
                 start: () => {
