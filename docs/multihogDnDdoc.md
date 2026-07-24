@@ -150,7 +150,9 @@ This system is neither a full version of 5e nor 3.5e. It's rather a hybrid syste
 
 ## Hybrid RNG
 
-Hybrid RNG is the physics layer. Without it, models tend toward sycophantic success.
+Combines two types of RNG, automatically switched based on context. If [COMBAT] is present in the State Tracker, the system automatically switches to RNG Queue in both the system prompt and context injection. The RollTheDice tool is only registered outside of combat, and the RNG Queue is only injected in combat.
+
+Hybrid RNG is ideal outside of CYOA mode because without CYOA mode, the GM can see the numbers in the RNG queue beforehand, giving it the ability, in theory, to fit the DC to a roll it sees coming. The tool call closes the door to this because it requires a pre-commit.
 
 ### Modes (Narrator Configuration → RNG)
 
@@ -165,7 +167,7 @@ Hybrid RNG is the physics layer. Without it, models tend toward sycophantic succ
 - Built with cryptographically random values.
 - Typical d20 queue: multiple pre-rolled lines for common dice.
 - Optional d100 queue (percentage mode).
-- Injected into the user message when Pre-Seeded RNG applies (always in Pre-Seeded Only; in Hybrid, primarily when combat is active).
+- Injected into the user message when Pre-Seeded RNG applies (always in Pre-Seeded Only; in Hybrid, ONLY when combat is active).
 
 ### Tool-call dice (commitment logic)
 
@@ -174,7 +176,7 @@ Non-legacy tool schema requires the narrator to declare **who**, **formula**, an
 - **d20:** success if `total >= dc`.
 - **d100:** roll-under; success if `total <= dc` (dc is a percentage).
 
-Legacy dice logic omits DC (vanilla-style tool). The narrator model must support **tool calling** for Hybrid / tool modes.
+Legacy dice logic omits DC (vanilla-style SillyTavern tool provided by the devs). The narrator model must support **tool calling** for Hybrid / tool modes, and function calling must be enabled in the Chat Completion preset. Legacy dice are NOT recommended but can provide some utility in edge-cases.
 
 ### Combat detection
 
@@ -229,6 +231,8 @@ Temporary separation while reunion remains plausible. The tracker moves full sta
 ```
 
 `[UNBENCH] Name` reunites. Optional `ETA:` timestamps when the story gives a real return time. Brief off-screen absence is **not** a bench. Benched members can appear in World Progression reports.
+
+Benching makes it possible to give "quests" to party members, enabling a kind of commander playstyle. You can send a party member off on a task, and they will return upon the ETA being met. Upon return the GM is instructed to perform a dice roll to figure out whether the trip was a success. The DC depends on the suitability of the companion for the task, making it important to choose the right person for the job. This is one of the simulation features.
 
 #### `[COMBAT]`
 
