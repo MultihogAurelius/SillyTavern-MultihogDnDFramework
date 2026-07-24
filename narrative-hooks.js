@@ -548,28 +548,178 @@ export function registerDiceSlashCommand() {
     }));
 
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
-        name: 'router',
+        name: 'lorebookagent',
+        aliases: ['lbagent', 'la', 'router'],
         callback: async (args, value) => {
-            const val = String(value || '').trim().toLowerCase();
-            if (val.startsWith('save')) {
-                const hint = val.substring(4).trim();
+            const settings = getSettings();
+            const quiet = String(args.quiet) === 'true';
+            const raw = String(value || '').trim();
+            const lower = raw.toLowerCase();
+
+            if (lower.startsWith('save')) {
+                const hint = raw.slice(4).trim();
                 await saveSceneToLorebook(hint);
                 return 'Scene save requested.';
             }
-            if (val === 'run' || val === 'research') {
-                const { chat } = SillyTavern.getContext();
-                const s = getSettings();
-                const combinedNarrative = getNarrativeBlocks(chat, -1, !!s.routerIncludeHidden);
-                await runRouterPass(combinedNarrative, null, null, true);
-                return 'Research pass started.';
+
+            if (!settings.routerEnabled) {
+                return 'Lorebook Agent is disabled.';
             }
-            return 'Usage: /router run | /router save [hint]';
+            if (isRouterRunning()) {
+                return 'Lorebook Agent is already running.';
+            }
+
+            /** @type {string|null} */
+            let manualPrompt = null;
+            /** @type {number|null} */
+            let lookback = null;
+
+            const lookbackRaw = args.lookback;
+            if (lookbackRaw !== undefined && lookbackRaw !== null && String(lookbackRaw).trim() !== '') {
+                const parsed = parseInt(String(lookbackRaw), 10);
+                if (Number.isFinite(parsed) && parsed >= 1) lookback = parsed;
+            }
+
+            if (lower === '' || lower === 'run' || lower === 'research') {
+                // null lookback → configured since-last-run / since-last-user / fixed lookback
+                manualPrompt = null;
+            } else {
+                // Any other unnamed text is a Direct Command prompt
+                manualPrompt = raw;
+                if (lookback === null) lookback = settings.routerDirectLookback || 10;
+            }
+
+            const { chat } = SillyTavern.getContext();
+            const combinedNarrative = getNarrativeBlocks(chat, -1, !!settings.routerIncludeHidden);
+            if (!quiet && typeof toastr !== 'undefined') {
+                toastr.info(
+                    manualPrompt ? 'Running Lorebook Agent with specific command...' : 'Starting Lorebook Agent pass...',
+                    'Lorebook Agent',
+                );
+            }
+            await runRouterPass(combinedNarrative, manualPrompt, lookback, true);
+            return manualPrompt ? 'Lorebook Agent command started.' : 'Lorebook Agent pass started.';
         },
-        helpString: 'Interact with the Router Agent (e.g. /router save)',
+        helpString: 'Run the Lorebook Agent (useful after /sendas, which does not auto-trigger it). '
+            + 'Aliases: /la, /lbagent, /router. '
+            + 'Usage: /lorebookagent | /lorebookagent run | /lorebookagent save [hint] | /lorebookagent &lt;direct command&gt;',
+        returns: 'status message',
+        namedArgumentList: [
+            SlashCommandNamedArgument.fromProps({
+                name: 'quiet',
+                description: 'Suppress the toast notification',
+                isRequired: false,
+                typeList: [ARGUMENT_TYPE.BOOLEAN],
+                defaultValue: 'false',
+            }),
+            SlashCommandNamedArgument.fromProps({
+                name: 'lookback',
+                description: 'Override lookback to N user turns (omit to use Lorebook Agent lookback settings)',
+                isRequired: false,
+                typeList: [ARGUMENT_TYPE.NUMBER],
+            }),
+        ],
         unnamedArgumentList: [
             SlashCommandArgument.fromProps({
-                description: 'command (e.g. save)',
-                isRequired: true,
+                description: 'run | research | save [hint] | direct command text (omit to run a normal pass)',
+                isRequired: false,
+                typeList: [ARGUMENT_TYPE.STRING],
+            }),
+        ],
+    }));
+
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name: 'statetracker',
+        aliases: ['st'],
+        callback: async (args, value) => {
+            const settings = getSettings();
+            const quiet = String(args.quiet) === 'true';
+            const raw = String(value || '').trim();
+            const lower = raw.toLowerCase();
+
+            if (!settings.enabled) {
+                return 'State Tracker is disabled.';
+            }
+            if (typeof globalThis._rpgStateModelRunning === 'function' && globalThis._rpgStateModelRunning()) {
+                return 'State Tracker is already running.';
+            }
+            if (typeof globalThis._rpgRunStateModelPass !== 'function') {
+                return 'State Tracker is not ready yet.';
+            }
+
+            /** @type {boolean} */
+            let isFullAudit = false;
+            /** @type {number|null} */
+            let customLookbackN = null;
+
+            const lookbackRaw = args.lookback;
+            if (lookbackRaw !== undefined && lookbackRaw !== null && String(lookbackRaw).trim() !== '') {
+                const parsed = parseInt(String(lookbackRaw), 10);
+                if (Number.isFinite(parsed) && parsed >= 1) customLookbackN = parsed;
+            }
+
+            if (lower === 'full' || lower === 'audit') {
+                isFullAudit = true;
+            } else if (lower === '' || lower === 'run' || lower === 'regular' || lower === 'update') {
+                // regular: since last user message (customLookbackN stays null unless lookback= was set)
+            } else if (/^\d+$/.test(lower)) {
+                customLookbackN = parseInt(lower, 10);
+            } else if (lower.startsWith('lookback')) {
+                const n = parseInt(lower.replace(/^lookback\s*/i, ''), 10);
+                if (!Number.isFinite(n) || n < 1) {
+                    return 'Usage: /statetracker lookback=N  or  /statetracker lookback N';
+                }
+                customLookbackN = n;
+            } else {
+                return 'Usage: /statetracker | /statetracker run | /statetracker full | /statetracker lookback=N';
+            }
+
+            const { chat } = SillyTavern.getContext();
+            let narrative = '';
+            if (isFullAudit) {
+                narrative = '';
+            } else if (customLookbackN !== null) {
+                narrative = getNarrativeBlocks(chat, customLookbackN);
+            } else {
+                narrative = getNarrativeBlocks(chat, -1);
+            }
+
+            if (!isFullAudit && !narrative) {
+                return 'No assistant message to parse.';
+            }
+
+            if (!quiet && typeof toastr !== 'undefined') {
+                toastr.info(
+                    isFullAudit ? 'Triggering Full Context Audit...' : 'Triggering manual State Update...',
+                    'RPG Tracker',
+                );
+            }
+            await globalThis._rpgRunStateModelPass(narrative, isFullAudit, customLookbackN);
+            return isFullAudit ? 'State Tracker full audit started.' : 'State Tracker update started.';
+        },
+        helpString: 'Run the State Tracker update (useful after /sendas, which does not auto-trigger it). '
+            + 'Alias: /st. '
+            + 'Usage: /statetracker | /statetracker run | /statetracker full | /statetracker lookback=N',
+        returns: 'status message',
+        namedArgumentList: [
+            SlashCommandNamedArgument.fromProps({
+                name: 'quiet',
+                description: 'Suppress the toast notification',
+                isRequired: false,
+                typeList: [ARGUMENT_TYPE.BOOLEAN],
+                defaultValue: 'false',
+            }),
+            SlashCommandNamedArgument.fromProps({
+                name: 'lookback',
+                description: 'Parse the last N assistant narrative blocks instead of since the last user message',
+                isRequired: false,
+                typeList: [ARGUMENT_TYPE.NUMBER],
+            }),
+        ],
+        unnamedArgumentList: [
+            SlashCommandArgument.fromProps({
+                description: 'run | regular | full | audit | lookback N | N (omit for a regular update)',
+                isRequired: false,
                 typeList: [ARGUMENT_TYPE.STRING],
             }),
         ],

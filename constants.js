@@ -313,7 +313,7 @@ export function getResolvedTimePrompt(settings) {
 
 export const QUESTS_NARRATOR = `On unambiguous acceptance: narrate clearly, end with *(Quest Accepted: Name)*. State giver, location, task, objective count, time pressure, promised reward. Don't do this pre-agreement. Note objective completion naturally; narrate success/failure at conclusion. Keep objectives few and broad (clear, completable outcomes — not step-by-step routes); do not keep adding micro-objectives mid-scene. Quest MOOD (in STATE MEMO, from time pressure + FRUSTRATION_COEFF) should guide questgiver tone for NPC-given quests only.
 
-QUEST DIFFICULTY: difficulty follows internal narrative/world consistency and logic; the player is not accommodated if they take a task beyond them.
+QUEST DIFFICULTY: difficulty follows internal narrative/world consistency and logic; the player is not accommodated if they take a task beyond them. Likewise, don't make quests more difficult than they should reasonably be per the narrative/context.
 
 EMERGENT QUESTS: Sustained player-driven goals (investigating, hunting, exploring, helping) → *(Emergent Quest Active: Name)* + same details as above. No FRUSTRATION_COEFF / NPC mood pressure on emergent quests.`;
 
@@ -427,6 +427,7 @@ DUAL-WIELDING (the ONLY path to a 3rd attack): wielding two light/one-handed mel
 - 3 is the absolute ceiling — no combination of BAB, dual-wielding, or abilities may ever exceed 3 attacks per round.
 - Dual-wielding without BAB +8 = 2 total attacks (primary + offhand). Dual-wielding with BAB +8 = 3 total attacks (primary, primary second at −5, offhand at −5).
 - Losing/sheathing the offhand weapon removes the offhand attack immediately; it is gear-dependent, not a permanent unlock.
+- The STATE MEMO is authoritative with APR ("Melee/Ranged X attacks" lines.)
 </attacks_per_round>
 
 <saving_throws>
@@ -455,7 +456,7 @@ LEVEL THRESHOLDS: 1–0 | 2–300 | 3–900 | 4–2,700 | 5–6,500 | 6–14,000
 <quests>
 On unambiguous acceptance: narrate clearly, end with *(Quest Accepted: Name)*. State giver, location, task, objective count, time pressure, promised reward. Don't do this pre-agreement. Note objective completion naturally; narrate success/failure at conclusion. Keep objectives few and broad (clear, completable outcomes — not step-by-step routes); do not keep adding micro-objectives mid-scene. Quest MOOD (in STATE MEMO, from time pressure + FRUSTRATION_COEFF) should guide questgiver tone for NPC-given quests only.
 
-QUEST DIFFICULTY: difficulty follows internal narrative/world consistency and logic; the player is not accommodated if they take a task beyond them.
+QUEST DIFFICULTY: difficulty follows internal narrative/world consistency and logic; the player is not accommodated if they take a task beyond them. Likewise, don't make quests more difficult than they should reasonably be per the narrative/context.
 
 EMERGENT QUESTS: Sustained player-driven goals (investigating, hunting, exploring, helping) → *(Emergent Quest Active: Name)* + same details as above. No FRUSTRATION_COEFF / NPC mood pressure on emergent quests.
 </quests>
@@ -715,6 +716,7 @@ DUAL-WIELDING (the ONLY path to a 3rd attack): wielding two light/one-handed mel
 - 3 is the absolute ceiling — no combination of BAB, dual-wielding, or abilities may ever exceed 3 attacks per round.
 - Dual-wielding without BAB +8 = 2 total attacks (primary + offhand). Dual-wielding with BAB +8 = 3 total attacks (primary, primary second at −5, offhand at −5).
 - Losing/sheathing the offhand weapon removes the offhand attack immediately; it is gear-dependent, not a permanent unlock.
+- The STATE MEMO is authoritative with APR ("Melee/Ranged X attacks" lines.)
 </attacks_per_round>
 
 <saving_throws>
@@ -743,7 +745,7 @@ LEVEL THRESHOLDS: 1–0 | 2–300 | 3–900 | 4–2,700 | 5–6,500 | 6–14,000
 <quests>
 On unambiguous acceptance: narrate clearly, end with *(Quest Accepted: Name)*. State giver, location, task, objective count, time pressure, promised reward. Don't do this pre-agreement. Note objective completion naturally; narrate success/failure at conclusion. Keep objectives few and broad (clear, completable outcomes — not step-by-step routes); do not keep adding micro-objectives mid-scene. Quest MOOD (in STATE MEMO, from time pressure + FRUSTRATION_COEFF) should guide questgiver tone for NPC-given quests only.
 
-QUEST DIFFICULTY: difficulty follows internal narrative/world consistency and logic; the player is not accommodated if they take a task beyond them.
+QUEST DIFFICULTY: difficulty follows internal narrative/world consistency and logic; the player is not accommodated if they take a task beyond them. Likewise, don't make quests more difficult than they should reasonably be per the narrative/context.
 
 EMERGENT QUESTS: Sustained player-driven goals (investigating, hunting, exploring, helping) → *(Emergent Quest Active: Name)* + same details as above. No FRUSTRATION_COEFF / NPC mood pressure on emergent quests.
 </quests>

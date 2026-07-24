@@ -2,6 +2,12 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [6.0.84] - 2026-07-24
+
+### Added
+- **`/lorebookagent` slash command**: manually invoke a Lorebook Agent pass from STscript (aliases: `/lbagent`, `/la`, `/router`). Useful after `/sendas`, which does not auto-trigger the agent. Supports `quiet=true`, `lookback=N`, `save [hint]`, and Direct Command text.
+- **`/statetracker` slash command**: manually invoke a State Tracker update from STscript (alias: `/st`). Supports regular update, `full` audit, `lookback=N`, and `quiet=true`.
+
 ## [6.0.83] - 2026-07-24
 
 ### Fixed
