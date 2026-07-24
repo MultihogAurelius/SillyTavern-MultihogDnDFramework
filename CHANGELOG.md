@@ -2,6 +2,14 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [6.1.1] - 2026-07-24
+
+### Added
+- **Tutorial Bot story lookback**: adjustable header control (**Story lookback**) injects the last N SillyTavern chat messages so players can discuss their adventure with the bot.
+
+### Changed
+- **Tutorial Bot lookback UI**: moved from the composer to the header next to the Tutorial Bot title, with a clear label.
+
 ## [6.1.0] - 2026-07-24
 
 ### Added

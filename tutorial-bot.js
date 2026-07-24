@@ -5,6 +5,7 @@
  */
 import { sendAgentTurn } from './llm-client.js';
 import { getSettings } from './state-manager.js';
+import { cleanToolCallMessage } from './memo-processor.js';
 import { runtimeState } from './src/app/runtime-state.js';
 
 const FOLDER_NAME = (function () {
@@ -21,15 +22,18 @@ const FOLDER_NAME = (function () {
 
 const DOC_URL = `/scripts/extensions/third-party/${FOLDER_NAME}/docs/multihogDnDdoc.md`;
 const HISTORY_STORAGE_KEY = 'rpg_tracker_tutorial_chat';
+const LOOKBACK_STORAGE_KEY = 'rpg_tracker_tutorial_lookback';
+const DEFAULT_LOOKBACK = 5;
 
 const PERSONA = `You are the Multihog D&D Framework Tutorial Bot — a concise in-app instructor for SillyTavern users.
 
 Rules:
-- Answer only questions about Multihog D&D Framework (setup, State Tracker, RNG, Lorebook Agent, World Progression, quests, CYOA, cartridges, UI, slash commands, troubleshooting).
-- Treat the DOCUMENTATION block below as your source of truth. Prefer it over guesswork.
+- Answer questions about Multihog D&D Framework (setup, State Tracker, RNG, Lorebook Agent, World Progression, quests, CYOA, cartridges, UI, slash commands, troubleshooting).
+- When CURRENT STORY CONTEXT is provided, you may also discuss the player's ongoing adventure, characters, and recent events using that context — help them reason about Multihog features in light of their story.
+- Treat the DOCUMENTATION block below as your source of truth for how Multihog works. Prefer it over guesswork.
 - Be brief and practical. Use short steps or bullet lists when explaining how-tos.
 - If the docs do not cover something, say you are unsure rather than inventing settings, IDs, or behavior.
-- Do not roleplay as the Game Master or invent campaign story. Stay in help mode.
+- Do not invent story facts beyond the provided story context. Do not roleplay as the Game Master narrating new scenes.
 - Do not claim you can change the user's settings or run the tracker for them unless they ask how to do it themselves.`;
 
 /** @type {string|null} */
@@ -67,6 +71,61 @@ function saveHistory() {
     } catch (err) {
         console.warn('[Tutorial Bot] Could not persist chat:', err);
     }
+}
+
+/**
+ * @returns {number}
+ */
+function loadLookback() {
+    try {
+        const raw = localStorage.getItem(LOOKBACK_STORAGE_KEY);
+        if (raw == null || raw === '') return DEFAULT_LOOKBACK;
+        const n = parseInt(raw, 10);
+        if (!Number.isFinite(n) || n < 0) return DEFAULT_LOOKBACK;
+        return Math.min(100, n);
+    } catch (_) {
+        return DEFAULT_LOOKBACK;
+    }
+}
+
+/**
+ * @param {number} n
+ */
+function saveLookback(n) {
+    try {
+        localStorage.setItem(LOOKBACK_STORAGE_KEY, String(n));
+    } catch (err) {
+        console.warn('[Tutorial Bot] Could not persist lookback:', err);
+    }
+}
+
+/** @type {number} */
+let _lookback = loadLookback();
+
+/**
+ * Recent SillyTavern chat messages for story discussion context.
+ * @param {number} n
+ * @returns {string}
+ */
+function buildNarrativeContext(n) {
+    if (!(n > 0)) return '';
+    const chat = SillyTavern.getContext()?.chat;
+    if (!Array.isArray(chat) || chat.length === 0) return '';
+
+    const recent = chat.slice(-n);
+    const lines = recent
+        .map((m) => {
+            const name = m.is_user ? 'Player' : (m.name || 'Narrator');
+            const content = cleanToolCallMessage(m.mes || m.content || '');
+            if (content === null) return null;
+            const text = String(content).trim();
+            if (!text) return null;
+            return `${name}: ${text}`;
+        })
+        .filter(Boolean);
+
+    if (!lines.length) return '';
+    return `## NARRATIVE HISTORY (Last ${lines.length} of ${recent.length} requested messages)\n${lines.join('\n\n')}`;
 }
 
 /** @type {boolean} */
@@ -194,8 +253,12 @@ async function loadDocumentation() {
     return _docPromise;
 }
 
-function buildSystemPrompt(doc) {
-    return `${PERSONA}\n\n--- DOCUMENTATION ---\n${doc}\n--- END DOCUMENTATION ---`;
+function buildSystemPrompt(doc, narrativeContext = '') {
+    let prompt = `${PERSONA}\n\n--- DOCUMENTATION ---\n${doc}\n--- END DOCUMENTATION ---`;
+    if (narrativeContext) {
+        prompt += `\n\n--- CURRENT STORY CONTEXT ---\n${narrativeContext}\n--- END STORY CONTEXT ---`;
+    }
+    return prompt;
 }
 
 export function isTutorialMode() {
@@ -209,21 +272,26 @@ export function isTutorialMode() {
 function ensureChatShell(panel) {
     const host = panel.querySelector('#rt-tutorial-view');
     if (!(host instanceof HTMLElement)) return null;
-    if (host.dataset.rtTutorialReady === '1') return host;
+    if (host.dataset.rtTutorialReady === '3') return host;
 
     host.innerHTML = `
         <div class="rt-tutorial-header">
             <button type="button" class="rpg-tracker-nav-btn rt-tutorial-back" id="rt-tutorial-back" title="Back to State Tracker">← Back</button>
             <span class="rt-tutorial-title">Tutorial Bot</span>
+            <label class="rt-tutorial-lookback" title="Include the last N SillyTavern chat messages as story context so you can discuss your adventure.">
+                <span class="rt-tutorial-lookback-label">Story lookback</span>
+                <input type="text" inputmode="numeric" pattern="[0-9]*" id="rt-tutorial-lookback" value="${_lookback}" min="0" max="100" aria-label="Story lookback message count">
+                <span class="rt-tutorial-lookback-unit">msgs</span>
+            </label>
             <button type="button" class="rpg-tracker-nav-btn rt-tutorial-clear" id="rt-tutorial-clear" title="Clear conversation">Clear</button>
         </div>
         <div class="rt-tutorial-messages" id="rt-tutorial-messages" role="log" aria-live="polite"></div>
         <div class="rt-tutorial-composer">
-            <textarea class="rt-tutorial-input" id="rt-tutorial-input" rows="2" placeholder="Ask how Multihog works… (Enter to send, Shift+Enter for newline)"></textarea>
+            <textarea class="rt-tutorial-input" id="rt-tutorial-input" rows="2" placeholder="Ask about Multihog or your story… (Enter to send, Shift+Enter for newline)"></textarea>
             <button type="button" class="rpg-tracker-prompt-send rt-tutorial-send" id="rt-tutorial-send" title="Send">▶</button>
         </div>
     `;
-    host.dataset.rtTutorialReady = '1';
+    host.dataset.rtTutorialReady = '3';
     return host;
 }
 
@@ -238,7 +306,7 @@ function renderTranscript() {
         box.innerHTML = `
             <div class="rt-tutorial-msg rt-tutorial-msg-bot rt-tutorial-welcome">
                 <div class="rt-tutorial-msg-label">Tutorial Bot</div>
-                <div class="rt-tutorial-msg-body">Ask me anything about Multihog — setup, Instant Action, State Tracker modules, Hybrid RNG, Lorebook Agent, World Progression, quests, CYOA, cartridges, or troubleshooting. I use the built-in documentation as my source of truth.</div>
+                <div class="rt-tutorial-msg-body">Ask me anything about Multihog — setup, Instant Action, State Tracker modules, Hybrid RNG, Lorebook Agent, World Progression, quests, CYOA, cartridges, or troubleshooting. Set <b>Story lookback</b> in the header to include recent chat messages so we can discuss your adventure too.</div>
             </div>`;
         return;
     }
@@ -256,11 +324,13 @@ function setBusy(busy) {
     _busy = busy;
     const send = _panel?.querySelector('#rt-tutorial-send');
     const input = _panel?.querySelector('#rt-tutorial-input');
+    const lookback = _panel?.querySelector('#rt-tutorial-lookback');
     if (send instanceof HTMLButtonElement) {
         send.disabled = busy;
         send.textContent = busy ? '…' : '▶';
     }
     if (input instanceof HTMLTextAreaElement) input.disabled = busy;
+    if (lookback instanceof HTMLInputElement) lookback.disabled = busy;
 }
 
 /**
@@ -345,6 +415,8 @@ export function enterTutorialMode() {
     }
 
     ensureChatShell(_panel);
+    // Shell may have been rebuilt (UI version bump) — re-bind controls on fresh nodes.
+    bindTutorialBotControls(_panel);
 
     // Ensure tracker tab (not Lorebook Agent)
     const agentMode = getSettings().trackerContentMode === 'agent'
@@ -420,8 +492,20 @@ async function sendMessage() {
     _abort = new AbortController();
 
     try {
+        // Sync lookback from UI before each send
+        const lookbackInp = /** @type {HTMLInputElement|null} */ (_panel.querySelector('#rt-tutorial-lookback'));
+        if (lookbackInp) {
+            let n = parseInt(String(lookbackInp.value).trim(), 10);
+            if (!Number.isFinite(n) || n < 0) n = 0;
+            n = Math.min(100, n);
+            lookbackInp.value = String(n);
+            _lookback = n;
+            saveLookback(n);
+        }
+
         const doc = await loadDocumentation();
-        const systemPrompt = buildSystemPrompt(doc);
+        const narrative = buildNarrativeContext(_lookback);
+        const systemPrompt = buildSystemPrompt(doc, narrative);
         const messages = [
             { role: 'system', content: systemPrompt },
             ..._history.map((m) => ({ role: m.role, content: m.content })),
@@ -465,7 +549,14 @@ export function bindTutorialBot(panel) {
     if (!(panel instanceof HTMLElement)) return;
     _panel = panel;
     ensureChatShell(panel);
+    bindTutorialBotControls(panel);
+}
 
+/**
+ * Attach event listeners to tutorial UI controls (idempotent per element).
+ * @param {HTMLElement} panel
+ */
+function bindTutorialBotControls(panel) {
     const helpBtn = panel.querySelector('#rpg-tracker-help-btn');
     if (helpBtn && !helpBtn.dataset.rtTutorialBound) {
         helpBtn.dataset.rtTutorialBound = '1';
@@ -516,6 +607,22 @@ export function bindTutorialBot(panel) {
                 void sendMessage();
             }
         });
+    }
+
+    const lookbackInp = panel.querySelector('#rt-tutorial-lookback');
+    if (lookbackInp instanceof HTMLInputElement && !lookbackInp.dataset.rtTutorialBound) {
+        lookbackInp.dataset.rtTutorialBound = '1';
+        lookbackInp.value = String(_lookback);
+        const commitLookback = () => {
+            let n = parseInt(String(lookbackInp.value).trim(), 10);
+            if (!Number.isFinite(n) || n < 0) n = 0;
+            n = Math.min(100, n);
+            lookbackInp.value = String(n);
+            _lookback = n;
+            saveLookback(n);
+        };
+        lookbackInp.addEventListener('change', commitLookback);
+        lookbackInp.addEventListener('blur', commitLookback);
     }
 
     // Leaving tracker tab exits tutorial so agent UI is not trapped

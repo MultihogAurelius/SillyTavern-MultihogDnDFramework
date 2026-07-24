@@ -820,6 +820,7 @@
     flex-shrink: 0;
     padding: 8px 10px;
     border-bottom: 1px solid var(--rt-border, rgba(255, 255, 255, 0.1));
+    flex-wrap: wrap;
 }
 
 .rt-tutorial-title {
@@ -829,6 +830,55 @@
     opacity: 0.85;
     letter-spacing: 0.02em;
     min-width: 0;
+}
+
+.rt-tutorial-lookback {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+    margin: 0;
+    padding: 3px 8px;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(0, 0, 0, 0.22);
+    font-size: 0.75em;
+    cursor: default;
+    user-select: none;
+}
+
+.rt-tutorial-lookback-label {
+    opacity: 0.8;
+    white-space: nowrap;
+    font-weight: 600;
+}
+
+.rt-tutorial-lookback input {
+    width: 36px;
+    height: 22px;
+    font-size: 0.95em;
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: var(--rt-text, white);
+    border-radius: 4px;
+    text-align: center;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+.rt-tutorial-lookback-unit {
+    opacity: 0.55;
+    white-space: nowrap;
+}
+
+.rt-tutorial-composer {
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+    flex-shrink: 0;
+    padding: 8px 10px 10px;
+    border-top: 1px solid var(--rt-border, rgba(255, 255, 255, 0.1));
+    box-sizing: border-box;
 }
 
 .rt-tutorial-messages {
@@ -973,16 +1023,6 @@
 .rt-tutorial-pending .rt-tutorial-msg-body {
     opacity: 0.65;
     font-style: italic;
-}
-
-.rt-tutorial-composer {
-    display: flex;
-    gap: 8px;
-    align-items: flex-end;
-    flex-shrink: 0;
-    padding: 8px 10px 10px;
-    border-top: 1px solid var(--rt-border, rgba(255, 255, 255, 0.1));
-    box-sizing: border-box;
 }
 
 .rt-tutorial-input {
