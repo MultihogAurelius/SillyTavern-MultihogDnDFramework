@@ -105,14 +105,6 @@ These are recommendations, not rules — experiment. Different models shine for 
 
 ---
 
-<div align="center">
-  <figure>
-    <img width="1918" height="982" alt="Screenshot 2026-06-18 195917" src="https://github.com/user-attachments/assets/a9778adb-8bdf-485e-ac96-973613321407" />
-  </figure>
-</div>
-
----
-
 <table border="0">
   <tr>
     <td align="center" valign="bottom">
@@ -127,6 +119,14 @@ These are recommendations, not rules — experiment. Different models shine for 
     </td>
   </tr>
 </table>
+
+---
+
+<div align="center">
+  <figure>
+    <img width="1918" height="982" alt="Screenshot 2026-06-18 195917" src="https://github.com/user-attachments/assets/a9778adb-8bdf-485e-ac96-973613321407" />
+  </figure>
+</div>
 
 ---
 
