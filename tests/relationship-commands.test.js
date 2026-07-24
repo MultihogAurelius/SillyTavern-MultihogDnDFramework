@@ -28,4 +28,21 @@ Trust +2 Tamsin
 [/RELATIONS]`)).toEqual({ memo: '', commands: [] });
         expect(extractStateTrackerRelationshipCommands('[TIME]Day 3[/TIME]')).toEqual({ memo: '[TIME]Day 3[/TIME]', commands: [] });
     });
+
+    it('never leaves complete or unclosed relationship blocks in the memo', () => {
+        expect(extractStateTrackerRelationshipCommands(`[TIME]Day 3[/TIME]
+[RELATIONS]
+Friendship +2 Elena
+[/RELATIONS]
+[PLACE]Tavern[/PLACE]`)).toEqual({
+            memo: '[TIME]Day 3[/TIME]\n\n[PLACE]Tavern[/PLACE]',
+            commands: [{ type: 'relationship_delta', npc: 'Elena', field: 'friendship', delta: 2 }],
+        });
+        expect(extractStateTrackerRelationshipCommands(`[TIME]Day 3[/TIME]
+[RELATIONS]
+Affection +1 Elena`)).toEqual({
+            memo: '[TIME]Day 3[/TIME]',
+            commands: [{ type: 'relationship_delta', npc: 'Elena', field: 'affection', delta: 1 }],
+        });
+    });
 });

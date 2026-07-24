@@ -2053,7 +2053,7 @@ async function runStateModelPass(narrativeOutput, isFullContext = false, overrid
                 if (memoBlocks.length > 0) {
                     cleanedOutput = memoBlocks[memoBlocks.length - 1][1].trim();
                 } else {
-                    cleanedOutput = result.replace(/<\/?memo>/gi, '').trim();
+                    cleanedOutput = cleanedOutput.replace(/<\/?memo>/gi, '').trim();
                 }
 
                 const merged = mergeMemo(memoBeforeThisChunk, cleanedOutput);

@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [6.0.82] - 2026-07-24
+
+### Fixed
+- **Relationship command leakage**: `[RELATIONS]` blocks are now removed before State Memo merging, including malformed or unclosed blocks.
+
 ## [6.0.81] - 2026-07-24
 
 ### Fixed

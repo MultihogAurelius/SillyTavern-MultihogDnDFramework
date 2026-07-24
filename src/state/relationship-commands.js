@@ -20,20 +20,18 @@
  */
 export function extractStateTrackerRelationshipCommands(response) {
     const source = typeof response === 'string' ? response : '';
-    const normalized = source.toUpperCase();
-    const start = normalized.indexOf('[RELATIONS]');
-    const end = start < 0 ? -1 : normalized.indexOf('[/RELATIONS]', start);
-    if (start < 0 || end < 0) return { memo: source, commands: [] };
-
-    const bodyStart = start + '[RELATIONS]'.length;
-    const block = source.slice(bodyStart, end);
-    const memo = `${source.slice(0, start)}${source.slice(end + '[/RELATIONS]'.length)}`.trim();
     const commands = [];
 
-    for (const line of block.split('\n')) {
-        const command = parseRelationshipCommandLine(line);
-        if (command) commands.push(command);
-    }
+    // Remove every relationship block before memo processing. An unclosed block is
+    // deliberately treated as extending to the end of the response: losing a malformed
+    // command is safer than leaking command syntax into persisted tracker state.
+    const memo = source.replace(/\[RELATIONS\]([\s\S]*?)(?:\[\/RELATIONS\]|$)/gi, (_match, block) => {
+        for (const line of block.split('\n')) {
+            const command = parseRelationshipCommandLine(line);
+            if (command) commands.push(command);
+        }
+        return '';
+    }).trim();
 
     return { memo, commands };
 }
