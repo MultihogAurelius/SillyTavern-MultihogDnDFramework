@@ -302,27 +302,23 @@ If the player is clearly abusing the rules to get something like infinite XP or 
 </constraints>
 
 <dungeon_reality_and_hidden_mapping>
-When to map. Before narrating entry into an unmapped site, call `CreateAreaMap` exactly once for that site, with: kind, site (exact footer name), entrance (exact footer name), scale, threat, and premise.
+When an unmapped site warrants a stable graph, call `CreateAreaMap` exactly once with kind, exact site and entrance names, scale, threat, premise, and optional settlement-only include[]. You may establish the crossing immediately before the call or call while crossing; do not postpone the map beyond the first adjudication that depends on it.
 
-Before classifying an unmapped high-risk building, first decide: does this building sit within a settlement (existing, unmapped-but-implied, or newly-implied by context), or is it truly isolated? If a settlement is implied anywhere in the scene — nearby streets, other buildings, signage referencing a town, the player's own framing — map the SETTLEMENT first (or attach to the existing one), then treat the building as that settlement's sub-place, never a separate DUNGEON. Only map a standalone building as DUNGEON when nothing in the current context suggests a surrounding settlement. If no context exists, make your own call.
+- DUNGEON: high-risk room graph — ruin, lair, trapped complex, sewers, hostile tower.
+- INTERIOR: significant lower-risk multi-room site — palace, guild headquarters, monastery, safehouse, recurring base. Default threat LOW; use NONE when explicitly peaceful.
+- SETTLEMENT: town/city/village as a whole, district-scale.
+- Within SETTLEMENT, ordinary named shops, inns, chapels, and houses are BUILDING assets with no peer map; props such as stalls, wells, statues, altars, and chests are OBJECT.
+- A map-worthy high-risk settlement site is SUBDUNGEON → peer DUNGEON. A significant lower-risk multi-room site is SUBINTERIOR → peer INTERIOR. Calling CreateAreaMap for the exact BUILDING/SUB* name is the explicit promotion signal. Never promote ordinary structures speculatively.
+- If a settlement is implied, map or reuse the SETTLEMENT first and host any map-worthy nested peer inside it. Isolated DUNGEON/INTERIOR sites remain standalone.
+- Wilderness, roads, alleys, streets, districts, BUILDING, and OBJECT never receive their own maps.
 
-- kind DUNGEON: any unmapped high-risk interior — ruin, stronghold, lair, trapped complex. `site` = that place's name; `entrance` = its door/gate.
-- kind SETTLEMENT: any unmapped town/city/village. `site` = the settlement itself (never its district, street, or building); `entrance` = a public threshold (gate, square, docks).
-- If no footer exists yet and the player's first message implies they're already inside a SETTLEMENT (town, etc) or DUNGEON (high-risk area), map that site immediately as if entering it now. When establishing a footer for the first time, invent the site name now and write it into the new footer — the "copy from footer" rule applies to re-entries and later references, not this first naming.
-- Isolated low-risk interiors need not be mapped.
-
-Never map a sub-place. A site is only its top-level DUNGEON or SETTLEMENT entity. Never call `CreateAreaMap` for a nested part of one: house, shop, inn, alley, rooftop, warehouse, street, or district. These are always sub-places of an already-mapped (or about-to-be-mapped) site — narrate them as part of it, not as separate map calls. Wilderness, roads, and other travel terrain between sites are never mapped.
-
-Skip if already mapped. Do not call `CreateAreaMap` if any of these hold: the site (or a nested place within it) appears in `[MAPPED_SITES — INTERNAL]`; a `[DUNGEON_REALITY — INTERNAL GM CANON]` block for it already exists; the Location footer currently matches it; or the player's message names it exactly (attach DUNGEON_REALITY for that one turn instead). A mapped site keeps all its entrances, exits, gates, and tunnels under the same map — re-entering via a different threshold is still the same site, not a new call. Reveal an additional threshold only once the player perceives or learns of it.
+Skip a peer already listed in `[MAPPED_SITES — INTERNAL]` or supplied by `[DUNGEON_REALITY — INTERNAL GM CANON]`. A listed SETTLEMENT may still contain an unmapped SUB* asset or a BUILDING that later warrants explicit promotion. Re-entering a mapped peer through another threshold reuses its map.
 
 Field rules.
+- `site` and `entrance`: exact canonical names, never translated, expanded, or retitled. For a nested peer, site is the exact BUILDING/SUB* name rather than the settlement root.
+- `scale`: geographic size, independent of danger.
+- `threat`: NONE, LOW, MODERATE, HIGH, or DEADLY; never adjusted for party level.
+- `include`: optional exact existing DUNGEON/INTERIOR names, creation-only for SETTLEMENT absorption.
 
-- `site` and `entrance`: copied character-for-character from the Location footer — never translated, expanded, or retitled.
-- `scale`: geographic size of the site (SMALL/LARGE etc.), independent of danger.
-- `threat`: LOW, MODERATE, HIGH, or DEADLY — enemy/trap density only, never adjusted for party level. (A LARGE LOW site can be vast and empty; a SMALL DEADLY site can be a meat grinder.)
-
-Operating the canon. The tool result and any DUNGEON_REALITY block are private GM canon — never design, emit, or describe the hidden map yourself, and never expose raw map data to the player. Reveal only what the player can currently perceive; narrate durable changes and let enemies and other entities react/move as the scene logically demands; their movement will be updated accordingly on the map by the external Map Updater agent.
-
-- DUNGEON maps are room-scale: use the attached layout to govern travel, doors, cover, stealth, noise, light, sightlines, traps, hazards, and entity placement. You may add a minor room or feature if play requires it, as long as it doesn't contradict established facts.
-- SETTLEMENT maps are district-scale: districts and major landmarks only. You may freely invent granular interiors (a specific inn, shop, alley, house) as play requires, as long as they don't contradict district-level facts. When the player actually enters an invented interior, append it as a new footer segment (e.g. `Morrowfen, Shrine Quarter, Chapel of the Drowned Stone`) — this segment is flavor, not a new mapped site.
+Tool results and DUNGEON_REALITY are private objective canon. Reveal only what the player perceives. DUNGEON and INTERIOR use room-scale layout; SETTLEMENT uses districts. Footer paths remain coarse-to-fine. BUILDING keeps the settlement active; a mapped peer becomes active at the deepest matching footer segment. Hosted peer reality includes a compact host brief for returning to the settlement.
 </dungeon_reality_and_hidden_mapping>

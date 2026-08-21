@@ -26,8 +26,11 @@ import {
     migrateDungeonMapAttachmentToContent,
     migrateDungeonMapSectionToStructured,
     normalizeDungeonMapDocument,
+    defaultMapSiteThreat,
     normalizeMapSiteThreat,
+    MAP_SITE_KINDS,
     MAP_SITE_THREATS,
+    MAP_ASSET_KINDS,
     parseDungeonMapDocument,
     parseEditableDungeonMapJson,
     serializeDungeonMapDocument,
@@ -36,6 +39,7 @@ import {
     parseDungeonDeltaBlock,
     reconcileDungeonMapAreaKnowledge,
     resolveActiveDungeonSite,
+    resolveCurrentMapPlacement,
     resolveMentionedDungeonSites,
     stripCapturedDungeonMapBlocks,
     stripDungeonRealityBlocksFromPrompt,
@@ -76,6 +80,37 @@ const connectedArchitectMap = {
         origin: 'INITIAL_MAP',
     }],
 };
+
+function linearArchitectMap(site, kind, count, asset = null) {
+    const areas = Array.from({ length: count }, (_, index) => ({
+        id: `room-${index + 1}`,
+        name: index === 0 ? 'Entrance' : `Room ${index + 1}`,
+        knowledge: index === 0 ? 'VISITED' : 'UNREVEALED',
+        geometry: [`Geometry fact ${index + 1}.`],
+        connections: [],
+    }));
+    for (let index = 0; index < areas.length - 1; index++) {
+        const detail = `Passage between room ${index + 1} and room ${index + 2}.`;
+        areas[index].connections.push({ to: areas[index + 1].id, state: 'OPEN', detail });
+        areas[index + 1].connections.push({ to: areas[index].id, state: 'OPEN', detail });
+    }
+    return {
+        version: 3,
+        site,
+        kind,
+        areas,
+        assets: asset ? [{
+            id: 'named-asset',
+            name: 'Named Asset',
+            location: 'room-1',
+            state: 'ACTIVE',
+            knowledge: 'KNOWN',
+            detail: 'A durable fact.',
+            origin: 'INITIAL_MAP',
+            ...asset,
+        }] : [],
+    };
+}
 
 describe('Map Architect validation', () => {
     it('accepts a connected graph even when its entrance route is locked', () => {
@@ -125,6 +160,66 @@ describe('Map Architect validation', () => {
         });
         expect(result.valid).toBe(true);
         expect(result.document.threat).toBe('NONE');
+    });
+
+    it('supports INTERIOR/NONE contracts and uses dungeon room-scale bounds', () => {
+        expect(MAP_SITE_KINDS).toEqual(['DUNGEON', 'SETTLEMENT', 'INTERIOR']);
+        expect(MAP_ASSET_KINDS).toEqual(expect.arrayContaining(['OBJECT', 'BUILDING', 'SUBDUNGEON', 'SUBINTERIOR']));
+        expect(defaultMapSiteThreat('DUNGEON')).toBe('HIGH');
+        expect(defaultMapSiteThreat('SETTLEMENT')).toBe('MODERATE');
+        expect(defaultMapSiteThreat('INTERIOR')).toBe('LOW');
+
+        const tooSmall = validateDungeonMapArchitecture(linearArchitectMap('Guild Hall', 'INTERIOR', 6), {
+            site: 'Guild Hall', entrance: 'Entrance', kind: 'INTERIOR', scale: 'MEDIUM', threat: 'LOW',
+        });
+        expect(tooSmall.valid).toBe(false);
+        expect(tooSmall.errors.some(error => error.code === 'SCALE_AREA_COUNT')).toBe(true);
+
+        const roomScale = validateDungeonMapArchitecture(linearArchitectMap('Guild Hall', 'INTERIOR', 7), {
+            site: 'Guild Hall', entrance: 'Entrance', kind: 'INTERIOR', scale: 'MEDIUM', threat: 'NONE',
+        });
+        expect(roomScale.valid).toBe(true);
+        expect(roomScale.document).toMatchObject({ kind: 'INTERIOR', threat: 'NONE' });
+    });
+
+    it('requires paired host fields and forbids hosted settlements', () => {
+        const incomplete = { ...structuredClone(connectedArchitectMap), kind: 'INTERIOR', hostSite: 'Rustport' };
+        const incompleteResult = validateDungeonMapArchitecture(incomplete, {
+            site: 'Abbey Undercroft', entrance: 'Cellar Landing', kind: 'INTERIOR',
+        });
+        expect(incompleteResult.errors.some(error => error.code === 'INCOMPLETE_HOST')).toBe(true);
+
+        const hostedSettlement = {
+            ...structuredClone(connectedArchitectMap),
+            kind: 'SETTLEMENT',
+            hostSite: 'Greater Rustport',
+            hostBrief: 'Contained in Greater Rustport.',
+        };
+        const settlementResult = validateDungeonMapArchitecture(hostedSettlement, {
+            site: 'Abbey Undercroft', entrance: 'Cellar Landing', kind: 'SETTLEMENT',
+        });
+        expect(settlementResult.errors.some(error => error.code === 'HOSTED_SETTLEMENT')).toBe(true);
+    });
+
+    it('enforces settlement-only structured asset kinds while OBJECT remains universal', () => {
+        for (const assetKind of ['BUILDING', 'SUBDUNGEON', 'SUBINTERIOR']) {
+            const rejected = validateDungeonMapArchitecture(
+                linearArchitectMap('Guild Hall', 'INTERIOR', 2, { kind: assetKind }),
+                { site: 'Guild Hall', entrance: 'Entrance', kind: 'INTERIOR' },
+            );
+            expect(rejected.errors.some(error => error.code === 'ASSET_KIND_NOT_ALLOWED')).toBe(true);
+        }
+        const objectMap = validateDungeonMapArchitecture(
+            linearArchitectMap('Guild Hall', 'INTERIOR', 2, { kind: 'OBJECT' }),
+            { site: 'Guild Hall', entrance: 'Entrance', kind: 'INTERIOR' },
+        );
+        expect(objectMap.valid).toBe(true);
+
+        const settlement = validateDungeonMapArchitecture(
+            linearArchitectMap('Rustport', 'SETTLEMENT', 2, { kind: 'BUILDING' }),
+            { site: 'Rustport', entrance: 'Entrance', kind: 'SETTLEMENT' },
+        );
+        expect(settlement.valid).toBe(true);
     });
 
     it('rejects active trap, hazard, and alarm assets at NONE threat', () => {
@@ -345,6 +440,26 @@ describe('Map Architect validation', () => {
         expect(injection).toContain('name it in the Location footer');
         expect(injection).toContain('Map kind: SETTLEMENT (district-scale)');
         expect(injection).not.toContain('room-scale interior canon');
+    });
+
+    it('renders INTERIOR as lower-risk room-scale canon rather than dungeon canon', () => {
+        const injection = buildDungeonRealityInjection({
+            siteRoot: 'Guild Headquarters',
+            mapChunks: [JSON.stringify({
+                version: 3,
+                site: 'Guild Headquarters',
+                kind: 'INTERIOR',
+                threat: 'LOW',
+                areas: [{ id: 'reception', name: 'Reception Hall', knowledge: 'VISITED', geometry: ['A broad public hall.'], connections: [] }],
+                assets: [],
+            })],
+            locationEntries: [],
+            statusLog: [],
+        }, 'Guild Headquarters, Reception Hall');
+        expect(injection).toContain('room-scale canon for a significant interior');
+        expect(injection).toContain('Map kind: INTERIOR (room-scale significant interior)');
+        expect(injection).toContain('Site threat is LOW');
+        expect(injection).not.toContain('room-scale dungeon canon');
     });
 
     it('tells the narrator that site threat governs occupancy, not party level', () => {
@@ -623,6 +738,38 @@ Area: Ossuary Behind Rotten Tapestry
         expect(applied.ok).toBe(true);
         expect(applied.document.areas[0].knowledge).toBe('VISITED');
         expect(map.areas[0].knowledge).toBe('UNREVEALED');
+    });
+
+    it('rejects settlement-only asset kinds in map transactions outside a settlement', () => {
+        const map = {
+            version: 3,
+            site: 'Guild Hall',
+            kind: 'INTERIOR',
+            threat: 'LOW',
+            areas: [{ id: 'foyer', name: 'Foyer', knowledge: 'VISITED', geometry: [], connections: [] }],
+            assets: [],
+        };
+        const result = applyDungeonMapTransaction(map, {
+            operation_id: 'day1-0814-invalid-building',
+            operations: [{
+                op: 'ADD_ASSET', evidence: 'CONFIRMED', name: 'Inner Shop', kind: 'BUILDING',
+                location: 'foyer', state: 'ACTIVE', knowledge: 'KNOWN', cause: 'The shop was established in play.',
+            }],
+        });
+        expect(result.ok).toBe(false);
+        expect(result.errors.some(error => error.code === 'ASSET_KIND_NOT_ALLOWED')).toBe(true);
+        expect(map.assets).toEqual([]);
+
+        const settlement = { ...map, site: 'Rustport', kind: 'SETTLEMENT' };
+        const oldAliasWrite = applyDungeonMapTransaction(settlement, {
+            operation_id: 'day1-0815-old-interior-alias',
+            operations: [{
+                op: 'ADD_ASSET', evidence: 'CONFIRMED', name: 'Old Alias Shop', kind: 'INTERIOR',
+                location: 'foyer', state: 'ACTIVE', knowledge: 'KNOWN', cause: 'Established in play.',
+            }],
+        });
+        expect(oldAliasWrite.ok).toBe(false);
+        expect(oldAliasWrite.errors.some(error => error.code === 'INVALID_ENUM')).toBe(true);
     });
 
     it('requires blocked geometry to be changed before an asset traverses it', () => {
@@ -1172,7 +1319,7 @@ The last guard falls and a loose stone reveals a niche.
         expect(injection).toContain('MUTATION — Lift: disabled');
         expect(injection).toContain('Do not treat it as a menu of allowed actions');
         expect(injection).toContain('resolved story events override stale positions/states');
-        expect(injection).toContain('room-scale interior canon');
+        expect(injection).toContain('room-scale dungeon canon');
         expect(injection).toContain('you may add a room or incidental feature');
         expect(injection).toContain('Cause / Actor / Since');
         expect(injection).toContain('Recent site activity');
@@ -1310,9 +1457,88 @@ The last guard falls and a loose stone reveals a niche.
         const index = buildMappedSitesInjection(sites);
         expect(index).toContain('- Ember Mine (DUNGEON)');
         expect(index).toContain('- Thornbrook (SETTLEMENT)');
-        expect(index).toContain('when approaching, entering, or returning');
+        expect(index).toContain('A mapped SETTLEMENT may still contain an unmapped SUBDUNGEON/SUBINTERIOR');
         expect(index).not.toContain('Ghost Site');
         expect(index).not.toContain('"version"');
+    });
+
+    it('annotates hosted peers and injects their deterministic exit context', () => {
+        const hostedDocument = {
+            version: 3,
+            site: 'Flooded Sewers',
+            kind: 'DUNGEON',
+            threat: 'HIGH',
+            hostSite: 'Rustport',
+            hostBrief: 'Contained in Rustport, Dock Ward. Warehouse piers stink of brine. Exit returns to Dock Ward in Rustport.',
+            areas: [{ id: 'grate', name: 'Treatment Grate', knowledge: 'VISITED', geometry: ['A corroded grate.'], connections: [] }],
+            assets: [],
+        };
+        const sites = {
+            sewers: { siteRoot: 'Flooded Sewers', mapChunks: [JSON.stringify(hostedDocument)] },
+        };
+        expect(listMappedSiteSummaries(sites)).toEqual([
+            { siteRoot: 'Flooded Sewers', kind: 'DUNGEON', hostSite: 'Rustport' },
+        ]);
+        expect(buildMappedSitesInjection(sites)).toContain('- Flooded Sewers (DUNGEON; inside Rustport)');
+
+        const injection = buildDungeonRealityInjection({
+            siteRoot: 'Flooded Sewers',
+            mapChunks: [JSON.stringify(hostedDocument)],
+            locationEntries: [],
+            statusLog: [],
+        }, 'Rustport, Dock Ward, Flooded Sewers, Treatment Grate');
+        expect(injection).toContain('Contained in: Rustport');
+        expect(injection).toContain(`Host brief: ${hostedDocument.hostBrief}`);
+    });
+
+    it('highlights new structured settlement interiors and legacy OBJECT buildings without migration', () => {
+        const base = {
+            version: 3,
+            site: 'Rustport',
+            kind: 'SETTLEMENT',
+            areas: [{ id: 'dock-ward', name: 'Dock Ward', knowledge: 'VISITED', geometry: ['Warehouse piers.'], connections: [] }],
+            assets: [],
+        };
+        for (const kind of ['BUILDING', 'SUBDUNGEON', 'SUBINTERIOR', 'OBJECT']) {
+            const document = structuredClone(base);
+            document.assets.push({
+                id: `site-${kind.toLowerCase()}`,
+                kind,
+                name: 'Gilded Tankard',
+                location: 'dock-ward',
+                state: 'ACTIVE',
+                knowledge: 'KNOWN',
+                detail: 'Occupies the ward.',
+                origin: 'INITIAL_MAP',
+            });
+            const placement = resolveCurrentMapPlacement(document, 'Rustport, Dock Ward, Gilded Tankard');
+            expect(placement.area?.id).toBe('dock-ward');
+            expect(placement.interiorAsset?.kind).toBe(kind);
+        }
+    });
+
+    it('preserves peaceful legacy DUNGEON maps without reclassification', () => {
+        const legacy = normalizeDungeonMapDocument({
+            version: 3,
+            site: 'Old Safehouse',
+            kind: 'DUNGEON',
+            threat: 'NONE',
+            areas: [{ id: 'foyer', name: 'Foyer', knowledge: 'VISITED', geometry: ['A quiet foyer.'], connections: [] }],
+            assets: [],
+        }, 'Old Safehouse');
+        expect(legacy).toMatchObject({ kind: 'DUNGEON', threat: 'NONE' });
+
+        const oldStructuralAlias = normalizeDungeonMapDocument({
+            version: 3,
+            site: 'Old Town',
+            kind: 'SETTLEMENT',
+            areas: [{ id: 'market', name: 'Market', knowledge: 'VISITED', geometry: [], connections: [] }],
+            assets: [{
+                id: 'old-inn', kind: 'INTERIOR', name: 'Old Inn', location: 'market', state: 'ACTIVE',
+                knowledge: 'KNOWN', detail: 'A legacy structure.', origin: 'INITIAL_MAP',
+            }],
+        }, 'Old Town');
+        expect(oldStructuralAlias.assets[0].kind).toBe('BUILDING');
     });
 
     it('strips a mapped-sites index from the prompt copy when Persistent Maps is off', () => {
@@ -1592,5 +1818,35 @@ The last guard falls and a loose stone reveals a niche.
         );
         expect(withAsset.ok).toBe(true);
         expect(withAsset.document.assets.some(asset => asset.id === 'new-rat')).toBe(true);
+
+        const invalidBuilding = parseEditableDungeonMapJson(JSON.stringify({
+            ...connectedArchitectMap,
+            kind: 'INTERIOR',
+            assets: [{
+                id: 'shop', kind: 'BUILDING', name: 'Shop', location: 'cellar-landing',
+                state: 'ACTIVE', knowledge: 'KNOWN', detail: '', origin: 'INITIAL_MAP',
+            }],
+        }), 'Abbey Undercroft');
+        expect(invalidBuilding.ok).toBe(false);
+        expect(invalidBuilding.errors.some(error => error.includes('allowed only on SETTLEMENT'))).toBe(true);
+
+        const incompleteHost = parseEditableDungeonMapJson(JSON.stringify({
+            ...connectedArchitectMap,
+            kind: 'INTERIOR',
+            hostSite: 'Rustport',
+        }), 'Abbey Undercroft');
+        expect(incompleteHost.ok).toBe(false);
+        expect(incompleteHost.errors.some(error => error.includes('hostSite and hostBrief'))).toBe(true);
+
+        const rejectedOldAliasWrite = parseEditableDungeonMapJson(JSON.stringify({
+            ...connectedArchitectMap,
+            kind: 'SETTLEMENT',
+            assets: [{
+                id: 'old-alias', kind: 'INTERIOR', name: 'Old Alias', location: 'cellar-landing',
+                state: 'ACTIVE', knowledge: 'KNOWN', detail: '', origin: 'INITIAL_MAP',
+            }],
+        }), 'Abbey Undercroft');
+        expect(rejectedOldAliasWrite.ok).toBe(false);
+        expect(rejectedOldAliasWrite.errors.some(error => error.includes('asset kind must be one of'))).toBe(true);
     });
 });

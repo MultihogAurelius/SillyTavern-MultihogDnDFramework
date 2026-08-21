@@ -64,17 +64,18 @@ describe('Map Architect component', () => {
         const hooks = readFileSync(new URL('../narrative-hooks.js', import.meta.url), 'utf8');
         const architect = readFileSync(new URL('../map-architect.js', import.meta.url), 'utf8');
         const router = readFileSync(new URL('../router.js', import.meta.url), 'utf8');
-        expect(hooks).toContain('For SETTLEMENT, copy the town/city/village name from the Location footer');
-        expect(hooks).toContain('Do not call for an alley, house, shop, rooftop, warehouse, street');
-        expect(hooks).toContain('Do not call for wilderness, roads, countryside, or other places between mapped sites');
-        expect(hooks).toContain('Do not call if [MAPPED_SITES] lists that site');
+        expect(hooks).toContain('SETTLEMENT is a district graph');
+        expect(hooks).toContain('Ordinary shops, inns, houses, and chapels remain BUILDING assets');
+        expect(hooks).toContain('Never map OBJECT props, wilderness, roads, or districts');
+        expect(hooks).toContain('A listed mapped peer is reused');
         expect(hooks).toContain('buildMappedSitesInjection');
         expect(architect).toContain('mapSiteFooterMismatchHint');
         expect(architect).toContain('Live location footer:');
         expect(router).toContain('mapSiteFooterMismatchHint(site, currentLocation)');
         expect(hooks).toContain("unregisterFunctionTool('CreateDungeonMap')");
-        expect(hooks).toContain("enum: ['LOW', 'MODERATE', 'HIGH', 'DEADLY']");
-        expect(hooks).toContain("enum: ['DUNGEON', 'SETTLEMENT']");
+        expect(hooks).toContain("enum: ['NONE', 'LOW', 'MODERATE', 'HIGH', 'DEADLY']");
+        expect(hooks).toContain("enum: ['DUNGEON', 'SETTLEMENT', 'INTERIOR']");
+        expect(hooks).toContain("include: { type: 'array'");
         expect(hooks).toContain('Generating a location map for');
         expect(hooks).toContain('isMapArchitectTextOpener(settings)');
         expect(hooks).toContain('applyMapArchitectTextOpenerCyoaCaveat');
@@ -136,15 +137,56 @@ describe('Map Architect component', () => {
         expect(MAP_ARCHITECT_JSON_SCHEMA.value.required).toEqual(['version', 'site', 'areas', 'assets']);
         expect(MAP_ARCHITECT_JSON_SCHEMA.value.properties.areas.items.required).toContain('connections');
         expect(MAP_ARCHITECT_JSON_SCHEMA.value.properties.assets.items.required).toContain('origin');
-        expect(MAP_ARCHITECT_JSON_SCHEMA.value.properties.kind.enum).toEqual(['DUNGEON', 'SETTLEMENT']);
-        expect(MAP_ARCHITECT_JSON_SCHEMA.value.properties.threat.enum).toEqual(['LOW', 'MODERATE', 'HIGH', 'DEADLY']);
+        expect(MAP_ARCHITECT_JSON_SCHEMA.value.properties.kind.enum).toEqual(['DUNGEON', 'SETTLEMENT', 'INTERIOR']);
+        expect(MAP_ARCHITECT_JSON_SCHEMA.value.properties.threat.enum).toEqual(['NONE', 'LOW', 'MODERATE', 'HIGH', 'DEADLY']);
+        expect(MAP_ARCHITECT_JSON_SCHEMA.value.properties.assets.items.properties.kind.enum)
+            .toEqual(expect.arrayContaining(['OBJECT', 'BUILDING', 'SUBDUNGEON', 'SUBINTERIOR']));
+    });
+
+    it('preflights exact include peers and persists absorption/promotion in one book save', () => {
+        const architect = readFileSync(new URL('../map-architect.js', import.meta.url), 'utf8');
+        const router = readFileSync(new URL('../router.js', import.meta.url), 'utf8');
+        const hosting = readFileSync(new URL('../map-hosting.js', import.meta.url), 'utf8');
+        expect(architect).toContain('resolveIncludeManifest(include, current.sites, args.site)');
+        expect(architect).toContain('include must name one existing mapped DUNGEON or INTERIOR exactly');
+        expect(architect).toContain('INCLUDED EXISTING PEERS (LOCKED)');
+        expect(architect).toContain('Create exactly one asset named');
+        expect(architect).toContain('resolveHostedCreationContext');
+        expect(architect).toContain("const expectedAssetKind = args.kind === 'INTERIOR' ? 'SUBINTERIOR' : 'SUBDUNGEON'");
+
+        const start = router.indexOf('export async function persistArchitectDungeonMap');
+        const end = router.indexOf('export async function persistManualDungeonMapDocument', start);
+        const persistence = router.slice(start, end);
+        expect(persistence).toContain('promoteSettlementPeerAsset');
+        expect(persistence).toContain('stampHostedPeerDocument');
+        expect(persistence).toContain('ensureHostCoreMirror');
+        expect(persistence).toContain('Included peer');
+        expect(persistence.match(/saveWorldInfoSnapshot\(/g)).toHaveLength(1);
+        expect(hosting).toContain('is already hosted inside');
+        expect(hosting).toContain('Contained in ${hostDocument.site}, ${area.name}.');
+        expect(hosting).toContain('Host Site: ${hostSite}');
+        expect(hosting).toContain('Host Brief: ${hostBrief}');
+    });
+
+    it('migrates only untouched shipped prompts to the new taxonomy defaults', () => {
+        const defaults = readFileSync(new URL('../src/state/defaults.js', import.meta.url), 'utf8');
+        const settings = readFileSync(new URL('../src/state/settings.js', import.meta.url), 'utf8');
+        expect(defaults).toContain("FACTORY_SETTINGS_VERSION = '2026.8.22.2'");
+        expect(settings).toContain('promptSignature');
+        expect(settings).toContain("'14870:8b5acf86'");
+        expect(settings).toContain("'9025:d21f2f49'");
+        expect(settings).toContain("'19340:f2971ff8'");
+        expect(settings).toContain("'15245:3f89155f'");
+        expect(settings).toContain('DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT');
+        expect(settings).toContain('DEFAULT_MAP_UPDATER_SYSTEM_PROMPT');
+        expect(settings).toContain('DEFAULT_MAP_EVOLUTION_SYSTEM_PROMPT');
     });
 
     it('defines a handshake-only brief contract for Auto map create', () => {
         expect(MAP_ARCHITECT_BRIEF_JSON_SCHEMA.name).toBe('map_architect_brief_v1');
         expect(MAP_ARCHITECT_BRIEF_JSON_SCHEMA.returnInvalid).toBe(true);
         expect(MAP_ARCHITECT_BRIEF_JSON_SCHEMA.value.required).toEqual(['entrance', 'kind', 'scale', 'threat', 'premise']);
-        expect(MAP_ARCHITECT_BRIEF_JSON_SCHEMA.value.properties.kind.enum).toEqual(['DUNGEON', 'SETTLEMENT']);
+        expect(MAP_ARCHITECT_BRIEF_JSON_SCHEMA.value.properties.kind.enum).toEqual(['DUNGEON', 'SETTLEMENT', 'INTERIOR']);
         expect(MAP_ARCHITECT_BRIEF_JSON_SCHEMA.value.properties.scale.enum).toEqual(['SMALL', 'MEDIUM', 'LARGE']);
         expect(MAP_ARCHITECT_BRIEF_JSON_SCHEMA.value.properties.keywords.maxItems).toBe(5);
         expect(DEFAULT_MAP_ARCHITECT_BRIEF_SYSTEM_PROMPT).toContain('filling only the CreateAreaMap handshake');
@@ -159,26 +201,38 @@ describe('Map Architect component', () => {
         expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('human-readable strings in the campaign language');
         expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('Threat is a site fact, never matched to party level');
         expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('Scale is size, not danger');
-        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('"threat":"HIGH"');
+        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('"threat":"NONE|LOW|MODERATE|HIGH|DEADLY"');
         expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).not.toContain('need not pre-invent');
         expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('copy that exact same string onto the reverse connection');
         expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('Never give a reciprocal pair two different detail strings');
         expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('Occasional hub/nexus layouts are welcome');
         expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('one area may have many routes');
         expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('KIND: DUNGEON');
+        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('KIND: INTERIOR');
         expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('KIND: SETTLEMENT');
         expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('never an alley, house, shop, rooftop, or street');
         expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('Areas are districts, gates, plazas');
-        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('The narrator will invent those granular locations during play');
-        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('"kind":"DUNGEON"');
-        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('"kind":"SETTLEMENT"');
+        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('Ordinary named structures are BUILDING assets');
+        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('Stalls, wells, statues, altars, and other props are OBJECT');
+        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('locked inclusion manifest');
+        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('may organically establish a SUBDUNGEON');
+        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('outside locked inclusions, normally create zero to two SUB* assets total');
+        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('Ordinary shops, inns, chapels, homes, and similar structures remain BUILDING');
+        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('exact canonical name of its future peer map');
+        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('INDEPENDENT SCHEMA SNIPPETS');
+        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('orbital science fiction');
+        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('submerged research complex');
+        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('fairy-tale diplomacy');
+        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('near-future city');
+        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).not.toContain('Hall of the Ember-Ancestors');
+        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).not.toContain('Morrowfen');
         expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('a neutralized mechanism is DEACTIVATED');
         expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('"origin":"INITIAL_MAP"');
         expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('"state":"LOCKED"');
         expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('Never make a chapel, inn, shop, or house its own settlement area');
         expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('Never use kind NPC');
         expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('ONE GROUP asset with optional integer count');
-        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('"count":6');
+        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('"count":7');
         expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('Never split a pack into many identical CREATURE assets');
         expect(MAP_ARCHITECT_JSON_SCHEMA.value.properties.assets.items.properties.count).toMatchObject({
             type: 'integer', minimum: 1, maximum: 99,

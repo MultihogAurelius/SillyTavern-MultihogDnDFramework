@@ -61,6 +61,22 @@ describe('Lorebook prompt templates', () => {
         expect(settings.routerModules.npc.format).toBe('custom format');
     });
 
+    it('preserves customized map prompts across the nested-site settings migration', () => {
+        testExtensionSettings[MODULE_NAME] = {
+            settingsVersion: '2026.8.22',
+            mapArchitectSystemPrompt: 'custom architect prompt',
+            mapUpdaterSystemPrompt: 'custom updater prompt',
+            mapEvolutionSystemPrompt: 'custom evolution prompt',
+        };
+
+        const settings = getSettings();
+
+        expect(settings.settingsVersion).toBe(FACTORY_SETTINGS_VERSION);
+        expect(settings.mapArchitectSystemPrompt).toBe('custom architect prompt');
+        expect(settings.mapUpdaterSystemPrompt).toBe('custom updater prompt');
+        expect(settings.mapEvolutionSystemPrompt).toBe('custom evolution prompt');
+    });
+
     it('resets both Basic Mode sources without overwriting Agent Mode', () => {
         const defaults = buildDefaultSettings();
         const settings = {

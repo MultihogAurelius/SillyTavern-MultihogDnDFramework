@@ -5,7 +5,7 @@
  */
 export const MAP_ARCHITECT_JSON_SCHEMA = Object.freeze({
     name: 'dungeon_map_v3',
-    description: 'A complete private objective map for one dungeon interior or settlement.',
+    description: 'A complete private objective map for one dungeon, significant interior, or settlement.',
     strict: false,
     returnInvalid: true,
     value: {
@@ -14,8 +14,8 @@ export const MAP_ARCHITECT_JSON_SCHEMA = Object.freeze({
         properties: {
             version: { type: 'integer', enum: [3] },
             site: { type: 'string', minLength: 1 },
-            kind: { type: 'string', enum: ['DUNGEON', 'SETTLEMENT'] },
-            threat: { type: 'string', enum: ['LOW', 'MODERATE', 'HIGH', 'DEADLY'] },
+            kind: { type: 'string', enum: ['DUNGEON', 'SETTLEMENT', 'INTERIOR'] },
+            threat: { type: 'string', enum: ['NONE', 'LOW', 'MODERATE', 'HIGH', 'DEADLY'] },
             areas: {
                 type: 'array',
                 minItems: 2,
@@ -51,7 +51,7 @@ export const MAP_ARCHITECT_JSON_SCHEMA = Object.freeze({
                     additionalProperties: false,
                     properties: {
                         id: { type: 'string', pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$' },
-                        kind: { type: 'string', enum: ['CREATURE', 'GROUP', 'TRAP', 'HAZARD', 'OBJECT', 'LOOT', 'BARRIER', 'ALARM', 'EFFECT', 'OTHER'] },
+                        kind: { type: 'string', enum: ['CREATURE', 'GROUP', 'TRAP', 'HAZARD', 'OBJECT', 'BUILDING', 'SUBDUNGEON', 'SUBINTERIOR', 'LOOT', 'BARRIER', 'ALARM', 'EFFECT', 'OTHER'] },
                         name: { type: 'string', minLength: 1 },
                         location: { type: 'string', minLength: 1 },
                         state: {
@@ -93,9 +93,9 @@ export const MAP_ARCHITECT_BRIEF_JSON_SCHEMA = Object.freeze({
         additionalProperties: false,
         properties: {
             entrance: { type: 'string', minLength: 1 },
-            kind: { type: 'string', enum: ['DUNGEON', 'SETTLEMENT'] },
+            kind: { type: 'string', enum: ['DUNGEON', 'SETTLEMENT', 'INTERIOR'] },
             scale: { type: 'string', enum: ['SMALL', 'MEDIUM', 'LARGE'] },
-            threat: { type: 'string', enum: ['LOW', 'MODERATE', 'HIGH', 'DEADLY'] },
+            threat: { type: 'string', enum: ['NONE', 'LOW', 'MODERATE', 'HIGH', 'DEADLY'] },
             premise: { type: 'string', minLength: 1 },
             keywords: {
                 type: 'array',

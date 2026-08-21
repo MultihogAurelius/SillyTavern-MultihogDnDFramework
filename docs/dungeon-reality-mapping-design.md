@@ -4,7 +4,7 @@
 
 **Related:** `<dungeon_reality_and_hidden_mapping>` narrator module, Map Architect, Map Updater, Map Evolution, World Progression, and Lorebook Agent
 
-**Updated:** 2026-08-17
+**Updated:** 2026-08-22
 
 ## Problem
 
@@ -14,7 +14,7 @@ An immutable initial map plus append-only room updates creates two competing fac
 
 ## Authority model
 
-- The narrator establishes immediate fiction and requests a map once before narrating entry into an unmapped high-risk interior (kind DUNGEON) or an unmapped town/city/village (kind SETTLEMENT), via `CreateAreaMap` or the `[CREATE_AREA_MAP]` text-command opener. A mundane named building can also use DUNGEON as the room-scale enum when the player explicitly requests that exact building as a persistent map or recurring home/base; entry, ownership, lodging, or an incidental footer leaf alone never triggers one. With the text-command opener, CYOA choices are suspended on that command turn so they are not appended after the fence; they resume on the continued narration turn. Occupancy on the attached map is maintained by the Map Updater on its own cadence (default: every turn); established story events override stale map states (a killed enemy stays dead even if still listed ACTIVE). The narrator must not rewind play or revive entities to match the lagging map. Settlement maps are district-scale: the narrator may invent granular interiors that do not contradict those districts.
+- The narrator establishes immediate fiction and requests a map once while crossing into, or immediately after establishing entry into, an unmapped DUNGEON, INTERIOR, or SETTLEMENT via `CreateAreaMap` or the `[CREATE_AREA_MAP]` text-command opener. Tool timing is allowed on either side of the crossing; text mode may narrate before the command fence and stops after it. Ordinary settlement buildings remain BUILDING assets. Calling `CreateAreaMap` for an exact nested building/site is the explicit promotion signal; Map Updater and Map Evolution never infer promotion. Occupancy on an attached map is maintained by Map Updater on its normal cadence, and established story events override stale map states.
 - Map Architect creates and validates the complete initial map, then writes it directly to the root Location entry. `site` must already appear as a Location footer segment; a translated or retitled root is rejected instead of creating an orphan English entry. Human-readable map labels follow the campaign language; JSON keys, IDs, and enums stay English.
 - Map Updater interprets established play and maintains occupancy on the active site. Map Evolution is a sibling pass: it advances mapped sites off-screen on their normal interval, site-exit, or manual cadence. During that pass it may interpret relevant unconsumed World Report prose. Lorebook Agent records NPCs, readable location lore, relationships, quests, and events separately. World Progression receives readable location dossiers with `[MAP]` stripped; Evolution is the only writer that turns macro pressure into map operations.
 - The optional World Skeleton is macro-only: locations are candidate WP subjects, while factions and conflicts provide context. It never creates named NPCs. Ordinary NPC lore becomes a read-only dossier constraint only after the GM/Lorebook Agent establishes that individual through play.
@@ -24,9 +24,11 @@ An immutable initial map plus append-only room updates creates two competing fac
 
 ## Map Architect generation
 
-Map Architect receives the exact site root, entrance label, kind (`DUNGEON` or `SETTLEMENT`), scale, threat (`NONE` / `LOW` / `MODERATE` / `HIGH` / `DEADLY`), premise, and a configurable recent-story lookback. Scale is geographic size; threat is site danger for occupancy and trap density and is never matched to party level. `NONE` forbids invented active danger, while `LOW` requires light but real danger. It emits one version 3 JSON object internally. Before persistence, a strict validator checks the site and entrance, kind, scale-appropriate area count for that kind, stable IDs, enum values, all references, reciprocal passages, and reachability of every area from the entrance. A locked or blocked destination remains part of the physical graph through a `LOCKED` or `BLOCKED` connection; inaccessible space is never represented by omitting its route.
+Map Architect receives the exact site root, entrance label, kind (`DUNGEON`, `INTERIOR`, or `SETTLEMENT`), scale, threat (`NONE` / `LOW` / `MODERATE` / `HIGH` / `DEADLY`), premise, optional settlement-only `include[]`, and a configurable recent-story lookback. Defaults are DUNGEON=HIGH, SETTLEMENT=MODERATE, and INTERIOR=LOW. Scale is geographic size; threat is site danger and is never matched to party level. It emits one version 3 JSON object internally. Before persistence, a strict validator checks identity, kind, scale-appropriate area count, stable IDs, settlement-only asset kinds, enum values, references, reciprocal passages, and reachability.
 
-DUNGEON maps are room-scale interiors, including an explicitly requested standalone mundane building; NONE-threat homes and workplaces retain their ordinary premise without weakening LOW's meaning. SETTLEMENT maps are macroscopic district graphs (gates, plazas, wards, landmarks) rather than every street and shop; the narrator fills granular interiors during play.
+DUNGEON and INTERIOR maps are room-scale. DUNGEON represents significant high-risk sites; INTERIOR represents significant low-risk multi-room sites such as palaces, guild headquarters, monasteries, and recurring bases. SETTLEMENT maps are macroscopic district graphs rather than every street and shop.
+
+When a new settlement supplies `include[]`, each value must exactly name an existing DUNGEON or INTERIOR peer. Architect receives a locked manifest and must place exactly one matching SUBDUNGEON or SUBINTERIOR asset. Persistence reloads and revalidates the Locations book, attaches the settlement, stamps every peer, mirrors host data into CORE, and performs one whole-book save. Any conflict aborts before the save.
 
 Invalid JSON or semantic errors are returned to Map Architect for up to two complete correction passes. A rejected map writes nothing. On success, JSON is stored directly in Lorebook Agent and only compact human-readable private canon is returned to the narrator. Repeated or concurrent calls preserve an already attached map instead of replacing it.
 
@@ -90,13 +92,19 @@ Geometry describes structural facts:
 - durable spatial features; and
 - connections and their current traversal state.
 
-Assets describe things that can move or materially change:
+Assets describe things that can move or materially change, plus settlement-owned named structures and peer slots:
 
 - creatures, groups, and patrols;
 - traps, hazards, alarms, and effects;
-- loot, keys, objects, barriers, and corpses.
+- loot, keys, OBJECT props, barriers, and corpses;
+- BUILDING for an ordinary named settlement structure with no peer map; and
+- SUBDUNGEON / SUBINTERIOR for an exact-name link to an independent hosted peer.
 
-Settlement interiors the party can enter (a chapel, inn, shop) normally stay assets occupying a district. They are not graph areas. The location footer may name that interior; Visuals/Map highlights the host district and treats the interior as occupancy of that node. Promoting every shop into an area would explode the town graph. A nested dungeon under such a building is a new mapped site, not a satellite node on the settlement map. The narrow exception is a distinct named building that the player deliberately selects as its own persistent room-scale map, such as a recurring home/base; merely entering, owning, or mentioning the building does not promote it.
+Settlement interiors the party can enter (a chapel, inn, shop, ordinary house) are BUILDING assets occupying a district. They are not graph areas. OBJECT is for non-structural props and set-dressing on all map kinds. Existing settlement OBJECT buildings remain valid legacy data and continue to highlight their district; they are not automatically converted.
+
+When creating a settlement, Architect may organically seed a small number of unmapped SUBDUNGEON/SUBINTERIOR assets if the premise and theme strongly justify future persistent peer graphs. Outside locked inclusions it normally creates zero to two, never uses them as filler, and defaults ordinary structures to BUILDING. The seeded asset name becomes the canonical exact name used by a later `CreateAreaMap` call.
+
+An explicit `CreateAreaMap(kind=DUNGEON|INTERIOR)` call while the host settlement is active promotes the exact BUILDING to SUBDUNGEON or SUBINTERIOR. An already matching SUB asset is retained, a conflicting SUB kind is rejected, and a missing exact asset is added to the current district as KNOWN / ACTIVE / NARRATOR_ESTABLISHED. Peer creation, parent promotion, host stamping, and CORE mirroring share one Locations-book save. Existing peer room graphs are preserved.
 
 An enemy exists once at site level and has one `location`. Movement updates that field instead of copying enemy prose between rooms. Optional `behavior` and `route` fields bound Map Updater's autonomous reactions.
 
@@ -127,6 +135,8 @@ Abbey Undercroft is a mapped site. Its private map stores current objective real
 [/MAP]
 ```
 
+Hosted DUNGEON and INTERIOR documents additionally carry paired runtime-owned `hostSite` and `hostBrief` fields. `hostBrief` is derived deterministically from the host asset's district and first geometry fact: `Contained in <Host>, <District>. <First district geometry fact> Exit returns to <District> in <Host>.` The same values are mirrored idempotently in the peer's existing CORE as backup; MAP is authoritative. Host fields are rejected on SETTLEMENT and conflicting re-hosting is rejected.
+
 The initial architect map is write-once: repeated tool calls and later legacy narrator outputs cannot replace it. After creation, only the validated Map Updater / Map Evolution transaction path can mutate `[MAP]`. Occupancy (`CONFIRMED`/`IMPLIED`/`AUTONOMOUS`) records play on the active site. Evolution (`EVOLVED`) may write inactive maps as well. Generic lorebook update, rewrite, cleanup, and consolidation operations preserve `[MAP]` exactly.
 
 The section is hidden from ordinary entry rendering, location cards, image prompts, and normal narrator lore activation. The root Location's blue `MAP` button and the Visuals/Map details control open the same human-readable inspector, grouping geometry, routes, and assets by area. **Reveal All** is remembered per chat; while it is off, unrevealed entries, raw JSON, and material Map Evolution summaries remain private, and Visuals/Map stays knowledge-filtered. Enabling it also fully reveals the Visuals/Map node graph. The inspector draws that graph below the Map Entries / Raw JSON tabs, shows the bounded per-site Evolution history, and can run Map Evolution immediately for that site alone. Visuals/Map itself can be popped out into its own window.
@@ -143,6 +153,8 @@ Map data, instructions, and occupancy updates are exposed only while the latest 
 | `Forest Near the Hall of the Ember-Ancestors` | `Hall of the Ember-Ancestors` | Map and updater absent |
 | `Varnholde Village, Elder's House` | `Abbey Undercroft` | Map and updater absent |
 | `Abbey Undercroft, Entrance` after returning | `Abbey Undercroft` | Map Updater resumes |
+
+Deepest exact footer activation applies to nested peers: a mapped DUNGEON or INTERIOR peer wins over its host settlement. A BUILDING or unmapped SUB asset leaves the settlement active, and exiting the peer reactivates the settlement. Active hosted reality includes `Contained in` and `hostBrief`; `[MAPPED_SITES]` annotates the peer as `inside <Host>`.
 
 Pinned mapped roots may keep their visible `[CORE]` text active outside the site, but their `[MAP]` payload is stripped from Lorebook Agent context. Incidental keywords and prose mentions do not activate map capability. While a site is current, its location-owned mapped root is also excluded from the Lorebook Agent's ordinary activation budget.
 
@@ -189,6 +201,8 @@ Pipeline after each narrator reply: State Tracker â†’ Map Updater (occupancy) â†
 ## Verification
 
 Tests cover Map Architect response parsing, strict connected-graph validation, hidden-wrapper compatibility, prose migration, structured storage, geometry/assets separation, movement, destruction, duplicate detection, strict schemas, semantic rejection without partial mutation, hierarchy activation, prompt filtering, narrator injection, dedicated settings/connection wiring, Map Updater occupancy updates, location-dossier map stripping, prose report routing, scheduled Map Evolution/EVOLVED transaction rules, cumulative per-site Evolution backlogs, causal threads and killed-by attribution, and Lorebook Agent map stripping.
+
+Nested-site coverage includes INTERIOR/NONE enums and defaults, room bounds, host pairing, settlement-only assets, mixed peer absorption, exact-name and conflicting-host failures, BUILDING/SUB promotion, missing-asset creation, existing-peer reuse, deepest activation, district highlighting, host injection/CORE mirroring, and preservation of legacy OBJECT buildings and peaceful DUNGEON maps.
 
 ## Atomic map transaction
 

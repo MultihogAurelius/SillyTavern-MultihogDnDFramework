@@ -666,7 +666,7 @@
                                 <label class="checkbox_label"><input type="checkbox" id="rpg_sysprompt_mod_random_events" /><span>🌍 Random Event Rolls</span></label>
                                 <label class="checkbox_label"><input type="checkbox" id="rpg_sysprompt_mod_resting" /><span>💤 Resting Restrictions (=&gt;9h between rests)</span></label>
                                 <label class="checkbox_label"><input type="checkbox" id="rpg_sysprompt_mod_party_bench" /><span>⛺ Benched Party</span></label>
-                                <label class="checkbox_label" title="Alpha: builds a hidden location map before exploring a dungeon/ruin (room-scale) or town/city (district-scale). New maps need CreateAreaMap (function calling) or the text-command opener below. Expect sharp edges."><input type="checkbox" id="rpg_sysprompt_mod_dungeon_reality_and_hidden_mapping" /><span>🗺️ Persistent Maps (Alpha)</span></label>
+                                <label class="checkbox_label" title="Alpha: builds district-scale settlements and room-scale dungeons or significant interiors. Settlement buildings remain assets unless CreateAreaMap explicitly promotes them. Expect sharp edges."><input type="checkbox" id="rpg_sysprompt_mod_dungeon_reality_and_hidden_mapping" /><span>🗺️ Persistent Maps (Alpha)</span></label>
                                 <div id="rpg_map_architect_opener_components" class="flex-container flexFlowColumn gap-1" style="padding-left: 20px; display: none;">
                                     <small style="display:block; font-weight:bold; opacity:0.65; text-transform:uppercase; font-size:0.7em; letter-spacing:0.4px;">Map Architect opener</small>
                                     <label class="checkbox_label" title="Default. The narrator calls CreateAreaMap; SillyTavern pauses the turn until the map is ready.">
@@ -1325,7 +1325,7 @@
                 <div class="inline-drawer-content">
                     <div class="flex-container flexFlowColumn gap-1">
                         <div style="font-size: 0.8em; opacity: 0.72; line-height: 1.4; margin-bottom: 8px;">
-                            Hidden maps for dungeons (room-scale) and towns (district-scale). <b>Map Architect</b> creates the first map on its own connection — that pass is the foundation, so it can use a stronger model. <b>Map Updater</b> and <b>Map Evolution</b> share a second connection for occupancy and off-screen change. Each pass has its own drawer.
+                            Persistent maps for dungeons and significant interiors (room-scale) and settlements (district-scale). Ordinary settlement buildings stay on their district until <b>CreateAreaMap</b> explicitly promotes one. <b>Map Architect</b> creates the first map on its own connection; <b>Map Updater</b> and <b>Map Evolution</b> share a second connection for occupancy and off-screen change.
                         </div>
 
                         <div class="inline-drawer">

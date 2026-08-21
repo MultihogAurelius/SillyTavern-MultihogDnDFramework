@@ -175,9 +175,10 @@ function formatFailure(errors) {
 }
 
 function kindRule(kind) {
-    return kind === 'SETTLEMENT'
-        ? 'SETTLEMENT interiors the party actually enters are OBJECT assets in the current district, not new areas. Named people are CREATURE. Unnamed bands, watches, and crowds are one GROUP with count. If CURRENT LOCATION names a more specific interior after the district and that name is not already an OBJECT asset, ADD_ASSET it. The footer is sufficient even when RECENT STORY is empty.'
-        : 'If the party enters a newly invented room the map lacks, ADD_AREA from the narrative.';
+    if (kind === 'SETTLEMENT') {
+        return 'Ordinary settlement structures the party enters are BUILDING assets in the current district. OBJECT is props only. SUBDUNGEON/SUBINTERIOR require explicit narrative establishment, and CreateAreaMap—not Map Updater—owns BUILDING promotion. If CURRENT LOCATION names an untracked ordinary structure, ADD_ASSET kind BUILDING. Named people are CREATURE; unnamed bands are one GROUP with count.';
+    }
+    return `${kind === 'INTERIOR' ? 'INTERIOR' : 'DUNGEON'} is room-scale. If the party enters a newly invented room the map lacks, ADD_AREA from the narrative.`;
 }
 
 function partyRosterSection(memo) {

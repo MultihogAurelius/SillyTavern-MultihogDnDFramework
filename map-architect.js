@@ -1,4 +1,4 @@
-/** Dedicated one-shot dungeon/settlement map generation agent. */
+/** Dedicated one-shot dungeon/settlement/interior map generation agent. */
 import { getSettings } from './state-manager.js';
 import { sendStateRequest } from './llm-client.js';
 import {
@@ -12,6 +12,7 @@ import {
     normalizeMapSiteThreat,
     defaultMapSiteThreat,
     parseDungeonMapDocument,
+    resolveCurrentMapPlacement,
     stripCapturedDungeonMapsFromPrompt,
     canonicalizeReciprocalConnectionDetails,
     validateDungeonMapArchitecture,
@@ -128,14 +129,15 @@ function currentTimeFrom(settings) {
 }
 
 function kindBrief(kind) {
-    return kind === 'SETTLEMENT'
-        ? 'SETTLEMENT = the city/town/village as a whole, district-scale; never an alley, house, or shop.'
-        : 'DUNGEON = room-scale hidden interior; populate rooms fully.';
+    if (kind === 'SETTLEMENT') return 'SETTLEMENT = the city/town/village as a whole, district-scale; ordinary structures are BUILDING assets, while zero to two strongly justified future peer sites may organically be SUBDUNGEON/SUBINTERIOR assets.';
+    if (kind === 'INTERIOR') return 'INTERIOR = a significant low-risk multi-room site with a stable room graph.';
+    return 'DUNGEON = a high-risk room-scale site; populate rooms fully.';
 }
 
 function threatBrief(threat, kind) {
     if (normalizeMapSiteKind(kind) === 'SETTLEMENT') {
         return {
+            NONE: 'NONE = peaceful civic occupancy with no invented active danger.',
             LOW: 'LOW = sleepy watch and civilian life; not a war zone.',
             MODERATE: 'MODERATE = normal garrison or street crime.',
             HIGH: 'HIGH = occupation, curfews, armed factions in several districts.',
@@ -143,6 +145,7 @@ function threatBrief(threat, kind) {
         }[threat] || 'Threat is site danger, not party level.';
     }
     return {
+        NONE: 'NONE = no invented active danger.',
         LOW: 'LOW = mostly empty/abandoned; sparse hostiles and traps.',
         MODERATE: 'MODERATE = moderate occupancy; hostiles here and there; some traps and hazards; safe pauses are not too unlikely.',
         HIGH: 'HIGH = frequent hostiles, packs or patrols, traps on multiple routes.',
@@ -150,7 +153,87 @@ function threatBrief(threat, kind) {
     }[threat] || 'Threat is site danger, not party level.';
 }
 
-function initialUserPrompt(args, context, referenceContext = '', currentLocation = '', currentTime = '') {
+function normalizeInclude(value) {
+    if (!Array.isArray(value)) return [];
+    const names = value.map(item => String(item || '').trim()).filter(Boolean);
+    return [...new Set(names)];
+}
+
+function resolveIncludeManifest(include, sites, hostSite) {
+    const manifest = [];
+    for (const requested of normalizeInclude(include)) {
+        const matches = Object.values(sites || {}).filter(site => String(site?.siteRoot || '').trim() === requested);
+        if (matches.length !== 1) {
+            throw mapArchitectFailure(`include must name one existing mapped DUNGEON or INTERIOR exactly. Could not resolve "${requested}".`);
+        }
+        const record = matches[0];
+        const document = parseDungeonMapDocument(record.mapChunks?.[0], record.siteRoot).document;
+        if (!['DUNGEON', 'INTERIOR'].includes(document.kind)) {
+            throw mapArchitectFailure(`Included site "${requested}" is ${document.kind}; only DUNGEON or INTERIOR peers can be absorbed.`);
+        }
+        if (document.hostSite && document.hostSite !== hostSite) {
+            throw mapArchitectFailure(`Included site "${requested}" is already hosted inside "${document.hostSite}" and cannot be re-hosted.`);
+        }
+        manifest.push({
+            site: record.siteRoot,
+            kind: document.kind,
+            assetKind: document.kind === 'INTERIOR' ? 'SUBINTERIOR' : 'SUBDUNGEON',
+            entryId: record.entryId,
+        });
+    }
+    return manifest;
+}
+
+function inclusionPrompt(manifest) {
+    if (!manifest.length) return '';
+    return `\nINCLUDED EXISTING PEERS (LOCKED)\n${manifest.map(item => `- ${item.site}: create exactly one ${item.assetKind} asset with name exactly "${item.site}" and place it in the correct settlement district.`).join('\n')}\nDo not rename, omit, duplicate, or change the kind of an included peer. Runtime will stamp host metadata after validation.\n`;
+}
+
+function inclusionValidationErrors(document, manifest) {
+    const errors = [];
+    for (const item of manifest) {
+        const matches = (document.assets || []).filter(asset => asset.name === item.site);
+        if (matches.length !== 1) {
+            errors.push({ code: 'INCLUDED_PEER_COUNT', path: '$.assets', hint: `Create exactly one asset named "${item.site}" for the included peer.` });
+            continue;
+        }
+        if (matches[0].kind !== item.assetKind) {
+            errors.push({ code: 'INCLUDED_PEER_KIND', path: `$.assets[${document.assets.indexOf(matches[0])}].kind`, hint: `Included ${item.kind} "${item.site}" must use asset kind ${item.assetKind}.` });
+        }
+    }
+    return errors;
+}
+
+function resolveHostedCreationContext(current, currentLocation, args) {
+    if (!currentLocation || !['DUNGEON', 'INTERIOR'].includes(args.kind)) return null;
+    const hostCandidates = Object.values(current.sites || {}).filter(record => {
+        if (!record?.mapChunks?.length || record.siteRoot === args.site) return false;
+        if (!locationContainsSiteRoot(currentLocation, record.siteRoot)) return false;
+        return parseDungeonMapDocument(record.mapChunks[0], record.siteRoot).document.kind === 'SETTLEMENT';
+    });
+    if (hostCandidates.length !== 1) return null;
+    const active = hostCandidates[0];
+    const hostDocument = parseDungeonMapDocument(active.mapChunks[0], active.siteRoot).document;
+    const exactAsset = hostDocument.assets.find(asset => String(asset.name || '').trim() === args.site) || null;
+    const expectedAssetKind = args.kind === 'INTERIOR' ? 'SUBINTERIOR' : 'SUBDUNGEON';
+    if (exactAsset && !['BUILDING', 'OBJECT', expectedAssetKind].includes(exactAsset.kind)) {
+        throw mapArchitectFailure(`Settlement asset "${args.site}" is ${exactAsset.kind}; ${args.kind} requires ${expectedAssetKind}.`);
+    }
+    const placement = resolveCurrentMapPlacement(hostDocument, currentLocation);
+    const hostArea = exactAsset
+        ? hostDocument.areas.find(area => area.id === exactAsset.location)
+        : placement.area;
+    if (!hostArea) return null;
+    return {
+        hostSite: active.siteRoot,
+        hostEntryId: active.entryId,
+        hostAreaId: hostArea.id,
+        expectedAssetKind,
+        premise: args.premise,
+    };
+}
+
+function initialUserPrompt(args, context, referenceContext = '', currentLocation = '', currentTime = '', includeManifest = []) {
     return `CREATE ONE PRIVATE MAP
 Exact site root: ${args.site}
 Entrance area: ${args.entrance}
@@ -158,6 +241,7 @@ Kind: ${args.kind} (${kindBrief(args.kind)})
 Scale: ${args.scale}
 Threat: ${args.threat} (${threatBrief(args.threat, args.kind)})
 Established premise: ${args.premise}
+${inclusionPrompt(includeManifest)}
 Live location footer: ${currentLocation || '(none yet)'}
 Current in-world time (authoritative): ${currentTime || 'Unknown'}
 
@@ -173,11 +257,11 @@ ${referenceContext || 'USER-SELECTED REFERENCE CONTEXT\n(none selected)'}
 Output only the required JSON object. Follow the ${args.kind} instruction set.`;
 }
 
-function correctionPrompt(args, context, referenceContext, priorOutput, parseError, errors, attempt, currentTime = '') {
+function correctionPrompt(args, context, referenceContext, priorOutput, parseError, errors, attempt, currentTime = '', includeManifest = []) {
     const issues = parseError
         ? [{ code: 'INVALID_JSON', path: '$', hint: parseError }]
         : errors.map(({ code, path, hint }) => ({ code, path, hint }));
-    return `CORRECTION PASS ${attempt}\nYour previous map was rejected. Return a complete corrected JSON object, not a patch.\n\nRequested site: ${args.site}\nRequested entrance: ${args.entrance}\nRequested kind: ${args.kind} (${kindBrief(args.kind)})\nScale: ${args.scale}\nThreat: ${args.threat} (${threatBrief(args.threat, args.kind)})\nPremise: ${args.premise}\nCurrent in-world time (authoritative): ${currentTime || 'Unknown'}\n\nVALIDATION ERRORS\n${JSON.stringify(issues, null, 2)}\n\nPREVIOUS OUTPUT\n${priorOutput}\n\nRECENT STORY CONTEXT\n${context || '(No additional recent context.)'}\n\n${referenceContext || 'USER-SELECTED REFERENCE CONTEXT\n(none selected)'}\n\nOutput only the corrected JSON object. Follow the ${args.kind} instruction set.`;
+    return `CORRECTION PASS ${attempt}\nYour previous map was rejected. Return a complete corrected JSON object, not a patch.\n\nRequested site: ${args.site}\nRequested entrance: ${args.entrance}\nRequested kind: ${args.kind} (${kindBrief(args.kind)})\nScale: ${args.scale}\nThreat: ${args.threat} (${threatBrief(args.threat, args.kind)})\nPremise: ${args.premise}\n${inclusionPrompt(includeManifest)}\nCurrent in-world time (authoritative): ${currentTime || 'Unknown'}\n\nVALIDATION ERRORS\n${JSON.stringify(issues, null, 2)}\n\nPREVIOUS OUTPUT\n${priorOutput}\n\nRECENT STORY CONTEXT\n${context || '(No additional recent context.)'}\n\n${referenceContext || 'USER-SELECTED REFERENCE CONTEXT\n(none selected)'}\n\nOutput only the corrected JSON object. Follow the ${args.kind} instruction set.`;
 }
 
 function existingResult(siteRecord) {
@@ -199,7 +283,7 @@ function describeFailure(error) {
 }
 
 function mapArchitectFailure(message) {
-    return new Error(`[MAP_ARCHITECT_ERROR — PRIVATE]\n${message}\nDo not call CreateAreaMap again in this turn. Remain outside the site and continue only after a later player turn permits a fresh attempt.\n[/MAP_ARCHITECT_ERROR]`);
+    return new Error(`[MAP_ARCHITECT_ERROR — PRIVATE]\n${message}\nDo not call CreateAreaMap again in this turn. Preserve the established fiction and retry only after a later player turn.\n[/MAP_ARCHITECT_ERROR]`);
 }
 
 async function runMapArchitectOnce(rawArgs) {
@@ -225,10 +309,25 @@ async function runMapArchitectOnce(rawArgs) {
     if ((current.errors || []).some(error => /no campaign prefix/i.test(String(error)))) {
         throw mapArchitectFailure('No campaign prefix is available, so there is no safe Locations lorebook target. Nothing was generated or saved.');
     }
+    const include = normalizeInclude(rawArgs?.include);
+    if (include.length && args.kind !== 'SETTLEMENT') {
+        throw mapArchitectFailure('include[] is valid only while first creating a SETTLEMENT map.');
+    }
+    const includeManifest = resolveIncludeManifest(include, current.sites, args.site);
+    const currentLocation = findLatestDungeonLocation(ctx.chat || []);
+    const hostContext = resolveHostedCreationContext(current, currentLocation, args);
     const existing = Object.values(current.sites || {}).find(record => dungeonSiteRootsMatch(record?.siteRoot, args.site));
     if (existing?.mapChunks?.length) {
+        if (includeManifest.length) {
+            throw mapArchitectFailure('include[] cannot modify a SETTLEMENT that already has a stored map.');
+        }
         if (rawArgs?.requireNew) {
             throw mapArchitectFailure(`A mapped location named "${args.site}" already exists.`);
+        }
+        if (hostContext) {
+            const existingDocument = parseDungeonMapDocument(existing.mapChunks[0], existing.siteRoot).document;
+            const saved = await persistArchitectDungeonMap(args.site, existingDocument, { hostContext });
+            return `[MAP_ARCHITECT_RESULT — PRIVATE]\nThe existing peer map was preserved and linked inside ${hostContext.hostSite}.\n\n${formatDungeonMapForNarrator(saved.document)}\n\nKeep unseen facts private and continue narration from the player-observable entrance.\n[/MAP_ARCHITECT_RESULT]`;
         }
         return existingResult(existing);
     }
@@ -236,8 +335,7 @@ async function runMapArchitectOnce(rawArgs) {
         throw mapArchitectFailure(`A location named "${args.site}" already exists. Use + MAP on that root instead.`);
     }
 
-    const currentLocation = findLatestDungeonLocation(ctx.chat || []);
-    if (currentLocation && !locationContainsSiteRoot(currentLocation, args.site) && !rawArgs?.allowOffsite) {
+    if (currentLocation && !locationContainsSiteRoot(currentLocation, args.site) && !rawArgs?.allowOffsite && !hostContext) {
         throw mapArchitectFailure(mapSiteFooterMismatchHint(args.site, currentLocation));
     }
 
@@ -246,7 +344,7 @@ async function runMapArchitectOnce(rawArgs) {
     const referenceContext = await buildMapArchitectReferenceContext(ctx, rawArgs);
     const currentTime = currentTimeFrom(settings);
     const systemPrompt = String(settings.mapArchitectSystemPrompt || DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).trim();
-    let prompt = initialUserPrompt(args, context, referenceContext, currentLocation, currentTime);
+    let prompt = initialUserPrompt(args, context, referenceContext, currentLocation, currentTime, includeManifest);
     let lastIssues = [];
 
     for (let attempt = 0; attempt <= MAX_CORRECTION_ATTEMPTS; attempt++) {
@@ -259,9 +357,13 @@ async function runMapArchitectOnce(rawArgs) {
         );
         const parsed = parseMapArchitectResponse(output);
         if (parsed.value?.areas) canonicalizeReciprocalConnectionDetails(parsed.value.areas);
-        const validation = parsed.value
+        const baseValidation = parsed.value
             ? validateDungeonMapArchitecture(parsed.value, { site: args.site, entrance: args.entrance, scale: args.scale, kind: args.kind, threat: args.threat })
             : { valid: false, errors: [] };
+        const includeErrors = baseValidation.valid ? inclusionValidationErrors(baseValidation.document, includeManifest) : [];
+        const validation = includeErrors.length
+            ? { valid: false, errors: includeErrors, document: null }
+            : baseValidation;
         if (validation.valid) {
             if (!isLocationMappingEnabled(getSettings())) {
                 throw mapArchitectFailure('Persistent Maps was disabled while the map was being generated. Nothing was saved.');
@@ -271,6 +373,8 @@ async function runMapArchitectOnce(rawArgs) {
                 requireNew: !!rawArgs?.requireNew,
                 locationKeys: rawArgs?.locationKeys,
                 locationCore: rawArgs?.locationCore,
+                includeManifest,
+                hostContext,
             });
             const status = saved.existing ? 'A concurrent map already existed and was preserved.' : `Map saved to ${saved.entryId}.`;
             return `[MAP_ARCHITECT_RESULT — PRIVATE]\n${status}\nTreat this as objective current canon. Do not expose unseen facts.\n\n${formatDungeonMapForNarrator(saved.document)}\n\nContinue narration from ${args.entrance}; reveal only what the player can perceive.\n[/MAP_ARCHITECT_RESULT]`;
@@ -279,7 +383,7 @@ async function runMapArchitectOnce(rawArgs) {
             ? [{ code: 'INVALID_JSON', path: '$', hint: parsed.error }]
             : validation.errors;
         if (attempt < MAX_CORRECTION_ATTEMPTS) {
-            prompt = correctionPrompt(args, context, referenceContext, output, parsed.error, validation.errors, attempt + 1, currentTime);
+            prompt = correctionPrompt(args, context, referenceContext, output, parsed.error, validation.errors, attempt + 1, currentTime, includeManifest);
         }
     }
 
@@ -326,7 +430,7 @@ ${context || '(No additional recent context.)'}
 ${referenceContext || 'USER-SELECTED REFERENCE CONTEXT\n(none selected)'}
 
 Infer entrance, kind, scale, threat, premise, and optional extra keywords as the GM would before calling CreateAreaMap.
-SETTLEMENT = the city/town/village as a whole, not an alley or shop. DUNGEON = a high-risk interior only.
+SETTLEMENT = the city/town/village as a whole. DUNGEON = a high-risk room graph. INTERIOR = a significant lower-risk multi-room site such as a palace, headquarters, monastery, safehouse, or recurring base. Ordinary settlement structures with no peer map are not mapped here.
 Do not include the locked site name in keywords.
 Output only the JSON object.`;
 

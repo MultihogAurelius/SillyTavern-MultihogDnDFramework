@@ -44,7 +44,7 @@ The altar is visibly scorched.`,
         expect(defaultsSource).toContain('maintained by the Map Updater');
         expect(updaterSource).toContain('MAX_CORRECTION_ATTEMPTS = 2');
         expect(updaterSource).toContain('applyActiveDungeonMapCommit');
-        expect(updaterPrompt).toContain('ADD_ASSET kind OBJECT, knowledge KNOWN');
+        expect(updaterPrompt).toContain('ADD_ASSET kind BUILDING, knowledge KNOWN');
         expect(updaterPrompt).toContain('Never write transient combat into asset.detail or chronicles');
         expect(updaterPrompt).toContain('{"noop":true}');
         expect(updaterPrompt).toContain('People are CREATURE or GROUP, never kind NPC');

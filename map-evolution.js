@@ -336,9 +336,13 @@ function formatFailure(errors) {
 }
 
 function kindPolicy(kind) {
-    return kind === 'SETTLEMENT'
-        ? 'SETTLEMENT: district and OBJECT change is expected when it makes logical and narrative sense. Several districts or groups may change in the same tick. Ordinary civic life (trade, harvest, conversation, civic projects) or unrest — neither is preferred. Co-located groups are not automatically enemies. Translate applicable macro pressure into a concrete local manifestation, while preserving any realization already established through play. Interiors are OBJECT assets in a district, not new areas.'
-        : 'DUNGEON: restock and new occupants are expected when they make logical and narrative sense. Living CREATURE/GROUP assets may act independently each tick — patrol, forage, rest, fortify, clash, talk, hang around, or pursue an archetype-fitting project — or stay put when that makes sense. Hostile kinds may cooperate or share downtime; same-room is not automatically a fight. Hours elapsed with several living groups may mean several operations, not one patrol MOVE, but idle occupants are allowed. Original factions, rival adventurers, scavengers, wildlife, or anyone the site could attract. Do not revive DESTROYED/DEAD assets.';
+    if (kind === 'SETTLEMENT') {
+        return 'SETTLEMENT: district, BUILDING, OBJECT, and occupant change is expected when logical. BUILDING is an ordinary structure; OBJECT is a prop. Never create/promote SUBDUNGEON or SUBINTERIOR—CreateAreaMap owns peer-map promotion. Several districts or groups may change in one tick. Preserve play-established reality.';
+    }
+    if (kind === 'INTERIOR') {
+        return 'INTERIOR: evolve ordinary room-scale occupancy, schedules, projects, access, and wear conservatively. Do not manufacture dungeon danger; respect NONE/LOW threat and established purpose.';
+    }
+    return 'DUNGEON: restock and new occupants are expected when they make logical and narrative sense. Living CREATURE/GROUP assets may act independently each tick — patrol, forage, rest, fortify, clash, talk, hang around, or pursue an archetype-fitting project — or stay put when that makes sense. Hostile kinds may cooperate or share downtime; same-room is not automatically a fight. Hours elapsed with several living groups may mean several operations, not one patrol MOVE, but idle occupants are allowed. Original factions, rival adventurers, scavengers, wildlife, or anyone the site could attract. Do not revive DESTROYED/DEAD assets.';
 }
 
 function triggerHeadline(trigger) {
@@ -872,6 +876,7 @@ export async function listMappedEvolutionSites() {
         return {
             siteRoot: site.siteRoot,
             kind: normalizeMapSiteKind(site.document?.kind),
+            hostSite: String(site.document?.hostSite || '').trim(),
             current: here,
         };
     });

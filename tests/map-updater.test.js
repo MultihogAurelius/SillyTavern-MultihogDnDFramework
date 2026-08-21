@@ -57,7 +57,7 @@ describe('Map Updater', () => {
         expect(snapshot).not.toContain('long hidden pier description');
     });
 
-    it('flags a settlement interior in CURRENT LOCATION that is not yet an OBJECT asset', () => {
+    it('flags a settlement building in CURRENT LOCATION that is not yet a BUILDING asset', () => {
         const snapshot = formatDungeonMapForUpdater({
             version: 3,
             site: 'Morrowfen',
@@ -74,7 +74,9 @@ describe('Map Updater', () => {
 
         expect(snapshot).toContain('shrine-quarter (Shrine Quarter)');
         expect(snapshot).toContain('Narrow lanes of salt-stained stone.');
-        expect(snapshot).toContain('SETTLEMENT INTERIOR NOT ON MAP');
+        expect(snapshot).toContain('SETTLEMENT BUILDING NOT ON MAP');
+        expect(snapshot).toContain('ADD_ASSET kind BUILDING');
+        expect(snapshot).toContain('CreateAreaMap owns promotion');
         expect(snapshot).toContain('Chapel of the Drowned Stone');
         expect(snapshot).toContain('Do not output {"noop":true} for this.');
         expect(snapshot).not.toContain('(Current location did not match an area id/name.)');
@@ -104,7 +106,7 @@ describe('Map Updater', () => {
 
         expect(snapshot).toContain('shrine-quarter (Shrine Quarter)');
         expect(snapshot).toContain('chapel-of-the-drowned-stone | OBJECT | Chapel of the Drowned Stone');
-        expect(snapshot).not.toContain('SETTLEMENT INTERIOR NOT ON MAP');
+        expect(snapshot).not.toContain('SETTLEMENT BUILDING NOT ON MAP');
     });
 
     it('ships a focused occupancy prompt and independent scheduler wiring', () => {
@@ -113,8 +115,10 @@ describe('Map Updater', () => {
         const settingsMarkup = readFileSync(new URL('../settings.html', import.meta.url), 'utf8');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('You do not write NPC biographies');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('KIND: SETTLEMENT');
-        expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('ADD_ASSET kind OBJECT');
-        expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('the footer is sufficient even when RECENT STORY is empty');
+        expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('ADD_ASSET kind BUILDING');
+        expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('OBJECT is props only');
+        expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('CreateAreaMap is the sole promotion signal');
+        expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('If CURRENT LOCATION names an untracked ordinary structure');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('"op":"ADD_ASSET"');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('"area_id":"shrine-quarter"');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('Never write {"type":"ADD_ASSET","asset":{...}}');

@@ -38,14 +38,16 @@ const MAP_SECTION_RE = /\[MAP\]([\s\S]*?)\[\/MAP\]/i;
 
 const AREA_KNOWLEDGE = ['UNREVEALED', 'DISCOVERED', 'VISITED'];
 const ASSET_KNOWLEDGE = ['UNREVEALED', 'SUSPECTED', 'KNOWN'];
-const ASSET_KINDS = ['CREATURE', 'GROUP', 'TRAP', 'HAZARD', 'OBJECT', 'LOOT', 'BARRIER', 'ALARM', 'EFFECT', 'OTHER'];
+const ASSET_KINDS = ['CREATURE', 'GROUP', 'TRAP', 'HAZARD', 'OBJECT', 'BUILDING', 'SUBDUNGEON', 'SUBINTERIOR', 'LOOT', 'BARRIER', 'ALARM', 'EFFECT', 'OTHER'];
+const SETTLEMENT_ONLY_ASSET_KINDS = ['BUILDING', 'SUBDUNGEON', 'SUBINTERIOR'];
 const ASSET_KIND_ALIASES = {
     NPC: 'CREATURE',
     PERSON: 'CREATURE',
     CHARACTER: 'CREATURE',
     ITEM: 'OBJECT',
-    BUILDING: 'OBJECT',
-    INTERIOR: 'OBJECT',
+    // Legacy maps briefly used INTERIOR as an asset synonym. New maps use
+    // BUILDING for an unmapped structure and INTERIOR for a peer map kind.
+    INTERIOR: 'BUILDING',
 };
 const ASSET_STATES = [
     'ACTIVE', 'ALERT', 'IDLE', 'DORMANT', 'FLEEING', 'CAPTURED',
@@ -73,7 +75,7 @@ const MAX_ASSET_COUNT = 99;
 export const PLAY_CANON_LOCKED_STATES = [
     'DEAD', 'DESTROYED', 'DEACTIVATED', 'TAKEN', 'CLEARED', 'REMOVED', 'EXPIRED', 'DISMISSED',
 ];
-export const MAP_SITE_KINDS = ['DUNGEON', 'SETTLEMENT'];
+export const MAP_SITE_KINDS = ['DUNGEON', 'SETTLEMENT', 'INTERIOR'];
 export const MAP_SITE_THREATS = ['NONE', 'LOW', 'MODERATE', 'HIGH', 'DEADLY'];
 export const MAP_KILL_STATES = KILL_STATES;
 export const MAP_ASSET_KINDS = ASSET_KINDS;
@@ -180,8 +182,9 @@ function enumValue(value, allowed, fallback) {
     return allowed.includes(normalized) ? normalized : fallback;
 }
 
-function coerceAssetKind(value) {
+function coerceAssetKind(value, { legacyStructuralAlias = true } = {}) {
     const normalized = String(value || '').trim().toUpperCase().replace(/[\s-]+/g, '_');
+    if (!legacyStructuralAlias && normalized === 'INTERIOR') return normalized;
     return ASSET_KIND_ALIASES[normalized] || normalized;
 }
 
@@ -263,7 +266,10 @@ export function normalizeMapSiteKind(value) {
 
 /** Site danger for occupancy/traps — independent of party level and of scale (size). */
 export function defaultMapSiteThreat(kind) {
-    return normalizeMapSiteKind(kind) === 'SETTLEMENT' ? 'MODERATE' : 'HIGH';
+    const normalized = normalizeMapSiteKind(kind);
+    if (normalized === 'SETTLEMENT') return 'MODERATE';
+    if (normalized === 'INTERIOR') return 'LOW';
+    return 'HIGH';
 }
 
 export function normalizeMapSiteThreat(value, fallback = '') {
@@ -492,7 +498,7 @@ export function normalizeDungeonMapDocument(raw, siteFallback = '') {
             : (resolveArea(asset?.location) || areas[0].id);
         const normalized = {
             id,
-            kind: enumValue(asset?.kind, ASSET_KINDS, 'OTHER'),
+            kind: enumValue(coerceAssetKind(asset?.kind), ASSET_KINDS, 'OTHER'),
             name,
             location,
             state,
@@ -517,6 +523,12 @@ export function normalizeDungeonMapDocument(raw, siteFallback = '') {
     const threat = normalizeMapSiteThreat(raw.threat, '');
     const document = { version: DUNGEON_MAP_FORMAT_VERSION, site, kind: normalizeMapSiteKind(raw.kind), areas, assets };
     if (threat) document.threat = threat;
+    const hostSite = String(raw.hostSite || '').trim();
+    const hostBrief = String(raw.hostBrief || '').trim();
+    if (hostSite && hostBrief) {
+        document.hostSite = hostSite;
+        document.hostBrief = hostBrief;
+    }
     return document;
 }
 
@@ -589,7 +601,7 @@ export function validateDungeonMapArchitecture(raw, { site = '', entrance = '', 
         };
     }
 
-    const allowedTop = new Set(['version', 'site', 'kind', 'threat', 'areas', 'assets']);
+    const allowedTop = new Set(['version', 'site', 'kind', 'threat', 'hostSite', 'hostBrief', 'areas', 'assets']);
     for (const key of Object.keys(raw)) {
         if (!allowedTop.has(key)) errors.push(architectureError('UNKNOWN_FIELD', `$.${key}`, raw[key], `Remove unsupported top-level field "${key}".`));
     }
@@ -606,7 +618,7 @@ export function validateDungeonMapArchitecture(raw, { site = '', entrance = '', 
     if (raw.kind != null && raw.kind !== '') {
         const rawKind = String(raw.kind || '').trim().toUpperCase();
         if (!MAP_SITE_KINDS.includes(rawKind)) {
-            errors.push(architectureError('INVALID_KIND', '$.kind', raw.kind, 'Use DUNGEON or SETTLEMENT.'));
+            errors.push(architectureError('INVALID_KIND', '$.kind', raw.kind, 'Use DUNGEON, SETTLEMENT, or INTERIOR.'));
         } else if (requestedKind && rawKind !== requestedKind) {
             errors.push(architectureError('KIND_MISMATCH', '$.kind', raw.kind, `Use the requested kind exactly: "${requestedKind}".`));
         }
@@ -630,6 +642,14 @@ export function validateDungeonMapArchitecture(raw, { site = '', entrance = '', 
 
     const areas = Array.isArray(raw.areas) ? raw.areas : [];
     const resolvedKind = requestedKind || normalizeMapSiteKind(raw.kind);
+    const hostSite = typeof raw.hostSite === 'string' ? raw.hostSite.trim() : '';
+    const hostBrief = typeof raw.hostBrief === 'string' ? raw.hostBrief.trim() : '';
+    if (!!hostSite !== !!hostBrief) {
+        errors.push(architectureError('INCOMPLETE_HOST', '$.hostSite', { hostSite: raw.hostSite, hostBrief: raw.hostBrief }, 'hostSite and hostBrief must either both be non-empty strings or both be omitted.'));
+    }
+    if ((hostSite || hostBrief) && resolvedKind === 'SETTLEMENT') {
+        errors.push(architectureError('HOSTED_SETTLEMENT', '$.hostSite', hostSite, 'SETTLEMENT maps cannot be hosted inside another site.'));
+    }
     const scaleBounds = scaleAreaBounds(scale, resolvedKind);
     if (scaleBounds && (areas.length < scaleBounds[0] || areas.length > scaleBounds[1])) {
         errors.push(architectureError('SCALE_AREA_COUNT', '$.areas', areas.length, `${resolvedKind} ${String(scale).toUpperCase()} maps require ${scaleBounds[0]}-${scaleBounds[1]} meaningful areas.`));
@@ -748,6 +768,9 @@ export function validateDungeonMapArchitecture(raw, { site = '', entrance = '', 
         else assetIds.add(id);
         if (typeof asset.name !== 'string' || !asset.name.trim()) errors.push(architectureError('MISSING_ASSET_NAME', `${path}.name`, asset.name, 'Supply a concise entity name.'));
         if (!ASSET_KINDS.includes(asset.kind)) errors.push(architectureError('INVALID_ASSET_KIND', `${path}.kind`, asset.kind, `Use one of: ${ASSET_KINDS.join(', ')}.`));
+        if (SETTLEMENT_ONLY_ASSET_KINDS.includes(asset.kind) && resolvedKind !== 'SETTLEMENT') {
+            errors.push(architectureError('ASSET_KIND_NOT_ALLOWED', `${path}.kind`, asset.kind, `${asset.kind} is allowed only on SETTLEMENT maps.`));
+        }
         const assetState = coerceAssetState(asset.state);
         if (!ASSET_STATES.includes(assetState)) errors.push(architectureError('INVALID_ASSET_STATE', `${path}.state`, asset.state, `Use one of: ${ASSET_STATES.join(', ')}.`));
         const noneSafeThreatStates = ['DORMANT', 'DESTROYED', 'DISABLED', 'DEACTIVATED', 'CLEARED', 'EXPIRED', 'DISMISSED', 'REMOVED'];
@@ -828,6 +851,30 @@ export function parseEditableDungeonMapJson(text, siteRoot = '') {
             document: null,
         };
     }
+    const rawKind = String(parsed.kind || '').trim().toUpperCase();
+    if (rawKind && !MAP_SITE_KINDS.includes(rawKind)) {
+        return { ok: false, errors: [`kind must be one of: ${MAP_SITE_KINDS.join(', ')}.`], document: null };
+    }
+    const hostSite = String(parsed.hostSite || '').trim();
+    const hostBrief = String(parsed.hostBrief || '').trim();
+    if (!!hostSite !== !!hostBrief) {
+        return { ok: false, errors: ['hostSite and hostBrief must both be present or both be omitted.'], document: null };
+    }
+    if ((hostSite || hostBrief) && rawKind === 'SETTLEMENT') {
+        return { ok: false, errors: ['SETTLEMENT maps cannot have hostSite/hostBrief.'], document: null };
+    }
+    const invalidAsset = (Array.isArray(parsed.assets) ? parsed.assets : []).find(asset => {
+        const assetKind = coerceAssetKind(asset?.kind, { legacyStructuralAlias: false });
+        return !ASSET_KINDS.includes(assetKind)
+            || (SETTLEMENT_ONLY_ASSET_KINDS.includes(assetKind) && rawKind !== 'SETTLEMENT');
+    });
+    if (invalidAsset) {
+        const assetKind = coerceAssetKind(invalidAsset.kind, { legacyStructuralAlias: false });
+        const message = ASSET_KINDS.includes(assetKind)
+            ? `${assetKind} assets are allowed only on SETTLEMENT maps.`
+            : `asset kind must be one of: ${ASSET_KINDS.join(', ')}.`;
+        return { ok: false, errors: [message], document: null };
+    }
     const document = normalizeDungeonMapDocument(parsed, site || rawSite);
     if (!Array.isArray(document.areas) || !document.areas.length) {
         return { ok: false, errors: ['Map must include at least one area.'], document: null };
@@ -905,6 +952,8 @@ export function formatDungeonMapForNarrator(documentOrContent, siteFallback = ''
     const mapKind = normalizeMapSiteKind(document.kind);
     if (mapKind === 'SETTLEMENT') {
         lines.push('Map kind: SETTLEMENT (district-scale). Invent granular interiors during play if they do not contradict these districts. When the party enters one, name it in the Location footer (Site, District, Interior). Do not open a new map for an alley, shop, or house.');
+    } else if (mapKind === 'INTERIOR') {
+        lines.push('Map kind: INTERIOR (room-scale significant interior). Prefer this stable room graph; ordinary rooms and incidental features may be added only when play requires them and established facts remain intact.');
     } else {
         lines.push('Map kind: DUNGEON (room-scale). Prefer this interior; you may add a room if play requires it, so long as it does not contradict established facts.');
     }
@@ -956,7 +1005,9 @@ export function formatDungeonMapForPlayer(documentOrContent, currentLocation = '
     const mapKind = normalizeMapSiteKind(document.kind);
     lines.push(mapKind === 'SETTLEMENT'
         ? 'Kind: SETTLEMENT (district-scale)'
-        : 'Kind: DUNGEON (room-scale)');
+        : mapKind === 'INTERIOR'
+            ? 'Kind: INTERIOR (room-scale)'
+            : 'Kind: DUNGEON (room-scale)');
     if (placement.area && revealedIds.has(placement.area.id)) {
         const interior = placement.interiorAsset && isPlayerVisibleAsset(placement.interiorAsset)
             ? placement.interiorAsset.name
@@ -1656,12 +1707,16 @@ export function applyDungeonMapTransaction(document, transaction, options = {}) 
 
         if (op === 'ADD_ASSET') {
             const name = requireMapString(operation.name, `${path}.name`, errors);
-            const kind = validateEnumField(coerceAssetKind(operation.kind), ASSET_KINDS, `${path}.kind`, errors, true);
+            const kind = validateEnumField(coerceAssetKind(operation.kind, { legacyStructuralAlias: false }), ASSET_KINDS, `${path}.kind`, errors, true);
             const state = validateEnumField(coerceAssetState(operation.state), ASSET_STATES, `${path}.state`, errors, true);
             const knowledge = validateEnumField(operation.knowledge, ASSET_KNOWLEDGE, `${path}.knowledge`, errors, true);
             const locationResult = resolveMapArea(working, operation.location);
             if (!locationResult.area) errors.push(mapError('AREA_NOT_FOUND', `${path}.location`, operation.location, 'Use an exact area ID or unambiguous label.', { allowed: working.areas.map(area => area.id), candidates: locationResult.candidates.map(area => area.id) }));
-            if (!name || !kind || !state || !knowledge || !locationResult.area) continue;
+            if (kind && SETTLEMENT_ONLY_ASSET_KINDS.includes(kind) && normalizeMapSiteKind(working.kind) !== 'SETTLEMENT') {
+                errors.push(mapError('ASSET_KIND_NOT_ALLOWED', `${path}.kind`, kind, `${kind} is allowed only on SETTLEMENT maps.`));
+            }
+            if (!name || !kind || !state || !knowledge || !locationResult.area
+                || (SETTLEMENT_ONLY_ASSET_KINDS.includes(kind) && normalizeMapSiteKind(working.kind) !== 'SETTLEMENT')) continue;
             const duplicateCandidates = working.assets.filter(asset => normalizeDungeonLabel(asset.name) === normalizeDungeonLabel(name) && asset.state !== 'REMOVED');
             const distinctFrom = new Set(cleanStringList(operation.distinct_from));
             if (duplicateCandidates.length && duplicateCandidates.some(candidate => !distinctFrom.has(candidate.id))) {
@@ -2022,7 +2077,7 @@ export function formatDungeonMapForUpdater(document, currentLocation = '', optio
         sections.push('', '## CURRENT AREA GEOMETRY', currentGeometry);
     }
     const interiorHint = (occupancyHints && kind === 'SETTLEMENT' && unmatchedInterior && !interiorAsset)
-        ? `\n\n## SETTLEMENT INTERIOR NOT ON MAP\n"${unmatchedInterior}" is in CURRENT LOCATION but is not an area and not an OBJECT asset. ADD_ASSET kind OBJECT, knowledge KNOWN, location = ${currentArea?.id || 'the current district'}. Do not output {"noop":true} for this.`
+        ? `\n\n## SETTLEMENT BUILDING NOT ON MAP\n"${unmatchedInterior}" is in CURRENT LOCATION but is not an area or settlement asset. ADD_ASSET kind BUILDING, knowledge KNOWN, location = ${currentArea?.id || 'the current district'}. Do not promote it to SUBDUNGEON/SUBINTERIOR; CreateAreaMap owns promotion. Do not output {"noop":true} for this.`
         : '';
     return sections.join('\n') + interiorHint;
 }
@@ -2230,10 +2285,13 @@ export function listMappedSiteSummaries(sites) {
     for (const site of Object.values(sites || {})) {
         if (!site?.siteRoot || !Array.isArray(site.mapChunks) || !site.mapChunks.length) continue;
         const parsed = parseDungeonMapDocument(site.mapChunks[0], site.siteRoot).document;
-        rows.push({
+        const row = {
             siteRoot: String(site.siteRoot).trim(),
             kind: normalizeMapSiteKind(parsed?.kind),
-        });
+        };
+        const hostSite = String(parsed?.hostSite || '').trim();
+        if (hostSite) row.hostSite = hostSite;
+        rows.push(row);
     }
     rows.sort((a, b) => a.siteRoot.localeCompare(b.siteRoot, undefined, { sensitivity: 'base' }));
     return rows;
@@ -2246,11 +2304,11 @@ export function listMappedSiteSummaries(sites) {
 export function buildMappedSitesInjection(sites) {
     const rows = listMappedSiteSummaries(sites);
     const lines = rows.length
-        ? rows.map(row => `- ${row.siteRoot} (${row.kind})`)
+        ? rows.map(row => `- ${row.siteRoot} (${row.kind}${row.hostSite ? `; inside ${row.hostSite}` : ''})`)
         : ['- None.'];
     const guidance = rows.length
-        ? 'Every site below already has a private map. Do not call CreateAreaMap for these names, or for a nested place of one of them, when approaching, entering, or returning. DUNGEON_REALITY is attached while the Location footer matches a listed site, or for one turn when the player input contains the exact complete site name; this list is the complete index.'
-        : 'No private maps exist yet. CreateAreaMap is allowed for a new unmapped dungeon or settlement before first entry, or for an exact named standalone building when the player explicitly requests its persistent layout.';
+        ? 'Every site below already has a private map. Do not call CreateAreaMap again for a listed map. A mapped SETTLEMENT may still contain an unmapped SUBDUNGEON/SUBINTERIOR, and an ordinary BUILDING may be deliberately promoted by a DUNGEON/INTERIOR CreateAreaMap call when it becomes map-worthy. DUNGEON_REALITY is attached while the Location footer matches a listed site, or for one turn when the player input contains the exact complete site name; this list is the complete index.'
+        : 'No private maps exist yet. CreateAreaMap is allowed for a new unmapped dungeon, settlement, or significant interior.';
     return `[MAPPED_SITES — INTERNAL]\n${guidance}\n\n${lines.join('\n')}\n[/MAPPED_SITES]\n`;
 }
 
@@ -2603,8 +2661,10 @@ export function buildDungeonRealityInjection(site, currentLocation, { activityTe
     const mapKind = normalizeMapSiteKind(parsedMap?.kind);
     const mapThreat = normalizeMapSiteThreat(parsedMap?.threat, '');
     const kindCanon = mapKind === 'SETTLEMENT'
-        ? 'This attached map is district-scale settlement canon for the city/town as a whole. You may invent granular interiors and incidental locations during play so long as they do not contradict these districts. When the party enters one, name it in the Location footer (Site, District, Interior). Do not request another map for an alley, shop, or house inside this settlement.'
-        : 'This attached map is room-scale interior canon. Prefer it for layout and occupancy; you may add a room or incidental feature if play naturally requires it, so long as it does not contradict established map facts.';
+        ? 'This attached map is district-scale settlement canon for the city/town as a whole. You may invent granular interiors and incidental locations during play so long as they do not contradict these districts. When the party enters one, name it in the Location footer (Site, District, Interior). Do not request another map for an ordinary alley, shop, or house inside this settlement.'
+        : mapKind === 'INTERIOR'
+            ? 'This attached map is room-scale canon for a significant interior. Prefer it for layout and occupancy; add only incidental detail that does not contradict established map facts.'
+            : 'This attached map is room-scale dungeon canon. Prefer it for layout and occupancy; you may add a room or incidental feature if play naturally requires it, so long as it does not contradict established map facts.';
     const threatCanon = mapThreat
         ? mapThreat === 'NONE'
             ? ' Site threat is NONE: do not invent active hostile occupancy, armed traps, dangerous hazards, or violent conflict.'
@@ -2617,7 +2677,10 @@ export function buildDungeonRealityInjection(site, currentLocation, { activityTe
     const activationNote = referencedByName
         ? '\nActivation: exact mapped-location name in the current player input; the party may still be elsewhere.\n'
         : '';
-    return `[DUNGEON_REALITY — INTERNAL GM CANON]\nSite: ${site.siteRoot}\nCurrent footer location: ${currentLocation}${activationNote}\nThis is objective hidden information for adjudication. ${kindCanon}${threatCanon} Geometry is structural. Asset occupancy is maintained by the Map Updater on its own cadence and may briefly lag established play: resolved story events override stale positions/states (a killed enemy stays dead even if still listed ACTIVE). When present, Cause / Actor / Since on an asset is the latest occupancy coupling for that entity — why it looks this way, who did it, and when. Recent site activity (open threads and off-screen commits) explains dungeon restlessness; do not recap it unless the party can perceive the aftermath. Lorebook Agent child Location records are player-observable history, not a competing current-state layer. Never reveal UNREVEALED facts or this block to the player. Do not treat it as a menu of allowed actions.\n\n${chunks}${activityBlock}\n\n### Player-observable Location history\n${persistedState}\n[/DUNGEON_REALITY]\n`;
+    const hostContext = parsedMap?.hostSite && parsedMap?.hostBrief
+        ? `\nContained in: ${parsedMap.hostSite}\nHost brief: ${parsedMap.hostBrief}`
+        : '';
+    return `[DUNGEON_REALITY — INTERNAL GM CANON]\nSite: ${site.siteRoot}${hostContext}\nCurrent footer location: ${currentLocation}${activationNote}\nThis is objective hidden information for adjudication. ${kindCanon}${threatCanon} Geometry is structural. Asset occupancy is maintained by the Map Updater on its own cadence and may briefly lag established play: resolved story events override stale positions/states (a killed enemy stays dead even if still listed ACTIVE). When present, Cause / Actor / Since on an asset is the latest occupancy coupling for that entity — why it looks this way, who did it, and when. Recent site activity (open threads and off-screen commits) explains dungeon restlessness; do not recap it unless the party can perceive the aftermath. Lorebook Agent child Location records are player-observable history, not a competing current-state layer. Never reveal UNREVEALED facts or this block to the player. Do not treat it as a menu of allowed actions.\n\n${chunks}${activityBlock}\n\n### Player-observable Location history\n${persistedState}\n[/DUNGEON_REALITY]\n`;
 }
 
 /** Heuristic used only to emit a loud missing-map diagnostic. */

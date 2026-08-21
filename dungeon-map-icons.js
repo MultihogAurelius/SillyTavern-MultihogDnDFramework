@@ -4,7 +4,7 @@
  * Knowledge is separate: player-facing views only show KNOWN/SUSPECTED.
  */
 
-const KIND_ORDER = ['CREATURE', 'GROUP', 'TRAP', 'HAZARD', 'ALARM', 'BARRIER', 'EFFECT', 'LOOT', 'OBJECT', 'OTHER'];
+const KIND_ORDER = ['CREATURE', 'GROUP', 'SUBDUNGEON', 'SUBINTERIOR', 'BUILDING', 'TRAP', 'HAZARD', 'ALARM', 'BARRIER', 'EFFECT', 'LOOT', 'OBJECT', 'OTHER'];
 
 const GONE_STATES = new Set(['DEAD', 'DESTROYED', 'TAKEN', 'REMOVED']);
 const SPENT_STATES = new Set(['TRIGGERED', 'EXHAUSTED', 'EXPIRED', 'CLEARED', 'DISMISSED']);
@@ -21,6 +21,9 @@ const KIND_ART = {
     BARRIER: new URL('./src/ui/SVG/barrier.svg', import.meta.url).href,
     EFFECT: new URL('./src/ui/SVG/effect.svg', import.meta.url).href,
     LOOT: new URL('./src/ui/SVG/open-treasure-chest.svg', import.meta.url).href,
+    BUILDING: new URL('./src/ui/SVG/building.svg', import.meta.url).href,
+    SUBDUNGEON: new URL('./src/ui/SVG/subdungeon.svg', import.meta.url).href,
+    SUBINTERIOR: new URL('./src/ui/SVG/subinterior.svg', import.meta.url).href,
     OBJECT: new URL('./src/ui/SVG/object.svg', import.meta.url).href,
     OTHER: new URL('./src/ui/SVG/other.svg', import.meta.url).href,
 };

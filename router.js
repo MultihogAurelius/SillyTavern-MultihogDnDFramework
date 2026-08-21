@@ -31,6 +31,7 @@ import {
     dungeonLabelsMatch,
     dungeonSiteRootsMatch,
     normalizeDungeonLabel,
+    normalizeMapSiteKind,
     extractDungeonMapSection,
     extractFooterLocation,
     findLatestDungeonLocation,
@@ -43,6 +44,7 @@ import {
     reconcileDungeonMapAreaKnowledge,
     replaceDungeonMapSection,
     resolveActiveDungeonSite,
+    resolveCurrentMapPlacement,
     serializeDungeonMapDocument,
     stripDungeonMapSection,
     collectDungeonMapHistorySnapshot,
@@ -50,6 +52,7 @@ import {
     DUNGEON_MAP_OPERATION_IDS_KEY,
 } from './dungeon-reality.js';
 import { recordLiveDungeonMapSnapshot } from './src/state/dungeon-map-history.js';
+import { ensureHostCoreMirror, stampHostedPeerDocument } from './map-hosting.js';
 import { clearEvolutionHistoryForSite, setSiteEvolutionIntervalOverride } from './map-evolution-lib.js';
 import {
     buildWorldProgressionLocationDossiers,
@@ -599,11 +602,71 @@ export async function syncDungeonMapsToLocationLorebook(chat, { capture = true }
     };
 }
 
+function rootEntryByExactSite(entries, site) {
+    return Object.values(entries || {}).find(entry => {
+        const label = String(entry?.comment || '').trim();
+        return label && !label.includes('::') && label === site;
+    }) || null;
+}
+
+function entryUidFromCompositeId(entryId) {
+    const value = String(entryId || '');
+    const separator = value.lastIndexOf('::');
+    return separator >= 0 ? value.slice(separator + 2) : value;
+}
+
+function allocateHostedAssetId(document, name) {
+    const used = new Set((document.assets || []).map(asset => asset.id));
+    const base = `subsite-${mapTransactionSignature(String(name || '')).slice(0, 8)}`;
+    if (!used.has(base)) return base;
+    let suffix = 2;
+    while (used.has(`${base}-${suffix}`)) suffix++;
+    return `${base}-${suffix}`;
+}
+
+function promoteSettlementPeerAsset(hostDocument, site, expectedKind, areaId, premise) {
+    if (normalizeMapSiteKind(hostDocument.kind) !== 'SETTLEMENT') {
+        throw new Error(`Host "${hostDocument.site}" is not a SETTLEMENT map.`);
+    }
+    const area = (hostDocument.areas || []).find(item => item.id === areaId);
+    if (!area) throw new Error(`Could not resolve the host district for "${site}".`);
+    const matches = (hostDocument.assets || []).filter(asset => String(asset.name || '').trim() === site && asset.state !== 'REMOVED');
+    if (matches.length > 1) throw new Error(`Settlement contains more than one active asset named "${site}".`);
+    let asset = matches[0] || null;
+    if (asset) {
+        if (![expectedKind, 'BUILDING', 'OBJECT'].includes(asset.kind)) {
+            throw new Error(`Settlement asset "${site}" is ${asset.kind}; expected ${expectedKind}.`);
+        }
+        asset.kind = expectedKind;
+        asset.location = area.id;
+    } else {
+        asset = {
+            id: allocateHostedAssetId(hostDocument, site),
+            kind: expectedKind,
+            name: site,
+            location: area.id,
+            state: 'ACTIVE',
+            knowledge: 'KNOWN',
+            detail: String(premise || '').trim(),
+            origin: 'NARRATOR_ESTABLISHED',
+        };
+        hostDocument.assets.push(asset);
+    }
+    return asset;
+}
+
 /**
  * Atomically attach a validated Map Architect document to its root Location.
  * Existing maps always win: concurrent/repeated tool calls never overwrite canon.
  */
-export async function persistArchitectDungeonMap(siteRoot, mapDocument, { allowOffsite = false, requireNew = false, locationKeys = null, locationCore = '' } = {}) {
+export async function persistArchitectDungeonMap(siteRoot, mapDocument, {
+    allowOffsite = false,
+    requireNew = false,
+    locationKeys = null,
+    locationCore = '',
+    includeManifest = [],
+    hostContext = null,
+} = {}) {
     const ctx = SillyTavern.getContext();
     const settings = getSettings();
     const prefix = getLivePrefix();
@@ -614,6 +677,9 @@ export async function persistArchitectDungeonMap(siteRoot, mapDocument, { allowO
     const bookName = `${prefix}_Locations`;
     const bookKnown = await isWorldInfoBookKnown(bookName, ctx);
     let bookData = bookKnown ? await loadWorldInfoFresh(bookName, ctx) : null;
+    // Work on a detached snapshot so validation or a failed backend save cannot
+    // leak partial host/promotion edits through an old cache-backed loader.
+    if (bookData) bookData = cloneRouterValue(bookData, null);
     if (!bookData) {
         if (bookKnown) {
             throw new Error(`Refusing to replace existing Locations lorebook "${bookName}" because it could not be loaded.`);
@@ -632,18 +698,23 @@ export async function persistArchitectDungeonMap(siteRoot, mapDocument, { allowO
         const label = String(entry?.comment || '').trim();
         return label && !label.includes('::') && dungeonSiteRootsMatch(label, site);
     });
-    const existing = rootEntry ? getDungeonMapAttachment(rootEntry) : null;
-    if (existing) {
+    const existingAttachment = rootEntry ? getDungeonMapAttachment(rootEntry) : null;
+    if (existingAttachment) {
         if (requireNew) {
             throw new Error(`A mapped location named "${site}" already exists.`);
         }
-        return {
-            bookName,
-            entryId: `${bookName}::${rootEntry.uid}`,
-            created: false,
-            existing: true,
-            document: parseDungeonMapDocument(existing.content, site).document,
-        };
+        if (Array.isArray(includeManifest) && includeManifest.length) {
+            throw new Error('include[] cannot modify a settlement that already has a stored map.');
+        }
+        if (!hostContext) {
+            return {
+                bookName,
+                entryId: `${bookName}::${rootEntry.uid}`,
+                created: false,
+                existing: true,
+                document: parseDungeonMapDocument(existingAttachment.content, site).document,
+            };
+        }
     }
 
     if (requireNew && rootEntry) {
@@ -651,7 +722,7 @@ export async function persistArchitectDungeonMap(siteRoot, mapDocument, { allowO
     }
 
     const currentLocation = findLatestDungeonLocation(ctx.chat || []);
-    if (!rootEntry && currentLocation && !locationContainsSiteRoot(currentLocation, site) && !allowOffsite) {
+    if (!rootEntry && currentLocation && !locationContainsSiteRoot(currentLocation, site) && !allowOffsite && !hostContext) {
         throw new Error(mapSiteFooterMismatchHint(site, currentLocation));
     }
 
@@ -686,11 +757,74 @@ export async function persistArchitectDungeonMap(siteRoot, mapDocument, { allowO
         bookData.entries[nextUid] = rootEntry;
     }
 
-    if (!attachDungeonMapToLocationEntry(rootEntry, {
-        siteRoot: site,
-        content: serializeDungeonMapDocument(mapDocument),
-    })) {
-        throw new Error(`Could not attach the generated map to "${site}".`);
+    let persistedDocument = existingAttachment
+        ? parseDungeonMapDocument(existingAttachment.content, site).document
+        : JSON.parse(JSON.stringify(mapDocument));
+
+    if (hostContext) {
+        const hostUid = entryUidFromCompositeId(hostContext.hostEntryId);
+        const hostEntry = bookData.entries?.[hostUid];
+        const hostAttachment = getDungeonMapAttachment(hostEntry);
+        if (!hostEntry || !hostAttachment || String(hostEntry.comment || '').trim() !== hostContext.hostSite) {
+            throw new Error(`Host settlement "${hostContext.hostSite}" changed before the peer could be saved.`);
+        }
+        const hostDocument = parseDungeonMapDocument(hostAttachment.content, hostContext.hostSite).document;
+        const hostAsset = promoteSettlementPeerAsset(
+            hostDocument,
+            site,
+            hostContext.expectedAssetKind,
+            hostContext.hostAreaId,
+            hostContext.premise,
+        );
+        const peerKind = normalizeMapSiteKind(persistedDocument.kind);
+        const expectedPeerKind = hostContext.expectedAssetKind === 'SUBINTERIOR' ? 'INTERIOR' : 'DUNGEON';
+        if (peerKind !== expectedPeerKind) {
+            throw new Error(`${hostContext.expectedAssetKind} requires a ${expectedPeerKind} peer map, received ${peerKind}.`);
+        }
+        persistedDocument = stampHostedPeerDocument(persistedDocument, hostDocument, hostAsset);
+        hostEntry.content = replaceDungeonMapSection(hostEntry.content, serializeDungeonMapDocument(hostDocument));
+        hostEntry.disable = true;
+    }
+
+    if (existingAttachment) {
+        rootEntry.content = ensureHostCoreMirror(rootEntry.content, persistedDocument.hostSite, persistedDocument.hostBrief);
+        rootEntry.content = replaceDungeonMapSection(rootEntry.content, serializeDungeonMapDocument(persistedDocument));
+    } else {
+        if (persistedDocument.hostSite && persistedDocument.hostBrief) {
+            rootEntry.content = ensureHostCoreMirror(rootEntry.content, persistedDocument.hostSite, persistedDocument.hostBrief);
+        }
+        if (!attachDungeonMapToLocationEntry(rootEntry, {
+            siteRoot: site,
+            content: serializeDungeonMapDocument(persistedDocument),
+        })) {
+            throw new Error(`Could not attach the generated map to "${site}".`);
+        }
+    }
+
+    const includes = Array.isArray(includeManifest) ? includeManifest : [];
+    if (includes.length && normalizeMapSiteKind(persistedDocument.kind) !== 'SETTLEMENT') {
+        throw new Error('include[] is valid only for a new SETTLEMENT map.');
+    }
+    for (const included of includes) {
+        const peerEntry = rootEntryByExactSite(bookData.entries, String(included.site || '').trim());
+        const lockedUid = entryUidFromCompositeId(included.entryId);
+        if (!peerEntry || String(peerEntry.uid) !== String(lockedUid)) {
+            throw new Error(`Included peer "${included.site}" changed identity before the settlement could be saved.`);
+        }
+        const peerAttachment = getDungeonMapAttachment(peerEntry);
+        if (!peerAttachment) throw new Error(`Included peer "${included.site}" no longer exists.`);
+        const peerDocument = parseDungeonMapDocument(peerAttachment.content, included.site).document;
+        if (peerDocument.kind !== included.kind || !['DUNGEON', 'INTERIOR'].includes(peerDocument.kind)) {
+            throw new Error(`Included peer "${included.site}" changed kind before the settlement could be saved.`);
+        }
+        const matchingAssets = (persistedDocument.assets || []).filter(asset => asset.name === included.site && asset.kind === included.assetKind);
+        if (matchingAssets.length !== 1) {
+            throw new Error(`Settlement must contain exactly one ${included.assetKind} asset named "${included.site}".`);
+        }
+        const stamped = stampHostedPeerDocument(peerDocument, persistedDocument, matchingAssets[0]);
+        peerEntry.content = ensureHostCoreMirror(peerEntry.content, stamped.hostSite, stamped.hostBrief);
+        peerEntry.content = replaceDungeonMapSection(peerEntry.content, serializeDungeonMapDocument(stamped));
+        peerEntry.disable = true;
     }
     rootEntry.disable = true;
     await saveWorldInfoSnapshot(bookName, bookData, ctx, 'Map Architect persistence');
@@ -714,9 +848,9 @@ export async function persistArchitectDungeonMap(siteRoot, mapDocument, { allowO
     return {
         bookName,
         entryId: `${bookName}::${rootEntry.uid}`,
-        created: true,
-        existing: false,
-        document: mapDocument,
+        created: !existingAttachment,
+        existing: !!existingAttachment,
+        document: persistedDocument,
     };
 }
 
@@ -744,7 +878,16 @@ export async function persistManualDungeonMapDocument(siteRoot, mapDocument) {
         return label && !label.includes('::') && dungeonSiteRootsMatch(label, site);
     });
     if (!rootEntry) throw new Error(`No Location root found for "${site}".`);
-    if (!getDungeonMapAttachment(rootEntry)) throw new Error(`"${site}" has no private map to edit.`);
+    const existingAttachment = getDungeonMapAttachment(rootEntry);
+    if (!existingAttachment) throw new Error(`"${site}" has no private map to edit.`);
+    const existingDocument = parseDungeonMapDocument(existingAttachment.content, site).document;
+    const oldHost = String(existingDocument.hostSite || '').trim();
+    const newHost = String(mapDocument.hostSite || '').trim();
+    const oldBrief = String(existingDocument.hostBrief || '').trim();
+    const newBrief = String(mapDocument.hostBrief || '').trim();
+    if (oldHost !== newHost || oldBrief !== newBrief) {
+        throw new Error('hostSite/hostBrief are runtime-owned and cannot be added, removed, edited, or re-hosted in the manual JSON editor.');
+    }
 
     if (migrateDungeonMapAttachmentToContent(rootEntry)) {
         // legacy extension blob upgraded to [MAP] in content

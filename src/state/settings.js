@@ -22,6 +22,8 @@ import {
 import { migrateChatSetupCatalogs } from './chat-setup.js';
 import { LOREBOOK_RUNTIME_FRAGMENT_KEYS } from './lorebook-runtime-fragments.js';
 import { DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT } from '../../map-architect-prompt.js';
+import { DEFAULT_MAP_UPDATER_SYSTEM_PROMPT } from '../../map-updater-prompt.js';
+import { DEFAULT_MAP_EVOLUTION_SYSTEM_PROMPT } from '../../map-evolution-prompt.js';
 
 // Re-entrancy guard: some migration blocks below call buildNpcInstruction()/
 // buildLocInstruction()/buildFacInstruction(), which themselves call
@@ -31,6 +33,16 @@ import { DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT } from '../../map-architect-prompt.
 // re-running the same migration block over and over → infinite recursion /
 // stack overflow that hangs the page on load. See CHANGELOG for details.
 let _gettingSettings = false;
+
+function promptSignature(value) {
+    const source = String(value || '');
+    let hash = 0x811c9dc5;
+    for (let index = 0; index < source.length; index++) {
+        hash ^= source.charCodeAt(index);
+        hash = Math.imul(hash, 0x01000193);
+    }
+    return `${source.length}:${(hash >>> 0).toString(16).padStart(8, '0')}`;
+}
 
 export function getSettings() {
     const { extensionSettings } = SillyTavern.getContext();
@@ -800,6 +812,30 @@ function getSettingsInternal(extensionSettings) {
             s.mapArchitectSystemPrompt = DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT;
         }
         s.settingsVersion = '8.27.0';
+    }
+
+    // 2026.8.22.1: nested-site taxonomy. Replace only the byte-identical shipped
+    // prompts from the preceding release; customized prompts remain untouched.
+    if (isOlderThan(s.settingsVersion, '2026.8.22.1')) {
+        if (promptSignature(s.mapArchitectSystemPrompt) === '14870:8b5acf86') {
+            s.mapArchitectSystemPrompt = DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT;
+        }
+        if (promptSignature(s.mapUpdaterSystemPrompt) === '9025:d21f2f49') {
+            s.mapUpdaterSystemPrompt = DEFAULT_MAP_UPDATER_SYSTEM_PROMPT;
+        }
+        if (promptSignature(s.mapEvolutionSystemPrompt) === '19340:f2971ff8') {
+            s.mapEvolutionSystemPrompt = DEFAULT_MAP_EVOLUTION_SYSTEM_PROMPT;
+        }
+        s.settingsVersion = '2026.8.22.1';
+    }
+
+    // 2026.8.22.2: let Map Architect sparingly seed narratively justified
+    // settlement peers. Replace only the untouched preceding default.
+    if (isOlderThan(s.settingsVersion, '2026.8.22.2')) {
+        if (promptSignature(s.mapArchitectSystemPrompt) === '15245:3f89155f') {
+            s.mapArchitectSystemPrompt = DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT;
+        }
+        s.settingsVersion = '2026.8.22.2';
     }
 
     // Stamp factory version even when a release has no field rewrites

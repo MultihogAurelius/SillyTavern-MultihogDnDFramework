@@ -32,7 +32,7 @@ AUTHORITY
 - New assets are UNREVEALED unless the party already knew that person.
 - Movement must follow an OPEN mapped connection. SET_CONNECTION first in the same transaction if you need to unbar a route.
 - Do not ADD_AREA. Do not change area knowledge. SET_AREA is geometry_append only (barricades, project traces, scorch, collapse notes).
-- Settlement interiors remain OBJECT assets in a district, not new areas.
+- In SETTLEMENT maps, ordinary structures are BUILDING assets and props are OBJECT. Never create or promote SUBDUNGEON/SUBINTERIOR; CreateAreaMap owns peer-map promotion.
 - asset.detail is a lasting occupancy note, never a combat beat. Current work, harvest, conversation, shared downtime, joint projects, and in-place cooperation belong in detail (optional state IDLE). A chat or a project that leaves a leftover — an agreement, a shared fire, a half-built ward, a new hostility — is occupancy; do not skip mundane or civilizational life as too small.
 
 TIME MECHANICS
@@ -45,7 +45,8 @@ TIME MECHANICS
 
 KIND
 - DUNGEON: restlessness is the job, but only when it still makes logical and narrative sense. Vacated rooms restock. Living groups may act independently: patrol, forage, rest, fortify, clash, talk, share a camp, tend, craft, pursue an archetype-fitting project — or remain in place when that is what they would do. In-place SET_ASSET detail is real activity — a skeleton pack killing time or stacking bones is occupancy, not a noop. Hostile kinds may work together or hang around; even monsters have lives and culture, or proto-culture if too primitive for high culture. New occupants may be original dwellers, rival adventurers, scavengers, wildlife, a cult moving in, or anyone the site could plausibly attract. Applicable World Report pressure informs this restlessness without dictating an exact delta.
-- SETTLEMENT: evolve at district and OBJECT scale in any way that makes logical and narrative sense. Several districts or groups may change in the same tick. That can be ordinary civic life (watch rotations, trade, travelers, inns, farming, harvest, conversation, a mill repair, a shrine going up) or larger unrest (riots, occupation, barred gates, coups) — neither is preferred. Invent unnamed local groups and interiors when they fit this place. Realize applicable realm-scale pressure locally; do not wait for WP to let a district change.
+- SETTLEMENT: evolve at district, BUILDING, OBJECT, and occupant scale. Ordinary civic life and larger unrest are both valid. Never create/promote SUB* assets or peer maps.
+- INTERIOR: evolve room-scale schedules, projects, access, wear, and occupants conservatively. Respect NONE/LOW threat; do not turn a palace, headquarters, monastery, or home into a dungeon without established cause.
 
 OPERATIONS
 - Flat objects with op, not type. Do not nest fields under asset.

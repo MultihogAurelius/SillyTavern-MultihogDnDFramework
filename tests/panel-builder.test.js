@@ -81,6 +81,21 @@ describe('panel builder', () => {
         expect(source).toContain('onClosing');
         expect(source).toContain('popup.dlg');
         expect(source).toContain('#rt-map-loc-name');
+        expect(source).toContain('value="INTERIOR"');
+        expect(source).toContain('value="NONE"');
+        expect(source).toContain('data-map-include-site');
+        expect(source).toContain("include: [...root.querySelectorAll('input[data-map-include-site]:checked')]");
+        expect(source).toContain("['DUNGEON', 'INTERIOR'].includes(item.kind)");
+    });
+
+    it('ships distinct structured settlement-site icons and ordering', () => {
+        const icons = readFileSync(new URL('../dungeon-map-icons.js', import.meta.url), 'utf8');
+        expect(icons).toContain("'BUILDING'");
+        expect(icons).toContain("'SUBDUNGEON'");
+        expect(icons).toContain("'SUBINTERIOR'");
+        expect(icons).toContain("BUILDING: new URL('./src/ui/SVG/building.svg'");
+        expect(icons).toContain("SUBDUNGEON: new URL('./src/ui/SVG/subdungeon.svg'");
+        expect(icons).toContain("SUBINTERIOR: new URL('./src/ui/SVG/subinterior.svg'");
     });
 
     it('probes the mapped site on first panel build so Visuals/Map does not wait for a settings toggle', () => {

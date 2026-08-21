@@ -84,8 +84,9 @@ describe('Map Evolution', () => {
         expect(DEFAULT_MAP_EVOLUTION_SYSTEM_PROMPT).toContain('logical and narrative sense');
         expect(DEFAULT_MAP_EVOLUTION_SYSTEM_PROMPT).toContain('ACCUMULATED EVOLUTION BACKLOG');
         expect(DEFAULT_MAP_EVOLUTION_SYSTEM_PROMPT).toContain('frequent short intervals have not been treated as independent resets');
-        expect(DEFAULT_MAP_EVOLUTION_SYSTEM_PROMPT).toContain('neither is preferred');
-        expect(DEFAULT_MAP_EVOLUTION_SYSTEM_PROMPT).toContain('or larger unrest');
+        expect(DEFAULT_MAP_EVOLUTION_SYSTEM_PROMPT).toContain('CreateAreaMap owns peer-map promotion');
+        expect(DEFAULT_MAP_EVOLUTION_SYSTEM_PROMPT).toContain('INTERIOR: evolve room-scale');
+        expect(DEFAULT_MAP_EVOLUTION_SYSTEM_PROMPT).toContain('and larger unrest');
         expect(DEFAULT_MAP_EVOLUTION_SYSTEM_PROMPT).not.toMatch(/SETTLEMENT: restlessness/);
         expect(DEFAULT_MAP_EVOLUTION_SYSTEM_PROMPT).not.toContain('not chaos by default');
         expect(DEFAULT_MAP_EVOLUTION_SYSTEM_PROMPT).not.toContain('Do not invent raids');

@@ -2,6 +2,12 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.22.1] - 2026-08-22
+
+### Changed
+- **Persistent Maps**: added room-scale `INTERIOR` maps, settlement `BUILDING` / `SUBDUNGEON` / `SUBINTERIOR` assets, creation-time peer absorption, and atomic nested-site promotion with host/exit context. Existing `OBJECT` buildings and peaceful `DUNGEON` maps remain compatible.
+- **Map Architect**: settlement generation may now sparingly seed narratively justified `SUBDUNGEON` / `SUBINTERIOR` sites for future mapping, while ordinary structures continue to use `BUILDING`.
+
 ## [2026.8.22] - 2026-08-21
 
 ### Changed

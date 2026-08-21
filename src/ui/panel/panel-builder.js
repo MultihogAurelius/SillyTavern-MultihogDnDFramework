@@ -28,8 +28,9 @@ const MAPS_GUIDE_HTML = `
         <p>It also means that you can go away and come back later, and the collapsed passage is still there to be cleared. It makes everything very real and immersive.</p>
         <p>Even better, while you’re away, Map Evolution may run and bring something like a rival adventuring group to the same passage and they may begin to clear it for you or something. They may blow it up with explosives, and you may come back to an open passage! The reason for the opened path is recorded by Map Evolution, so the GM knows why the passage is open. And you’ll likely find the adventuring group inside, which will make for a very interesting encounter indeed. “Wait, you opened the collapsed path <em>FOR me?</em>”</p>
         <h3 style="margin:18px 0 6px;color:#bae6fd;">How Are They Created and Injected in Context?</h3>
-        <p>The GM creates maps automatically when you enter a dungeon (kind DUNGEON) or a town (kind SETTLEMENT) by calling the Map Architect. It does not create maps for wilderness or insignificant areas. This is so that the number of maps remains sensible. Not everything needs to be a map.</p>
-        <p>Maps are injected while you’re inside the mapped location, or for the next GM response when your message contains the exact complete location name. Partial names, aliases, and fuzzy matches do not activate a map. This keeps large map context scoped while still grounding the GM when you announce travel to a mapped place.</p>
+        <p>The GM creates a district-scale SETTLEMENT map for a town or city, a room-scale DUNGEON map for a significant dangerous complex, or a room-scale INTERIOR map for a significant low-risk multi-room site. Ordinary shops, inns, chapels, and homes are BUILDING assets on their settlement district; props and set-dressing are OBJECT assets. Wilderness and insignificant places are not mapped.</p>
+        <p>A settlement may absorb existing DUNGEON or INTERIOR maps when it is first created. The settlement receives matching SUBDUNGEON or SUBINTERIOR assets, while each peer keeps its independent room graph and remembers its host. Calling CreateAreaMap for an exact settlement building or nested site is the explicit promotion signal; Map Updater and Map Evolution never guess that promotion.</p>
+        <p>The deepest exact footer match activates: a mapped nested peer wins over its host, while a BUILDING or unmapped SUB site keeps the settlement active. Leaving the peer reactivates the settlement. Partial names, aliases, and fuzzy matches do not activate a map.</p>
         <p>You can also create maps manually from the “+ Add Mapped Location” button in the Locations header, or you can press the “+ MAP” button on any Location lore entry header.</p>
         <h3 style="margin:18px 0 6px;color:#bae6fd;">Editing Maps</h3>
         <p>You can edit maps directly by editing the JSON object. Open a map, then click on “&lt;/&gt; Raw JSON”. I will later add a proper graphical map editor. For now this is the only way.</p>
@@ -167,7 +168,7 @@ async function populateMapCreationContextOptions(root, ctx) {
     }
 }
 
-async function promptAndRunLorebookAgentMap(siteRoot, locationContent, escapeHtml, { runMapArchitect, inferMapArchitectArgs, lookbackDefault } = {}) {
+async function promptAndRunLorebookAgentMap(siteRoot, locationContent, escapeHtml, { runMapArchitect, inferMapArchitectArgs, listMappedEvolutionSites, lookbackDefault } = {}) {
     const site = String(siteRoot || '').trim();
     if (!site) return { ok: false, error: 'No location root to map.' };
     const ctx = SillyTavern.getContext();
@@ -178,6 +179,13 @@ async function promptAndRunLorebookAgentMap(siteRoot, locationContent, escapeHtm
     const premiseDefault = loreEntry
         || `${site} is a location root requested for a Persistent Map. Stay consistent with established story.`;
     const lookbackValue = Math.max(0, Math.min(100, Number(lookbackDefault) || 12));
+    const mappedSites = typeof listMappedEvolutionSites === 'function'
+        ? await listMappedEvolutionSites().catch(() => [])
+        : [];
+    const eligibleIncludes = mappedSites.filter(item => ['DUNGEON', 'INTERIOR'].includes(item.kind) && !item.hostSite && item.siteRoot !== site);
+    const includeOptions = eligibleIncludes.length
+        ? eligibleIncludes.map(item => `<label style="display:flex;gap:6px;align-items:center;"><input type="checkbox" data-map-include-site="${escapeHtml(item.siteRoot)}"> ${escapeHtml(item.siteRoot)} <span style="opacity:.6">(${item.kind})</span></label>`).join('')
+        : '<span style="opacity:.6">No eligible DUNGEON/INTERIOR peers.</span>';
     const html = `
         <div style="text-align:left;font-size:0.9em;line-height:1.4;">
             <p>Create a private map for <b>${escapeHtml(site)}</b> with Map Architect. The narrator is not involved.</p>
@@ -194,8 +202,9 @@ async function promptAndRunLorebookAgentMap(siteRoot, locationContent, escapeHtm
             </div>
             <div id="rt-map-create-manual" hidden>
                 <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;">
-                    <label style="display:flex;gap:6px;align-items:center;"><input type="radio" name="rt-map-create-kind" value="SETTLEMENT" checked> Settlement</label>
-                    <label style="display:flex;gap:6px;align-items:center;"><input type="radio" name="rt-map-create-kind" value="DUNGEON"> Dungeon</label>
+                    <label style="display:flex;gap:6px;align-items:center;"><input type="radio" name="rt-map-create-kind" value="SETTLEMENT" checked onchange="var t=document.getElementById('rt-map-create-threat');if(t)t.value='MODERATE'"> Settlement</label>
+                    <label style="display:flex;gap:6px;align-items:center;"><input type="radio" name="rt-map-create-kind" value="DUNGEON" onchange="var t=document.getElementById('rt-map-create-threat');if(t)t.value='HIGH'"> Dungeon</label>
+                    <label style="display:flex;gap:6px;align-items:center;"><input type="radio" name="rt-map-create-kind" value="INTERIOR" onchange="var t=document.getElementById('rt-map-create-threat');if(t)t.value='LOW'"> Interior</label>
                 </div>
                 <label style="display:block;margin-top:8px;">Entrance
                     <input id="rt-map-create-entrance" type="text" value="Entrance" style="width:100%;margin-top:3px;box-sizing:border-box;">
@@ -209,8 +218,9 @@ async function promptAndRunLorebookAgentMap(siteRoot, locationContent, escapeHtm
                         </select>
                     </label>
                     <label style="flex:1;">Threat
-                        <select id="rt-map-create-threat" style="width:100%;margin-top:3px;">
-                            <option value="LOW">LOW</option>
+                         <select id="rt-map-create-threat" style="width:100%;margin-top:3px;">
+                             <option value="NONE">NONE</option>
+                             <option value="LOW">LOW</option>
                             <option value="MODERATE" selected>MODERATE</option>
                             <option value="HIGH">HIGH</option>
                             <option value="DEADLY">DEADLY</option>
@@ -220,6 +230,10 @@ async function promptAndRunLorebookAgentMap(siteRoot, locationContent, escapeHtm
                 <label style="display:block;margin-top:8px;">Premise
                     <textarea id="rt-map-create-premise" style="width:100%;height:88px;margin-top:3px;box-sizing:border-box;resize:vertical;">${escapeHtml(premiseDefault)}</textarea>
                 </label>
+                <details style="margin-top:8px;">
+                    <summary style="cursor:pointer;">Absorb existing mapped peers (SETTLEMENT only)</summary>
+                    <div style="display:flex;flex-direction:column;gap:4px;margin-top:6px;">${includeOptions}</div>
+                </details>
             </div>
             <details style="margin-top:10px;">
                 <summary style="cursor:pointer;">Optional reference context</summary>
@@ -253,6 +267,8 @@ async function promptAndRunLorebookAgentMap(siteRoot, locationContent, escapeHtm
                     characterCards: [...root.querySelectorAll('input[data-map-context-character-card]:checked')]
                         .map(input => selectedCharacterCardReference(ctx.characters?.[Number(input.dataset.mapContextCharacterCard)]))
                         .filter(Boolean),
+                    include: [...root.querySelectorAll('input[data-map-include-site]:checked')]
+                        .map(input => String(input.dataset.mapIncludeSite || '').trim()).filter(Boolean),
                 };
             }
             return true;
@@ -271,6 +287,7 @@ async function promptAndRunLorebookAgentMap(siteRoot, locationContent, escapeHtm
                 scale: form.scale,
                 threat: form.threat,
                 premise: form.premise,
+                include: form.include,
                 allowOffsite: true,
                 lorebookNames: form.lorebookNames,
                 characterCards: form.characterCards,
@@ -307,11 +324,19 @@ function parseKeywordInput(value) {
     return String(value || '').split(/[,;\n]/).map(part => part.trim()).filter(Boolean);
 }
 
-async function promptAndCreateMappedLocation({ runMapArchitect, inferMapArchitectArgs, lookbackDefault } = {}) {
+async function promptAndCreateMappedLocation({ runMapArchitect, inferMapArchitectArgs, listMappedEvolutionSites, escapeHtml, lookbackDefault } = {}) {
     const ctx = SillyTavern.getContext();
     const { Popup } = ctx || {};
     if (!Popup?.show?.confirm) return { ok: false, error: 'Popup API is not available.' };
     const lookbackValue = Math.max(0, Math.min(100, Number(lookbackDefault) || 12));
+    const mappedSites = typeof listMappedEvolutionSites === 'function'
+        ? await listMappedEvolutionSites().catch(() => [])
+        : [];
+    const eligibleIncludes = mappedSites.filter(item => ['DUNGEON', 'INTERIOR'].includes(item.kind) && !item.hostSite);
+    const safe = typeof escapeHtml === 'function' ? escapeHtml : value => String(value || '');
+    const includeOptions = eligibleIncludes.length
+        ? eligibleIncludes.map(item => `<label style="display:flex;gap:6px;align-items:center;"><input type="checkbox" data-map-include-site="${safe(item.siteRoot)}"> ${safe(item.siteRoot)} <span style="opacity:.6">(${item.kind})</span></label>`).join('')
+        : '<span style="opacity:.6">No eligible DUNGEON/INTERIOR peers.</span>';
 
     const html = `
         <div style="text-align:left;font-size:0.9em;line-height:1.4;">
@@ -338,8 +363,9 @@ async function promptAndCreateMappedLocation({ runMapArchitect, inferMapArchitec
                 </label>
                 <p style="margin:4px 0 0;opacity:0.65;font-size:0.85em;">The location name is added automatically. Max 6 total.</p>
                 <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;">
-                    <label style="display:flex;gap:6px;align-items:center;"><input type="radio" name="rt-map-loc-kind" value="SETTLEMENT" checked> Settlement</label>
-                    <label style="display:flex;gap:6px;align-items:center;"><input type="radio" name="rt-map-loc-kind" value="DUNGEON"> Dungeon</label>
+                    <label style="display:flex;gap:6px;align-items:center;"><input type="radio" name="rt-map-loc-kind" value="SETTLEMENT" checked onchange="var t=document.getElementById('rt-map-loc-threat');if(t)t.value='MODERATE'"> Settlement</label>
+                    <label style="display:flex;gap:6px;align-items:center;"><input type="radio" name="rt-map-loc-kind" value="DUNGEON" onchange="var t=document.getElementById('rt-map-loc-threat');if(t)t.value='HIGH'"> Dungeon</label>
+                    <label style="display:flex;gap:6px;align-items:center;"><input type="radio" name="rt-map-loc-kind" value="INTERIOR" onchange="var t=document.getElementById('rt-map-loc-threat');if(t)t.value='LOW'"> Interior</label>
                 </div>
                 <label style="display:block;margin-top:8px;">Entrance
                     <input id="rt-map-loc-entrance" type="text" value="Entrance" style="width:100%;margin-top:3px;box-sizing:border-box;">
@@ -353,17 +379,22 @@ async function promptAndCreateMappedLocation({ runMapArchitect, inferMapArchitec
                         </select>
                     </label>
                     <label style="flex:1;">Threat
-                        <select id="rt-map-loc-threat" style="width:100%;margin-top:3px;">
-                            <option value="LOW">LOW</option>
+                         <select id="rt-map-loc-threat" style="width:100%;margin-top:3px;">
+                             <option value="NONE">NONE</option>
+                             <option value="LOW">LOW</option>
                             <option value="MODERATE" selected>MODERATE</option>
                             <option value="HIGH">HIGH</option>
                             <option value="DEADLY">DEADLY</option>
                         </select>
                     </label>
                 </div>
-                <label style="display:block;margin-top:8px;">Premise
+                 <label style="display:block;margin-top:8px;">Premise
                     <textarea id="rt-map-loc-premise" placeholder="Established facts for CORE and the map" style="width:100%;height:88px;margin-top:3px;box-sizing:border-box;resize:vertical;"></textarea>
-                </label>
+                 </label>
+                 <details style="margin-top:8px;">
+                     <summary style="cursor:pointer;">Absorb existing mapped peers (SETTLEMENT only)</summary>
+                     <div style="display:flex;flex-direction:column;gap:4px;margin-top:6px;">${includeOptions}</div>
+                 </details>
             </div>
             <details style="margin-top:10px;">
                 <summary style="cursor:pointer;">Optional reference context</summary>
@@ -400,6 +431,8 @@ async function promptAndCreateMappedLocation({ runMapArchitect, inferMapArchitec
                     scale: popupValue(root, '#rt-map-loc-scale', 'MEDIUM').toUpperCase(),
                     threat: popupValue(root, '#rt-map-loc-threat', defaultMapSiteThreat(kind)).toUpperCase(),
                     premise: popupValue(root, '#rt-map-loc-premise'),
+                    include: [...root.querySelectorAll('input[data-map-include-site]:checked')]
+                        .map(input => String(input.dataset.mapIncludeSite || '').trim()).filter(Boolean),
                 };
             }
             return true;
@@ -423,6 +456,7 @@ async function promptAndCreateMappedLocation({ runMapArchitect, inferMapArchitec
                 scale: form.scale,
                 threat: form.threat,
                 premise: form.premise,
+                include: form.include,
                 allowOffsite: true,
                 requireNew: true,
                 locationKeys: form.locationKeys,
@@ -2376,9 +2410,11 @@ export function createPanel(dependencies) {
                                         addMappedBtn.disabled = true;
                                         try {
                                             const choice = await promptAndCreateMappedLocation({
-                                                runMapArchitect,
-                                                inferMapArchitectArgs,
-                                                lookbackDefault: getSettings()?.mapArchitectLookback,
+                                                 runMapArchitect,
+                                                 inferMapArchitectArgs,
+                                                 listMappedEvolutionSites,
+                                                 escapeHtml,
+                                                 lookbackDefault: getSettings()?.mapArchitectLookback,
                                             });
                                             if (choice?.cancelled) return;
                                             if (choice?.ok) {
@@ -3698,6 +3734,7 @@ export function createPanel(dependencies) {
                                                     {
                                                         runMapArchitect,
                                                         inferMapArchitectArgs,
+                                                        listMappedEvolutionSites,
                                                         lookbackDefault: getSettings()?.mapArchitectLookback,
                                                     },
                                                 );

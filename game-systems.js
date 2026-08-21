@@ -347,7 +347,7 @@ const NARRATOR_TOGGLE_IDS = {
     dungeon_reality_and_hidden_mapping: 'rpg_sysprompt_mod_dungeon_reality_and_hidden_mapping',
 };
 
-const LOCATION_MAPPING_TOGGLE_TITLE = 'Alpha: builds a hidden location map before exploring a dungeon/ruin (room-scale) or town/city (district-scale). New maps use CreateAreaMap (function calling) or the text-command opener below. Expect sharp edges.';
+const LOCATION_MAPPING_TOGGLE_TITLE = 'Alpha: builds persistent district-scale settlements and room-scale dungeons or significant interiors. Settlement buildings remain assets unless CreateAreaMap explicitly promotes them. Expect sharp edges.';
 
 export function isSectionUnlocked(settings, tag) {
     return (settings.customSyspromptLibrary || []).some(p =>
