@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.24.1] - 2026-08-22
+
+### Changed
+- **Map Updater streetscape observation**: clearly identified existing UNREVEALED/SUSPECTED BUILDING/OBJECT landmarks become `KNOWN` from outside observation without clearing `notEntered`.
+
 ## [2026.8.24] - 2026-08-22
 
 ### Changed

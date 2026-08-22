@@ -163,6 +163,9 @@ describe('Map Updater', () => {
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('Positional footer tails');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('behind the general store');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('exterior-relative footer phrases');
+        expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('Streetscape observation');
+        expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('newly observed landmarks');
+        expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('clearly observed UNREVEALED landmarks become KNOWN without clearing notEntered');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('"op":"ADD_ASSET"');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('"area_id":"shrine-quarter"');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('Never write {"type":"ADD_ASSET","asset":{...}}');
@@ -176,6 +179,7 @@ describe('Map Updater', () => {
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('A KNOWN or SUSPECTED asset reveals its effective containing area');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('notEntered:false');
         expect(updater).toContain('Positional tails such as "behind the general store"');
+        expect(updater).toContain('SET_ASSET knowledge KNOWN on each match without clearing notEntered');
         expect(updater).toContain('Exterior-relative phrasing');
         expect(updater).toContain('formatPartyRosterForMapUpdater');
         expect(updater).toContain('## CURRENT IN-WORLD TIME (AUTHORITATIVE)');
