@@ -853,6 +853,15 @@ function getSettingsInternal(extensionSettings) {
         s.settingsVersion = '2026.8.22.3';
     }
 
+    // 2026.8.23.1: keep private Map Architect premise facts from leaking into
+    // initial player knowledge. Replace only the untouched preceding default.
+    if (isOlderThan(s.settingsVersion, '2026.8.23.1')) {
+        if (promptSignature(s.mapArchitectSystemPrompt) === '16167:7d0c5b25') {
+            s.mapArchitectSystemPrompt = DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT;
+        }
+        s.settingsVersion = '2026.8.23.1';
+    }
+
     // Stamp factory version even when a release has no field rewrites
     // (8.28.0 mapped-site index is prompt/injection only).
     if (isOlderThan(s.settingsVersion, FACTORY_SETTINGS_VERSION)) {

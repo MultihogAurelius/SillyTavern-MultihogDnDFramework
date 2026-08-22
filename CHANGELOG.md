@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.23.1] - 2026-08-23
+
+### Fixed
+- **Map Architect knowledge isolation**: premise and reference facts now define private site reality without making unseen districts, inhabitants, threats, or landmarks `DISCOVERED`, `SUSPECTED`, or `KNOWN`. Only explicit player-facing story context can raise initial knowledge above the entrance defaults.
+
 ## [2026.8.23] - 2026-08-23
 
 ### Changed

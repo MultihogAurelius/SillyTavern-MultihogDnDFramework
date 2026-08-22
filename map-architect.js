@@ -259,7 +259,7 @@ Entrance area: ${args.entrance}
 Kind: ${args.kind} (${kindBrief(args.kind)})
 Scale: ${args.scale}
 Threat: ${args.threat} (${threatBrief(args.threat, args.kind)})
-Established premise: ${args.premise}
+Objective private premise (does not grant player knowledge): ${args.premise}
 ${inclusionPrompt(includeManifest)}
 Live location footer: ${currentLocation || '(none yet)'}
 Current in-world time (authoritative): ${currentTime || 'Unknown'}
@@ -280,7 +280,7 @@ function correctionPrompt(args, context, referenceContext, priorOutput, parseErr
     const issues = parseError
         ? [{ code: 'INVALID_JSON', path: '$', hint: parseError }]
         : errors.map(({ code, path, hint }) => ({ code, path, hint }));
-    return `CORRECTION PASS ${attempt}\nYour previous map was rejected. Return a complete corrected JSON object, not a patch.\n\nRequested site: ${args.site}\nRequested entrance: ${args.entrance}\nRequested kind: ${args.kind} (${kindBrief(args.kind)})\nScale: ${args.scale}\nThreat: ${args.threat} (${threatBrief(args.threat, args.kind)})\nPremise: ${args.premise}\n${inclusionPrompt(includeManifest)}\nCurrent in-world time (authoritative): ${currentTime || 'Unknown'}\n\nVALIDATION ERRORS\n${JSON.stringify(issues, null, 2)}\n\nPREVIOUS OUTPUT\n${priorOutput}\n\nRECENT STORY CONTEXT\n${context || '(No additional recent context.)'}\n\n${referenceContext || 'USER-SELECTED REFERENCE CONTEXT\n(none selected)'}\n\nOutput only the corrected JSON object. Follow the ${args.kind} instruction set.`;
+    return `CORRECTION PASS ${attempt}\nYour previous map was rejected. Return a complete corrected JSON object, not a patch.\n\nRequested site: ${args.site}\nRequested entrance: ${args.entrance}\nRequested kind: ${args.kind} (${kindBrief(args.kind)})\nScale: ${args.scale}\nThreat: ${args.threat} (${threatBrief(args.threat, args.kind)})\nObjective private premise (does not grant player knowledge): ${args.premise}\n${inclusionPrompt(includeManifest)}\nCurrent in-world time (authoritative): ${currentTime || 'Unknown'}\n\nVALIDATION ERRORS\n${JSON.stringify(issues, null, 2)}\n\nPREVIOUS OUTPUT\n${priorOutput}\n\nRECENT STORY CONTEXT\n${context || '(No additional recent context.)'}\n\n${referenceContext || 'USER-SELECTED REFERENCE CONTEXT\n(none selected)'}\n\nOutput only the corrected JSON object. Follow the ${args.kind} instruction set.`;
 }
 
 function existingResult(siteRecord) {

@@ -550,7 +550,7 @@ export function registerMapArchitectTool() {
                     kind: { type: 'string', enum: ['DUNGEON', 'SETTLEMENT', 'INTERIOR'], description: 'DUNGEON = high-risk room-scale site. INTERIOR = significant lower-risk multi-room site. SETTLEMENT = city/town/village district-scale graph.' },
                     scale: { type: 'string', enum: ['SMALL', 'MEDIUM', 'LARGE'], description: 'Geographic size, not danger. DUNGEON: SMALL 4-7 rooms, MEDIUM 7-12, LARGE 12-20. SETTLEMENT: SMALL 4-7 districts, MEDIUM 6-10, LARGE 8-14.' },
                     threat: { type: 'string', enum: ['NONE', 'LOW', 'MODERATE', 'HIGH', 'DEADLY'], description: 'Site danger for occupancy and trap density. NONE forbids invented active danger. Independent of party level and scale.' },
-                    premise: { type: 'string', description: 'Dense established facts and creative constraints: site purpose/history, visible entrance, expected inhabitants or danger, tone, and anything that must not be contradicted.' },
+                    premise: { type: 'string', description: 'Objective private site facts and creative constraints: purpose/history, expected inhabitants or danger, tone, and anything that must not be contradicted. Premise facts do not by themselves grant the player knowledge.' },
                     include: { type: 'array', items: { type: 'string' }, description: 'Optional only for first creation of a SETTLEMENT. Exact existing mapped DUNGEON/INTERIOR names to absorb as SUBDUNGEON/SUBINTERIOR peers.' },
                 },
                 required: ['site', 'entrance', 'kind', 'scale', 'threat', 'premise'],
