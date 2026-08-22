@@ -71,7 +71,7 @@ export function summarizeEvolutionDigest(siteRoot, transaction) {
         if (op === 'MOVE_ASSET') return `${operation.asset_id} moved to ${operation.to}${why}`;
         if (op === 'ADD_ASSET') return `added ${operation.name} in ${operation.location}${why}`;
         if (op === 'SET_ASSET') return `${operation.asset_id} ${operation.state || 'updated'}${why}`;
-        if (op === 'REMOVE_ASSET') return `${operation.asset_id} left the site${why}`;
+        if (op === 'REMOVE_ASSET') return `${operation.asset_id} removed from map${why}`;
         if (op === 'SET_CONNECTION') return `route ${operation.from}→${operation.to} ${operation.state}${why}`;
         if (op === 'SET_AREA') return `geometry ${operation.area_id}${why}`;
         return `${op || 'OP'}${why}`;

@@ -939,6 +939,15 @@ function getSettingsInternal(extensionSettings) {
         s.settingsVersion = '2026.8.24.6';
     }
 
+    // 2026.8.24.9: Map Updater REMOVE_ASSET hard-delete + REMOVE vs DESTROYED guidance.
+    if (isOlderThan(s.settingsVersion, '2026.8.24.9')) {
+        const updaterSig = promptSignature(s.mapUpdaterSystemPrompt);
+        if (updaterSig === '14884:38c92245' || updaterSig === '16030:85697ccd') {
+            s.mapUpdaterSystemPrompt = DEFAULT_MAP_UPDATER_SYSTEM_PROMPT;
+        }
+        s.settingsVersion = '2026.8.24.9';
+    }
+
     // Stamp factory version even when a release has no field rewrites
     // (8.28.0 mapped-site index is prompt/injection only).
     if (isOlderThan(s.settingsVersion, FACTORY_SETTINGS_VERSION)) {

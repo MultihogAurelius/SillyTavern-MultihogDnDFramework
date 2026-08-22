@@ -22,7 +22,8 @@ describe('Adventure Companion fallback actions', () => {
     it('treats natural requests and underspecified demos as action intent', async () => {
         const { COMPANION_PERSONA, COMPANION_ACTION_TOOLS } = await import('../adventure-companion.js');
 
-        expect(COMPANION_PERSONA).toContain('Actions — these three ONLY (hard limit):');
+        expect(COMPANION_PERSONA).toContain('Actions — these four ONLY (hard limit):');
+        expect(COMPANION_PERSONA).toContain('Map Updater');
         expect(COMPANION_PERSONA).toContain('You have no other action surface.');
         expect(COMPANION_PERSONA).toContain('never invent a UI workflow');
         expect(COMPANION_PERSONA).toContain('They do not need exact wording, command syntax, magic phrases');
@@ -31,8 +32,20 @@ describe('Adventure Companion fallback actions', () => {
         expect(COMPANION_PERSONA).toContain('Brainstorming, theories, casual possibilities');
         expect(COMPANION_ACTION_TOOLS[0].function.description).toContain('ordinary conversational language');
         expect(COMPANION_ACTION_TOOLS[1].function.description).toContain('ordinary conversational language');
-        expect(COMPANION_ACTION_TOOLS[2].function.name).toBe('act_for_user');
-        expect(COMPANION_ACTION_TOOLS).toHaveLength(3);
+        expect(COMPANION_ACTION_TOOLS[2].function.name).toBe('command_map_updater');
+        expect(COMPANION_ACTION_TOOLS[3].function.name).toBe('act_for_user');
+        expect(COMPANION_ACTION_TOOLS).toHaveLength(4);
+    });
+
+    it('extracts Map Updater commands from fallback tags', async () => {
+        const { parseCompanionFallbackActions } = await import('../adventure-companion.js');
+        const parsed = parseCompanionFallbackActions(
+            '<companion_action type="map_updater">REMOVE_ASSET the tipped chair clutter asset.</companion_action>',
+        );
+        expect(parsed.actions).toEqual([{
+            name: 'command_map_updater',
+            instruction: 'REMOVE_ASSET the tipped chair clutter asset.',
+        }]);
     });
 
     it('extracts State Tracker and Lorebook Agent commands in order', async () => {
@@ -207,6 +220,47 @@ I can take care of both.
         expect(runRouterPass).toHaveBeenCalledWith(null, 'Record the masked woman.', null, true);
         expect(sendAgentTurn).toHaveBeenCalledTimes(3);
         expect(reply).toBe('Both updates completed.');
+    });
+
+    it('executes a Map Updater command via fallback tags', async () => {
+        testExtensionSettings['rpg_tracker'] = {
+            locationMappingEnabled: true,
+            mapUpdaterEnabled: true,
+            mapUpdaterDirectLookback: 8,
+        };
+        const { sendAgentTurn } = await import('../llm-client.js');
+        const { runtimeState } = await import('../src/app/runtime-state.js');
+        const runMapUpdaterPass = vi.fn().mockResolvedValue({ ok: true });
+        runtimeState.runMapUpdaterPassRef = runMapUpdaterPass;
+        runtimeState.isLoreOrMapAgentBusyRef = () => false;
+        const { configureRuntimeActions } = await import('../src/app/runtime-bridge.js');
+        configureRuntimeActions({
+            sendDirectPrompt: vi.fn(),
+            runRouterPass: vi.fn(),
+            isRouterRunning: vi.fn().mockReturnValue(false),
+        });
+        sendAgentTurn
+            .mockResolvedValueOnce({
+                content: '<companion_action type="map_updater">Remove asset diner-tipped-chair from the map.</companion_action>',
+                toolCall: null,
+            })
+            .mockResolvedValueOnce({
+                content: 'Removed the clutter asset from the map.',
+                toolCall: null,
+            });
+        const { runCompanionAgentLoop } = await import('../adventure-companion.js');
+
+        const reply = await runCompanionAgentLoop([
+            { role: 'system', content: 'Companion test' },
+            { role: 'user', content: 'Remove that mistaken chair asset from the map.' },
+        ], new AbortController().signal);
+
+        expect(runMapUpdaterPass).toHaveBeenCalledWith({
+            isManual: true,
+            lookback: 8,
+            directInstruction: 'Remove asset diner-tipped-chair from the map.',
+        });
+        expect(reply).toBe('Removed the clutter asset from the map.');
     });
 
     it('submits a normal chat action and ends the Companion loop when CYOA is off', async () => {

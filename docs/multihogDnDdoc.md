@@ -12,13 +12,14 @@ The Adventure Companion's CHAT view can be detached into a draggable, resizable 
 
 Adventure Companion has its own **Connection Settings** drawer and can use Main API, a Connection **Profile**, or dedicated Ollama/OpenAI endpoints independently from State Tracker. The same drawer mirrors all CHAT options: Tutorial Mode, story lookback count / All, Lorebook Agent lore injection, State Tracker memo injection, and current site map injection.
 
-The **Adventure Companion can perform exactly three actions** when ordinary conversational language shows clear intent — and nothing else:
+The **Adventure Companion can perform exactly four actions** when ordinary conversational language shows clear intent — and nothing else:
 
 1. Send a direct command to the **State Tracker** to correct or update mechanical campaign state.
-2. Send a direct command to the **Lorebook Agent** to create or update campaign lore.
-3. **Act for the player** by submitting their next turn. When CYOA mode is active, it may choose one of the current CYOA buttons or type a player action through SillyTavern's normal chat input. When CYOA mode is inactive, it submits through the normal chat input.
+2. Send a direct command to the **Lorebook Agent** to create or update campaign lore (NPCs, factions, quests, readable history — not private `[MAP]` occupancy).
+3. Send a direct command to the **Map Updater** to correct active-site map occupancy (remove mistaken assets, mark kills `DESTROYED` when remains stay, `REMOVE_ASSET` when nothing lasting remains, move assets, fix building contents).
+4. **Act for the player** by submitting their next turn. When CYOA mode is active, it may choose one of the current CYOA buttons or type a player action through SillyTavern's normal chat input. When CYOA mode is inactive, it submits through the normal chat input.
 
-Those three are the hard limit. The Companion cannot operate Multihog UI controls (settings drawers, relationship editors, NPC card panels, inventory UIs, module toggles, invented menu paths). Campaign or lore changes must go through State Tracker / Lorebook Agent commands, not imagined UI steps. If it is unsure whether a control exists, it must say so or use one of the three actions — never invent buttons, tabs, or editors.
+Those four are the hard limit. The Companion cannot operate Multihog UI controls (settings drawers, relationship editors, NPC card panels, inventory UIs, module toggles, invented menu paths). Campaign state goes to State Tracker; lore goes to Lorebook Agent; map occupancy goes to Map Updater — not imagined UI steps. If it is unsure whether a control exists, it must say so or use one of the four actions — never invent buttons, tabs, or editors.
 
 Players do not need exact command strings, magic phrases, imperative wording, or the subsystem names. Polite questions, indirect requests, and requests to show, test, or demonstrate the capability count as action intent. For an underspecified demo, the Companion may choose one small, harmless, clearly labeled demo addition.
 

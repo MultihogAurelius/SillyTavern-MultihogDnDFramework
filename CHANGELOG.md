@@ -2,6 +2,36 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.24.12] - 2026-08-22
+
+### Changed
+- **Adventure Companion welcome**: default CHAT greeting now lists Map Updater among the four relay actions.
+
+## [2026.8.24.11] - 2026-08-22
+
+### Added
+- **Adventure Companion → Map Updater**: fourth action relays direct map occupancy instructions (same as Lorebook Agent / State Tracker). Persona, tools, fallback tags, and tutorial docs updated.
+
+## [2026.8.24.10] - 2026-08-22
+
+### Changed
+- **Visuals/Map toolbar**: removed redundant Map Updater button; run Map Updater from the header play menu (or 💬 direct prompt on the site map).
+
+## [2026.8.24.9] - 2026-08-22
+
+### Changed
+- **Map Updater REMOVE_ASSET**: `REMOVE_ASSET` now deletes the asset record (and contained children) from the map. Prompt adds `REMOVE_ASSET` alongside existing `DESTROYED`/`DEAD` guidance — kills still default to remains in-room; purge only when nothing lasting stays or correcting a mistake.
+
+## [2026.8.24.8] - 2026-08-22
+
+### Fixed
+- **Visuals/Map Map Updater direct prompt**: compact single-row layout; 💬 toggle now hides/shows the panel (`display:flex` no longer overrides `hidden`).
+
+## [2026.8.24.7] - 2026-08-22
+
+### Added
+- **Visuals/Map Map Updater direct prompt**: run Map Updater from the site-map toolbar with optional one-pass instructions and lookback (`Ctx`).
+
 ## [2026.8.24.6] - 2026-08-22
 
 ### Changed

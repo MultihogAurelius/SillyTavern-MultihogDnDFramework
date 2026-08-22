@@ -137,7 +137,7 @@ describe('Map Evolution', () => {
         expect(line).not.toContain('Forgotten Tomb:');
         expect(line).toContain('odran FLEEING');
         expect(line).toContain('by party');
-        expect(line).toContain('odran left the site');
+        expect(line).toContain('odran removed from map');
         expect(line).not.toContain('"op"');
 
         const many = summarizeEvolutionDigest('Hall', {

@@ -701,6 +701,149 @@ export function reattachDungeonMapPanel() {
     document.getElementById(PANEL_ID)?.remove();
 }
 
+function mapUpdaterToast(kind, message, title = 'Map Updater') {
+    const toast = globalThis.toastr;
+    if (!toast || !message) return;
+    if (kind === 'success') toast.success(message, title);
+    else if (kind === 'info') toast.info(message, title);
+    else if (kind === 'warning') toast.warning(message, title);
+    else toast.error(message, title);
+}
+
+function summarizeMapUpdaterResult(result) {
+    const skipped = result?.skipped;
+    if (skipped === 'location_mapping_off' || skipped === 'dungeon_reality_off') {
+        return { kind: 'warning', message: 'Persistent Maps is off.' };
+    }
+    if (skipped === 'no_active_map') return { kind: 'warning', message: 'No active dungeon or settlement map.' };
+    if (skipped === 'disabled') return { kind: 'warning', message: 'Map Updater is disabled.' };
+    if (skipped === 'busy') return { kind: 'warning', message: 'Another agent is already running.' };
+    if (skipped === 'stopped') return { kind: 'info', message: 'Stopped.' };
+    if (result?.ok && result?.noop) return { kind: 'info', message: 'Nothing durable changed.' };
+    if (result?.ok) return { kind: 'success', message: 'Occupancy update applied.' };
+    return { kind: 'error', message: 'Could not apply a valid occupancy update.' };
+}
+
+function bindMapUpdaterDirectControls(root) {
+    const mapRoot = root.querySelector('.rt-immersion-map');
+    if (!mapRoot) return;
+
+    const toggle = mapRoot.querySelector('.rt-map-updater-direct-toggle');
+    const panel = mapRoot.querySelector('.rt-map-updater-direct-panel');
+    const input = mapRoot.querySelector('.rt-map-updater-direct-input');
+    const lookbackInput = mapRoot.querySelector('.rt-map-updater-direct-lookback');
+    const runButtons = mapRoot.querySelectorAll('.rt-map-updater-direct-run');
+    const status = mapRoot.querySelector('.rt-map-updater-direct-status');
+
+    const settings = getSettings();
+
+    const setPanelOpen = (open) => {
+        if (!panel) return;
+        panel.hidden = !open;
+        settings.mapUpdaterDirectPromptOpen = open;
+        void saveSettings();
+        if (toggle) {
+            toggle.classList.toggle('active', open);
+            toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        }
+        if (open && input) input.focus();
+    };
+
+    const setStatus = (text) => {
+        if (status) status.textContent = text || '';
+    };
+
+    setPanelOpen(Boolean(settings.mapUpdaterDirectPromptOpen));
+    if (input) input.value = settings.mapUpdaterDirectPrompt || '';
+    if (lookbackInput) {
+        lookbackInput.value = String(settings.mapUpdaterDirectLookback ?? settings.routerLookback ?? 10);
+    }
+
+    const runManual = async ({ clearInput = false } = {}) => {
+        if (typeof runtimeState.isLoreOrMapAgentBusyRef === 'function' && runtimeState.isLoreOrMapAgentBusyRef()) {
+            mapUpdaterToast('warning', 'Another agent is already running.');
+            return;
+        }
+        const run = runtimeState.runMapUpdaterPassRef;
+        if (typeof run !== 'function') {
+            mapUpdaterToast('error', 'Map Updater is not available yet.');
+            return;
+        }
+        const s = getSettings();
+        const directInstruction = input ? String(input.value || '').trim() : '';
+        const lookback = lookbackInput
+            ? Math.max(0, parseInt(String(lookbackInput.value), 10) || 0)
+            : (s.mapUpdaterDirectLookback ?? s.routerLookback ?? 10);
+        if (lookbackInput) {
+            s.mapUpdaterDirectLookback = lookback;
+            lookbackInput.value = String(lookback);
+        }
+        for (const button of runButtons) button.disabled = true;
+        setStatus('Running Map Updater…');
+        try {
+            const result = await run({
+                isManual: true,
+                lookback,
+                directInstruction,
+            });
+            const summary = summarizeMapUpdaterResult(result);
+            mapUpdaterToast(summary.kind, summary.message);
+            setStatus(summary.message);
+            if (result?.ok && typeof runtimeState.refreshImmersionView === 'function') {
+                await runtimeState.refreshImmersionView();
+            }
+            if (clearInput && input) {
+                input.value = '';
+                s.mapUpdaterDirectPrompt = '';
+                void saveSettings();
+            }
+        } catch (error) {
+            const message = String(error?.message || error);
+            mapUpdaterToast('error', message);
+            setStatus(message);
+        } finally {
+            for (const button of runButtons) button.disabled = false;
+        }
+    };
+
+    if (toggle && panel) {
+        toggle.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            setPanelOpen(panel.hidden);
+        });
+    }
+
+    if (input) {
+        input.addEventListener('input', () => {
+            const s = getSettings();
+            s.mapUpdaterDirectPrompt = String(input.value || '');
+            void saveSettings();
+        });
+        input.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                void runManual({ clearInput: true });
+            }
+        });
+    }
+
+    if (lookbackInput) {
+        lookbackInput.addEventListener('change', () => {
+            const s = getSettings();
+            s.mapUpdaterDirectLookback = Math.max(0, Math.min(100, parseInt(String(lookbackInput.value), 10) || 0));
+            lookbackInput.value = String(s.mapUpdaterDirectLookback);
+            void saveSettings();
+        });
+    }
+
+    mapRoot.querySelector('.rt-map-updater-direct-run')?.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        void runManual({ clearInput: true });
+    });
+}
+
 /** Bind pop-out / reattach / area clicks inside a Visuals/Map embed. */
 export function bindDungeonMapEmbedEvents(root, {
     scene,
@@ -711,6 +854,7 @@ export function bindDungeonMapEmbedEvents(root, {
     if (!root) return;
     bindAreaClicks(root, onAreaClick);
     bindDungeonMapPan(root);
+    bindMapUpdaterDirectControls(root);
     root.querySelectorAll('.rt-dungeon-map-details').forEach(button => {
         button.addEventListener('click', (event) => {
             event.preventDefault();

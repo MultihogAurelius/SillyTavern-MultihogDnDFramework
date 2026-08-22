@@ -258,7 +258,10 @@ describe('Map Updater', () => {
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('short footer names still match longer BUILDING assets');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('external combat tracker (not shown to you.)');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('map-worthy child');
-        expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('"op":"ADD_ASSET"');
+        expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('REMOVE vs DESTROYED (both valid');
+        expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('Default for kills and destroyed things');
+        expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('REMOVE_ASSET is additional, not a substitute for DESTROYED');
+        expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('"op":"REMOVE_ASSET"');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('"area_id":"shrine-quarter"');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('Never write {"type":"ADD_ASSET","asset":{...}}');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('Never ADD_ASSET the player or anyone listed in the supplied [PARTY] names');
@@ -282,7 +285,7 @@ describe('Map Updater', () => {
         expect(updater).toContain('Exterior-relative phrasing');
         expect(updater).toContain('formatPartyRosterForMapUpdater');
         expect(updater).toContain('## CURRENT IN-WORLD TIME (AUTHORITATIVE)');
-        expect(updater).toContain('initialUserPrompt(loaded, recentStory, memo, currentTime, populationTarget)');
+        expect(updater).toContain('initialUserPrompt(loaded, recentStory, memo, currentTime, populationTarget, instruction)');
         expect(updater).toContain("'FIRST-ENTRY BUILDING POPULATION'");
         expect(updater).toContain('(MANDATORY THIS PASS)');
         expect(updater).toContain('shouldForceBuildingPopulationPass');
@@ -294,7 +297,8 @@ describe('Map Updater', () => {
         const defaults = readFileSync(new URL('../src/state/defaults.js', import.meta.url), 'utf8');
         expect(defaults).toContain('mapUpdaterMaxTokens: 25000');
         expect(settingsMarkup).toMatch(/id="rpg_map_updater_max_tokens"[^>]*max="32000"/);
-        expect(updater).toContain("export async function runMapUpdaterPass({ isManual = false, lookback = null, buildingIntent = '' } = {})");
+        expect(updater).toContain("export async function runMapUpdaterPass({ isManual = false, lookback = null, buildingIntent = '', directInstruction = '' } = {})");
+        expect(updater).toContain('DIRECT INSTRUCTION (THIS PASS ONLY)');
         expect(updater).toContain('export async function onMapUpdaterUserMessage(messageId)');
         expect(updater).toContain('resolveBuildingIntentPopulationTarget');
         expect(updater).toContain('if (settings.mapUpdaterEnabled === false && !isManual)');

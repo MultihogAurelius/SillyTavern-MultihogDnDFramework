@@ -385,6 +385,7 @@ runtimeState.refreshTrackerViewRef = () => {
 };
 runtimeState.applyMapEvolutionTickSettingsToUiRef = applyMapEvolutionTickSettingsToUi;
 runtimeState.runMapEvolutionPassRef = runMapEvolutionPass;
+runtimeState.runMapUpdaterPassRef = runMapUpdaterPass;
 runtimeState.loadMappedEvolutionSiteRef = loadMappedEvolutionSite;
 runtimeState.isLoreOrMapAgentBusyRef = () => isRouterRunning() || isMapUpdaterRunning() || isMapEvolutionRunning();
 

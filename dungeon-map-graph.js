@@ -336,9 +336,23 @@ export function renderDungeonMapEmbedHtml(graph, { detached = false, siteRoot = 
         <div class="rt-immersion-section-label">
             <span>Site map</span>
             <span class="rt-dungeon-map-label-actions">
+                <button type="button" class="rt-map-updater-direct-toggle rpg-tracker-icon-btn" title="Direct prompt for Map Updater" aria-expanded="false">💬</button>
                 <button type="button" class="rt-dungeon-map-details" title="Open map details" aria-label="Open map details">Map Details</button>
                 <button type="button" class="rt-dungeon-map-detach rpg-tracker-icon-btn" title="Open map in a separate window" aria-label="Open map in a separate window">⧉</button>
             </span>
+        </div>
+        <div class="rt-map-updater-direct-panel" hidden>
+            <div class="rt-map-updater-direct-bar">
+                <textarea class="rt-map-updater-direct-input text_pole" rows="2" placeholder="Instruct Map Updater for this run only… (Enter to run, Shift+Enter for newline)"></textarea>
+                <div class="rt-map-updater-direct-actions">
+                    <label class="rt-map-updater-direct-lookback-label" title="Recent story lookback for this manual Map Updater run">
+                        Ctx
+                        <input type="text" inputmode="numeric" pattern="[0-9]*" class="rt-map-updater-direct-lookback" min="0" max="100" value="10">
+                    </label>
+                    <button type="button" class="rt-map-updater-direct-run menu_button interactable"><i class="fa-solid fa-play"></i> Run</button>
+                </div>
+            </div>
+            <span class="rt-map-updater-direct-status" role="status" aria-live="polite"></span>
         </div>
         <div class="rt-dungeon-graph-scroll">${renderDungeonMapGraphSvg(graph, { compact: true, siteRoot: siteRoot || graph.site })}</div>
     </div>`;

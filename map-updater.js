@@ -215,7 +215,13 @@ ${children}
 Resolve this lightweight, map-free interior now using the normal flat operations array. RECENT STORY was widened for this population pass so you can ground contents in what was established. ADD_ASSET only map-worthy CREATURE, GROUP, LOOT, HAZARD, TRAP, ALARM, BARRIER, or interactive/scavengable OBJECT contents — never ambient set dressing (tipped chairs, dusty booths, ordinary counters, general mess). New children must be ADD_ASSET with location equal to the exact BUILDING id/name; never SET_ASSET a brand-new invented asset_id. Keep the interior lean and interesting, not excessive (do not pack every house with enemies when the district is already crowded). Reconcile established SUSPECTED contents rather than duplicating them. ${intentPhase ? 'Every newly generated contained asset must be UNREVEALED; only later GM narration can make it KNOWN or SUSPECTED. Do not emit chronicles in this pre-narration pass.' : 'KNOWN requires observation in RECENT STORY; concealed additions are UNREVEALED; an unconfirmed rumor stays SUSPECTED; certain knowledge may be KNOWN.'} An established empty, closed, or abandoned building may add no contents. In every case, explicitly finish with SET_ASSET on the BUILDING using notEntered:false. Do not output noop, ADD_AREA, SUBDUNGEON, SUBINTERIOR, or CreateAreaMap.`;
 }
 
-function initialUserPrompt(loaded, recentStory, memo, currentTime, populationTarget = null) {
+function formatDirectInstructionBlock(directInstruction) {
+    const text = String(directInstruction || '').trim();
+    if (!text) return '';
+    return `\n## DIRECT INSTRUCTION (THIS PASS ONLY)\nFollow this user instruction for this occupancy update. It does not override JSON output rules or the durable-only contract.\n${text}\n`;
+}
+
+function initialUserPrompt(loaded, recentStory, memo, currentTime, populationTarget = null, directInstruction = '') {
     const kind = normalizeMapSiteKind(loaded.context.document?.kind);
     return `UPDATE THE ATTACHED MAP
 Exact site root: ${loaded.context.siteRoot}
@@ -236,11 +242,11 @@ ${formatBuildingPopulationBundle(populationTarget)}
 
 ## RECENT STORY
 ${recentStory || '(No additional recent context.)'}
-
+${formatDirectInstructionBlock(directInstruction)}
 Output only the required JSON object. Use {"noop":true} when no durable map fact changed.`;
 }
 
-function correctionPrompt(loaded, recentStory, priorOutput, errors, attempt, memo, currentTime, populationTarget = null) {
+function correctionPrompt(loaded, recentStory, priorOutput, errors, attempt, memo, currentTime, populationTarget = null, directInstruction = '') {
     return `CORRECTION PASS ${attempt}
 Your previous map update was rejected. Return a complete corrected JSON object, not a patch. Reuse the same operation_id unless the error says to mint a new one.
 
@@ -264,6 +270,7 @@ ${formatBuildingPopulationBundle(populationTarget)}
 
 ## RECENT STORY
 ${recentStory || '(No additional recent context.)'}
+${formatDirectInstructionBlock(directInstruction)}
 
 Output only the corrected JSON object.`;
 }
@@ -296,9 +303,9 @@ export async function maybeRollbackMapUpdaterForSwipe(msg) {
 /**
  * One occupancy-maintenance pass for the currently mapped site.
  * Skips when Persistent Maps is off, no map is active, Lorebook Agent is busy, or auto-updates are disabled.
- * @param {{ isManual?: boolean, lookback?: number|null, buildingIntent?: string }} [options]
+ * @param {{ isManual?: boolean, lookback?: number|null, buildingIntent?: string, directInstruction?: string }} [options]
  */
-export async function runMapUpdaterPass({ isManual = false, lookback = null, buildingIntent = '' } = {}) {
+export async function runMapUpdaterPass({ isManual = false, lookback = null, buildingIntent = '', directInstruction = '' } = {}) {
     const settings = getSettings();
     if (settings.mapUpdaterEnabled === false && !isManual) return { skipped: 'disabled' };
     if (!isLocationMappingEnabled(settings)) return { skipped: 'location_mapping_off' };
@@ -334,7 +341,8 @@ export async function runMapUpdaterPass({ isManual = false, lookback = null, bui
         const memo = settings.currentMemo || '';
         const currentTime = currentTimeFrom(settings, recentStory);
         const systemPrompt = String(settings.mapUpdaterSystemPrompt || DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).trim();
-        let prompt = initialUserPrompt(loaded, recentStory, memo, currentTime, populationTarget);
+        const instruction = String(directInstruction || '').trim();
+        let prompt = initialUserPrompt(loaded, recentStory, memo, currentTime, populationTarget, instruction);
         let lastIssues = [];
 
         for (let attempt = 0; attempt <= MAX_CORRECTION_ATTEMPTS; attempt++) {
@@ -354,7 +362,7 @@ export async function runMapUpdaterPass({ isManual = false, lookback = null, bui
             if (!parsed.value) {
                 lastIssues = [{ code: 'INVALID_JSON', path: '$', hint: parsed.error || 'No JSON object was found.' }];
                 if (attempt < MAX_CORRECTION_ATTEMPTS) {
-                    prompt = correctionPrompt(loaded, recentStory, output, lastIssues, attempt + 1, memo, currentTime, populationTarget);
+                    prompt = correctionPrompt(loaded, recentStory, output, lastIssues, attempt + 1, memo, currentTime, populationTarget, instruction);
                     continue;
                 }
                 break;
@@ -363,7 +371,7 @@ export async function runMapUpdaterPass({ isManual = false, lookback = null, bui
             if (partyIssues.length) {
                 lastIssues = partyIssues;
                 if (attempt < MAX_CORRECTION_ATTEMPTS) {
-                    prompt = correctionPrompt(loaded, recentStory, output, lastIssues, attempt + 1, memo, currentTime, populationTarget);
+                    prompt = correctionPrompt(loaded, recentStory, output, lastIssues, attempt + 1, memo, currentTime, populationTarget, instruction);
                     continue;
                 }
                 break;
@@ -373,7 +381,7 @@ export async function runMapUpdaterPass({ isManual = false, lookback = null, bui
                 if (populationIssues.length) {
                     lastIssues = populationIssues;
                     if (attempt < MAX_CORRECTION_ATTEMPTS) {
-                        prompt = correctionPrompt(loaded, recentStory, output, lastIssues, attempt + 1, memo, currentTime, populationTarget);
+                        prompt = correctionPrompt(loaded, recentStory, output, lastIssues, attempt + 1, memo, currentTime, populationTarget, instruction);
                         continue;
                     }
                     break;
@@ -387,7 +395,7 @@ export async function runMapUpdaterPass({ isManual = false, lookback = null, bui
             if (populationIssues.length) {
                 lastIssues = populationIssues;
                 if (attempt < MAX_CORRECTION_ATTEMPTS) {
-                    prompt = correctionPrompt(loaded, recentStory, output, lastIssues, attempt + 1, memo, currentTime, populationTarget);
+                    prompt = correctionPrompt(loaded, recentStory, output, lastIssues, attempt + 1, memo, currentTime, populationTarget, instruction);
                     continue;
                 }
                 break;
@@ -396,7 +404,7 @@ export async function runMapUpdaterPass({ isManual = false, lookback = null, bui
             if (!validation.ok) {
                 lastIssues = validation.errors || [];
                 if (attempt < MAX_CORRECTION_ATTEMPTS) {
-                    prompt = correctionPrompt(loaded, recentStory, output, lastIssues, attempt + 1, memo, currentTime, populationTarget);
+                    prompt = correctionPrompt(loaded, recentStory, output, lastIssues, attempt + 1, memo, currentTime, populationTarget, instruction);
                     continue;
                 }
                 break;
@@ -406,7 +414,7 @@ export async function runMapUpdaterPass({ isManual = false, lookback = null, bui
             if (!mapResult.ok) {
                 lastIssues = mapResult.errors || [{ code: mapResult.code || 'MAP_COMMIT_FAILED', path: 'map', hint: 'Persistence rejected the transaction.' }];
                 if (attempt < MAX_CORRECTION_ATTEMPTS && mapResult.retryable !== false) {
-                    prompt = correctionPrompt(loaded, recentStory, output, lastIssues, attempt + 1, memo, currentTime, populationTarget);
+                    prompt = correctionPrompt(loaded, recentStory, output, lastIssues, attempt + 1, memo, currentTime, populationTarget, instruction);
                     continue;
                 }
                 break;

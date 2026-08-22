@@ -8,7 +8,7 @@ import { getSettings } from './state-manager.js';
 import { cleanToolCallMessage, memoForGmContext } from './memo-processor.js';
 import { runtimeState } from './src/app/runtime-state.js';
 import { isRouterRunning, runRouterPass, sendDirectPrompt } from './src/app/runtime-bridge.js';
-import { isEffectiveSectionEnabled } from './src/state/section-enabled.js';
+import { isLocationMappingEnabled, isEffectiveSectionEnabled } from './src/state/section-enabled.js';
 import { formatDungeonMapForPlayer, stripDungeonMapSection } from './dungeon-reality.js';
 import { clampFloatingPanelToViewport, isMobileLayout, makeDraggable, makeResizableBL, makeResizableBR, resolveViewportClampedGeometry } from './ui-geometry.js';
 
@@ -49,12 +49,13 @@ Rules:
 - For framework and settings questions, be brief and practical. If the supplied documentation does not cover something, say you are unsure rather than inventing settings, IDs, or behavior.
 - Keep replies engaging but not endless. Match the player's energy.
 
-Actions — these three ONLY (hard limit):
+Actions — these four ONLY (hard limit):
 1. Send a direct command to the **State Tracker** to correct or update mechanical campaign state (memo / tracked modules).
-2. Send a direct command to the **Lorebook Agent** to create or update campaign lore.
-3. **Act for the player** — submit their next turn (send a chat message for them, or choose a CYOA button when CYOA choices are supplied).
+2. Send a direct command to the **Lorebook Agent** to create or update campaign lore (NPCs, factions, quests, readable location history — not private map occupancy).
+3. Send a direct command to the **Map Updater** to correct or update the active site's private map occupancy ([MAP]: areas, assets, routes, building contents). Use for removing mistaken assets, clearing remains from a room, marking kills as DESTROYED when remains stay, MOVE_ASSET, and similar durable occupancy facts — not for lorebook NPC bios or memo modules.
+4. **Act for the player** — submit their next turn (send a chat message for them, or choose a CYOA button when CYOA choices are supplied).
 
-You have no other action surface. You cannot click Multihog UI, open settings drawers, edit relationship bars / NPC cards / inventory panels / module toggles in the interface, or walk the player through invented menu paths. If a change belongs in campaign state or lore, do it via State Tracker or Lorebook Agent commands — never invent a UI workflow. If you do not know how a Multihog screen looks or whether a control exists, say so or use one of the three actions above; do not guess at buttons, tabs, or editors.
+You have no other action surface. You cannot click Multihog UI, open settings drawers, edit relationship bars / NPC cards / inventory panels / module toggles in the interface, or walk the player through invented menu paths. Campaign state goes to State Tracker; lore goes to Lorebook Agent; map occupancy goes to Map Updater — never invent a UI workflow. If you do not know how a Multihog screen looks or whether a control exists, say so or use one of the four actions above; do not guess at buttons, tabs, or editors.
 
 Action rules:
 - Act whenever the player's intent to make a change is clear from ordinary conversation. They do not need exact wording, command syntax, magic phrases, or the names "State Tracker" and "Lorebook Agent."
@@ -67,13 +68,14 @@ Action rules:
 - When ACT FOR USER MODE says CYOA is inactive, compose a concise in-character player action and submit it as action_text.
 - Every act_for_user call must include commentary: a brief, lively, context-aware reaction to the move you chose. Make it feel like a clever friend at the table—amused, intrigued, impressed, ominous, or playful as appropriate. Do not mechanically report that an action was submitted, repeat the full action, use a status/checkmark format, or invent the outcome.
 - A successful act-for-user submission ends your current turn. Do not call another action afterward.
-- A request may require multiple actions. Execute them one at a time. If it combines bookkeeping/lore changes with a player turn, perform State Tracker and Lorebook Agent work first and act_for_user last.
-- For State Tracker and Lorebook Agent work, accurately tell the player whether it completed, made no change, was unavailable, or failed. For a successful player turn, use the supplied organic commentary instead of a mechanical completion receipt; the submitted action is already visible in the main chat.
+- A request may require multiple actions. Execute them one at a time. If it combines bookkeeping/lore/map changes with a player turn, perform State Tracker, Lorebook Agent, and Map Updater work first and act_for_user last.
+- For State Tracker, Lorebook Agent, and Map Updater work, accurately tell the player whether it completed, made no change, was unavailable, or failed. For a successful player turn, use the supplied organic commentary instead of a mechanical completion receipt; the submitted action is already visible in the main chat.
 - You cannot change extension settings or narrate/declare new story outcomes yourself. act_for_user only submits the player's turn; the main narrator remains the authority that advances the story.
 
 When native tools are unavailable, emit actions using exactly one or more of these fallback blocks:
 <companion_action type="state_tracker">the direct instruction</companion_action>
 <companion_action type="lorebook_agent">the direct instruction</companion_action>
+<companion_action type="map_updater">the direct instruction</companion_action>
 <companion_action type="act_for_user">{"choice_index":2,"commentary":"A quiet route into danger. I respect the optimism."}</companion_action>
 <companion_action type="act_for_user">{"action_text":"the player action to submit","commentary":"Subtlety has left the building. Let's see who notices first."}</companion_action>
 Do not show fallback blocks unless you are actually performing a change the player clearly intends. After action results are supplied, do not repeat completed actions; summarize the results for the player.
@@ -110,6 +112,24 @@ export const COMPANION_ACTION_TOOLS = [
                     instruction: {
                         type: 'string',
                         description: 'A self-contained Lorebook Agent instruction preserving the player’s intent. Minor harmless details may be inferred for an underspecified demo request.',
+                    },
+                },
+                required: ['instruction'],
+                additionalProperties: false,
+            },
+        },
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'command_map_updater',
+            description: 'Send a direct instruction to the Map Updater when ordinary conversational language shows clear intent to correct active-site map occupancy: remove an asset from [MAP], mark a kill DESTROYED when remains stay, clear remains with REMOVE_ASSET, move assets, fix mistaken clutter, or similar durable occupancy facts. Not for Lorebook lore or State Tracker memo modules.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    instruction: {
+                        type: 'string',
+                        description: 'A self-contained Map Updater instruction preserving the player’s intent. Name exact asset ids when known from ACTIVE SITE MAP; otherwise describe the durable occupancy change clearly.',
                     },
                 },
                 required: ['instruction'],
@@ -920,9 +940,14 @@ export function parseCompanionFallbackActions(text) {
     const visibleText = source.replace(actionPattern, (_match, doubleQuotedType, singleQuotedType, body) => {
         const type = String(doubleQuotedType || singleQuotedType || '').trim().toLowerCase();
         const instruction = String(body || '').trim();
-        if (instruction && (type === 'state_tracker' || type === 'lorebook_agent')) {
+        if (instruction && (type === 'state_tracker' || type === 'lorebook_agent' || type === 'map_updater')) {
+            const nameByType = {
+                state_tracker: 'command_state_tracker',
+                lorebook_agent: 'command_lorebook_agent',
+                map_updater: 'command_map_updater',
+            };
             actions.push({
-                name: type === 'state_tracker' ? 'command_state_tracker' : 'command_lorebook_agent',
+                name: nameByType[type],
                 instruction,
             });
         } else if (instruction && type === 'act_for_user') {
@@ -968,7 +993,7 @@ function normalizeCompanionAction(name, args) {
         }
         return null;
     }
-    if (name !== 'command_state_tracker' && name !== 'command_lorebook_agent') return null;
+    if (name !== 'command_state_tracker' && name !== 'command_lorebook_agent' && name !== 'command_map_updater') return null;
     const instruction = String(args?.instruction || '').trim();
     if (!instruction) return null;
     return { name, instruction };
@@ -984,6 +1009,33 @@ function companionActionArgs(action) {
         return args;
     }
     return { instruction: action.instruction };
+}
+
+/** @param {any} result */
+function summarizeMapUpdaterCompanionResult(result) {
+    const skipped = result?.skipped;
+    if (skipped === 'location_mapping_off' || skipped === 'dungeon_reality_off') {
+        return { success: false, status: 'unavailable', message: 'Persistent Maps is off.' };
+    }
+    if (skipped === 'no_active_map') {
+        return { success: false, status: 'unavailable', message: 'No active dungeon or settlement map.' };
+    }
+    if (skipped === 'disabled') {
+        return { success: false, status: 'disabled', message: 'Map Updater is disabled.' };
+    }
+    if (skipped === 'busy') {
+        return { success: false, status: 'busy', message: 'Another agent is already running.' };
+    }
+    if (skipped === 'stopped') {
+        return { success: true, status: 'stopped', message: 'Stopped.' };
+    }
+    if (result?.ok && result?.noop) {
+        return { success: true, status: 'noop', message: 'Nothing durable changed on the map.' };
+    }
+    if (result?.ok) {
+        return { success: true, status: 'completed', message: 'Map occupancy update applied.' };
+    }
+    return { success: false, status: 'failed', message: 'Could not apply a valid map occupancy update.' };
 }
 
 /**
@@ -1086,6 +1138,57 @@ async function executeCompanionAction(action) {
             };
         }
 
+        if (action.name === 'command_map_updater') {
+            const settings = getSettings();
+            if (!isLocationMappingEnabled(settings)) {
+                return {
+                    action: 'Map Updater',
+                    success: false,
+                    status: 'unavailable',
+                    message: 'Persistent Maps is off.',
+                };
+            }
+            if (settings.mapUpdaterEnabled === false) {
+                return {
+                    action: 'Map Updater',
+                    success: false,
+                    status: 'disabled',
+                    message: 'Map Updater is disabled.',
+                };
+            }
+            if (typeof runtimeState.isLoreOrMapAgentBusyRef === 'function' && runtimeState.isLoreOrMapAgentBusyRef()) {
+                return {
+                    action: 'Map Updater',
+                    success: false,
+                    status: 'busy',
+                    message: 'Another agent is already running.',
+                };
+            }
+            const run = runtimeState.runMapUpdaterPassRef;
+            if (typeof run !== 'function') {
+                return {
+                    action: 'Map Updater',
+                    success: false,
+                    status: 'unavailable',
+                    message: 'Map Updater is not available yet.',
+                };
+            }
+            const lookback = settings.mapUpdaterDirectLookback ?? settings.routerLookback ?? 10;
+            const result = await run({
+                isManual: true,
+                lookback,
+                directInstruction: action.instruction,
+            });
+            const summary = summarizeMapUpdaterCompanionResult(result);
+            if (summary.success && result?.ok && !result?.noop && typeof runtimeState.refreshImmersionView === 'function') {
+                await runtimeState.refreshImmersionView();
+            }
+            return {
+                action: 'Map Updater',
+                ...summary,
+            };
+        }
+
         const settings = getSettings();
         if (!settings.routerEnabled) {
             return {
@@ -1120,6 +1223,8 @@ async function executeCompanionAction(action) {
     } catch (err) {
         const actionLabel = action.name === 'command_state_tracker'
             ? 'State Tracker'
+            : action.name === 'command_map_updater'
+                ? 'Map Updater'
             : action.name === 'act_for_user'
                 ? 'Player Turn'
                 : 'Lorebook Agent';
@@ -1457,7 +1562,7 @@ function welcomeHtml() {
     return `
         <div class="rt-tutorial-msg rt-tutorial-msg-bot rt-tutorial-welcome">
             <div class="rt-tutorial-msg-label">Adventure Companion</div>
-            <div class="rt-tutorial-msg-body">Ask me about Multihog, brainstorm or discuss your adventure, or ask me to do one of three things: update the State Tracker, update the Lorebook Agent, or take your next turn (chat message / CYOA)—no special command wording required. I can't operate Multihog UI menus myself. Enable Tutorial Mode when you want the framework guide attached to every request.</div>
+            <div class="rt-tutorial-msg-body">Ask me about Multihog, brainstorm or discuss your adventure, or ask me to do one of four things: update the State Tracker, update the Lorebook Agent, update the active site map (Map Updater), or take your next turn (chat message / CYOA)—no special command wording required. I can't operate Multihog UI menus myself. Enable Tutorial Mode when you want the framework guide attached to every request.</div>
         </div>`;
 }
 

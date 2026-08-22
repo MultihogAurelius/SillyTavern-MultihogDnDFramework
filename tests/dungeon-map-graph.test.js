@@ -305,6 +305,10 @@ describe('dungeon map graph', () => {
         const html = renderDungeonMapEmbedHtml(graph, { detached: false });
         expect(html).toContain('rt-dungeon-map-details');
         expect(html).toContain('Map Details');
+        expect(html).toContain('rt-map-updater-direct-panel');
+        expect(html).toContain('rt-map-updater-direct-bar');
+        expect(html).toContain('rt-map-updater-direct-run');
+        expect(html).not.toContain('rt-map-updater-run');
         expect(html).not.toContain('rt-dungeon-alpha-tag');
         expect(html).toContain('rt-dungeon-graph-scroll');
     });

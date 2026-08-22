@@ -23,6 +23,7 @@ export const runtimeState = {
     updateMapEvolutionScheduleDisplayRef: null,
     refreshTrackerViewRef: null,
     runMapEvolutionPassRef: null,
+    runMapUpdaterPassRef: null,
     loadMappedEvolutionSiteRef: null,
     isLoreOrMapAgentBusyRef: null,
 };

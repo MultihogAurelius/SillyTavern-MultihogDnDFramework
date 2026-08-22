@@ -90,6 +90,9 @@ export function createChatStateLoader({
     s.mapEvolutionWorldReportApplications = JSON.parse(JSON.stringify(saved.mapEvolutionWorldReportApplications || {}));
     s.pcCharacterBlockSeeded = !!saved.pcCharacterBlockSeeded;
     s.routerDirectPrompt = saved.routerDirectPrompt || '';
+    s.mapUpdaterDirectPrompt = saved.mapUpdaterDirectPrompt || '';
+    s.mapUpdaterDirectLookback = saved.mapUpdaterDirectLookback ?? saved.routerLookback ?? 10;
+    s.mapUpdaterDirectPromptOpen = !!saved.mapUpdaterDirectPromptOpen;
     s.worldProgressionLookback = saved.worldProgressionLookback ?? 20;
     s.worldProgressionHistoryLookback = saved.worldProgressionHistoryLookback ?? 0;
     s.worldProgressionInjectionPosition = saved.worldProgressionInjectionPosition ?? 4;

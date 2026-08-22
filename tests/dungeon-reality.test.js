@@ -1993,7 +1993,26 @@ The last guard falls and a loose stone reveals a niche.
         expect(resolveAssetEffectiveArea(moved.document, 'parcel')?.id).toBe('south');
         const removed = applyDungeonMapTransaction(moved.document, { operation_id: 'porter-left', operations: [{ op: 'REMOVE_ASSET', evidence: 'CONFIRMED', asset_id: 'porter', cause: 'Left the site.' }] });
         expect(removed.ok).toBe(true);
+        expect(removed.document.assets.find(asset => asset.id === 'porter')).toBeUndefined();
+        expect(removed.document.assets.find(asset => asset.id === 'parcel')).toBeUndefined();
         expect(resolveAssetEffectiveArea(removed.document, 'parcel')).toBeNull();
+    });
+
+    it('REMOVE_ASSET deletes the asset record and contained children from the map', () => {
+        const map = normalizeDungeonMapDocument({
+            version: 3, site: 'Test', kind: 'DUNGEON',
+            areas: [{ id: 'hall', name: 'Hall', knowledge: 'VISITED', geometry: [], connections: [] }],
+            assets: [
+                { id: 'clutter-chair', kind: 'OBJECT', name: 'Tipped Chair', location: 'hall', state: 'ACTIVE', knowledge: 'KNOWN', origin: 'INITIAL_MAP' },
+            ],
+        });
+        const removed = applyDungeonMapTransaction(map, {
+            operation_id: 'clutter-removed',
+            operations: [{ op: 'REMOVE_ASSET', evidence: 'CONFIRMED', asset_id: 'clutter-chair', cause: 'Mistaken ambient clutter.' }],
+        });
+        expect(removed.ok).toBe(true);
+        expect(removed.document.assets).toHaveLength(0);
+        expect(formatDungeonMapForNarrator(removed.document)).not.toContain('Tipped Chair');
     });
 
     it('detects pending BUILDING entry and requires Evolution population to clear it atomically', () => {

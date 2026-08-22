@@ -1808,6 +1808,14 @@ export function listContainedMapAssets(document, containerRef, { recursive = fal
     return direct.flatMap(asset => [asset, ...listContainedMapAssets(map, asset.id, { recursive: true })]);
 }
 
+function collectAssetDeletionIds(document, rootId) {
+    const ids = new Set([rootId]);
+    for (const contained of listContainedMapAssets(document, rootId, { recursive: true })) {
+        ids.add(contained.id);
+    }
+    return ids;
+}
+
 function validateEnumField(value, allowed, path, errors, required = false) {
     if (value == null || value === '') {
         if (required) errors.push(mapError('MISSING_FIELD', path, value, `Supply one of: ${allowed.join(', ')}.`, { allowed }));
@@ -2107,15 +2115,10 @@ export function applyDungeonMapTransaction(document, transaction, options = {}) 
                 continue;
             }
             if (op === 'REMOVE_ASSET') {
-                asset.last_location = asset.location;
-                asset.location = null;
-                asset.state = 'REMOVED';
-                if (operation.knowledge != null) {
-                    const knowledge = validateEnumField(operation.knowledge, ASSET_KNOWLEDGE, `${path}.knowledge`, errors);
-                    if (knowledge) asset.knowledge = knowledge;
-                }
-                if (operation.detail != null) asset.detail = String(operation.detail || '').trim();
-                stampCausalFields(asset, operation, path, errors, currentTime);
+                readCausalCause(operation, path, errors);
+                const toRemove = collectAssetDeletionIds(working, asset.id);
+                working.assets = working.assets.filter(item => !toRemove.has(item.id));
+                for (const id of toRemove) assetIds.delete(id);
                 continue;
             }
 

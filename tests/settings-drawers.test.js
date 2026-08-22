@@ -111,7 +111,7 @@ describe('General & Visuals settings', () => {
 
         expect(companionMarkup).toContain('Open Adventure Companion with the <b>CHAT</b> button at the top of the State Tracker. It can help with your adventure when <b>TUTORIAL MODE</b> is enabled, getting you to grips with the extension.');
         expect(companionMarkup).toContain('Otherwise, it\'s there if you just feel like chatting about your adventure or brainstorm, etc.');
-        expect(companionMarkup).toContain('You can also ask it to make changes in the State Tracker or Lorebook Agent, and it can take actions for you if you ask it to (by typing messages or making CYOA mode choices for you.)');
+        expect(companionMarkup).toContain('You can also ask it to make changes in the State Tracker, Lorebook Agent, or Map Updater, and it can take actions for you if you ask it to (by typing messages or making CYOA mode choices for you.)');
 
         [
             'rpg_adventure_companion_tutorial_mode',
