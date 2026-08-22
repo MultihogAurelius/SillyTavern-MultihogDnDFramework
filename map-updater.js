@@ -8,7 +8,6 @@ import {
 import { sendStateRequest } from './llm-client.js';
 import {
     extractCurrentTimeStr,
-    findNthUserMessageStartIdx,
     formatAgentChatLogFromIndex,
 } from './memo-processor.js';
 import {
@@ -21,9 +20,11 @@ import { isLocationMappingEnabled } from './src/state/section-enabled.js';
 import { parseMapArchitectResponse } from './map-architect-parser.js';
 import { DEFAULT_MAP_UPDATER_SYSTEM_PROMPT } from './map-updater-prompt.js';
 import {
+    BUILDING_POPULATION_MIN_LOOKBACK_TURNS,
     extractPartyMemberNames,
     formatPartyRosterForMapUpdater,
     isPartyMemberAssetName,
+    resolveMapUpdaterStoryWindow,
     validateBuildingPopulationTransaction,
 } from './map-updater-lib.js';
 import {
@@ -38,6 +39,11 @@ import {
     snapshotCampaignLocationsBook,
 } from './router.js';
 import { isMapEvolutionRunning } from './map-evolution.js';
+
+export {
+    BUILDING_POPULATION_MIN_LOOKBACK_TURNS,
+    resolveMapUpdaterStoryWindow,
+} from './map-updater-lib.js';
 
 const MAX_CORRECTION_ATTEMPTS = 2;
 const swipeSnapshots = new Map();
@@ -114,45 +120,9 @@ function requestSettings(settings) {
     };
 }
 
-function mapUpdaterLookbackTurns(settings, lookback) {
-    const requested = Number(lookback);
-    if (Number.isFinite(requested) && requested > 0) return Math.max(1, Math.min(100, requested));
-    const router = Number(settings.routerLookback);
-    if (Number.isFinite(router) && router > 0) return Math.max(1, Math.min(100, router));
-    const architect = Number(settings.mapArchitectLookback);
-    if (Number.isFinite(architect) && architect > 0) return Math.max(1, Math.min(100, architect));
-    return 4;
-}
-
-/**
- * Auto-runs use the since-last-run watermark. Manual runs always use lookback
- * (same as Lorebook Agent's play button), even if the watermark already caught up.
- */
-export function resolveMapUpdaterStoryWindow(chat, settings, { isManual = false, lookback = null } = {}) {
-    const messages = Array.isArray(chat) ? chat : [];
-    const turns = mapUpdaterLookbackTurns(settings, lookback);
-    if (isManual) {
-        return {
-            startIdx: findNthUserMessageStartIdx(messages, turns),
-            sinceLastRun: false,
-        };
-    }
-    const lastLen = Number(settings.mapUpdaterLastRunChatLength) || 0;
-    if (lastLen > 0 && lastLen < messages.length) {
-        return { startIdx: lastLen, sinceLastRun: true };
-    }
-    if (lastLen >= messages.length && messages.length > 0) {
-        return { startIdx: messages.length, sinceLastRun: true };
-    }
-    return {
-        startIdx: findNthUserMessageStartIdx(messages, turns),
-        sinceLastRun: false,
-    };
-}
-
-function recentStoryContext(ctx, settings, { isManual = false, lookback = null } = {}) {
+function recentStoryContext(ctx, settings, { isManual = false, lookback = null, minLookbackTurns = null } = {}) {
     const chat = Array.isArray(ctx.chat) ? ctx.chat : [];
-    const window = resolveMapUpdaterStoryWindow(chat, settings, { isManual, lookback });
+    const window = resolveMapUpdaterStoryWindow(chat, settings, { isManual, lookback, minLookbackTurns });
     return formatAgentChatLogFromIndex(chat, window.startIdx, !!settings.routerIncludeHidden, window.sinceLastRun);
 }
 
@@ -190,7 +160,7 @@ function formatFailure(errors) {
 
 function kindRule(kind) {
     if (kind === 'SETTLEMENT') {
-        return 'Ordinary settlement structures the party enters are BUILDING assets in the current district. OBJECT is props only. SUBDUNGEON/SUBINTERIOR require explicit narrative establishment, and CreateAreaMap—not Map Updater—owns BUILDING promotion. If CURRENT LOCATION names an untracked ordinary structure, ADD_ASSET kind BUILDING. Positional tails such as "behind the general store" or "outside the inn" stay on the district — never invent a BUILDING from that phrasing. When RECENT STORY clearly identifies existing UNREVEALED BUILDING/OBJECT landmarks from outside, SET_ASSET knowledge KNOWN on each match without clearing notEntered. Named people are CREATURE; unnamed bands are one GROUP with count.';
+        return 'Ordinary settlement structures the party enters are BUILDING assets in the current district. OBJECT is props only. SUBDUNGEON/SUBINTERIOR require explicit narrative establishment, and CreateAreaMap—not Map Updater—owns BUILDING promotion. If CURRENT LOCATION names an untracked ordinary structure, ADD_ASSET kind BUILDING. Positional tails such as "behind the general store" or "outside the inn" stay on the district — never invent a BUILDING from that phrasing. When RECENT STORY clearly identifies existing UNREVEALED BUILDING/OBJECT landmarks from outside, SET_ASSET knowledge KNOWN on each match without clearing notEntered. On FIRST-ENTRY BUILDING POPULATION, derive interior CREATURE/GROUP/LOOT/OBJECT contents from the narrative with common sense (do not overcrowd every house with hostiles). Named people are CREATURE; unnamed bands are one GROUP with count.';
     }
     return `${kind === 'INTERIOR' ? 'INTERIOR' : 'DUNGEON'} is room-scale. If the party enters a newly invented room the map lacks, ADD_AREA from the narrative.`;
 }
@@ -238,7 +208,7 @@ ${identity}
 Existing contained assets:
 ${children}
 
-Resolve this lightweight, map-free interior now using the normal flat operations array. Add only narratively appropriate CREATURE, GROUP, OBJECT, LOOT, HAZARD, or TRAP assets with location equal to the exact BUILDING id/name. Reconcile established SUSPECTED contents rather than duplicating them. KNOWN requires observation in RECENT STORY; concealed additions are UNREVEALED; an unconfirmed rumor stays SUSPECTED. An established empty, closed, or abandoned building may add no contents. In every case, explicitly finish with SET_ASSET on the BUILDING using notEntered:false. Do not output noop, ADD_AREA, SUBDUNGEON, SUBINTERIOR, or CreateAreaMap.`;
+Resolve this lightweight, map-free interior now using the normal flat operations array. RECENT STORY was widened for this first-entry pass so you can ground contents in what was established. Derive how many and what kind of CREATURE, GROUP, OBJECT, LOOT, HAZARD, or TRAP assets to add from the narrative and setting — interesting and fitting, not excessive (do not pack every house with enemies when the district is already crowded). Location must equal the exact BUILDING id/name. Reconcile established SUSPECTED contents rather than duplicating them. KNOWN requires observation in RECENT STORY; concealed additions are UNREVEALED; an unconfirmed rumor stays SUSPECTED; certain knowledge may be KNOWN. An established empty, closed, or abandoned building may add no contents. In every case, explicitly finish with SET_ASSET on the BUILDING using notEntered:false. Do not output noop, ADD_AREA, SUBDUNGEON, SUBINTERIOR, or CreateAreaMap.`;
 }
 
 function initialUserPrompt(loaded, recentStory, memo, currentTime, populationTarget = null) {
@@ -349,7 +319,11 @@ export async function runMapUpdaterPass({ isManual = false, lookback = null } = 
         broadcastStep('thought', `Site: ${loaded.context.siteRoot} (${kind})\nCurrent location: ${loaded.currentLocation || 'Unknown'}`);
 
         const snapshot = await snapshotCampaignLocationsBook();
-        const recentStory = recentStoryContext(ctx, settings, { isManual, lookback });
+        const recentStory = recentStoryContext(ctx, settings, {
+            isManual,
+            lookback,
+            minLookbackTurns: populationTarget ? BUILDING_POPULATION_MIN_LOOKBACK_TURNS : null,
+        });
         const memo = settings.currentMemo || '';
         const currentTime = currentTimeFrom(settings, recentStory);
         const systemPrompt = String(settings.mapUpdaterSystemPrompt || DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).trim();

@@ -2,6 +2,12 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.24.2] - 2026-08-22
+
+### Changed
+- **Map Updater BUILDING population**: clarified narrative-driven interior contents (creative, setting-fit, not excessive), rumor/known seeding, and child-map wording.
+- **First-entry lookback**: FIRST-ENTRY BUILDING POPULATION passes now include at least the last 10 user turns of RECENT STORY (or more when the since-last-run window is wider).
+
 ## [2026.8.24.1] - 2026-08-22
 
 ### Changed

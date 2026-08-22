@@ -6,8 +6,80 @@
 const PARTY_FIELD_LINE = /^(Combat|Gear|Proficiencies|Attr|Saves|Skills|Traits|Abilities|Spells|HD|Status)\s*:/i;
 const PARTY_HP_HEADER = /:\s*[+-]?[\d,]+(?:\/[\d,]+)?\s*HP\b/i;
 
+/** First-entry BUILDING population needs enough story to invent interior contents. */
+export const BUILDING_POPULATION_MIN_LOOKBACK_TURNS = 10;
+
 function normalizeAssetRef(value) {
     return String(value || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+}
+
+function findNthUserMessageStartIdx(chat, n = 1) {
+    if (!chat?.length || n <= 0) return 0;
+    let found = 0;
+    for (let i = chat.length - 1; i >= 0; i--) {
+        if (chat[i]?.is_user) {
+            found++;
+            if (found >= n) return i;
+        }
+    }
+    return 0;
+}
+
+function mapUpdaterLookbackTurns(settings, lookback) {
+    const requested = Number(lookback);
+    if (Number.isFinite(requested) && requested > 0) return Math.max(1, Math.min(100, requested));
+    const router = Number(settings?.routerLookback);
+    if (Number.isFinite(router) && router > 0) return Math.max(1, Math.min(100, router));
+    const architect = Number(settings?.mapArchitectLookback);
+    if (Number.isFinite(architect) && architect > 0) return Math.max(1, Math.min(100, architect));
+    return 4;
+}
+
+/**
+ * Auto-runs use the since-last-run watermark. Manual runs always use lookback.
+ * First-entry BUILDING population forces at least BUILDING_POPULATION_MIN_LOOKBACK_TURNS
+ * of user-turn history (or more when the watermark already covers a wider span).
+ */
+export function resolveMapUpdaterStoryWindow(chat, settings, {
+    isManual = false,
+    lookback = null,
+    minLookbackTurns = null,
+} = {}) {
+    const messages = Array.isArray(chat) ? chat : [];
+    const minTurns = Number(minLookbackTurns);
+    const hasMinLookback = Number.isFinite(minTurns) && minTurns > 0;
+    const turns = Math.max(
+        mapUpdaterLookbackTurns(settings, lookback),
+        hasMinLookback ? Math.max(1, Math.min(100, Math.floor(minTurns))) : 0,
+    );
+    const lookbackStart = findNthUserMessageStartIdx(messages, turns);
+
+    if (isManual) {
+        return { startIdx: lookbackStart, sinceLastRun: false };
+    }
+
+    const lastLen = Number(settings?.mapUpdaterLastRunChatLength) || 0;
+    let watermarkStart = null;
+    if (lastLen > 0 && lastLen < messages.length) {
+        watermarkStart = lastLen;
+    } else if (lastLen >= messages.length && messages.length > 0) {
+        watermarkStart = messages.length;
+    }
+
+    if (hasMinLookback) {
+        if (watermarkStart == null) {
+            return { startIdx: lookbackStart, sinceLastRun: false };
+        }
+        return {
+            startIdx: Math.min(lookbackStart, watermarkStart),
+            sinceLastRun: watermarkStart <= lookbackStart,
+        };
+    }
+
+    if (watermarkStart != null) {
+        return { startIdx: watermarkStart, sinceLastRun: true };
+    }
+    return { startIdx: lookbackStart, sinceLastRun: false };
 }
 
 export function validateBuildingPopulationTransaction(transaction, target) {

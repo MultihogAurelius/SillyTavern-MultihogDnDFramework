@@ -9,6 +9,19 @@ import {
     isPartyMemberAssetName,
     partyNameFromHeader,
 } from '../map-updater-lib.js';
+import {
+    BUILDING_POPULATION_MIN_LOOKBACK_TURNS,
+    resolveMapUpdaterStoryWindow,
+} from '../map-updater-lib.js';
+
+function chatWithUserTurns(count) {
+    const chat = [];
+    for (let i = 0; i < count; i++) {
+        chat.push({ is_user: true, mes: `Player turn ${i + 1}` });
+        chat.push({ is_user: false, mes: `Narrator turn ${i + 1}` });
+    }
+    return chat;
+}
 
 describe('Map Updater', () => {
     it('requires an explicit first-entry BUILDING flag clear but permits an intentionally empty result', () => {
@@ -23,6 +36,34 @@ describe('Map Updater', () => {
         const updater = readFileSync(new URL('../map-updater.js', import.meta.url), 'utf8');
         expect(updater).toContain('if (value.noop === true) return true');
         expect(updater).toContain('return Array.isArray(value.operations) && value.operations.length === 0');
+    });
+
+    it('widens auto RECENT STORY to at least 10 user turns for first-entry BUILDING population', () => {
+        expect(BUILDING_POPULATION_MIN_LOOKBACK_TURNS).toBe(10);
+        const chat = chatWithUserTurns(12);
+        // Watermark only covers the latest exchange (last 2 messages).
+        const settings = { mapUpdaterLastRunChatLength: chat.length - 2, routerLookback: 4 };
+        const auto = resolveMapUpdaterStoryWindow(chat, settings, { isManual: false });
+        expect(auto).toEqual({ startIdx: chat.length - 2, sinceLastRun: true });
+
+        const population = resolveMapUpdaterStoryWindow(chat, settings, {
+            isManual: false,
+            minLookbackTurns: BUILDING_POPULATION_MIN_LOOKBACK_TURNS,
+        });
+        // 10 user turns → start at the 3rd user message (index 4) in a 12-turn chat of pairs.
+        expect(population.startIdx).toBe(4);
+        expect(population.startIdx).toBeLessThan(auto.startIdx);
+
+        const widerWatermark = resolveMapUpdaterStoryWindow(chat, {
+            mapUpdaterLastRunChatLength: 0,
+            routerLookback: 4,
+        }, {
+            isManual: false,
+            minLookbackTurns: BUILDING_POPULATION_MIN_LOOKBACK_TURNS,
+        });
+        // No watermark: fall back to the forced 10-turn lookback.
+        expect(widerWatermark.startIdx).toBe(4);
+        expect(widerWatermark.sinceLastRun).toBe(false);
     });
 
     it('formats a compact ID snapshot without dumping every room geometry', () => {
@@ -154,7 +195,7 @@ describe('Map Updater', () => {
         const updater = readFileSync(new URL('../map-updater.js', import.meta.url), 'utf8');
         const hooks = readFileSync(new URL('../narrative-hooks.js', import.meta.url), 'utf8');
         const settingsMarkup = readFileSync(new URL('../settings.html', import.meta.url), 'utf8');
-        expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('You do not write NPC biographies');
+        expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('You do not narrate play');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('KIND: SETTLEMENT');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('ADD_ASSET kind BUILDING');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('OBJECT is props only');
@@ -166,6 +207,10 @@ describe('Map Updater', () => {
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('Streetscape observation');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('newly observed landmarks');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('clearly observed UNREVEALED landmarks become KNOWN without clearing notEntered');
+        expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('BUILDING entry and Asset population');
+        expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('Derive how many and what kind of assets to add to the BUILDING based on the narrative');
+        expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('external combat tracker (not shown to you.)');
+        expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('map-worthy child');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('"op":"ADD_ASSET"');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('"area_id":"shrine-quarter"');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('Never write {"type":"ADD_ASSET","asset":{...}}');
@@ -180,6 +225,8 @@ describe('Map Updater', () => {
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('notEntered:false');
         expect(updater).toContain('Positional tails such as "behind the general store"');
         expect(updater).toContain('SET_ASSET knowledge KNOWN on each match without clearing notEntered');
+        expect(updater).toContain('On FIRST-ENTRY BUILDING POPULATION, derive interior');
+        expect(updater).toContain('Derive how many and what kind of CREATURE, GROUP, OBJECT, LOOT, HAZARD, or TRAP assets');
         expect(updater).toContain('Exterior-relative phrasing');
         expect(updater).toContain('formatPartyRosterForMapUpdater');
         expect(updater).toContain('## CURRENT IN-WORLD TIME (AUTHORITATIVE)');
@@ -196,9 +243,13 @@ describe('Map Updater', () => {
         expect(settingsMarkup).toMatch(/id="rpg_map_updater_max_tokens"[^>]*max="32000"/);
         expect(updater).toContain('export async function runMapUpdaterPass({ isManual = false, lookback = null } = {})');
         expect(updater).toContain('if (settings.mapUpdaterEnabled === false && !isManual)');
-        expect(updater).toContain('export function resolveMapUpdaterStoryWindow');
-        expect(updater).toContain('if (isManual)');
-        expect(updater).toContain('recentStoryContext(ctx, settings, { isManual, lookback })');
+        expect(updater).toContain('resolveMapUpdaterStoryWindow');
+        expect(updater).toContain('BUILDING_POPULATION_MIN_LOOKBACK_TURNS');
+        expect(updater).toContain('minLookbackTurns: populationTarget ? BUILDING_POPULATION_MIN_LOOKBACK_TURNS : null');
+        expect(updater).toContain('RECENT STORY was widened for this first-entry pass');
+        const updaterLib = readFileSync(new URL('../map-updater-lib.js', import.meta.url), 'utf8');
+        expect(updaterLib).toContain('export function resolveMapUpdaterStoryWindow');
+        expect(updaterLib).toContain('export const BUILDING_POPULATION_MIN_LOOKBACK_TURNS = 10');
         expect(hooks).toContain('runMapUpdaterPass');
         expect(hooks).toContain('mapUpdaterRunEvery');
         expect(hooks).toContain('maybeRollbackMapUpdaterForSwipe');

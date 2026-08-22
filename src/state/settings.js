@@ -895,6 +895,15 @@ function getSettingsInternal(extensionSettings) {
         s.settingsVersion = '2026.8.24.1';
     }
 
+    // 2026.8.24.2: BUILDING population guidance + first-entry lookback widening.
+    // Replace only untouched Map Updater prompts from the prior release.
+    if (isOlderThan(s.settingsVersion, '2026.8.24.2')) {
+        if (promptSignature(s.mapUpdaterSystemPrompt) === '12407:1e905713') {
+            s.mapUpdaterSystemPrompt = DEFAULT_MAP_UPDATER_SYSTEM_PROMPT;
+        }
+        s.settingsVersion = '2026.8.24.2';
+    }
+
     // Stamp factory version even when a release has no field rewrites
     // (8.28.0 mapped-site index is prompt/injection only).
     if (isOlderThan(s.settingsVersion, FACTORY_SETTINGS_VERSION)) {
