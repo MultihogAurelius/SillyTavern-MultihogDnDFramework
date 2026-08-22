@@ -62,11 +62,11 @@ describe('Display Groups BETA safety and planning', () => {
 
     it('defensively rejects malformed, overlapping, and dedicated-module membership', () => {
         expect(normalizeDisplayGroups([
-            { id: 'first', name: 'First', members: ['FUEL', 'CHARACTER', 'COMBAT'] },
-            { id: 'second', name: 'Second', members: ['FUEL', 'QUESTS', 'OXYGEN'] },
+            { id: 'first', name: 'First', members: ['FUEL', 'CHARACTER', 'PARTY', 'COMBAT'] },
+            { id: 'second', name: 'Second', members: ['FUEL', 'QUESTS', 'OXYGEN', 'BENCHED PARTY'] },
             { id: '', name: 'Broken', members: ['OTHER'] },
         ])).toEqual([
-            { id: 'first', name: 'First', icon: '🗂️', enabled: true, members: ['FUEL', 'CHARACTER'] },
+            { id: 'first', name: 'First', icon: '🗂️', enabled: true, members: ['FUEL', 'CHARACTER', 'PARTY'] },
             { id: 'second', name: 'Second', icon: '🗂️', enabled: true, members: ['OXYGEN'] },
         ]);
     });

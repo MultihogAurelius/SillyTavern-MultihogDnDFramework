@@ -5,7 +5,6 @@
 
 export const DISPLAY_GROUP_EXCLUDED_TAGS = new Set([
     'COMBAT',
-    'PARTY',
     'BENCHED PARTY',
     'QUESTS',
 ]);
