@@ -2,6 +2,14 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.24.14] - 2026-08-23
+
+### Added
+- **Map Details Map Updater direct prompt**: Direct Prompt on the site inspector targets that map even when it is not the active site (`siteRoot` pass + inspector commit path).
+
+### Changed
+- **Map Details direct prompt UI**: labeled Direct Prompt button aligned with Map Entries / Raw JSON; prompt panel opens below that row.
+
 ## [2026.8.24.12] - 2026-08-22
 
 ### Changed

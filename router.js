@@ -1126,6 +1126,36 @@ export async function loadAllMappedSiteContexts() {
     return { prefix, books, sites, currentLocation };
 }
 
+/**
+ * Load one mapped site by root label for manual Map Updater / inspector passes.
+ * @param {string} siteRoot
+ */
+export async function loadDungeonMapContextForSite(siteRoot) {
+    const wanted = normalizeDungeonLabel(siteRoot);
+    if (!wanted) return null;
+    const loaded = await loadAllMappedSiteContexts();
+    if (!loaded) return null;
+    const site = (loaded.sites || []).find(candidate => normalizeDungeonLabel(candidate.siteRoot) === wanted);
+    if (!site) return null;
+    const footer = loaded.currentLocation || '';
+    const isActiveSite = footer && normalizeDungeonLabel(footer).includes(wanted);
+    return {
+        prefix: loaded.prefix,
+        books: loaded.books,
+        currentLocation: footer,
+        isActiveSite,
+        context: {
+            prefix: loaded.prefix,
+            bookName: site.bookName,
+            uid: site.uid,
+            entryId: site.entryId,
+            siteRoot: site.siteRoot,
+            currentLocation: footer,
+            document: site.document,
+        },
+    };
+}
+
 /** Deep-clone the campaign Locations book for Map Updater swipe restore. */
 export async function snapshotCampaignLocationsBook(ctx = SillyTavern.getContext()) {
     const prefix = getLivePrefix();

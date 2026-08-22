@@ -1020,6 +1020,9 @@ function summarizeMapUpdaterCompanionResult(result) {
     if (skipped === 'no_active_map') {
         return { success: false, status: 'unavailable', message: 'No active dungeon or settlement map.' };
     }
+    if (skipped === 'no_such_map') {
+        return { success: false, status: 'unavailable', message: 'That mapped site could not be loaded.' };
+    }
     if (skipped === 'disabled') {
         return { success: false, status: 'disabled', message: 'Map Updater is disabled.' };
     }

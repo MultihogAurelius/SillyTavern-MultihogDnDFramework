@@ -393,9 +393,30 @@ export async function openDungeonMapReadablePopup(mapDocument, { siteLabel = '',
         <div class="rt-dungeon-map-toolbar">
             <label class="rt-dungeon-map-reveal-toggle"><input type="checkbox" class="rt-dungeon-map-reveal-all"${revealAll ? ' checked' : ''}> Reveal All</label>
         </div>
-        <div class="rt-dungeon-map-view-switch" role="tablist" aria-label="Map view">
-            <button type="button" class="rt-dungeon-map-view-btn rt-dungeon-map-view-btn-active" data-map-view="readable" role="tab" aria-selected="true"><i class="fa-solid fa-list"></i> Map Entries</button>
-            <button type="button" class="rt-dungeon-map-view-btn" data-map-view="raw" role="tab" aria-selected="false" ${revealAll ? '' : 'disabled '}title="${revealAll ? 'Edit raw map JSON' : 'Turn on Reveal All to edit raw JSON'}"><i class="fa-solid fa-code"></i> Raw JSON</button>
+        <section class="rt-dungeon-map-updater-section">
+            <div class="rt-dungeon-map-updater-header">
+                <div class="rt-dungeon-map-updater-title"><i class="fa-solid fa-arrows-rotate"></i> Map Updater</div>
+            </div>
+        </section>
+        <div class="rt-dungeon-map-view-row">
+            <div class="rt-dungeon-map-view-switch" role="tablist" aria-label="Map view">
+                <button type="button" class="rt-dungeon-map-view-btn rt-dungeon-map-view-btn-active" data-map-view="readable" role="tab" aria-selected="true"><i class="fa-solid fa-list"></i> Map Entries</button>
+                <button type="button" class="rt-dungeon-map-view-btn" data-map-view="raw" role="tab" aria-selected="false" ${revealAll ? '' : 'disabled '}title="${revealAll ? 'Edit raw map JSON' : 'Turn on Reveal All to edit raw JSON'}"><i class="fa-solid fa-code"></i> Raw JSON</button>
+            </div>
+            <button type="button" class="menu_button interactable rt-map-updater-direct-toggle" title="Show or hide Map Updater direct prompt" aria-expanded="true"><i class="fa-solid fa-comment-dots"></i> Direct Prompt</button>
+        </div>
+        <div class="rt-map-updater-direct-panel">
+            <div class="rt-map-updater-direct-bar">
+                <textarea class="rt-map-updater-direct-input text_pole" rows="2" placeholder="Instruct Map Updater for this site only… (Enter to run, Shift+Enter for newline)"></textarea>
+                <div class="rt-map-updater-direct-actions">
+                    <label class="rt-map-updater-direct-lookback-label" title="Recent story lookback for this manual Map Updater run">
+                        Ctx
+                        <input type="text" inputmode="numeric" pattern="[0-9]*" class="rt-map-updater-direct-lookback" min="0" max="100" value="10">
+                    </label>
+                    <button type="button" class="rt-map-updater-direct-run menu_button interactable"><i class="fa-solid fa-play"></i> Run</button>
+                </div>
+            </div>
+            <span class="rt-map-updater-direct-status" role="status" aria-live="polite"></span>
         </div>
         <div class="rt-dungeon-graph-scroll rt-dungeon-map-popup-graph" data-map-graph></div>
         <div class="rt-dungeon-map-readable" data-map-panel="readable"></div>
@@ -570,6 +591,10 @@ export async function openDungeonMapReadablePopup(mapDocument, { siteLabel = '',
         await openMapEvolutionTestingGround({ siteRoot: site });
         await reloadInspectorFromLiveMap();
     });
+    bindMapUpdaterDirectControls(popupDom, {
+        siteRoot: site,
+        onSuccess: () => reloadInspectorFromLiveMap(),
+    });
     await ctx.callGenericPopup(popupDom, ctx.POPUP_TYPE?.TEXT ?? 1, '', {
         okButton: 'Close', cancelButton: false, wide: true, large: true,
         allowVerticalScrolling: true,
@@ -716,6 +741,7 @@ function summarizeMapUpdaterResult(result) {
         return { kind: 'warning', message: 'Persistent Maps is off.' };
     }
     if (skipped === 'no_active_map') return { kind: 'warning', message: 'No active dungeon or settlement map.' };
+    if (skipped === 'no_such_map') return { kind: 'warning', message: 'That mapped site could not be loaded.' };
     if (skipped === 'disabled') return { kind: 'warning', message: 'Map Updater is disabled.' };
     if (skipped === 'busy') return { kind: 'warning', message: 'Another agent is already running.' };
     if (skipped === 'stopped') return { kind: 'info', message: 'Stopped.' };
@@ -724,24 +750,26 @@ function summarizeMapUpdaterResult(result) {
     return { kind: 'error', message: 'Could not apply a valid occupancy update.' };
 }
 
-function bindMapUpdaterDirectControls(root) {
-    const mapRoot = root.querySelector('.rt-immersion-map');
-    if (!mapRoot) return;
+function bindMapUpdaterDirectControls(root, { siteRoot = null, onSuccess } = {}) {
+    const scope = root?.querySelector?.('.rt-immersion-map') || root;
+    if (!scope) return;
 
-    const toggle = mapRoot.querySelector('.rt-map-updater-direct-toggle');
-    const panel = mapRoot.querySelector('.rt-map-updater-direct-panel');
-    const input = mapRoot.querySelector('.rt-map-updater-direct-input');
-    const lookbackInput = mapRoot.querySelector('.rt-map-updater-direct-lookback');
-    const runButtons = mapRoot.querySelectorAll('.rt-map-updater-direct-run');
-    const status = mapRoot.querySelector('.rt-map-updater-direct-status');
+    const toggle = scope.querySelector('.rt-map-updater-direct-toggle');
+    const panel = scope.querySelector('.rt-map-updater-direct-panel');
+    const input = scope.querySelector('.rt-map-updater-direct-input');
+    const lookbackInput = scope.querySelector('.rt-map-updater-direct-lookback');
+    const runButtons = scope.querySelectorAll('.rt-map-updater-direct-run');
+    const status = scope.querySelector('.rt-map-updater-direct-status');
 
     const settings = getSettings();
 
     const setPanelOpen = (open) => {
         if (!panel) return;
         panel.hidden = !open;
-        settings.mapUpdaterDirectPromptOpen = open;
-        void saveSettings();
+        if (!siteRoot) {
+            settings.mapUpdaterDirectPromptOpen = open;
+            void saveSettings();
+        }
         if (toggle) {
             toggle.classList.toggle('active', open);
             toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
@@ -753,8 +781,8 @@ function bindMapUpdaterDirectControls(root) {
         if (status) status.textContent = text || '';
     };
 
-    setPanelOpen(Boolean(settings.mapUpdaterDirectPromptOpen));
-    if (input) input.value = settings.mapUpdaterDirectPrompt || '';
+    setPanelOpen(siteRoot ? true : Boolean(settings.mapUpdaterDirectPromptOpen));
+    if (input) input.value = siteRoot ? '' : (settings.mapUpdaterDirectPrompt || '');
     if (lookbackInput) {
         lookbackInput.value = String(settings.mapUpdaterDirectLookback ?? settings.routerLookback ?? 10);
     }
@@ -785,17 +813,24 @@ function bindMapUpdaterDirectControls(root) {
                 isManual: true,
                 lookback,
                 directInstruction,
+                siteRoot: siteRoot || null,
             });
             const summary = summarizeMapUpdaterResult(result);
             mapUpdaterToast(summary.kind, summary.message);
             setStatus(summary.message);
-            if (result?.ok && typeof runtimeState.refreshImmersionView === 'function') {
-                await runtimeState.refreshImmersionView();
+            if (result?.ok) {
+                if (typeof onSuccess === 'function') {
+                    await onSuccess();
+                } else if (typeof runtimeState.refreshImmersionView === 'function') {
+                    await runtimeState.refreshImmersionView();
+                }
             }
             if (clearInput && input) {
                 input.value = '';
-                s.mapUpdaterDirectPrompt = '';
-                void saveSettings();
+                if (!siteRoot) {
+                    s.mapUpdaterDirectPrompt = '';
+                    void saveSettings();
+                }
             }
         } catch (error) {
             const message = String(error?.message || error);
@@ -816,6 +851,7 @@ function bindMapUpdaterDirectControls(root) {
 
     if (input) {
         input.addEventListener('input', () => {
+            if (siteRoot) return;
             const s = getSettings();
             s.mapUpdaterDirectPrompt = String(input.value || '');
             void saveSettings();
@@ -837,7 +873,7 @@ function bindMapUpdaterDirectControls(root) {
         });
     }
 
-    mapRoot.querySelector('.rt-map-updater-direct-run')?.addEventListener('click', (event) => {
+    scope.querySelector('.rt-map-updater-direct-run')?.addEventListener('click', (event) => {
         event.preventDefault();
         event.stopPropagation();
         void runManual({ clearInput: true });

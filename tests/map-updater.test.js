@@ -285,7 +285,7 @@ describe('Map Updater', () => {
         expect(updater).toContain('Exterior-relative phrasing');
         expect(updater).toContain('formatPartyRosterForMapUpdater');
         expect(updater).toContain('## CURRENT IN-WORLD TIME (AUTHORITATIVE)');
-        expect(updater).toContain('initialUserPrompt(loaded, recentStory, memo, currentTime, populationTarget, instruction)');
+        expect(updater).toContain('initialUserPrompt(loaded, recentStory, memo, currentTime, populationTarget, instruction, promptOpts)');
         expect(updater).toContain("'FIRST-ENTRY BUILDING POPULATION'");
         expect(updater).toContain('(MANDATORY THIS PASS)');
         expect(updater).toContain('shouldForceBuildingPopulationPass');
@@ -297,7 +297,8 @@ describe('Map Updater', () => {
         const defaults = readFileSync(new URL('../src/state/defaults.js', import.meta.url), 'utf8');
         expect(defaults).toContain('mapUpdaterMaxTokens: 25000');
         expect(settingsMarkup).toMatch(/id="rpg_map_updater_max_tokens"[^>]*max="32000"/);
-        expect(updater).toContain("export async function runMapUpdaterPass({ isManual = false, lookback = null, buildingIntent = '', directInstruction = '' } = {})");
+        expect(updater).toContain('siteRoot = null');
+        expect(updater).toContain('loadDungeonMapContextForSite');
         expect(updater).toContain('DIRECT INSTRUCTION (THIS PASS ONLY)');
         expect(updater).toContain('export async function onMapUpdaterUserMessage(messageId)');
         expect(updater).toContain('resolveBuildingIntentPopulationTarget');

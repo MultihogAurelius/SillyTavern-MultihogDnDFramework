@@ -5428,6 +5428,18 @@ textarea.rt-cr-input {
     border-radius: 8px;
     background: rgba(0, 0, 0, 0.24);
 }
+.rt-dungeon-map-view-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+.rt-dungeon-map-view-row .rt-dungeon-map-view-switch {
+    margin-bottom: 0;
+    flex: 1 1 auto;
+    min-width: 0;
+}
 
 .rt-dungeon-map-view-btn {
     display: inline-flex;
@@ -8067,6 +8079,39 @@ textarea.rt-cr-input {
     opacity: 0.75;
     line-height: 1.2;
     min-height: 0;
+}
+.rt-dungeon-map-popup .rt-map-updater-direct-panel[hidden] {
+    display: none !important;
+}
+.rt-dungeon-map-popup .rt-map-updater-direct-panel:not([hidden]) {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 0 0 12px;
+    padding: 0;
+}
+.rt-dungeon-map-updater-section {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 8px 0 4px;
+}
+.rt-dungeon-map-updater-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.rt-dungeon-map-updater-title {
+    font-size: 0.82em;
+    font-weight: 600;
+    opacity: 0.85;
+}
+.rt-dungeon-map-popup .rt-map-updater-direct-toggle {
+    font-size: 0.85em;
+    text-transform: none;
+    letter-spacing: 0;
+    margin: 0;
+    white-space: nowrap;
 }
 .rt-map-updater-direct-toggle.active {
     color: var(--rt-accent, #5eb8d4);
