@@ -6,6 +6,7 @@
 
 import {
     normalizeDungeonMapDocument,
+    resolveAssetEffectiveArea,
     resolveCurrentMapPlacement,
 } from './dungeon-reality.js';
 import {
@@ -90,13 +91,17 @@ export function buildDungeonMapGraph(document, { playerFacing = true, currentLoc
         }
     }
     const visibleIds = new Set([...known, ...fog]);
+    const effectiveAssets = map.assets.map(asset => ({
+        ...asset,
+        location: resolveAssetEffectiveArea(map, asset)?.id || asset.location,
+    }));
     const nodes = map.areas
         .filter(area => visibleIds.has(area.id))
         .map(area => {
             const fogged = fog.has(area.id);
             const icons = fogged
                 ? []
-                : collectAreaAssetIcons(map.assets, area.id, { playerFacing });
+                : collectAreaAssetIcons(effectiveAssets, area.id, { playerFacing });
             return {
                 id: area.id,
                 name: area.name,
@@ -362,15 +367,16 @@ function areaDisplayName(id, revealAll, visibleIds, areasById) {
  * @param {{ revealAll?: boolean }} [options]
  */
 export function renderDungeonMapReadableHtml(mapDocument, { revealAll = true } = {}) {
-    const areas = Array.isArray(mapDocument?.areas) ? mapDocument.areas : [];
-    const assets = Array.isArray(mapDocument?.assets) ? mapDocument.assets : [];
+    const map = normalizeDungeonMapDocument(mapDocument, mapDocument?.site);
+    const areas = map.areas;
+    const assets = map.assets;
     const visibleAreas = revealAll ? areas : areas.filter(isPlayerVisibleArea);
     const visibleIds = new Set(visibleAreas.map(area => area.id));
     const areasById = new Map(areas.map(area => [area.id, area]));
     const visibleAssets = revealAll ? assets : assets.filter(asset => {
         if (!isPlayerVisibleAsset(asset)) return false;
         if (!asset.location) return true;
-        return visibleIds.has(asset.location);
+        return visibleIds.has(resolveAssetEffectiveArea(map, asset)?.id);
     });
     const renderTag = (value, className = '') => `<span class="rt-dungeon-map-tag ${className}">${escapeHtml(value)}</span>`;
     const renderAsset = (asset) => {
@@ -390,10 +396,12 @@ export function renderDungeonMapReadableHtml(mapDocument, { revealAll = true } =
         if (asset.last_location) {
             metadata.push(`<b>Last location:</b> ${escapeHtml(areaDisplayName(asset.last_location, revealAll, visibleIds, areasById))}`);
         }
+        const children = visibleAssets.filter(candidate => candidate.location === asset.id);
         return `<div class="rt-dungeon-map-asset">
                     <div class="rt-dungeon-map-asset-head"><i class="fa-solid fa-diamond"></i><strong>${escapeHtml(asset.name)}</strong>${renderTag(asset.kind)}${renderTag(asset.state, 'rt-dungeon-map-state')}${renderTag(asset.knowledge, 'rt-dungeon-map-knowledge')}</div>
                     ${asset.detail ? `<div class="rt-dungeon-map-asset-detail">${escapeHtml(asset.detail)}</div>` : ''}
                     ${metadata.length ? `<div class="rt-dungeon-map-asset-meta">${metadata.join('<span class="rt-dungeon-map-meta-sep">&bull;</span>')}</div>` : ''}
+                    ${children.length ? `<div class="rt-dungeon-map-assets rt-dungeon-map-contained">${children.map(renderAsset).join('')}</div>` : ''}
                 </div>`;
     };
     const renderArea = (area) => {
@@ -417,7 +425,7 @@ export function renderDungeonMapReadableHtml(mapDocument, { revealAll = true } =
                     ${areaAssets.length ? `<div class="rt-dungeon-map-assets"><span class="rt-dungeon-map-section-label">Assets (${areaAssets.length})</span>${areaAssets.map(renderAsset).join('')}</div>` : ''}
                 </section>`;
     };
-    const unplaced = visibleAssets.filter(asset => !asset.location || !areasById.has(asset.location));
+    const unplaced = visibleAssets.filter(asset => (!asset.location || (!areasById.has(asset.location) && !assets.some(parent => parent.id === asset.location))));
     if (!visibleAreas.length && !unplaced.length) {
         return '<div class="rt-dungeon-map-empty">No revealed rooms yet.</div>';
     }

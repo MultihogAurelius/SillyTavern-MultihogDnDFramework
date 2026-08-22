@@ -2,6 +2,12 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.22.2] - 2026-08-22
+
+### Fixed
+- **Hosted map placement**: promoting a settlement asset now stores or reuses its map at `Settlement :: District :: Asset` instead of creating an unrelated top-level Location. Full-path activation keeps identically named buildings in different settlements distinct.
+- **Mapped-area footers**: narrator guidance now requires the exact current room/area after a hosted peer breadcrumb, including four-tier paths such as `Ashford, North Residential Streets, Residential House, Kitchen Passage`; active map canon flags an incomplete site-only footer for correction.
+
 ## [2026.8.22.1] - 2026-08-22
 
 ### Changed
@@ -3242,3 +3248,8 @@ Significant upgrades to editing custom fields. The formatting is now clear, and 
 - **HUD Controls**: Added "SYSPROMPT" and "RNG" toggle buttons directly to the tracker panel.
 - **Optimized Layout**: Reordered sections to prioritize Character and Combat status over meta-stats like XP and Time.
 - **Factory Reset**: Added a "Factory Reset" button to the settings panel for easy recovery of default prompts.
+# 2026.8.22.3
+
+- Added map-free BUILDING containers with deterministic first-entry population through the normal Map Updater pass, explicit rumor-seeded SUSPECTED contents, and atomic off-screen Evolution population.
+- Asset placement now supports the closed containment pairs BUILDING → occupants/objects/loot/hazards/traps and CREATURE/GROUP → carried objects/loot, including effective-area movement, filtering, inspection, and presentation.
+- Untouched Map Architect, Map Updater, and Map Evolution prompts migrate to the new container policy while customized prompts remain unchanged.

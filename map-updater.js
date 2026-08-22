@@ -15,6 +15,7 @@ import {
     applyDungeonMapTransaction,
     formatDungeonMapForUpdater,
     normalizeMapSiteKind,
+    resolveBuildingPopulationTarget,
 } from './dungeon-reality.js';
 import { isLocationMappingEnabled } from './src/state/section-enabled.js';
 import { parseMapArchitectResponse } from './map-architect-parser.js';
@@ -23,6 +24,7 @@ import {
     extractPartyMemberNames,
     formatPartyRosterForMapUpdater,
     isPartyMemberAssetName,
+    validateBuildingPopulationTransaction,
 } from './map-updater-lib.js';
 import {
     appendEvolutionThreads,
@@ -45,6 +47,18 @@ let _mapUpdaterController = null;
 
 export function isMapUpdaterRunning() {
     return _mapUpdaterRunning;
+}
+
+/** Check the post-GM footer without invoking a model; used only to bypass cadence on first entry. */
+export async function shouldForceBuildingPopulationPass() {
+    if (!isLocationMappingEnabled(getSettings())) return false;
+    try {
+        const loaded = await loadActiveDungeonMapContext();
+        return !!(loaded?.context && resolveBuildingPopulationTarget(loaded.context.document, loaded.currentLocation));
+    } catch (error) {
+        console.warn('[RPG Tracker] Could not check BUILDING first-entry population:', error);
+        return false;
+    }
 }
 
 /**
@@ -207,7 +221,27 @@ function rejectPartyMemberAssets(transaction, memo) {
     });
 }
 
-function initialUserPrompt(loaded, recentStory, memo, currentTime) {
+function formatBuildingPopulationBundle(target) {
+    if (!target) return '';
+    const identity = target.building
+        ? `Building: ${target.building.id} | ${target.building.name}\nDetail: ${target.building.detail || '(none)'}\nOwner: ${target.building.owner || '(none)'}`
+        : `Untracked building name: ${target.untrackedName}\nCreate this BUILDING in ${target.area.id} before adding its contents.`;
+    const children = target.children.length
+        ? target.children.map(asset => `- ${asset.id} | ${asset.kind} | ${asset.name} | ${asset.state} | ${asset.knowledge} | ${asset.detail || ''}`).join('\n')
+        : '- None.';
+    return `
+## FIRST-ENTRY BUILDING POPULATION (MANDATORY THIS PASS)
+The completed GM footer places the party inside this BUILDING for the first unresolved time.
+District: ${target.area.id} | ${target.area.name}
+District geometry: ${(target.area.geometry || [])[0] || '(none)'}
+${identity}
+Existing contained assets:
+${children}
+
+Resolve this lightweight, map-free interior now using the normal flat operations array. Add only narratively appropriate CREATURE, GROUP, OBJECT, LOOT, HAZARD, or TRAP assets with location equal to the exact BUILDING id/name. Reconcile established SUSPECTED contents rather than duplicating them. KNOWN requires observation in RECENT STORY; concealed additions are UNREVEALED; an unconfirmed rumor stays SUSPECTED. An established empty, closed, or abandoned building may add no contents. In every case, explicitly finish with SET_ASSET on the BUILDING using notEntered:false. Do not output noop, ADD_AREA, SUBDUNGEON, SUBINTERIOR, or CreateAreaMap.`;
+}
+
+function initialUserPrompt(loaded, recentStory, memo, currentTime, populationTarget = null) {
     const kind = normalizeMapSiteKind(loaded.context.document?.kind);
     return `UPDATE THE ATTACHED MAP
 Exact site root: ${loaded.context.siteRoot}
@@ -224,6 +258,7 @@ Compare absolute asset duration timestamps against this value. A met or passed b
 
 ## CURRENT MAP
 ${formatDungeonMapForUpdater(loaded.context.document, loaded.currentLocation)}
+${formatBuildingPopulationBundle(populationTarget)}
 
 ## RECENT STORY
 ${recentStory || '(No additional recent context.)'}
@@ -231,7 +266,7 @@ ${recentStory || '(No additional recent context.)'}
 Output only the required JSON object. Use {"noop":true} when no durable map fact changed.`;
 }
 
-function correctionPrompt(loaded, recentStory, priorOutput, errors, attempt, memo, currentTime) {
+function correctionPrompt(loaded, recentStory, priorOutput, errors, attempt, memo, currentTime, populationTarget = null) {
     return `CORRECTION PASS ${attempt}
 Your previous map update was rejected. Return a complete corrected JSON object, not a patch. Reuse the same operation_id unless the error says to mint a new one.
 
@@ -251,6 +286,7 @@ ${currentTime || 'Unknown'}
 
 ## CURRENT MAP
 ${formatDungeonMapForUpdater(loaded.context.document, loaded.currentLocation)}
+${formatBuildingPopulationBundle(populationTarget)}
 
 ## RECENT STORY
 ${recentStory || '(No additional recent context.)'}
@@ -309,6 +345,7 @@ export async function runMapUpdaterPass({ isManual = false, lookback = null } = 
         broadcastStep('start', 'Initializing Map Updater...');
 
         const kind = normalizeMapSiteKind(loaded.context.document?.kind);
+        const populationTarget = resolveBuildingPopulationTarget(loaded.context.document, loaded.currentLocation);
         broadcastStep('thought', `Site: ${loaded.context.siteRoot} (${kind})\nCurrent location: ${loaded.currentLocation || 'Unknown'}`);
 
         const snapshot = await snapshotCampaignLocationsBook();
@@ -316,7 +353,7 @@ export async function runMapUpdaterPass({ isManual = false, lookback = null } = 
         const memo = settings.currentMemo || '';
         const currentTime = currentTimeFrom(settings, recentStory);
         const systemPrompt = String(settings.mapUpdaterSystemPrompt || DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).trim();
-        let prompt = initialUserPrompt(loaded, recentStory, memo, currentTime);
+        let prompt = initialUserPrompt(loaded, recentStory, memo, currentTime, populationTarget);
         let lastIssues = [];
 
         for (let attempt = 0; attempt <= MAX_CORRECTION_ATTEMPTS; attempt++) {
@@ -336,7 +373,7 @@ export async function runMapUpdaterPass({ isManual = false, lookback = null } = 
             if (!parsed.value) {
                 lastIssues = [{ code: 'INVALID_JSON', path: '$', hint: parsed.error || 'No JSON object was found.' }];
                 if (attempt < MAX_CORRECTION_ATTEMPTS) {
-                    prompt = correctionPrompt(loaded, recentStory, output, lastIssues, attempt + 1, memo, currentTime);
+                    prompt = correctionPrompt(loaded, recentStory, output, lastIssues, attempt + 1, memo, currentTime, populationTarget);
                     continue;
                 }
                 break;
@@ -345,22 +382,40 @@ export async function runMapUpdaterPass({ isManual = false, lookback = null } = 
             if (partyIssues.length) {
                 lastIssues = partyIssues;
                 if (attempt < MAX_CORRECTION_ATTEMPTS) {
-                    prompt = correctionPrompt(loaded, recentStory, output, lastIssues, attempt + 1, memo, currentTime);
+                    prompt = correctionPrompt(loaded, recentStory, output, lastIssues, attempt + 1, memo, currentTime, populationTarget);
                     continue;
                 }
                 break;
             }
             if (isMapUpdaterNoop(parsed.value)) {
+                const populationIssues = validateBuildingPopulationTransaction(parsed.value, populationTarget);
+                if (populationIssues.length) {
+                    lastIssues = populationIssues;
+                    if (attempt < MAX_CORRECTION_ATTEMPTS) {
+                        prompt = correctionPrompt(loaded, recentStory, output, lastIssues, attempt + 1, memo, currentTime, populationTarget);
+                        continue;
+                    }
+                    break;
+                }
                 finishMapUpdater(ctx, snapshot, { applied: false });
                 if (settings.debugMode) console.log('[RPG Tracker] Map Updater: noop.');
                 broadcastStep('finish', 'Noop — no durable map fact changed.');
                 return { ok: true, noop: true };
             }
+            const populationIssues = validateBuildingPopulationTransaction(parsed.value, populationTarget);
+            if (populationIssues.length) {
+                lastIssues = populationIssues;
+                if (attempt < MAX_CORRECTION_ATTEMPTS) {
+                    prompt = correctionPrompt(loaded, recentStory, output, lastIssues, attempt + 1, memo, currentTime, populationTarget);
+                    continue;
+                }
+                break;
+            }
             const validation = applyDungeonMapTransaction(loaded.context.document, parsed.value, { currentTime });
             if (!validation.ok) {
                 lastIssues = validation.errors || [];
                 if (attempt < MAX_CORRECTION_ATTEMPTS) {
-                    prompt = correctionPrompt(loaded, recentStory, output, lastIssues, attempt + 1, memo, currentTime);
+                    prompt = correctionPrompt(loaded, recentStory, output, lastIssues, attempt + 1, memo, currentTime, populationTarget);
                     continue;
                 }
                 break;
@@ -370,7 +425,7 @@ export async function runMapUpdaterPass({ isManual = false, lookback = null } = 
             if (!mapResult.ok) {
                 lastIssues = mapResult.errors || [{ code: mapResult.code || 'MAP_COMMIT_FAILED', path: 'map', hint: 'Persistence rejected the transaction.' }];
                 if (attempt < MAX_CORRECTION_ATTEMPTS && mapResult.retryable !== false) {
-                    prompt = correctionPrompt(loaded, recentStory, output, lastIssues, attempt + 1, memo, currentTime);
+                    prompt = correctionPrompt(loaded, recentStory, output, lastIssues, attempt + 1, memo, currentTime, populationTarget);
                     continue;
                 }
                 break;

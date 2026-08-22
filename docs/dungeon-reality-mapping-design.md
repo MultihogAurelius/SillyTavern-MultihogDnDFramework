@@ -106,7 +106,13 @@ When creating a settlement, Architect may organically seed a small number of unm
 
 An explicit `CreateAreaMap(kind=DUNGEON|INTERIOR)` call while the host settlement is active promotes the exact BUILDING to SUBDUNGEON or SUBINTERIOR. An already matching SUB asset is retained, a conflicting SUB kind is rejected, and a missing exact asset is added to the current district as KNOWN / ACTIVE / NARRATOR_ESTABLISHED. Peer creation, parent promotion, host stamping, and CORE mirroring share one Locations-book save. Existing peer room graphs are preserved.
 
-An enemy exists once at site level and has one `location`. Movement updates that field instead of copying enemy prose between rooms. Optional `behavior` and `route` fields bound Map Updater's autonomous reactions.
+The tool call continues to use the exact settlement asset name, but runtime storage is namespaced under the resolved hierarchy: `Settlement :: District :: Asset`. If that child Location already exists, its lore entry is reused. Map activation matches the complete path, so common leaf names such as “Residential House” do not collide across settlements.
+
+While a room-scale peer is active, the narrator footer preserves that complete breadcrumb and appends the exact current map area: `Settlement, District, Asset, Area`. It must not stop at the asset/site tier once narration places the party in a particular room. This final area segment is what places the player bubble for Map Updater and map highlighting.
+
+An asset exists once at site level and has one `location`. That reference is normally an area ID, but the closed container model also permits `BUILDING → CREATURE/GROUP/OBJECT/LOOT/HAZARD/TRAP` and `CREATURE/GROUP → OBJECT/LOOT`. Effective placement follows the parent chain, so moving a creature carries its inventory and removing a container takes its descendants off-map without destroying their associations. Routes remain area-only.
+
+Map Architect always places initial assets directly in areas and creates BUILDING empty. Runtime stamps every new or legacy BUILDING missing the field with `notEntered: true`. After the GM footer first resolves inside that BUILDING, the normal Map Updater pass is forced regardless of cadence and receives a deterministic population bundle. It adds or reconciles contained assets—or records an intentionally empty result—and explicitly clears `notEntered` in the same atomic transaction. An explicit GM rumor may add a legal contained asset as `SUSPECTED` without clearing the flag. Off-screen Evolution may populate first, but must explicitly clear the same flag in that transaction.
 
 Entities are either a named individual (`kind: CREATURE`, omit `count` or use `1`) or a pack (`kind: GROUP` with optional integer `count` 2–99). A patrol, garrison, swarm, or unnamed band is **one** GROUP asset, not many identical singleton CREATUREs. `SET_ASSET` may change `count` for attrition or restock. `0` is invalid — use `DESTROYED` or `DEAD` when none remain.
 
@@ -160,7 +166,7 @@ Pinned mapped roots may keep their visible `[CORE]` text active outside the site
 
 Map Updater is a dedicated one-shot JSON pass (shared Map Updater & Evolution connection, separate from Map Architect). It emits either `{"noop":true}` or an occupancy transaction. Lorebook Agent no longer receives `inspect_map`, `list_map_assets`, `commit.map`, or `[MAP_COMMIT]`.
 
-The two occupancy/lore cadences are independent: Map Updater defaults to every turn; Lorebook Agent defaults to every 3 messages. The Lorebook Agent header play button expands into a manual choice between Lorebook Agent, Map Updater, and Map Evolution.
+The two occupancy/lore cadences are independent: Map Updater defaults to every turn; Lorebook Agent defaults to every 3 messages. Pending BUILDING first entry bypasses the Map Updater cadence but uses that same pass rather than a separate generation event. The Lorebook Agent header play button expands into a manual choice between Lorebook Agent, Map Updater, and Map Evolution.
 
 ## Map Evolution
 
@@ -202,7 +208,7 @@ Pipeline after each narrator reply: State Tracker → Map Updater (occupancy) �
 
 Tests cover Map Architect response parsing, strict connected-graph validation, hidden-wrapper compatibility, prose migration, structured storage, geometry/assets separation, movement, destruction, duplicate detection, strict schemas, semantic rejection without partial mutation, hierarchy activation, prompt filtering, narrator injection, dedicated settings/connection wiring, Map Updater occupancy updates, location-dossier map stripping, prose report routing, scheduled Map Evolution/EVOLVED transaction rules, cumulative per-site Evolution backlogs, causal threads and killed-by attribution, and Lorebook Agent map stripping.
 
-Nested-site coverage includes INTERIOR/NONE enums and defaults, room bounds, host pairing, settlement-only assets, mixed peer absorption, exact-name and conflicting-host failures, BUILDING/SUB promotion, missing-asset creation, existing-peer reuse, deepest activation, district highlighting, host injection/CORE mirroring, and preservation of legacy OBJECT buildings and peaceful DUNGEON maps.
+Nested-site coverage includes INTERIOR/NONE enums and defaults, room bounds, host pairing, settlement-only assets, mixed peer absorption, exact-name and conflicting-host failures, BUILDING/SUB promotion, missing-asset creation, existing-peer reuse, deepest activation, district highlighting, host injection/CORE mirroring, BUILDING/container validation and first-entry population, and preservation of legacy OBJECT buildings and peaceful DUNGEON maps.
 
 ## Atomic map transaction
 

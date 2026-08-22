@@ -13,12 +13,14 @@ import {
     defaultMapSiteThreat,
     parseDungeonMapDocument,
     resolveCurrentMapPlacement,
+    settlementAbsorptionMatchesCurrentPeer,
     stripCapturedDungeonMapsFromPrompt,
     canonicalizeReciprocalConnectionDetails,
     validateDungeonMapArchitecture,
 } from './dungeon-reality.js';
 import { locationRootExists, persistArchitectDungeonMap, syncDungeonMapsToLocationLorebook } from './router.js';
 import { DEFAULT_MAP_ARCHITECT_BRIEF_SYSTEM_PROMPT, DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT } from './map-architect-prompt.js';
+import { buildHostedPeerSitePath } from './map-hosting.js';
 import { parseMapArchitectResponse } from './map-architect-parser.js';
 import { MAP_ARCHITECT_BRIEF_JSON_SCHEMA, MAP_ARCHITECT_JSON_SCHEMA } from './map-architect-schema.js';
 import { extractCurrentTimeStr } from './memo-processor.js';
@@ -224,13 +226,30 @@ function resolveHostedCreationContext(current, currentLocation, args) {
         ? hostDocument.areas.find(area => area.id === exactAsset.location)
         : placement.area;
     if (!hostArea) return null;
+    const hostedAsset = exactAsset || { name: args.site, location: hostArea.id };
     return {
         hostSite: active.siteRoot,
         hostEntryId: active.entryId,
         hostAreaId: hostArea.id,
+        assetName: args.site,
+        peerSite: buildHostedPeerSitePath(hostDocument, hostedAsset),
         expectedAssetKind,
         premise: args.premise,
     };
+}
+
+function findExistingArchitectSite(sites, requestedSite, hostContext = null) {
+    const records = Object.values(sites || {});
+    if (!hostContext) {
+        return records.find(record => dungeonSiteRootsMatch(record?.siteRoot, requestedSite));
+    }
+    const canonical = records.find(record => dungeonSiteRootsMatch(record?.siteRoot, hostContext.peerSite));
+    if (canonical) return canonical;
+    return records.find(record => {
+        if (!record?.mapChunks?.length || !dungeonSiteRootsMatch(record.siteRoot, requestedSite)) return false;
+        const document = parseDungeonMapDocument(record.mapChunks[0], record.siteRoot).document;
+        return !document.hostSite || document.hostSite === hostContext.hostSite;
+    });
 }
 
 function initialUserPrompt(args, context, referenceContext = '', currentLocation = '', currentTime = '', includeManifest = []) {
@@ -315,8 +334,9 @@ async function runMapArchitectOnce(rawArgs) {
     }
     const includeManifest = resolveIncludeManifest(include, current.sites, args.site);
     const currentLocation = findLatestDungeonLocation(ctx.chat || []);
+    const absorbsCurrentPeer = settlementAbsorptionMatchesCurrentPeer(args.kind, currentLocation, includeManifest);
     const hostContext = resolveHostedCreationContext(current, currentLocation, args);
-    const existing = Object.values(current.sites || {}).find(record => dungeonSiteRootsMatch(record?.siteRoot, args.site));
+    const existing = findExistingArchitectSite(current.sites, args.site, hostContext);
     if (existing?.mapChunks?.length) {
         if (includeManifest.length) {
             throw mapArchitectFailure('include[] cannot modify a SETTLEMENT that already has a stored map.');
@@ -335,7 +355,7 @@ async function runMapArchitectOnce(rawArgs) {
         throw mapArchitectFailure(`A location named "${args.site}" already exists. Use + MAP on that root instead.`);
     }
 
-    if (currentLocation && !locationContainsSiteRoot(currentLocation, args.site) && !rawArgs?.allowOffsite && !hostContext) {
+    if (currentLocation && !locationContainsSiteRoot(currentLocation, args.site) && !rawArgs?.allowOffsite && !hostContext && !absorbsCurrentPeer) {
         throw mapArchitectFailure(mapSiteFooterMismatchHint(args.site, currentLocation));
     }
 

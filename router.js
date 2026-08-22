@@ -46,13 +46,14 @@ import {
     resolveActiveDungeonSite,
     resolveCurrentMapPlacement,
     serializeDungeonMapDocument,
+    settlementAbsorptionMatchesCurrentPeer,
     stripDungeonMapSection,
     collectDungeonMapHistorySnapshot,
     applyDungeonMapHistorySnapshotToBook,
     DUNGEON_MAP_OPERATION_IDS_KEY,
 } from './dungeon-reality.js';
 import { recordLiveDungeonMapSnapshot } from './src/state/dungeon-map-history.js';
-import { ensureHostCoreMirror, stampHostedPeerDocument } from './map-hosting.js';
+import { buildHostedPeerSitePath, ensureHostCoreMirror, stampHostedPeerDocument } from './map-hosting.js';
 import { clearEvolutionHistoryForSite, setSiteEvolutionIntervalOverride } from './map-evolution-lib.js';
 import {
     buildWorldProgressionLocationDossiers,
@@ -655,6 +656,44 @@ function promoteSettlementPeerAsset(hostDocument, site, expectedKind, areaId, pr
     return asset;
 }
 
+function findArchitectMapEntry(entries, canonicalSite, requestedSite, hostContext) {
+    const rows = Object.values(entries || {});
+    const mapped = rows.filter(entry => getDungeonMapAttachment(entry));
+    const canonical = mapped.find(entry => {
+        const attachment = getDungeonMapAttachment(entry);
+        return dungeonSiteRootsMatch(attachment.siteRoot, canonicalSite);
+    });
+    if (canonical) return canonical;
+    if (hostContext) {
+        const compatibleLegacy = mapped.find(entry => {
+            const attachment = getDungeonMapAttachment(entry);
+            if (!dungeonSiteRootsMatch(attachment.siteRoot, requestedSite)) return false;
+            const document = parseDungeonMapDocument(attachment.content, attachment.siteRoot).document;
+            return !document.hostSite || document.hostSite === hostContext.hostSite;
+        });
+        if (compatibleLegacy) return compatibleLegacy;
+        return rows.find(entry => String(entry?.comment || '').trim() === canonicalSite) || null;
+    }
+    return rows.find(entry => {
+        const label = String(entry?.comment || '').trim();
+        return label && !label.includes('::') && dungeonSiteRootsMatch(label, canonicalSite);
+    }) || null;
+}
+
+function moveLocationEntryUnderHostedPath(entries, entry, canonicalSite, requestedSite) {
+    const oldLabel = String(entry?.comment || '').trim();
+    if (!oldLabel || oldLabel === canonicalSite) return;
+    for (const candidate of Object.values(entries || {})) {
+        if (!candidate || candidate === entry) continue;
+        const label = String(candidate.comment || '').trim();
+        if (label.startsWith(`${oldLabel} :: `)) {
+            candidate.comment = `${canonicalSite}${label.slice(oldLabel.length)}`;
+        }
+    }
+    entry.comment = canonicalSite;
+    entry.key = cleanKeys([requestedSite, canonicalSite, ...(Array.isArray(entry.key) ? entry.key : [])]);
+}
+
 /**
  * Atomically attach a validated Map Architect document to its root Location.
  * Existing maps always win: concurrent/repeated tool calls never overwrite canon.
@@ -670,9 +709,10 @@ export async function persistArchitectDungeonMap(siteRoot, mapDocument, {
     const ctx = SillyTavern.getContext();
     const settings = getSettings();
     const prefix = getLivePrefix();
-    const site = String(siteRoot || '').trim();
+    const requestedSite = String(siteRoot || '').trim();
+    const site = String(hostContext?.peerSite || requestedSite).trim();
     if (!prefix) throw new Error('No campaign prefix is available for the Locations lorebook.');
-    if (!site) throw new Error('Map Architect requires an exact site root.');
+    if (!requestedSite || !site) throw new Error('Map Architect requires an exact site root.');
 
     const bookName = `${prefix}_Locations`;
     const bookKnown = await isWorldInfoBookKnown(bookName, ctx);
@@ -694,10 +734,7 @@ export async function persistArchitectDungeonMap(siteRoot, mapDocument, {
         };
     }
 
-    let rootEntry = Object.values(bookData.entries || {}).find(entry => {
-        const label = String(entry?.comment || '').trim();
-        return label && !label.includes('::') && dungeonSiteRootsMatch(label, site);
-    });
+    let rootEntry = findArchitectMapEntry(bookData.entries, site, requestedSite, hostContext);
     const existingAttachment = rootEntry ? getDungeonMapAttachment(rootEntry) : null;
     if (existingAttachment) {
         if (requireNew) {
@@ -712,7 +749,7 @@ export async function persistArchitectDungeonMap(siteRoot, mapDocument, {
                 entryId: `${bookName}::${rootEntry.uid}`,
                 created: false,
                 existing: true,
-                document: parseDungeonMapDocument(existingAttachment.content, site).document,
+                document: parseDungeonMapDocument(existingAttachment.content, existingAttachment.siteRoot).document,
             };
         }
     }
@@ -722,7 +759,8 @@ export async function persistArchitectDungeonMap(siteRoot, mapDocument, {
     }
 
     const currentLocation = findLatestDungeonLocation(ctx.chat || []);
-    if (!rootEntry && currentLocation && !locationContainsSiteRoot(currentLocation, site) && !allowOffsite && !hostContext) {
+    const absorbsCurrentPeer = settlementAbsorptionMatchesCurrentPeer(mapDocument.kind, currentLocation, includeManifest);
+    if (!rootEntry && currentLocation && !locationContainsSiteRoot(currentLocation, site) && !allowOffsite && !hostContext && !absorbsCurrentPeer) {
         throw new Error(mapSiteFooterMismatchHint(site, currentLocation));
     }
 
@@ -732,10 +770,13 @@ export async function persistArchitectDungeonMap(siteRoot, mapDocument, {
         const coreBody = String(locationCore || '').trim();
         const coreContent = /\[CORE\]/i.test(coreBody)
             ? coreBody
-            : `[CORE]\n${coreBody || `${site} is a mapped site. Its private map stores current objective reality; child Location entries preserve player-observable history.`}\n[/CORE]`;
+            : `[CORE]\n${coreBody || `${requestedSite} is a mapped site. Its private map stores current objective reality; child Location entries preserve player-observable history.`}\n[/CORE]`;
         rootEntry = {
             uid: nextUid,
-            key: locationKeysForNewRoot(site, locationKeys),
+            key: locationKeysForNewRoot(requestedSite, [
+                site,
+                ...(Array.isArray(locationKeys) ? locationKeys : String(locationKeys || '').split(/[,;\n]/)),
+            ]),
             keysecondary: [],
             comment: site,
             content: coreContent,
@@ -758,7 +799,7 @@ export async function persistArchitectDungeonMap(siteRoot, mapDocument, {
     }
 
     let persistedDocument = existingAttachment
-        ? parseDungeonMapDocument(existingAttachment.content, site).document
+        ? parseDungeonMapDocument(existingAttachment.content, existingAttachment.siteRoot).document
         : JSON.parse(JSON.stringify(mapDocument));
 
     if (hostContext) {
@@ -771,17 +812,23 @@ export async function persistArchitectDungeonMap(siteRoot, mapDocument, {
         const hostDocument = parseDungeonMapDocument(hostAttachment.content, hostContext.hostSite).document;
         const hostAsset = promoteSettlementPeerAsset(
             hostDocument,
-            site,
+            requestedSite,
             hostContext.expectedAssetKind,
             hostContext.hostAreaId,
             hostContext.premise,
         );
+        const livePeerSite = buildHostedPeerSitePath(hostDocument, hostAsset);
+        if (livePeerSite !== site) {
+            throw new Error(`Host path for "${requestedSite}" changed before the peer could be saved.`);
+        }
         const peerKind = normalizeMapSiteKind(persistedDocument.kind);
         const expectedPeerKind = hostContext.expectedAssetKind === 'SUBINTERIOR' ? 'INTERIOR' : 'DUNGEON';
         if (peerKind !== expectedPeerKind) {
             throw new Error(`${hostContext.expectedAssetKind} requires a ${expectedPeerKind} peer map, received ${peerKind}.`);
         }
+        persistedDocument.site = site;
         persistedDocument = stampHostedPeerDocument(persistedDocument, hostDocument, hostAsset);
+        moveLocationEntryUnderHostedPath(bookData.entries, rootEntry, site, requestedSite);
         hostEntry.content = replaceDungeonMapSection(hostEntry.content, serializeDungeonMapDocument(hostDocument));
         hostEntry.disable = true;
     }
@@ -874,13 +921,13 @@ export async function persistManualDungeonMapDocument(siteRoot, mapDocument) {
     }
 
     const rootEntry = Object.values(bookData.entries).find(entry => {
-        const label = String(entry?.comment || '').trim();
-        return label && !label.includes('::') && dungeonSiteRootsMatch(label, site);
+        const attachment = getDungeonMapAttachment(entry);
+        return attachment && dungeonSiteRootsMatch(attachment.siteRoot, site);
     });
     if (!rootEntry) throw new Error(`No Location root found for "${site}".`);
     const existingAttachment = getDungeonMapAttachment(rootEntry);
     if (!existingAttachment) throw new Error(`"${site}" has no private map to edit.`);
-    const existingDocument = parseDungeonMapDocument(existingAttachment.content, site).document;
+    const existingDocument = parseDungeonMapDocument(existingAttachment.content, existingAttachment.siteRoot).document;
     const oldHost = String(existingDocument.hostSite || '').trim();
     const newHost = String(mapDocument.hostSite || '').trim();
     const oldBrief = String(existingDocument.hostBrief || '').trim();
@@ -1212,7 +1259,7 @@ function findMappedChildEntry(entries, rootLabel, areaName) {
         const label = String(entry?.comment || '').trim();
         const segments = label.split(/\s*::\s*/).filter(Boolean);
         if (segments.length > 1) {
-            return segments.some(segment => dungeonSiteRootsMatch(segment, rootLabel))
+            return locationContainsSiteRoot(label, rootLabel)
                 && dungeonLabelsMatch(segments.at(-1), areaName);
         }
         const keys = Array.isArray(entry?.key) ? entry.key : [];

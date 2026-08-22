@@ -6,6 +6,26 @@
 const PARTY_FIELD_LINE = /^(Combat|Gear|Proficiencies|Attr|Saves|Skills|Traits|Abilities|Spells|HD|Status)\s*:/i;
 const PARTY_HP_HEADER = /:\s*[+-]?[\d,]+(?:\/[\d,]+)?\s*HP\b/i;
 
+function normalizeAssetRef(value) {
+    return String(value || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+}
+
+export function validateBuildingPopulationTransaction(transaction, target) {
+    if (!target) return [];
+    const operations = Array.isArray(transaction?.operations) ? transaction.operations : [];
+    const expected = target.building?.id || target.untrackedName;
+    const clear = operations.find(operation =>
+        String(operation?.op || '').toUpperCase() === 'SET_ASSET'
+        && operation?.notEntered === false
+        && normalizeAssetRef(operation.asset_id) === normalizeAssetRef(expected));
+    if (clear) return [];
+    return [{
+        code: 'BUILDING_POPULATION_NOT_RESOLVED',
+        path: 'operations',
+        hint: `This is the first-entry population pass for "${expected}". Include SET_ASSET with asset_id "${expected}" and notEntered:false in the same transaction, even when the building is intentionally empty.`,
+    }];
+}
+
 export function extractMemoSection(memo, tag) {
     const source = String(memo || '');
     const open = `[${tag}]`;

@@ -87,6 +87,8 @@ describe('Map Evolution', () => {
         expect(DEFAULT_MAP_EVOLUTION_SYSTEM_PROMPT).toContain('CreateAreaMap owns peer-map promotion');
         expect(DEFAULT_MAP_EVOLUTION_SYSTEM_PROMPT).toContain('INTERIOR: evolve room-scale');
         expect(DEFAULT_MAP_EVOLUTION_SYSTEM_PROMPT).toContain('and larger unrest');
+        expect(DEFAULT_MAP_EVOLUTION_SYSTEM_PROMPT).toContain('BUILDING may contain CREATURE/GROUP/OBJECT/LOOT/HAZARD/TRAP');
+        expect(DEFAULT_MAP_EVOLUTION_SYSTEM_PROMPT).toContain('SET_ASSET notEntered:false');
         expect(DEFAULT_MAP_EVOLUTION_SYSTEM_PROMPT).not.toMatch(/SETTLEMENT: restlessness/);
         expect(DEFAULT_MAP_EVOLUTION_SYSTEM_PROMPT).not.toContain('not chaos by default');
         expect(DEFAULT_MAP_EVOLUTION_SYSTEM_PROMPT).not.toContain('Do not invent raids');

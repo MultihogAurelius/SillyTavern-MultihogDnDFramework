@@ -58,6 +58,20 @@ Out-of-range attack attempt → note {{user}} couldn't attack due to range; ask 
         for (const source of sources) expect(source).not.toMatch(abbreviatedDamage);
     });
 
+    it('keeps the embedded mapping module synchronized with the shipped files', () => {
+        const normalize = (value) => String(value).replaceAll('\r\n', '\n');
+        const mappingModule = (value) => normalize(value).match(
+            /<dungeon_reality_and_hidden_mapping>[\s\S]*?<\/dungeon_reality_and_hidden_mapping>/,
+        )?.[0];
+
+        expect(mappingModule(RT_PROMPTS['sysprompt.txt'])).toBe(
+            mappingModule(readFileSync(new URL('../sysprompt.txt', import.meta.url), 'utf8')),
+        );
+        expect(mappingModule(RT_PROMPTS['sysprompt_legacy.txt'])).toBe(
+            mappingModule(readFileSync(new URL('../sysprompt_legacy.txt', import.meta.url), 'utf8')),
+        );
+    });
+
     it('ships the short Map Architect and external-agent ownership contract in both narrator prompts', () => {
         const sources = [
             RT_PROMPTS['sysprompt.txt'],
@@ -72,16 +86,32 @@ Out-of-range attack attempt → note {{user}} couldn't attack due to range; ask 
             expect(source).toContain('INTERIOR: significant lower-risk multi-room site');
             expect(source).toContain('SETTLEMENT: town/city/village as a whole, district-scale');
             expect(source).toContain('ordinary named shops, inns, chapels, and houses are BUILDING');
-            expect(source).toContain('stalls, wells, statues, altars, and chests are OBJECT');
+            expect(source).toContain('OBJECT means non-structural props or set-dressing');
+            expect(source).toContain('never use OBJECT for a named structure');
             expect(source).toContain('SUBDUNGEON → peer DUNGEON');
             expect(source).toContain('SUBINTERIOR → peer INTERIOR');
-            expect(source).toContain('explicit promotion signal');
+            expect(source).toContain('fresh chat may begin inside an unhosted DUNGEON/INTERIOR');
+            expect(source).toContain('immediately create that SETTLEMENT at the exit boundary');
+            expect(source).toContain('include: ["Exact Current Peer Name"]');
+            expect(source).toContain('successful absorption supplies hostSite/hostBrief');
+            expect(source).toContain('leave the peer standalone');
+            expect(source).toContain('Promotion first reclassifies the BUILDING');
+            expect(source).toContain('Both tests are required');
+            expect(source).toContain('Importance alone is not sufficient');
+            expect(source).toContain('Map Architect leaves it empty at architecture time');
+            expect(source).toContain('Map Updater resolves its contents during the normal post-narration pass');
+            expect(source).toContain('GM-authored rumor may be canonized only as SUSPECTED');
+            expect(source).toContain('concealed contents remain UNREVEALED');
+            expect(source).toContain('Player speculation alone is insufficient');
             expect(source).toContain('optional settlement-only include[]');
             expect(source).toContain('creation-only for SETTLEMENT absorption');
-            expect(source).toContain('Wilderness, roads, alleys, streets, districts, BUILDING, and OBJECT never receive their own maps');
+            expect(source).toContain('BUILDING has no map unless explicitly promoted and reclassified');
             expect(source).toContain('exact canonical names, never translated, expanded, or retitled');
-            expect(source).toContain('BUILDING keeps the settlement active');
+            expect(source).toContain('BUILDING keeps the SETTLEMENT active');
             expect(source).toContain('mapped peer becomes active at the deepest matching footer segment');
+            expect(source).toContain('may be four or more tiers');
+            expect(source).toContain('Ashford, North Residential Streets, Residential House, Kitchen Passage');
+            expect(source).toContain('Never stop at the mapped site name');
             expect(source).toContain('private objective canon');
             expect(source).toContain('[DUNGEON_REALITY — INTERNAL GM CANON]');
             expect(source).toContain('[MAPPED_SITES — INTERNAL]');

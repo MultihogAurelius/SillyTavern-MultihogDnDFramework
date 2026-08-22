@@ -1,5 +1,17 @@
 import { normalizeMapSiteKind } from './dungeon-reality.js';
 
+function resolveHostArea(hostDocument, asset) {
+    const area = (hostDocument.areas || []).find(item => item.id === asset.location);
+    if (!area) throw new Error(`Hosted asset "${asset.name}" does not occupy a valid district.`);
+    return area;
+}
+
+/** Canonical Locations-lore path for a peer hosted by a settlement asset. */
+export function buildHostedPeerSitePath(hostDocument, asset) {
+    const area = resolveHostArea(hostDocument, asset);
+    return `${hostDocument.site} :: ${area.name} :: ${asset.name}`;
+}
+
 /** Mirror runtime-owned host metadata inside an existing CORE block, idempotently. */
 export function ensureHostCoreMirror(content, hostSite, hostBrief) {
     const source = String(content || '');
@@ -16,8 +28,7 @@ export function ensureHostCoreMirror(content, hostSite, hostBrief) {
 
 /** Build the canonical compact exit packet from the host district. */
 export function buildHostedPeerBrief(hostDocument, asset) {
-    const area = (hostDocument.areas || []).find(item => item.id === asset.location);
-    if (!area) throw new Error(`Hosted asset "${asset.name}" does not occupy a valid district.`);
+    const area = resolveHostArea(hostDocument, asset);
     const fact = String(area.geometry?.[0] || '').trim();
     return `Contained in ${hostDocument.site}, ${area.name}.${fact ? ` ${fact}` : ''} Exit returns to ${area.name} in ${hostDocument.site}.`
         .replace(/\s+/g, ' ')

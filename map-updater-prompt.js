@@ -28,7 +28,8 @@ TIME MECHANICS
 - Legacy relative values such as "10 minutes" have no absolute anchor. Preserve them unless narration establishes the resulting change; never treat them as already elapsed by guesswork.
 
 OPERATIONS
-- Each operation is a flat object: {"op":"ADD_ASSET","name":"...","kind":"OBJECT","location":"area-id",...}. Use op, not type. Do not nest fields under asset.
+- Each operation is a flat object: {"op":"ADD_ASSET","name":"...","kind":"OBJECT","location":"area-or-container-id",...}. Use op, not type. Do not nest fields under asset.
+- location may be an area ID, or a legal container ID: BUILDING contains CREATURE/GROUP/OBJECT/LOOT/HAZARD/TRAP; CREATURE/GROUP contains carried OBJECT/LOOT. MOVE_ASSET to/from uses the same direct placement references. Routes remain area IDs.
 - Existing but newly encountered entity: SET_ASSET or MOVE_ASSET, not ADD_ASSET.
 - Genuinely new narrator-established entity: ADD_ASSET. The extension generates its ID. People are CREATURE or GROUP, never kind NPC.
 - Packs vs individuals: a named person or unique monster is CREATURE (omit count or count:1). A patrol, garrison, swarm, pack, or unnamed band is ONE GROUP with count (2-99 living members). Never ADD_ASSET six identical ghouls; add one GROUP with count:6. Reduce count with SET_ASSET when members die. DESTROYED/DEAD only when none remain. Never use count 0.
@@ -42,7 +43,9 @@ KIND: DUNGEON / INTERIOR
 If the party enters a newly invented room the room-scale map lacks, ADD_AREA (or ADD_ASSET for an incidental feature) from the narrative. Do not wait for the status footer to name it. INTERIOR obeys the same geometry rules while retaining its lower-risk premise.
 
 KIND: SETTLEMENT
-A chapel, inn, shop, house, or similar ordinary structure the party actually enters is a BUILDING asset in the current district, not a new area or peer map. OBJECT is props only. Named people occupying it are CREATURE; unnamed bands, watches, and crowds are GROUP with count. Entering it is durable even when the district was already VISITED. If CURRENT LOCATION names an untracked ordinary structure, ADD_ASSET kind BUILDING, knowledge KNOWN. SUBDUNGEON/SUBINTERIOR are allowed only when the narration explicitly establishes a map-worthy peer; never infer or perform BUILDING promotion. CreateAreaMap is the sole promotion signal.
+A chapel, inn, shop, house, or similar ordinary structure the party actually enters is a BUILDING asset in the current district, not a new area or peer map. OBJECT is props only. BUILDING is a lightweight container with no rooms or connections. Contained occupants and things use the BUILDING id as location. Named people are CREATURE; unnamed bands, watches, and crowds are GROUP with count. Entering it is durable even when the district was already VISITED. If CURRENT LOCATION names an untracked ordinary structure, ADD_ASSET kind BUILDING, knowledge KNOWN. When FIRST-ENTRY BUILDING POPULATION is supplied, populate or intentionally resolve that exact building and explicitly SET_ASSET notEntered:false in the same transaction; never noop that bundle. SUBDUNGEON/SUBINTERIOR are allowed only when the narration explicitly establishes a map-worthy peer; never infer or perform BUILDING promotion. CreateAreaMap is the sole promotion signal.
+
+An explicit GM-authored rumor that a specific BUILDING contains a person, group, object, loot, hazard, or trap may ADD_ASSET at that BUILDING with knowledge SUSPECTED. Player speculation is not evidence. Rumor seeding never changes the BUILDING's notEntered flag; first entry still reconciles its suspected contents.
 
 CHRONICLES
 - Player-observable lasting history only. A chronicle makes its area VISITED. If it reports an asset, set that asset's knowledge to KNOWN in the corresponding operation.
@@ -54,8 +57,8 @@ EXAMPLES
 No change:
 {"noop":true}
 
-Settlement building + occupant (flat fields, op not type, area_id not area):
-{"operation_id":"day1-1557-chapel-odran","operations":[{"op":"ADD_ASSET","evidence":"CONFIRMED","name":"Chapel of the Drowned Stone","kind":"BUILDING","location":"shrine-quarter","state":"ACTIVE","knowledge":"KNOWN","detail":"Narrow stone chapel behind an iron votive screen.","cause":"The party entered this chapel."},{"op":"ADD_ASSET","evidence":"CONFIRMED","name":"Odran","kind":"CREATURE","location":"shrine-quarter","state":"ACTIVE","knowledge":"KNOWN","detail":"Elderly gray-hooded priest tending the chapel.","cause":"Encountered tending the chapel when the party entered."}],"chronicles":[{"area_id":"shrine-quarter","text":"Entered the Chapel of the Drowned Stone and received shelter from Odran."}]}
+Settlement building + contained occupant on first entry (flat fields, op not type, area_id not area):
+{"operation_id":"day1-1557-chapel-odran","operations":[{"op":"ADD_ASSET","evidence":"CONFIRMED","name":"Chapel of the Drowned Stone","kind":"BUILDING","location":"shrine-quarter","state":"ACTIVE","knowledge":"KNOWN","detail":"Narrow stone chapel behind an iron votive screen.","cause":"The party entered this chapel."},{"op":"ADD_ASSET","evidence":"CONFIRMED","name":"Odran","kind":"CREATURE","location":"Chapel of the Drowned Stone","state":"ACTIVE","knowledge":"KNOWN","detail":"Elderly gray-hooded priest tending the chapel.","cause":"Encountered tending the chapel when the party entered."},{"op":"SET_ASSET","evidence":"CONFIRMED","asset_id":"Chapel of the Drowned Stone","notEntered":false,"cause":"The party's first entry resolved the chapel interior."}],"chronicles":[{"area_id":"shrine-quarter","text":"Entered the Chapel of the Drowned Stone and received shelter from Odran."}]}
 
 Existing occupancy change:
 {"operation_id":"day1-1602-ghoul-destroyed","operations":[{"op":"SET_ASSET","evidence":"CONFIRMED","asset_id":"crypt-ghoul","state":"DESTROYED","knowledge":"KNOWN","detail":"Smoldering remains on the landing.","cause":"Killed by the party on the cellar landing.","actor":"party"}],"chronicles":[{"area_id":"cellar-landing","text":"The crypt ghoul was destroyed."}]}

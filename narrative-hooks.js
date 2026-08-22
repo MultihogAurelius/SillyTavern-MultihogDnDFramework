@@ -16,7 +16,7 @@ import { getSettings, hydrateWorldProgressionFromChatState, persistWorldProgress
 import { syncCombatProfile, isCombatActive } from './llm-client.js';
 import { parseQuestsFromMemo, extractCurrentTimeStr, cleanMessageContent, formatInWorldTime, memoForGmContext, stripPromptInjectionsFromUserText, stripCyoaAndPacingInjections } from './memo-processor.js';
 import { runRouterPass, saveSceneToLorebook, scanAssistantOutputForKeywords, parseInWorldMinutes, runWorldProgressionPass, updateLorebookEntry, getLorebookManifest, rollbackRouterPass, isRouterRunning, syncDungeonMapsToLocationLorebook } from './router.js';
-import { maybeRollbackMapUpdaterForSwipe, runMapUpdaterPass, stopMapUpdaterPass } from './map-updater.js';
+import { maybeRollbackMapUpdaterForSwipe, runMapUpdaterPass, shouldForceBuildingPopulationPass, stopMapUpdaterPass } from './map-updater.js';
 import { maybeRollbackMapEvolutionForSwipe, maybeRunMapEvolution, stopMapEvolutionPass } from './map-evolution.js';
 import { formatNarratorSiteActivity } from './map-evolution-lib.js';
 import { shiftMemoAndMapHistory } from './src/state/dungeon-map-history.js';
@@ -170,7 +170,7 @@ function resolveEndOfOutputFooterSection(settings) {
 *(Status: [HP]) | (XP: [current]/[next level]) | (Location: [Main, Sub, Sub-sub, etc])*
 *Level [X] | [HH:MM AM/PM], Day [X]*
 Footer shows ONLY {{user}}'s HP/XP/level/location — never party/NPC status or names.
-Location is coarse-to-fine (city, district, then the specific building/interior). If {{user}} is inside a named chapel, inn, shop, house, or similar, that interior MUST be the last segment.`;
+Location is coarse-to-fine and may be four or more tiers. For an unmapped settlement building use Settlement, District, Building. For a mapped DUNGEON/INTERIOR peer, preserve every host tier and append the exact current mapped area as the final segment: Settlement, District, Site, Area (for example: Ashford, North Residential Streets, Residential House, Kitchen Passage). Never stop at the mapped site name when narration places {{user}} in a specific mapped area.`;
     if (settings.use24hTime) {
         inner = inner.replace(/\[HH:MM AM\/PM\]/g, '[HH:MM] (24-hour clock, NO AM/PM)');
     }
@@ -541,7 +541,7 @@ export function registerMapArchitectTool() {
         registerFunctionTool({
             name: 'CreateAreaMap',
             displayName: 'Map Architect',
-            description: 'Creates and saves one private objective map. DUNGEON is a high-risk room graph, INTERIOR is a significant lower-risk multi-room site, and SETTLEMENT is a district graph. Inside a mapped settlement, call DUNGEON or INTERIOR for an exact BUILDING/SUB* name only when it deliberately warrants promotion to a peer map; the call atomically promotes/links it. Ordinary shops, inns, houses, and chapels remain BUILDING assets with no peer map. Never map OBJECT props, wilderness, roads, or districts. A listed mapped peer is reused; a listed SETTLEMENT may still contain an unmapped SUB* site. include[] is creation-only for a new SETTLEMENT and absorbs exact existing DUNGEON/INTERIOR peers. The runtime validates, persists, and returns compact private canon.',
+            description: 'Creates and saves one private objective map. DUNGEON is a high-risk room graph, INTERIOR is a significant lower-risk multi-room site, and SETTLEMENT is a district graph. Inside a mapped settlement, call DUNGEON or INTERIOR for an exact BUILDING/SUB* name only when it deliberately warrants promotion to a peer map; the call atomically promotes/links it. Ordinary shops, inns, houses, and chapels remain BUILDING assets with no peer map. Never map OBJECT props, wilderness, roads, or districts. A listed mapped peer is reused; a listed SETTLEMENT may still contain an unmapped SUB* site. include[] is creation-only for a new SETTLEMENT and absorbs exact existing DUNGEON/INTERIOR peers. When exiting an initially standalone peer into a newly established settlement, immediately create that SETTLEMENT with the active peer in include[]. The runtime validates, persists, and returns compact private canon.',
             parameters: {
                 type: 'object',
                 properties: {
@@ -2895,10 +2895,14 @@ export async function onGenerationEnded() {
         });
         document.dispatchEvent(new CustomEvent('rt_generation_tick'));
     }
+    const forceBuildingPopulation = countsTowardRunEvery
+        && settings.mapUpdaterEnabled !== false
+        && isLocationMappingEnabled(settings)
+        && await shouldForceBuildingPopulationPass();
     const shouldTryMapUpdater = countsTowardRunEvery
         && settings.mapUpdaterEnabled !== false
         && isLocationMappingEnabled(settings)
-        && _mapUpdaterAutoTick >= mapEvery;
+        && (_mapUpdaterAutoTick >= mapEvery || forceBuildingPopulation);
     if (shouldTryMapUpdater) {
         const mapResult = await runMapUpdaterPass();
         const skipped = mapResult?.skipped;
@@ -2909,6 +2913,7 @@ export async function onGenerationEnded() {
             skipped: skipped || null,
             ok: mapResult?.ok === true,
             noop: mapResult?.noop === true,
+            forcedBuildingPopulation: forceBuildingPopulation,
         });
     }
 

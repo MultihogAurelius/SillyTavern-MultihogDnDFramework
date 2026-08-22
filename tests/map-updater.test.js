@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { formatDungeonMapForUpdater } from '../dungeon-reality.js';
 import { DEFAULT_MAP_UPDATER_SYSTEM_PROMPT } from '../map-updater-prompt.js';
+import { validateBuildingPopulationTransaction } from '../map-updater-lib.js';
 import {
     extractPartyMemberNames,
     formatPartyRosterForMapUpdater,
@@ -10,6 +11,14 @@ import {
 } from '../map-updater-lib.js';
 
 describe('Map Updater', () => {
+    it('requires an explicit first-entry BUILDING flag clear but permits an intentionally empty result', () => {
+        const target = { building: { id: 'house', name: 'House' }, area: { id: 'north' }, children: [], untrackedName: '' };
+        expect(validateBuildingPopulationTransaction({ noop: true }, target)[0]?.code).toBe('BUILDING_POPULATION_NOT_RESOLVED');
+        expect(validateBuildingPopulationTransaction({
+            operation_id: 'house-empty',
+            operations: [{ op: 'SET_ASSET', asset_id: 'house', notEntered: false, cause: 'The empty house was entered.' }],
+        }, target)).toEqual([]);
+    });
     it('treats noop and empty operations as a skip', () => {
         const updater = readFileSync(new URL('../map-updater.js', import.meta.url), 'utf8');
         expect(updater).toContain('if (value.noop === true) return true');
@@ -127,9 +136,14 @@ describe('Map Updater', () => {
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('TIME MECHANICS');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('set duration to ""');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('stored timestamp plus authoritative current time is sufficient evidence');
+        expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('BUILDING is a lightweight container');
+        expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('knowledge SUSPECTED');
+        expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('notEntered:false');
         expect(updater).toContain('formatPartyRosterForMapUpdater');
         expect(updater).toContain('## CURRENT IN-WORLD TIME (AUTHORITATIVE)');
-        expect(updater).toContain('initialUserPrompt(loaded, recentStory, memo, currentTime)');
+        expect(updater).toContain('initialUserPrompt(loaded, recentStory, memo, currentTime, populationTarget)');
+        expect(updater).toContain('FIRST-ENTRY BUILDING POPULATION (MANDATORY THIS PASS)');
+        expect(updater).toContain('shouldForceBuildingPopulationPass');
         expect(updater).toContain('PARTY_MEMBER_NOT_AN_ASSET');
         expect(updater).toContain('mapRuntimeConnectionSource');
         expect(updater).not.toContain('mapArchitectConnectionSource');
@@ -185,7 +199,7 @@ describe('Map Updater', () => {
         expect(updater.indexOf("skipped: 'no_active_map'")).toBeLessThan(startIdx);
         expect(updater.indexOf("skipped: 'disabled'")).toBeLessThan(startIdx);
         expect(updater.indexOf("skipped: 'location_mapping_off'")).toBeLessThan(startIdx);
-        const loopRecheckIdx = updater.indexOf('if (!isLocationMappingEnabled(getSettings()))');
+        const loopRecheckIdx = updater.indexOf('if (!isLocationMappingEnabled(getSettings()))', startIdx);
         const sendIdx = updater.indexOf('sendStateRequest(requestSettings(settings), systemPrompt, prompt, signal)');
         expect(loopRecheckIdx).toBeGreaterThan(startIdx);
         expect(sendIdx).toBeGreaterThan(loopRecheckIdx);

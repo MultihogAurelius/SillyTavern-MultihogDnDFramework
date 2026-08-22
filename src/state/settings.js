@@ -838,6 +838,21 @@ function getSettingsInternal(extensionSettings) {
         s.settingsVersion = '2026.8.22.2';
     }
 
+    // 2026.8.22.3: BUILDING containers and first-entry population. Replace
+    // only untouched map prompts from the preceding release.
+    if (isOlderThan(s.settingsVersion, '2026.8.22.3')) {
+        if (promptSignature(s.mapArchitectSystemPrompt) === '15899:9c4786b5') {
+            s.mapArchitectSystemPrompt = DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT;
+        }
+        if (promptSignature(s.mapUpdaterSystemPrompt) === '9171:bc52dc99') {
+            s.mapUpdaterSystemPrompt = DEFAULT_MAP_UPDATER_SYSTEM_PROMPT;
+        }
+        if (promptSignature(s.mapEvolutionSystemPrompt) === '19287:beb4258a') {
+            s.mapEvolutionSystemPrompt = DEFAULT_MAP_EVOLUTION_SYSTEM_PROMPT;
+        }
+        s.settingsVersion = '2026.8.22.3';
+    }
+
     // Stamp factory version even when a release has no field rewrites
     // (8.28.0 mapped-site index is prompt/injection only).
     if (isOlderThan(s.settingsVersion, FACTORY_SETTINGS_VERSION)) {

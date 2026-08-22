@@ -29,6 +29,7 @@ AREAS AND PASSAGES
 ASSETS
 - Each asset is {"id":"stable-kebab-id","kind":"CREATURE|GROUP|TRAP|HAZARD|OBJECT|BUILDING|SUBDUNGEON|SUBINTERIOR|LOOT|BARRIER|ALARM|EFFECT|OTHER","name":"concise label","location":"area-id","state":"ACTIVE","knowledge":"UNREVEALED|SUSPECTED|KNOWN","detail":"objective current fact","origin":"INITIAL_MAP"}.
 - BUILDING, SUBDUNGEON, and SUBINTERIOR are SETTLEMENT-only. OBJECT is a non-structural prop on every map kind.
+- Every initial Architect asset must reference an area ID directly. BUILDING supports contained assets later, but the Architect always creates it empty; first-entry Map Updater or off-screen Map Evolution owns its contents. Do not emit notEntered—the runtime stamps it.
 - Choose the most accurate allowed initial state. Live traps and alarms are ARMED; a neutralized mechanism is DEACTIVATED. Every asset must occupy exactly one existing area.
 - Entities are either a named individual or a pack. A named person or unique monster is kind CREATURE (omit count, or count:1). A patrol, garrison, swarm, pack, or unnamed band is ONE GROUP asset with optional integer count (2-99 living members of that one asset). Prefer one GROUP with count over many identical singleton CREATUREs.
 - Optional count is living members of THIS asset (1-99). Do not encode remaining numbers only in detail. Never use count 0; that is DESTROYED or DEAD.

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildHostedPeerBrief, ensureHostCoreMirror, stampHostedPeerDocument } from '../map-hosting.js';
+import { buildHostedPeerBrief, buildHostedPeerSitePath, ensureHostCoreMirror, stampHostedPeerDocument } from '../map-hosting.js';
 
 const host = {
     version: 3,
@@ -22,6 +22,10 @@ const asset = {
 };
 
 describe('nested map hosting', () => {
+    it('derives the canonical nested Locations path from host, district, and exact asset name', () => {
+        expect(buildHostedPeerSitePath(host, asset)).toBe('Rustport :: Dock Ward :: Flooded Sewers');
+    });
+
     it('derives the exact deterministic host brief from the first district geometry fact', () => {
         expect(buildHostedPeerBrief(host, asset)).toBe(
             'Contained in Rustport, Dock Ward. Warehouse piers smell of brine. Exit returns to Dock Ward in Rustport.',
