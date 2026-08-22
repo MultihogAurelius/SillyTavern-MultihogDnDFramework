@@ -170,7 +170,11 @@ function resolveEndOfOutputFooterSection(settings) {
 *(Status: [HP]) | (XP: [current]/[next level]) | (Location: [Main, Sub, Sub-sub, etc])*
 *Level [X] | [HH:MM AM/PM], Day [X]*
 Footer shows ONLY {{user}}'s HP/XP/level/location — never party/NPC status or names.
-Location is coarse-to-fine and may be four or more tiers. For an unmapped settlement building use Settlement, District, Building. For a mapped DUNGEON/INTERIOR peer, preserve every host tier and append the exact current mapped area as the final segment: Settlement, District, Site, Area (for example: Ashford, North Residential Streets, Residential House, Kitchen Passage). Never stop at the mapped site name when narration places {{user}} in a specific mapped area.`;
+Location is coarse-to-fine and may be four or more tiers.
+
+- For an unmapped settlement building use Settlement, District, Building.
+- For a mapped DUNGEON/INTERIOR child, preserve every host tier and append the exact current mapped area as the final segment: Settlement, District, Site, Area (for example: Ashford, North Residential Streets, Residential House, Kitchen Passage). Never stop at the mapped site name when narration places {{user}} in a specific mapped area.
+- Never refer to mapped BUILDINGs positionally in the footer (e.g. "Main Street, General Store rear loading dock".) Either "Main Street" or "Main Street, General Store" if actually inside.`;
     if (settings.use24hTime) {
         inner = inner.replace(/\[HH:MM AM\/PM\]/g, '[HH:MM] (24-hour clock, NO AM/PM)');
     }

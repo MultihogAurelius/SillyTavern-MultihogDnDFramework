@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.23.5] - 2026-08-22
+
+### Changed
+- **Status footer location rules**: clarified settlement / hosted-map tier guidance and forbade positional BUILDING phrasing (use the district alone, or `District, Building` only when actually inside).
+
 ## [2026.8.23.4] - 2026-08-22
 
 ### Fixed
