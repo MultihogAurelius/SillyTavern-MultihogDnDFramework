@@ -862,6 +862,18 @@ function getSettingsInternal(extensionSettings) {
         s.settingsVersion = '2026.8.23.1';
     }
 
+    // 2026.8.23.2: keep known/suspected asset placement consistent with area
+    // knowledge. Replace only untouched prompts from the preceding release.
+    if (isOlderThan(s.settingsVersion, '2026.8.23.2')) {
+        if (promptSignature(s.mapArchitectSystemPrompt) === '16952:206a52ae') {
+            s.mapArchitectSystemPrompt = DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT;
+        }
+        if (promptSignature(s.mapUpdaterSystemPrompt) === '10260:25eac89f') {
+            s.mapUpdaterSystemPrompt = DEFAULT_MAP_UPDATER_SYSTEM_PROMPT;
+        }
+        s.settingsVersion = '2026.8.23.2';
+    }
+
     // Stamp factory version even when a release has no field rewrites
     // (8.28.0 mapped-site index is prompt/injection only).
     if (isOlderThan(s.settingsVersion, FACTORY_SETTINGS_VERSION)) {

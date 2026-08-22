@@ -38,6 +38,7 @@ OPERATIONS
 - Operations apply in array order. Open a connection before moving an asset through it. Newly added areas may be referenced later in the same transaction by their exact name.
 - Narrator facts are CONFIRMED. Strongly entailed consequences are IMPLIED. AUTONOMOUS is allowed only for a logical reaction to an established trigger and only when the existing asset has an explicit behavior/route. Never mutate from speculation or from an unresolved player attempt.
 - If duplicate validation names candidates, retry with that asset or list every genuinely distinct candidate in distinct_from.
+- A KNOWN or SUSPECTED asset reveals its effective containing area. The runtime automatically raises an UNREVEALED containing area to DISCOVERED, including through BUILDING or carried-inventory containers.
 
 KIND: DUNGEON / INTERIOR
 If the party enters a newly invented room the room-scale map lacks, ADD_AREA (or ADD_ASSET for an incidental feature) from the narrative. Do not wait for the status footer to name it. INTERIOR obeys the same geometry rules while retaining its lower-risk premise.

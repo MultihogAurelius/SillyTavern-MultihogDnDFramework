@@ -38,6 +38,7 @@ import {
     isPlayCanonLockedState,
     parseDungeonDeltaBlock,
     reconcileDungeonMapAreaKnowledge,
+    reconcileAssetAreaKnowledge,
     resolveActiveDungeonSite,
     resolveCurrentMapPlacement,
     resolveAssetEffectiveArea,
@@ -125,6 +126,45 @@ describe('Map Architect validation', () => {
         expect(result.valid).toBe(true);
         expect(result.document.areas).toHaveLength(2);
         expect(result.document.threat).toBe('HIGH');
+    });
+
+    it('automatically discovers the effective area of known or suspected assets', () => {
+        const raw = {
+            version: 3,
+            site: 'Hollow Creek',
+            kind: 'SETTLEMENT',
+            areas: [
+                { id: 'east-outskirts', name: 'East Outskirts', knowledge: 'VISITED', geometry: [], connections: [{ to: 'main-street', state: 'OPEN', detail: 'Two-lane road' }] },
+                { id: 'main-street', name: 'Main Street', knowledge: 'UNREVEALED', geometry: [], connections: [{ to: 'east-outskirts', state: 'OPEN', detail: 'Two-lane road' }] },
+            ],
+            assets: [
+                { id: 'general-store', kind: 'BUILDING', name: 'General Store', location: 'main-street', state: 'ACTIVE', knowledge: 'KNOWN', detail: '', origin: 'INITIAL_MAP' },
+                { id: 'wanderers', kind: 'GROUP', name: 'Main Street Undead', location: 'general-store', state: 'ACTIVE', knowledge: 'SUSPECTED', detail: '', origin: 'INITIAL_MAP' },
+            ],
+        };
+
+        const normalized = normalizeDungeonMapDocument(raw);
+        expect(normalized.areas.find(area => area.id === 'main-street')?.knowledge).toBe('DISCOVERED');
+        normalized.areas[1].knowledge = 'UNREVEALED';
+        expect(reconcileAssetAreaKnowledge(normalized).areas[1].knowledge).toBe('DISCOVERED');
+
+        const architectRaw = structuredClone(raw);
+        architectRaw.assets[1].location = 'main-street';
+        const architect = validateDungeonMapArchitecture(architectRaw, {
+            site: 'Hollow Creek', entrance: 'East Outskirts', kind: 'SETTLEMENT',
+        });
+        expect(architect.valid).toBe(true);
+        expect(architect.document.areas.find(area => area.id === 'main-street')?.knowledge).toBe('DISCOVERED');
+
+        const updated = applyDungeonMapTransaction({ ...structuredClone(raw), assets: [] }, {
+            operation_id: 'hollow-creek-store-spotted',
+            operations: [{
+                op: 'ADD_ASSET', evidence: 'CONFIRMED', name: 'General Store', kind: 'BUILDING',
+                location: 'main-street', state: 'ACTIVE', knowledge: 'KNOWN', cause: 'Spotted from the outskirts.',
+            }],
+        });
+        expect(updated.ok).toBe(true);
+        expect(updated.document.areas.find(area => area.id === 'main-street')?.knowledge).toBe('DISCOVERED');
     });
 
     it('stamps requested threat onto a valid map and rejects a mismatched threat', () => {

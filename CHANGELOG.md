@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.23.2] - 2026-08-23
+
+### Fixed
+- **Asset-area knowledge consistency**: any `KNOWN` or `SUSPECTED` asset now automatically raises its effective containing area from `UNREVEALED` to `DISCOVERED`, including assets inside BUILDING or carried-inventory containers. Architect creation, Updater transactions, saved-map normalization, and presentation share the same invariant.
+
 ## [2026.8.23.1] - 2026-08-23
 
 ### Fixed

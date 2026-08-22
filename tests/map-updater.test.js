@@ -138,6 +138,7 @@ describe('Map Updater', () => {
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('stored timestamp plus authoritative current time is sufficient evidence');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('BUILDING is a lightweight container');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('knowledge SUSPECTED');
+        expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('A KNOWN or SUSPECTED asset reveals its effective containing area');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('notEntered:false');
         expect(updater).toContain('formatPartyRosterForMapUpdater');
         expect(updater).toContain('## CURRENT IN-WORLD TIME (AUTHORITATIVE)');

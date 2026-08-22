@@ -545,6 +545,7 @@ export function normalizeDungeonMapDocument(raw, siteFallback = '') {
         document.hostSite = hostSite;
         document.hostBrief = hostBrief;
     }
+    reconcileAssetAreaKnowledge(document);
     return document;
 }
 
@@ -1650,6 +1651,17 @@ export function resolveAssetEffectiveArea(document, assetOrRef) {
         asset = resolveMapAsset(document, asset.location).asset;
     }
     return null;
+}
+
+/** A located known/suspected asset necessarily reveals its effective map area. */
+export function reconcileAssetAreaKnowledge(document) {
+    if (!document || !Array.isArray(document.areas) || !Array.isArray(document.assets)) return document;
+    for (const asset of document.assets) {
+        if (!['KNOWN', 'SUSPECTED'].includes(String(asset?.knowledge || '').toUpperCase())) continue;
+        const area = resolveAssetEffectiveArea(document, asset);
+        if (area?.knowledge === 'UNREVEALED') area.knowledge = 'DISCOVERED';
+    }
+    return document;
 }
 
 function resolveMapEffectiveArea(document, ref) {

@@ -181,7 +181,7 @@ describe('Map Architect component', () => {
     it('migrates only untouched shipped prompts to the new taxonomy defaults', () => {
         const defaults = readFileSync(new URL('../src/state/defaults.js', import.meta.url), 'utf8');
         const settings = readFileSync(new URL('../src/state/settings.js', import.meta.url), 'utf8');
-        expect(defaults).toContain("FACTORY_SETTINGS_VERSION = '2026.8.23.1'");
+        expect(defaults).toContain("FACTORY_SETTINGS_VERSION = '2026.8.23.2'");
         expect(settings).toContain('promptSignature');
         expect(settings).toContain("'14870:8b5acf86'");
         expect(settings).toContain("'9025:d21f2f49'");
@@ -191,6 +191,8 @@ describe('Map Architect component', () => {
         expect(settings).toContain("'9171:bc52dc99'");
         expect(settings).toContain("'19287:beb4258a'");
         expect(settings).toContain("'16167:7d0c5b25'");
+        expect(settings).toContain("'16952:206a52ae'");
+        expect(settings).toContain("'10260:25eac89f'");
         expect(settings).toContain('DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT');
         expect(settings).toContain('DEFAULT_MAP_UPDATER_SYSTEM_PROMPT');
         expect(settings).toContain('DEFAULT_MAP_EVOLUTION_SYSTEM_PROMPT');
@@ -239,6 +241,7 @@ describe('Map Architect component', () => {
         expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('Premise details, logical proximity, connectivity, and Architect-invented lines of sight never grant DISCOVERED knowledge');
         expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('Every asset defaults to UNREVEALED');
         expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('Use SUSPECTED only when player-facing recent story explicitly establishes a clue or rumor');
+        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('A KNOWN or SUSPECTED asset reveals its containing area');
         expect(DEFAULT_MAP_ARCHITECT_BRIEF_SYSTEM_PROMPT).toContain('does not grant the player knowledge of any area or asset');
         expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('INDEPENDENT SCHEMA SNIPPETS');
         expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('orbital science fiction');

@@ -35,6 +35,7 @@ ASSETS
 - Optional count is living members of THIS asset (1-99). Do not encode remaining numbers only in detail. Never use count 0; that is DESTROYED or DEAD.
 - Optional behavior, route, faction, owner, and duration fields describe logical reactions, patrol bounds, possession, or temporary entities. route is an array of existing area IDs.
 - Knowledge describes what the player currently knows, not what exists. Every asset defaults to UNREVEALED. Use KNOWN only when player-facing recent story explicitly establishes direct observation or reliable knowledge of that exact asset. Use SUSPECTED only when player-facing recent story explicitly establishes a clue or rumor about that exact asset. The private premise, threat, reference/design context, and facts you invent establish objective existence only; they never upgrade knowledge by themselves.
+- A KNOWN or SUSPECTED asset reveals its containing area: that area's knowledge must be DISCOVERED or VISITED, never UNREVEALED. This also applies when the asset's player-facing location is established by sight, clue, or rumor.
 
 TIME MECHANICS
 - When an asset's current state has a known temporal boundary, record it in the optional duration field as an absolute in-world timestamp using the narrative's current time format, for example "Until Day 2, 4:40 AM." This applies to alarms, temporary effects, summoned entities, expiring hazards, timed barriers, and anything else whose current state ends or changes at a known time.
