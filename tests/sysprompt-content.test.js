@@ -94,8 +94,14 @@ Out-of-range attack attempt → note {{user}} couldn't attack due to range; ask 
             expect(source).toContain('Promotion first reclassifies the BUILDING');
             expect(source).toContain('Importance alone is not sufficient');
             expect(source).toContain('BUILDING interiors use lazy asset generation and are empty on initialization');
-            expect(source).toContain('an external Map Updater agent fills it out');
+            expect(source).toContain('When the player expresses the intent to enter BUILDING');
+            expect(source).toContain('an external Map Updater agent fills it out with its own asset content');
+            expect(source).toContain('the map is not a strict limitation, especially in SETTLEMENT areas');
+            expect(source).toContain('Successful Perception checks do not spawn new enemies');
+            expect(source).toContain('perception checks only reveal them (if they exist.)');
             expect(source).toContain('rumors are canoninized by the Map Updater');
+            expect(source).not.toContain('A first-entry footer remains a retry fallback');
+            expect(source).not.toContain('establishes its objective hidden contents before your next narration');
             expect(source).toContain('optional settlement-only include[]');
             expect(source).toContain('creation-only for SETTLEMENT absorption');
             expect(source).toContain('BUILDING has no map unless explicitly promoted');

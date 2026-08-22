@@ -2,6 +2,22 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.24.6] - 2026-08-22
+
+### Changed
+- **Map Architect familiar sites**: when player-facing story establishes thorough familiarity (home, daily workplace, recurring base), initial maps mark every area `VISITED` and ordinary assets `KNOWN`; hidden surprises stay `UNREVEALED`.
+
+## [2026.8.24.5] - 2026-08-22
+
+### Changed
+- **Map Updater BUILDING population**: skip ambient set dressing (tipped chairs, dusty booths, ordinary furniture); add only map-worthy CREATURE/GROUP/LOOT/HAZARD/TRAP/ALARM/BARRIER/interactive OBJECT contents via `ADD_ASSET`, never `SET_ASSET` on invented ids.
+
+## [2026.8.24.4] - 2026-08-22
+
+### Changed
+- **Pre-narration BUILDING population**: an explicit player action targeting a pending BUILDING now runs its hidden population pass during `MESSAGE_SENT`, before SillyTavern assembles the narrator prompt. Perception, entry, and danger checks therefore adjudicate pre-existing map reality instead of creating contents afterward.
+- **Intent safety**: pre-narration contents begin `UNREVEALED`, cannot write chronicles or assume entry/roll success, and clear the shared population gate atomically. Footer-based first entry remains a retry fallback.
+
 ## [2026.8.24.3] - 2026-08-22
 
 ### Changed

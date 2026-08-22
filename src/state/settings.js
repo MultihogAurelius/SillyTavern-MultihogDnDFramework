@@ -912,6 +912,33 @@ function getSettingsInternal(extensionSettings) {
         s.settingsVersion = '2026.8.24.3';
     }
 
+    // 2026.8.24.4: populate pending BUILDING contents from explicit player
+    // intent before narrator adjudication. Preserve customized Updater prompts.
+    if (isOlderThan(s.settingsVersion, '2026.8.24.4')) {
+        if (promptSignature(s.mapUpdaterSystemPrompt) === '13803:3665a0ba') {
+            s.mapUpdaterSystemPrompt = DEFAULT_MAP_UPDATER_SYSTEM_PROMPT;
+        }
+        s.settingsVersion = '2026.8.24.4';
+    }
+
+    // 2026.8.24.5: BUILDING population skips ambient clutter; new children
+    // must use ADD_ASSET. Preserve customized Updater prompts.
+    if (isOlderThan(s.settingsVersion, '2026.8.24.5')) {
+        if (promptSignature(s.mapUpdaterSystemPrompt) === '14305:798ad4c6') {
+            s.mapUpdaterSystemPrompt = DEFAULT_MAP_UPDATER_SYSTEM_PROMPT;
+        }
+        s.settingsVersion = '2026.8.24.5';
+    }
+
+    // 2026.8.24.6: Map Architect familiar-site knowledge (all areas VISITED).
+    // Preserve customized Architect prompts.
+    if (isOlderThan(s.settingsVersion, '2026.8.24.6')) {
+        if (promptSignature(s.mapArchitectSystemPrompt) === '17180:395cfd6b') {
+            s.mapArchitectSystemPrompt = DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT;
+        }
+        s.settingsVersion = '2026.8.24.6';
+    }
+
     // Stamp factory version even when a release has no field rewrites
     // (8.28.0 mapped-site index is prompt/injection only).
     if (isOlderThan(s.settingsVersion, FACTORY_SETTINGS_VERSION)) {

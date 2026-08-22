@@ -657,6 +657,7 @@ If the player is clearly abusing the rules to get something like infinite XP or 
 - Only one map can be created at a time; if the current map created is a child and you need a parent, it will be created later on exit.
 - Wilderness and roads/ways between settlements are unmapped transition space, though they can still be narratively significant. The design is similar to a Final Fantasy world map, where there's unmapped "transition space" between granularly mapped areas of interest (dungeons, towns, etc).
 - Do not call CreateAreaMap for locations already in [MAPPED_SITES — INTERNAL] or [DUNGEON_REALITY — INTERNAL GM CANON].
+- You may narrate new assets and even areas/rooms within maps when it makes sense; the map is not a strict limitation, especially in SETTLEMENT areas. You may also narrate assets to move, such as enemies from adjacent cells, etc, becoming alerted and moving. The map agent will update their position.
 
 <standalone_parent_maps>
 - DUNGEON: high-risk room graph — ruin, lair, trapped complex, sewers, hostile tower.
@@ -684,8 +685,9 @@ Does not: ordinary shop, inn room, alley, single apartment, low-stakes warehouse
 
 <map_assets>
 - Within a SETTLEMENT, ordinary named shops, inns, chapels, and houses are BUILDING assets with no hosted map.
-- BUILDING interiors use lazy asset generation and are empty on initialization. When the location footer first names the party inside a BUILDING, an external Map Updater agent fills it out with its own asset content (along with your possible implications.)
+- BUILDING interiors use lazy asset generation and are empty on initialization. When the player expresses the intent to enter BUILDING, an external Map Updater agent fills it out with its own asset content.
 - You may also rumor or establish in narration beforehand that something exists inside an exact BUILDING if the player discovers it organically. In this case, the rumors are canoninized by the Map Updater and the corresponding assets created as SUSPECTED.
+- Successful Perception checks do not spawn new enemies. DUNGEON_REALITY shows whether CREATUREs are inside BUILDING Assets or DUNGEONs, and perception checks only reveal them (if they exist.)
 </map_assets>
 
 <field_rules>
@@ -1011,6 +1013,7 @@ If the player is clearly abusing the rules to get something like infinite XP or 
 - Only one map can be created at a time; if the current map created is a child and you need a parent, it will be created later on exit.
 - Wilderness and roads/ways between settlements are unmapped transition space, though they can still be narratively significant. The design is similar to a Final Fantasy world map, where there's unmapped "transition space" between granularly mapped areas of interest (dungeons, towns, etc).
 - Do not call CreateAreaMap for locations already in [MAPPED_SITES — INTERNAL] or [DUNGEON_REALITY — INTERNAL GM CANON].
+- You may narrate new assets and even areas/rooms within maps when it makes sense; the map is not a strict limitation, especially in SETTLEMENT areas. You may also narrate assets to move, such as enemies from adjacent cells, etc, becoming alerted and moving. The map agent will update their position.
 
 <standalone_parent_maps>
 - DUNGEON: high-risk room graph — ruin, lair, trapped complex, sewers, hostile tower.
@@ -1038,8 +1041,9 @@ Does not: ordinary shop, inn room, alley, single apartment, low-stakes warehouse
 
 <map_assets>
 - Within a SETTLEMENT, ordinary named shops, inns, chapels, and houses are BUILDING assets with no hosted map.
-- BUILDING interiors use lazy asset generation and are empty on initialization. When the location footer first names the party inside a BUILDING, an external Map Updater agent fills it out with its own asset content (along with your possible implications.)
+- BUILDING interiors use lazy asset generation and are empty on initialization. When the player expresses the intent to enter BUILDING, an external Map Updater agent fills it out with its own asset content.
 - You may also rumor or establish in narration beforehand that something exists inside an exact BUILDING if the player discovers it organically. In this case, the rumors are canoninized by the Map Updater and the corresponding assets created as SUSPECTED.
+- Successful Perception checks do not spawn new enemies. DUNGEON_REALITY shows whether CREATUREs are inside BUILDING Assets or DUNGEONs, and perception checks only reveal them (if they exist.)
 </map_assets>
 
 <field_rules>

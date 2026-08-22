@@ -86,16 +86,40 @@ export function validateBuildingPopulationTransaction(transaction, target) {
     if (!target) return [];
     const operations = Array.isArray(transaction?.operations) ? transaction.operations : [];
     const expected = target.building?.id || target.untrackedName;
+    const issues = [];
     const clear = operations.find(operation =>
         String(operation?.op || '').toUpperCase() === 'SET_ASSET'
         && operation?.notEntered === false
         && normalizeAssetRef(operation.asset_id) === normalizeAssetRef(expected));
-    if (clear) return [];
-    return [{
-        code: 'BUILDING_POPULATION_NOT_RESOLVED',
-        path: 'operations',
-        hint: `This is the first-entry population pass for "${expected}". Include SET_ASSET with asset_id "${expected}" and notEntered:false in the same transaction, even when the building is intentionally empty.`,
-    }];
+    if (!clear) {
+        issues.push({
+            code: 'BUILDING_POPULATION_NOT_RESOLVED',
+            path: 'operations',
+            hint: `This is a mandatory population pass for "${expected}". Include SET_ASSET with asset_id "${expected}" and notEntered:false in the same transaction, even when the building is intentionally empty.`,
+        });
+    }
+    if (target.phase === 'intent') {
+        if (Array.isArray(transaction?.chronicles) && transaction.chronicles.length) {
+            issues.push({
+                code: 'PRE_NARRATION_CHRONICLE_NOT_ALLOWED',
+                path: 'chronicles',
+                hint: 'The player has only declared intent. Do not record an outcome or visited-area chronicle before the narrator adjudicates it.',
+            });
+        }
+        operations.forEach((operation, index) => {
+            const op = String(operation?.op || '').toUpperCase();
+            if (op === 'ADD_ASSET'
+                && normalizeAssetRef(operation.location) === normalizeAssetRef(expected)
+                && String(operation.knowledge || '').toUpperCase() !== 'UNREVEALED') {
+                issues.push({
+                    code: 'PRE_NARRATION_ASSET_REVEALED',
+                    path: `operations[${index}].knowledge`,
+                    hint: 'New contents generated from player intent are objective hidden reality. Use knowledge UNREVEALED; the subsequent narration and Map Updater pass reveal anything actually perceived.',
+                });
+            }
+        });
+    }
+    return issues;
 }
 
 export function extractMemoSection(memo, tag) {

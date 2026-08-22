@@ -14,6 +14,7 @@ import {
     applyDungeonMapTransaction,
     formatDungeonMapForUpdater,
     normalizeMapSiteKind,
+    resolveBuildingIntentPopulationTarget,
     resolveBuildingPopulationTarget,
 } from './dungeon-reality.js';
 import { isLocationMappingEnabled } from './src/state/section-enabled.js';
@@ -160,7 +161,7 @@ function formatFailure(errors) {
 
 function kindRule(kind) {
     if (kind === 'SETTLEMENT') {
-        return 'Ordinary settlement structures the party enters are BUILDING assets in the current district. OBJECT is props only. SUBDUNGEON/SUBINTERIOR require explicit narrative establishment, and CreateAreaMap—not Map Updater—owns BUILDING promotion. If CURRENT LOCATION names an untracked ordinary structure, ADD_ASSET kind BUILDING. Positional tails such as "behind the general store" or "outside the inn" stay on the district — never invent a BUILDING from that phrasing. When RECENT STORY clearly identifies existing UNREVEALED BUILDING/OBJECT landmarks from outside, SET_ASSET knowledge KNOWN on each match without clearing notEntered. Footer leaves may shorten the asset name ("General Store" for "Bullion General Store") — still treat that as entry of the matching BUILDING, clear notEntered, and populate normally. On FIRST-ENTRY BUILDING POPULATION, derive interior CREATURE/GROUP/LOOT/OBJECT contents from the narrative with common sense (do not overcrowd every house with hostiles). Named people are CREATURE; unnamed bands are one GROUP with count.';
+        return 'Ordinary settlement structures the party enters are BUILDING assets in the current district. OBJECT is props only. SUBDUNGEON/SUBINTERIOR require explicit narrative establishment, and CreateAreaMap—not Map Updater—owns BUILDING promotion. If CURRENT LOCATION names an untracked ordinary structure, ADD_ASSET kind BUILDING. Positional tails such as "behind the general store" or "outside the inn" stay on the district — never invent a BUILDING from that phrasing. When RECENT STORY clearly identifies existing UNREVEALED BUILDING/OBJECT landmarks from outside, SET_ASSET knowledge KNOWN on each match without clearing notEntered. Footer leaves may shorten the asset name ("General Store" for "Bullion General Store") — still treat that as entry of the matching BUILDING, clear notEntered, and populate normally. On FIRST-ENTRY / INTENT BUILDING POPULATION, ADD_ASSET only map-worthy CREATURE/GROUP/LOOT/HAZARD/TRAP/ALARM/BARRIER/OBJECT contents — never ambient clutter (tipped chairs, dusty booths, ordinary furniture). Named people are CREATURE; unnamed bands are one GROUP with count.';
     }
     return `${kind === 'INTERIOR' ? 'INTERIOR' : 'DUNGEON'} is room-scale. If the party enters a newly invented room the map lacks, ADD_AREA from the narrative.`;
 }
@@ -193,6 +194,7 @@ function rejectPartyMemberAssets(transaction, memo) {
 
 function formatBuildingPopulationBundle(target) {
     if (!target) return '';
+    const intentPhase = target.phase === 'intent';
     const identity = target.building
         ? `Building: ${target.building.id} | ${target.building.name}\nDetail: ${target.building.detail || '(none)'}\nOwner: ${target.building.owner || '(none)'}`
         : `Untracked building name: ${target.untrackedName}\nCreate this BUILDING in ${target.area.id} before adding its contents.`;
@@ -200,15 +202,17 @@ function formatBuildingPopulationBundle(target) {
         ? target.children.map(asset => `- ${asset.id} | ${asset.kind} | ${asset.name} | ${asset.state} | ${asset.knowledge} | ${asset.detail || ''}`).join('\n')
         : '- None.';
     return `
-## FIRST-ENTRY BUILDING POPULATION (MANDATORY THIS PASS)
-The completed GM footer places the party inside this BUILDING for the first unresolved time.
+## ${intentPhase ? 'PRE-NARRATION BUILDING INTENT POPULATION' : 'FIRST-ENTRY BUILDING POPULATION'} (MANDATORY THIS PASS)
+${intentPhase
+        ? `The player's latest action deliberately targets this BUILDING. Establish its objective hidden contents now, before the narrator adjudicates approach, entry, perception, or danger. The player action is intent only: do not assume entry succeeded, invent a roll outcome, or mark new contents perceived.\nPlayer action: ${target.playerText || '(not supplied)'}`
+        : 'The completed GM footer places the party inside this BUILDING for the first unresolved time.'}
 District: ${target.area.id} | ${target.area.name}
 District geometry: ${(target.area.geometry || [])[0] || '(none)'}
 ${identity}
 Existing contained assets:
 ${children}
 
-Resolve this lightweight, map-free interior now using the normal flat operations array. RECENT STORY was widened for this first-entry pass so you can ground contents in what was established. Derive how many and what kind of CREATURE, GROUP, OBJECT, LOOT, HAZARD, or TRAP assets to add from the narrative and setting — interesting and fitting, not excessive (do not pack every house with enemies when the district is already crowded). Location must equal the exact BUILDING id/name. Reconcile established SUSPECTED contents rather than duplicating them. KNOWN requires observation in RECENT STORY; concealed additions are UNREVEALED; an unconfirmed rumor stays SUSPECTED; certain knowledge may be KNOWN. An established empty, closed, or abandoned building may add no contents. In every case, explicitly finish with SET_ASSET on the BUILDING using notEntered:false. Do not output noop, ADD_AREA, SUBDUNGEON, SUBINTERIOR, or CreateAreaMap.`;
+Resolve this lightweight, map-free interior now using the normal flat operations array. RECENT STORY was widened for this population pass so you can ground contents in what was established. ADD_ASSET only map-worthy CREATURE, GROUP, LOOT, HAZARD, TRAP, ALARM, BARRIER, or interactive/scavengable OBJECT contents — never ambient set dressing (tipped chairs, dusty booths, ordinary counters, general mess). New children must be ADD_ASSET with location equal to the exact BUILDING id/name; never SET_ASSET a brand-new invented asset_id. Keep the interior lean and interesting, not excessive (do not pack every house with enemies when the district is already crowded). Reconcile established SUSPECTED contents rather than duplicating them. ${intentPhase ? 'Every newly generated contained asset must be UNREVEALED; only later GM narration can make it KNOWN or SUSPECTED. Do not emit chronicles in this pre-narration pass.' : 'KNOWN requires observation in RECENT STORY; concealed additions are UNREVEALED; an unconfirmed rumor stays SUSPECTED; certain knowledge may be KNOWN.'} An established empty, closed, or abandoned building may add no contents. In every case, explicitly finish with SET_ASSET on the BUILDING using notEntered:false. Do not output noop, ADD_AREA, SUBDUNGEON, SUBINTERIOR, or CreateAreaMap.`;
 }
 
 function initialUserPrompt(loaded, recentStory, memo, currentTime, populationTarget = null) {
@@ -264,10 +268,10 @@ ${recentStory || '(No additional recent context.)'}
 Output only the corrected JSON object.`;
 }
 
-function finishMapUpdater(ctx, snapshot, { applied = false } = {}) {
+function finishMapUpdater(ctx, snapshot, { applied = false, stampSwipe = true } = {}) {
     persistMapUpdaterLastRunWatermark(ctx.chat?.length || 0);
     persistMapUpdaterLastRunTimestamp();
-    if (applied) stampTriggerMessage(ctx, snapshot);
+    if (applied && stampSwipe) stampTriggerMessage(ctx, snapshot);
 }
 
 /**
@@ -292,9 +296,9 @@ export async function maybeRollbackMapUpdaterForSwipe(msg) {
 /**
  * One occupancy-maintenance pass for the currently mapped site.
  * Skips when Persistent Maps is off, no map is active, Lorebook Agent is busy, or auto-updates are disabled.
- * @param {{ isManual?: boolean, lookback?: number|null }} [options]
+ * @param {{ isManual?: boolean, lookback?: number|null, buildingIntent?: string }} [options]
  */
-export async function runMapUpdaterPass({ isManual = false, lookback = null } = {}) {
+export async function runMapUpdaterPass({ isManual = false, lookback = null, buildingIntent = '' } = {}) {
     const settings = getSettings();
     if (settings.mapUpdaterEnabled === false && !isManual) return { skipped: 'disabled' };
     if (!isLocationMappingEnabled(settings)) return { skipped: 'location_mapping_off' };
@@ -305,6 +309,10 @@ export async function runMapUpdaterPass({ isManual = false, lookback = null } = 
     try {
         const loaded = await loadActiveDungeonMapContext();
         if (!loaded?.context) return { skipped: 'no_active_map' };
+        const populationTarget = buildingIntent
+            ? resolveBuildingIntentPopulationTarget(loaded.context.document, loaded.currentLocation, buildingIntent)
+            : resolveBuildingPopulationTarget(loaded.context.document, loaded.currentLocation);
+        if (buildingIntent && !populationTarget) return { skipped: 'no_building_intent' };
         if (_mapUpdaterRunning || isRouterRunning() || isMapEvolutionRunning()) return { skipped: 'busy' };
 
         _mapUpdaterRunning = true;
@@ -315,7 +323,6 @@ export async function runMapUpdaterPass({ isManual = false, lookback = null } = 
         broadcastStep('start', 'Initializing Map Updater...');
 
         const kind = normalizeMapSiteKind(loaded.context.document?.kind);
-        const populationTarget = resolveBuildingPopulationTarget(loaded.context.document, loaded.currentLocation);
         broadcastStep('thought', `Site: ${loaded.context.siteRoot} (${kind})\nCurrent location: ${loaded.currentLocation || 'Unknown'}`);
 
         const snapshot = await snapshotCampaignLocationsBook();
@@ -404,7 +411,7 @@ export async function runMapUpdaterPass({ isManual = false, lookback = null } = 
                 }
                 break;
             }
-            finishMapUpdater(ctx, snapshot, { applied: true });
+            finishMapUpdater(ctx, snapshot, { applied: true, stampSwipe: populationTarget?.phase !== 'intent' });
             if (settings.debugMode) {
                 console.log('[RPG Tracker] Map Updater applied', mapResult.operationId || parsed.value.operation_id);
             }
@@ -449,4 +456,19 @@ export async function runMapUpdaterPass({ isManual = false, lookback = null } = 
             document.dispatchEvent(new CustomEvent('rt_map_updater_status', { detail: { running: false } }));
         }
     }
+}
+
+/**
+ * MESSAGE_SENT hook. SillyTavern awaits this event before assembling the main
+ * narrator prompt, so a matched BUILDING receives hidden contents first.
+ */
+export async function onMapUpdaterUserMessage(messageId) {
+    const ctx = SillyTavern.getContext();
+    const index = Number(messageId);
+    if (!Number.isInteger(index) || index !== (ctx.chat?.length || 0) - 1) return { skipped: 'not_latest_user_message' };
+    const message = ctx.chat?.[index];
+    if (!message?.is_user || message?.is_system) return { skipped: 'not_user_message' };
+    const buildingIntent = String(message.mes || '').trim();
+    if (!buildingIntent) return { skipped: 'empty_user_message' };
+    return runMapUpdaterPass({ buildingIntent });
 }

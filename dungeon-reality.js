@@ -674,6 +674,8 @@ export function validateDungeonMapArchitecture(raw, { site = '', entrance = '', 
     const areaIds = new Set();
     const areaNames = new Set();
     const allowedArea = new Set(['id', 'name', 'knowledge', 'geometry', 'connections']);
+    const allAreasVisited = areas.length > 0
+        && areas.every(area => area && typeof area === 'object' && !Array.isArray(area) && area.knowledge === 'VISITED');
     areas.forEach((area, index) => {
         const path = `$.areas[${index}]`;
         if (!area || typeof area !== 'object' || Array.isArray(area)) {
@@ -694,7 +696,9 @@ export function validateDungeonMapArchitecture(raw, { site = '', entrance = '', 
         else areaNames.add(nameKey);
         if (!AREA_KNOWLEDGE.includes(area.knowledge)) errors.push(architectureError('INVALID_AREA_KNOWLEDGE', `${path}.knowledge`, area.knowledge, `Use one of: ${AREA_KNOWLEDGE.join(', ')}.`));
         if (index === 0 && area.knowledge !== 'VISITED') errors.push(architectureError('ENTRANCE_NOT_VISITED', `${path}.knowledge`, area.knowledge, 'The first/entrance area must be VISITED.'));
-        if (index > 0 && area.knowledge === 'VISITED') errors.push(architectureError('PREMATURELY_VISITED', `${path}.knowledge`, area.knowledge, 'Only the entrance is VISITED on initial creation; use DISCOVERED or UNREVEALED.'));
+        if (index > 0 && area.knowledge === 'VISITED' && !allAreasVisited) {
+            errors.push(architectureError('PREMATURELY_VISITED', `${path}.knowledge`, area.knowledge, 'Only the entrance is VISITED on initial creation unless every area is VISITED for a story-established familiar site; otherwise use DISCOVERED or UNREVEALED.'));
+        }
         if (index === 0 && entrance && name && !dungeonLabelsMatch(name, entrance)) {
             errors.push(architectureError('ENTRANCE_MISMATCH', `${path}.name`, name, `The first area must match the requested entrance: "${entrance}".`));
         }
@@ -1427,6 +1431,52 @@ export function resolveBuildingPopulationTarget(document, currentLocation = '') 
         return { building: null, area: placement.area, children: [], untrackedName: placement.unmatchedInterior };
     }
     return null;
+}
+
+/**
+ * Resolve a unique pending BUILDING explicitly referenced by the player's new
+ * action. This runs before narration, so it deliberately does not depend on a
+ * footer claiming that entry already happened.
+ */
+export function resolveBuildingIntentPopulationTarget(document, currentLocation = '', playerText = '') {
+    const map = normalizeDungeonMapDocument(document, document?.site);
+    if (normalizeMapSiteKind(map.kind) !== 'SETTLEMENT') return null;
+    const normalizedText = normalizeDungeonLabel(playerText);
+    if (!normalizedText) return null;
+    const paddedText = ` ${normalizedText} `;
+    const siteTokens = new Set(normalizeDungeonLabel(map.site).split(' ').filter(Boolean));
+    const pending = map.assets.filter(asset =>
+        asset.kind === 'BUILDING'
+        && asset.state !== 'REMOVED'
+        && asset.notEntered !== false
+        && resolveAssetEffectiveArea(map, asset));
+    const scored = pending.map((building) => {
+        const normalizedName = normalizeDungeonLabel(building.name);
+        if (!normalizedName) return { building, score: 0 };
+        if (paddedText.includes(` ${normalizedName} `)) return { building, score: 1000 + normalizedName.length };
+        const nameTokens = normalizedName.split(' ').filter(Boolean);
+        const withoutSite = nameTokens.filter(token => !siteTokens.has(token)).join(' ');
+        if (withoutSite.length >= 4 && paddedText.includes(` ${withoutSite} `)) {
+            return { building, score: 500 + withoutSite.length };
+        }
+        const distinctive = nameTokens
+            .filter(token => token.length >= 5 && !siteTokens.has(token))
+            .filter(token => paddedText.includes(` ${token} `));
+        return { building, score: distinctive.length ? Math.max(...distinctive.map(token => token.length)) : 0 };
+    }).filter(candidate => candidate.score > 0).sort((a, b) => b.score - a.score);
+    if (!scored.length || (scored[1] && scored[1].score === scored[0].score)) return null;
+    const building = scored[0].building;
+    const area = resolveAssetEffectiveArea(map, building);
+    if (!area) return null;
+    return {
+        building,
+        area,
+        children: map.assets.filter(asset => asset.location === building.id),
+        untrackedName: '',
+        phase: 'intent',
+        playerText: String(playerText || '').trim(),
+        previousPlacement: resolveCurrentMapPlacement(map, currentLocation),
+    };
 }
 
 /** Light normalization for footer drift without introducing opaque IDs. */

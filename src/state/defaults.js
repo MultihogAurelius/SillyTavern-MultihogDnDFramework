@@ -1550,7 +1550,7 @@ You may be asked to use Markers: ((PLS)), ((B)), ((XB)), ((BDG)), ((HGT)). These
 
 /** Latest settings migration version — factory reset skips legacy upgrade paths at or below this. */
 
-export const FACTORY_SETTINGS_VERSION = '2026.8.24.3';
+export const FACTORY_SETTINGS_VERSION = '2026.8.24.6';
 
 
 /** Remove extension UI keys from localStorage so a factory reset does not rehydrate stale panel state. */
