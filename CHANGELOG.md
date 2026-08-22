@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.24] - 2026-08-22
+
+### Changed
+- **Status footer**: drop duplicated hosted-child breadcrumb guidance (owned by `<dungeon_reality_and_hidden_mapping>`); ban positional phrasing for unmapped BUILDINGs (`Main Street` or `Main Street, General Store` only when inside).
+
 ## [2026.8.23.5] - 2026-08-22
 
 ### Changed
