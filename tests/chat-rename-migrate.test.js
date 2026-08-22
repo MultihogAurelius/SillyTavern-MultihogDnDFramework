@@ -21,7 +21,11 @@ function readLocalMap(key) {
 }
 
 function markRenameReset() {
-    runtimeState.pendingUnseenChatReset = { oldId: 'Old Chat', newId: 'Renamed Chat' };
+    runtimeState.pendingUnseenChatReset = {
+        oldId: 'Old Chat',
+        newId: 'Renamed Chat',
+        preexistingLocalMapKeys: [],
+    };
 }
 
 describe('chat rename migration helpers', () => {
@@ -41,11 +45,14 @@ describe('chat rename migration helpers', () => {
         const handlerEnd = source.indexOf('function updateChatLinkUI()', handlerStart);
         const handler = source.slice(handlerStart, handlerEnd);
         const resetCall = handler.indexOf('resetUnseenChatState(s);');
-        const markerWrite = handler.indexOf('runtimeState.pendingUnseenChatReset = { oldId: oldChatId, newId: resolvedId };');
+        const localProbe = handler.indexOf('localChatMapHasEntry(key, resolvedId)');
+        const markerWrite = handler.indexOf('runtimeState.pendingUnseenChatReset = {');
 
         expect(handlerStart).toBeGreaterThan(-1);
         expect(handlerEnd).toBeGreaterThan(handlerStart);
         expect(resetCall).toBeGreaterThan(-1);
+        expect(localProbe).toBeGreaterThan(-1);
+        expect(localProbe).toBeLessThan(resetCall);
         expect(markerWrite).toBeGreaterThan(resetCall);
     });
 
@@ -254,6 +261,59 @@ describe('onChatRenamedMigrate', () => {
         expect(runtimeState.pendingUnseenChatReset).toBeNull();
     });
 
+    it('replaces browser-local shells seeded after the marked rename reset', async () => {
+        const s = getSettings();
+        s.chatStates = {
+            'Old Chat': { currentMemo: 'old campaign' },
+            'Renamed Chat': { currentMemo: '', routerLastRunAt: 1787331050916 },
+        };
+        localStorage.setItem(COMPANION_BY_CHAT_KEY, JSON.stringify({
+            'Old Chat': { history: [{ content: 'old plan' }] },
+            'Renamed Chat': { history: [] },
+        }));
+        localStorage.setItem(MEMO_RECOVERY_KEY, JSON.stringify({
+            'Old Chat': { currentMemo: 'old campaign', ts: 1 },
+            'Renamed Chat': { currentMemo: '', ts: 2 },
+        }));
+        markRenameReset();
+
+        await onChatRenamedMigrate(
+            { oldFileName: 'Old Chat.jsonl', newFileName: 'Renamed Chat.jsonl' },
+            { saveSettings: vi.fn(), loadChatState: vi.fn(() => true) },
+        );
+
+        expect(readLocalMap(COMPANION_BY_CHAT_KEY)).toEqual({
+            'Renamed Chat': { history: [{ content: 'old plan' }] },
+        });
+        expect(readLocalMap(MEMO_RECOVERY_KEY)).toEqual({
+            'Renamed Chat': { currentMemo: 'old campaign', ts: 1 },
+        });
+        expect(globalThis.toastr.warning).not.toHaveBeenCalled();
+    });
+
+    it('preserves browser-local destination data that existed before the rename reset', async () => {
+        const s = getSettings();
+        s.chatStates = {
+            'Old Chat': { currentMemo: 'old campaign' },
+            'Renamed Chat': { currentMemo: '' },
+        };
+        localStorage.setItem(COMPANION_BY_CHAT_KEY, JSON.stringify({
+            'Old Chat': { history: [{ content: 'old plan' }] },
+            'Renamed Chat': { history: [{ content: 'pre-existing plan' }] },
+        }));
+        markRenameReset();
+        runtimeState.pendingUnseenChatReset.preexistingLocalMapKeys = [COMPANION_BY_CHAT_KEY];
+
+        await onChatRenamedMigrate(
+            { oldFileName: 'Old Chat.jsonl', newFileName: 'Renamed Chat.jsonl' },
+            { saveSettings: vi.fn(), loadChatState: vi.fn(() => true) },
+        );
+
+        expect(readLocalMap(COMPANION_BY_CHAT_KEY)['Old Chat'].history[0].content).toBe('old plan');
+        expect(readLocalMap(COMPANION_BY_CHAT_KEY)['Renamed Chat'].history[0].content).toBe('pre-existing plan');
+        expect(globalThis.toastr.warning).toHaveBeenCalledOnce();
+    });
+
     it('moves portrait-only campaign state over a marked setup shell', async () => {
         const s = getSettings();
         s.chatStates = {
@@ -271,11 +331,16 @@ describe('onChatRenamedMigrate', () => {
         expect(s.chatStates['Old Chat']).toBeUndefined();
     });
 
-    it('preserves a real lower-content destination even when a reset marker exists', async () => {
+    it('replaces a marked rename shell even when it inherited substantive run metadata', async () => {
         const s = getSettings();
         s.chatStates = {
             'Old Chat': { currentMemo: 'old campaign', quests: [{ id: 'old' }] },
-            'Renamed Chat': { playerCharacter: { name: 'Destination PC' } },
+            'Renamed Chat': {
+                currentMemo: '',
+                routerLastRunAt: 1787331050916,
+                mapUpdaterLastRunAt: 1787331050916,
+                setup: { version: 3 },
+            },
         };
         markRenameReset();
 
@@ -284,9 +349,31 @@ describe('onChatRenamedMigrate', () => {
             { saveSettings: vi.fn(), loadChatState: vi.fn() },
         );
 
-        expect(s.chatStates['Renamed Chat'].playerCharacter?.name).toBe('Destination PC');
-        expect(s.chatStates['Old Chat'].currentMemo).toBe('old campaign');
-        expect(globalThis.toastr.warning).toHaveBeenCalled();
+        expect(s.chatStates['Renamed Chat'].currentMemo).toBe('old campaign');
+        expect(s.chatStates['Renamed Chat'].quests).toEqual([{ id: 'old' }]);
+        expect(s.chatStates['Old Chat']).toBeUndefined();
+        expect(globalThis.toastr.warning).not.toHaveBeenCalled();
+    });
+
+    it('moves setup-only chat status over its exact marked rename shell', async () => {
+        const s = getSettings();
+        s.chatStates = {
+            'Old Chat': { setup: { version: 3, narrativePacing: 'high_agency' } },
+            'Renamed Chat': {
+                setup: { version: 3, narrativePacing: 'normal' },
+                routerLastRunAt: 1787331050916,
+            },
+        };
+        markRenameReset();
+
+        await onChatRenamedMigrate(
+            { oldFileName: 'Old Chat.jsonl', newFileName: 'Renamed Chat.jsonl' },
+            { saveSettings: vi.fn(), loadChatState: vi.fn(() => true) },
+        );
+
+        expect(s.chatStates['Renamed Chat'].setup.narrativePacing).toBe('high_agency');
+        expect(s.chatStates['Old Chat']).toBeUndefined();
+        expect(globalThis.toastr.warning).not.toHaveBeenCalled();
     });
 
     it('preserves an unmarked setup-only destination because the collision is ambiguous', async () => {

@@ -59,6 +59,11 @@ import { cloneCampaignStackToPrefix } from './src/features/chat/clone-campaign-s
 import { branchCampaignChat, isBranchSeedInProgress } from './src/features/chat/branch-campaign.js';
 import { onChatRenamedMigrate } from './src/features/chat/chat-rename-migrate.js';
 import {
+    COMPANION_BY_CHAT_KEY,
+    MEMO_RECOVERY_KEY,
+    localChatMapHasEntry,
+} from './src/features/chat/local-chat-map.js';
+import {
     initSettingsOverlay,
     openSettingsOverlay,
     closeSettingsOverlay,
@@ -2131,8 +2136,16 @@ function onChatChanged(newChatId) {
                 console.warn('[RPG Tracker] Branch seed guard active but partition missing for', resolvedId);
             }
         } else {
+            // Capture genuine browser-local destination entries before the reset
+            // writes its own empty Adventure Companion / recovery shells there.
+            const preexistingLocalMapKeys = [COMPANION_BY_CHAT_KEY, MEMO_RECOVERY_KEY]
+                .filter((key) => localChatMapHasEntry(key, resolvedId));
             resetUnseenChatState(s);
-            runtimeState.pendingUnseenChatReset = { oldId: oldChatId, newId: resolvedId };
+            runtimeState.pendingUnseenChatReset = {
+                oldId: oldChatId,
+                newId: resolvedId,
+                preexistingLocalMapKeys,
+            };
         }
     } else if (!found && typeof globalThis._rpgLoadAdventureCompanionForChat === 'function') {
         // Partition missing but chatStates entry may exist empty — still hydrate companion map

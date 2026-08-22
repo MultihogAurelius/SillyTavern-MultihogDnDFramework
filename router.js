@@ -53,7 +53,7 @@ import {
     DUNGEON_MAP_OPERATION_IDS_KEY,
 } from './dungeon-reality.js';
 import { recordLiveDungeonMapSnapshot } from './src/state/dungeon-map-history.js';
-import { buildHostedPeerSitePath, ensureHostCoreMirror, stampHostedPeerDocument } from './map-hosting.js';
+import { buildHostedPeerSitePath, ensureHostCoreMirror, reparentHostedLocationEntries, stampHostedPeerDocument } from './map-hosting.js';
 import { clearEvolutionHistoryForSite, setSiteEvolutionIntervalOverride } from './map-evolution-lib.js';
 import {
     buildWorldProgressionLocationDossiers,
@@ -680,20 +680,6 @@ function findArchitectMapEntry(entries, canonicalSite, requestedSite, hostContex
     }) || null;
 }
 
-function moveLocationEntryUnderHostedPath(entries, entry, canonicalSite, requestedSite) {
-    const oldLabel = String(entry?.comment || '').trim();
-    if (!oldLabel || oldLabel === canonicalSite) return;
-    for (const candidate of Object.values(entries || {})) {
-        if (!candidate || candidate === entry) continue;
-        const label = String(candidate.comment || '').trim();
-        if (label.startsWith(`${oldLabel} :: `)) {
-            candidate.comment = `${canonicalSite}${label.slice(oldLabel.length)}`;
-        }
-    }
-    entry.comment = canonicalSite;
-    entry.key = cleanKeys([requestedSite, canonicalSite, ...(Array.isArray(entry.key) ? entry.key : [])]);
-}
-
 /**
  * Atomically attach a validated Map Architect document to its root Location.
  * Existing maps always win: concurrent/repeated tool calls never overwrite canon.
@@ -828,7 +814,7 @@ export async function persistArchitectDungeonMap(siteRoot, mapDocument, {
         }
         persistedDocument.site = site;
         persistedDocument = stampHostedPeerDocument(persistedDocument, hostDocument, hostAsset);
-        moveLocationEntryUnderHostedPath(bookData.entries, rootEntry, site, requestedSite);
+        reparentHostedLocationEntries(bookData.entries, rootEntry, site, requestedSite);
         hostEntry.content = replaceDungeonMapSection(hostEntry.content, serializeDungeonMapDocument(hostDocument));
         hostEntry.disable = true;
     }
@@ -868,7 +854,10 @@ export async function persistArchitectDungeonMap(siteRoot, mapDocument, {
         if (matchingAssets.length !== 1) {
             throw new Error(`Settlement must contain exactly one ${included.assetKind} asset named "${included.site}".`);
         }
+        const hostedSite = buildHostedPeerSitePath(persistedDocument, matchingAssets[0]);
         const stamped = stampHostedPeerDocument(peerDocument, persistedDocument, matchingAssets[0]);
+        stamped.site = hostedSite;
+        reparentHostedLocationEntries(bookData.entries, peerEntry, hostedSite, included.site);
         peerEntry.content = ensureHostCoreMirror(peerEntry.content, stamped.hostSite, stamped.hostBrief);
         peerEntry.content = replaceDungeonMapSection(peerEntry.content, serializeDungeonMapDocument(stamped));
         peerEntry.disable = true;

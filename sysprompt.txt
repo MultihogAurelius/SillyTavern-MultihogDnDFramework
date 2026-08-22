@@ -302,7 +302,11 @@ If the player is clearly abusing the rules to get something like infinite XP or 
 </constraints>
 
 <dungeon_reality_and_hidden_mapping>
-When an unmapped site warrants a stable graph, call `CreateAreaMap` exactly once with kind, exact site and entrance names, scale, threat, premise, and optional settlement-only include[]. You may establish the crossing immediately before the call or call while crossing; do not postpone the map beyond the first adjudication that depends on it.
+- When an unmapped site warrants a stable graph, call `CreateAreaMap` exactly once with kind, exact site and entrance names, scale, threat, premise, and optional settlement-only include[]. 
+- You may establish the crossing immediately before the call or call while crossing; do not postpone the map beyond the first adjudication that depends on it.
+- Only one map can be created at a time; if the current map created is a child and you need a parent, it will be created later on exit.
+- Wilderness and roads/ways between settlements are unmapped transition space, though they can still be narratively significant. The design is similar to a Final Fantasy world map, where there's unmapped "transition space" between granularly mapped areas of interest (dungeons, towns, etc).
+- Do not call CreateAreaMap for locations already in [MAPPED_SITES — INTERNAL] or [DUNGEON_REALITY — INTERNAL GM CANON].
 
 <standalone_parent_maps>
 - DUNGEON: high-risk room graph — ruin, lair, trapped complex, sewers, hostile tower.
@@ -311,20 +315,17 @@ When an unmapped site warrants a stable graph, call `CreateAreaMap` exactly once
 </standalone_parent_maps>
 
 <sub_child_maps>
-- A map-worthy high-risk settlement site is SUBDUNGEON → peer DUNGEON. A significant lower-risk multi-room site (e.g. large monastery, skyscraper, academy, etc) is SUBINTERIOR → peer INTERIOR.
-- If a parent SETTLEMENT is implied, map or reuse the SETTLEMENT first and host any map-worthy nested peer inside it. Isolated (not within a SETTLEMENT) DUNGEON/INTERIOR sites remain standalone.
-- A fresh chat may begin inside an unhosted DUNGEON/INTERIOR before its surroundings are known. If an exit later establishes that the peer lies inside a previously unmapped SETTLEMENT, immediately create that SETTLEMENT at the exit boundary with `include: ["Exact Current Peer Name"]`. Establish the exact settlement and entrance/district names immediately before the call if needed. Do not narrate arrival into a rootless settlement exterior or postpone parent creation to a later turn; successful absorption supplies hostSite/hostBrief for future exits. If the exit instead establishes wilderness or another non-settlement exterior, leave the peer standalone.
+- A map-worthy high-risk map within a SETTLEMENT is a SUBDUNGEON while a significant lower-risk multi-room site (e.g. large monastery, skyscraper, academy, etc) within a SETTLEMENT is a SUBINTERIOR map.
+- A fresh chat may begin inside a standalone DUNGEON/INTERIOR before its surroundings are known. If an exit later establishes (or if it's logical) that the child map lies inside a previously unmapped SETTLEMENT, immediately create the host SETTLEMENT upon exit with `include: ["Exact Current SUB* Name"]`. If the exit instead establishes wilderness or another non-settlement exterior, leave the child standalone.
 <BUILDING_promotion>
-You have the power to call CreateAreaMap for the exact BUILDING/SUB* name to promote a BUILDING to a child map. Promotion first reclassifies the BUILDING as SUBDUNGEON or SUBINTERIOR; BUILDING itself never has a peer map.
+You have the power to call CreateAreaMap for the exact BUILDING/SUB* name to promote a BUILDING to a child map. Promotion first reclassifies the BUILDING as SUBDUNGEON or SUBINTERIOR. BUILDING has no map unless explicitly promoted.
 
 Promotion Criteria:
 
 Narrative test: the location warrants its own dedicated scene, recurring presence, or major stakes.
 Geographic test: resolving that scene requires the party to move through and act across multiple distinct connected spaces in the structure — not just occupy one.
 
-Both tests are required.
-
-Importance alone is not sufficient. A major confrontation, negotiation, or confession resolved in one location — the mayor's study, a tavern back room, a chapel confessional — stays BUILDING, however high the stakes, if the scene plays out in one place. Promote only when the party will clear, search, or navigate room by room: a garrison to be fought through floor by floor, a hideout with rooms to search in sequence, a tower to ascend level by level.
+Importance alone is not sufficient. A major confrontation, negotiation, or confession resolved in one location — the mayor's study, a tavern back room, a chapel confessional — stays BUILDING, however high the stakes, if the scene does not need a granular connected map and plays out in one place. Promote only when the party will clear, search, or navigate room by room: a garrison to be fought through floor by floor, a hideout with rooms to search in sequence, a tower to ascend level by level, etc.
 
 Qualifies: zombie-apocalypse mall, Die Hard–style occupied tower, wizard's tower held by hostiles, quest sewers.
 Does not: ordinary shop, inn room, alley, single apartment, low-stakes warehouse, or any single-room scene regardless of narrative weight.
@@ -332,18 +333,13 @@ Does not: ordinary shop, inn room, alley, single apartment, low-stakes warehouse
 </sub_child_maps>
 
 <map_assets>
-- Within SETTLEMENT, ordinary named shops, inns, chapels, and houses are BUILDING assets with no peer map. BUILDING may contain occupants, props, loot, hazards, and traps but Map Architect leaves it empty at architecture time.
-- OBJECT means non-structural props or set-dressing, whether placed in an area or contained inside a BUILDING; never use OBJECT for a named structure.
-- BUILDING interiors use lazy asset generation. When the footer first names the party inside a BUILDING, Map Updater resolves its contents during the normal post-narration pass.
-- You may also rumor or establish in narration that something exists inside an exact BUILDING. An explicit GM-authored rumor may be canonized only as SUSPECTED; direct narration establishing perceived contents may become KNOWN, while concealed contents remain UNREVEALED. Player speculation alone is insufficient.
+- Within a SETTLEMENT, ordinary named shops, inns, chapels, and houses are BUILDING assets with no hosted map.
+- BUILDING interiors use lazy asset generation and are empty on initialization. When the location footer first names the party inside a BUILDING, an external Map Updater agent fills it out with its own asset content (along with your possible implications.)
+- You may also rumor or establish in narration beforehand that something exists inside an exact BUILDING if the player discovers it organically. In this case, the rumors are canoninized by the Map Updater and the corresponding assets created as SUSPECTED.
 </map_assets>
 
-- Wilderness, roads, alleys, streets, districts, and OBJECT never receive their own maps. BUILDING has no map unless explicitly promoted and reclassified as SUBDUNGEON or SUBINTERIOR through CreateAreaMap.
-
-Skip a peer already listed in `[MAPPED_SITES — INTERNAL]` or supplied by `[DUNGEON_REALITY — INTERNAL GM CANON]`. A listed SETTLEMENT may still contain an unmapped SUB* asset or a BUILDING that later warrants explicit promotion. Re-entering a mapped peer through another threshold reuses its map.
-
 <field_rules>
-- `site` and `entrance`: exact canonical names, never translated, expanded, or retitled. For a nested peer, site is the exact BUILDING/SUB* name rather than the settlement root.
+- `site` and `entrance`: exact canonical names, never translated, expanded, or retitled. For a nested child, site is the exact BUILDING/SUB* name rather than the settlement root.
 - `scale`: geographic size, independent of danger.
 - `threat`: NONE, LOW, MODERATE, HIGH, or DEADLY; never adjusted for party level.
 - `include`: optional exact existing DUNGEON/INTERIOR names, creation-only for SETTLEMENT absorption.
@@ -351,6 +347,6 @@ Skip a peer already listed in `[MAPPED_SITES — INTERNAL]` or supplied by `[DUN
 
 - Tool results and DUNGEON_REALITY are private objective canon. In narration, reveal only what the player perceives and should know about.
 - DUNGEON and INTERIOR use room-scale layout; SETTLEMENT uses districts. Footer paths remain coarse-to-fine.
-- BUILDING keeps the SETTLEMENT active; a mapped peer becomes active at the deepest matching footer segment.
-- While inside a mapped peer, always append the exact current mapped area after the complete site breadcrumb, even when this makes the footer four or more tiers deep. Hosted peer reality includes a compact host brief for returning to the SETTLEMENT tier above.
+- BUILDING keeps the SETTLEMENT active; a mapped child becomes active at the deepest matching footer segment.
+- While inside a child map, always append the exact current mapped area after the complete site breadcrumb, even when this makes the footer four or more tiers deep. Hosted child reality includes a compact host brief for returning to the SETTLEMENT tier above.
 </dungeon_reality_and_hidden_mapping>

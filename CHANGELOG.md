@@ -2,6 +2,15 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.23] - 2026-08-23
+
+### Changed
+- **Narrator mapping policy**: refreshed the canonical hidden-mapping module for one-map-at-a-time creation, unmapped transition space, standalone-child exit absorption, BUILDING promotion, and lazy BUILDING population. Shipped and embedded prompt copies now stay synchronized with the root source text.
+
+### Fixed
+- **Settlement absorption breadcrumbs**: absorbing an existing DUNGEON/INTERIOR now reparents its root and every descendant Location beneath the settlement district while stamping the canonical hosted site and exit context in the same atomic save.
+- **Chat rename recovery**: exact rename-reset markers now replace transient destination shells, including browser-local Companion and memo-recovery shells, without overwriting data that existed before the rename.
+
 ## [2026.8.22.2] - 2026-08-22
 
 ### Fixed

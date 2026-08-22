@@ -189,6 +189,12 @@ export async function onChatRenamedMigrate(detail, deps) {
     const hasNew = Object.prototype.hasOwnProperty.call(s.chatStates, newId);
     const pendingReset = runtimeState.pendingUnseenChatReset;
     const resetMatchesRename = pendingReset?.oldId === oldId && pendingReset?.newId === newId;
+    const hasLocalMapBaseline = resetMatchesRename && Array.isArray(pendingReset?.preexistingLocalMapKeys);
+    const preexistingLocalMapKeys = new Set(
+        hasLocalMapBaseline
+            ? pendingReset.preexistingLocalMapKeys
+            : [],
+    );
     if (resetMatchesRename) runtimeState.pendingUnseenChatReset = null;
 
     let migratedPartition = false;
@@ -198,12 +204,14 @@ export async function onChatRenamedMigrate(detail, deps) {
         delete s.chatStates[oldId];
         migratedPartition = true;
     } else if (hasOld && hasNew) {
-        // Replace only the exact shell this session observed reset during the
-        // oldId -> newId switch. Content alone cannot distinguish a race shell
-        // from a legitimate configured-but-unstarted destination campaign.
-        const oldHasSubstance = partitionHasCampaignSubstance(s.chatStates[oldId]);
-        const newLooksEmpty = partitionLooksEmpty(s.chatStates[newId]);
-        if (resetMatchesRename && oldHasSubstance && newLooksEmpty) {
+        // onChatChanged records this marker only after proving the destination
+        // partition did not exist and resetting live state for oldId -> newId.
+        // A save can then seed the new key before CHAT_RENAMED runs. That shell
+        // may inherit operational timestamps (for example routerLastRunAt), so
+        // inspecting its content is not a reliable way to recognize it. The
+        // exact marker is the proof; replace the transient partition regardless
+        // of which stale live fields the intervening save copied into it.
+        if (resetMatchesRename) {
             s.chatStates[newId] = s.chatStates[oldId];
             delete s.chatStates[oldId];
             migratedPartition = true;
@@ -234,12 +242,15 @@ export async function onChatRenamedMigrate(detail, deps) {
     }
 
     // A genuine partition collision may represent two different chats, so keep
-    // both local-map entries untouched. Otherwise move only into an unused key;
-    // moveLocalChatMapEntry itself preserves both sides on a local-only collision.
+    // both local-map entries untouched. For an exact reset marker, replace only
+    // destination entries that were absent before CHAT_CHANGED seeded its own
+    // browser-local shells. Genuine pre-existing local data remains protected.
     let localMapCollision = false;
     if (!partitionCollision) {
         localMapCollision = [COMPANION_BY_CHAT_KEY, MEMO_RECOVERY_KEY]
-            .map((key) => moveLocalChatMapEntry(key, oldId, newId))
+            .map((key) => moveLocalChatMapEntry(key, oldId, newId, {
+                replaceDestination: hasLocalMapBaseline && !preexistingLocalMapKeys.has(key),
+            }))
             .includes('collision');
     }
     if (localMapCollision) {

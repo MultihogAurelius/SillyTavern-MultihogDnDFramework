@@ -162,11 +162,14 @@ describe('Map Architect component', () => {
         const persistence = router.slice(start, end);
         expect(persistence).toContain('promoteSettlementPeerAsset');
         expect(persistence).toContain('findArchitectMapEntry');
-        expect(persistence).toContain('moveLocationEntryUnderHostedPath');
+        expect(persistence).toContain('reparentHostedLocationEntries');
         expect(persistence).toContain('persistedDocument.site = site');
         expect(persistence).toContain('stampHostedPeerDocument');
         expect(persistence).toContain('ensureHostCoreMirror');
         expect(persistence).toContain('Included peer');
+        expect(persistence).toContain('const hostedSite = buildHostedPeerSitePath(persistedDocument, matchingAssets[0])');
+        expect(persistence).toContain('stamped.site = hostedSite');
+        expect(persistence.match(/reparentHostedLocationEntries\(/g)).toHaveLength(2);
         expect(persistence).toContain('settlementAbsorptionMatchesCurrentPeer(mapDocument.kind, currentLocation, includeManifest)');
         expect(persistence.match(/saveWorldInfoSnapshot\(/g)).toHaveLength(1);
         expect(hosting).toContain('is already hosted inside');
@@ -178,7 +181,7 @@ describe('Map Architect component', () => {
     it('migrates only untouched shipped prompts to the new taxonomy defaults', () => {
         const defaults = readFileSync(new URL('../src/state/defaults.js', import.meta.url), 'utf8');
         const settings = readFileSync(new URL('../src/state/settings.js', import.meta.url), 'utf8');
-        expect(defaults).toContain("FACTORY_SETTINGS_VERSION = '2026.8.22.3'");
+        expect(defaults).toContain("FACTORY_SETTINGS_VERSION = '2026.8.23'");
         expect(settings).toContain('promptSignature');
         expect(settings).toContain("'14870:8b5acf86'");
         expect(settings).toContain("'9025:d21f2f49'");

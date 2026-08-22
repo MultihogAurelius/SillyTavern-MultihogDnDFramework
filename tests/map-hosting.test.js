@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildHostedPeerBrief, buildHostedPeerSitePath, ensureHostCoreMirror, stampHostedPeerDocument } from '../map-hosting.js';
+import { buildHostedPeerBrief, buildHostedPeerSitePath, ensureHostCoreMirror, reparentHostedLocationEntries, stampHostedPeerDocument } from '../map-hosting.js';
 
 const host = {
     version: 3,
@@ -30,6 +30,26 @@ describe('nested map hosting', () => {
         expect(buildHostedPeerBrief(host, asset)).toBe(
             'Contained in Rustport, Dock Ward. Warehouse piers smell of brine. Exit returns to Dock Ward in Rustport.',
         );
+    });
+
+    it('reparents an absorbed peer root and all descendant Location breadcrumbs', () => {
+        const root = { comment: 'Flooded Sewers', key: ['Flooded Sewers', 'sewer'] };
+        const child = { comment: 'Flooded Sewers :: Treatment Grate', key: ['Treatment Grate'] };
+        const grandchild = { comment: 'Flooded Sewers :: Treatment Grate :: Pump Room', key: ['Pump Room'] };
+        const unrelated = { comment: 'Flooded Sewers Annex', key: ['Flooded Sewers Annex'] };
+        const entries = { 1: root, 2: child, 3: grandchild, 4: unrelated };
+
+        expect(reparentHostedLocationEntries(
+            entries,
+            root,
+            'Rustport :: Dock Ward :: Flooded Sewers',
+            'Flooded Sewers',
+        )).toBe(true);
+        expect(root.comment).toBe('Rustport :: Dock Ward :: Flooded Sewers');
+        expect(root.key.slice(0, 2)).toEqual(['Flooded Sewers', 'Rustport :: Dock Ward :: Flooded Sewers']);
+        expect(child.comment).toBe('Rustport :: Dock Ward :: Flooded Sewers :: Treatment Grate');
+        expect(grandchild.comment).toBe('Rustport :: Dock Ward :: Flooded Sewers :: Treatment Grate :: Pump Room');
+        expect(unrelated.comment).toBe('Flooded Sewers Annex');
     });
 
     it('mirrors host lines inside CORE idempotently without disturbing other lore', () => {

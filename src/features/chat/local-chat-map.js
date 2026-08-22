@@ -29,6 +29,20 @@ function writeLocalChatMap(key, map) {
 }
 
 /**
+ * Test whether a browser-local chat map already owns a chat key.
+ * Used before CHAT_CHANGED resets an unseen destination, so rename migration
+ * can distinguish pre-existing data from entries created by the reset itself.
+ * @param {string} storageKey
+ * @param {string} chatId
+ * @returns {boolean}
+ */
+export function localChatMapHasEntry(storageKey, chatId) {
+    if (!storageKey || !chatId) return false;
+    const map = readLocalChatMap(storageKey);
+    return Object.prototype.hasOwnProperty.call(map, chatId);
+}
+
+/**
  * Deep-copy a localStorage chat-keyed map entry from oldId to newId.
  * @param {string} storageKey
  * @param {string} oldId
@@ -56,13 +70,14 @@ export function copyLocalChatMapEntry(storageKey, oldId, newId) {
  * @param {string} storageKey
  * @param {string} oldId
  * @param {string} newId
+ * @param {{ replaceDestination?: boolean }} [opts]
  * @returns {'invalid'|'missing'|'collision'|'moved'}
  */
-export function moveLocalChatMapEntry(storageKey, oldId, newId) {
+export function moveLocalChatMapEntry(storageKey, oldId, newId, opts = {}) {
     if (!oldId || !newId || oldId === newId) return 'invalid';
     const map = readLocalChatMap(storageKey);
     if (!Object.prototype.hasOwnProperty.call(map, oldId)) return 'missing';
-    if (Object.prototype.hasOwnProperty.call(map, newId)) return 'collision';
+    if (Object.prototype.hasOwnProperty.call(map, newId) && !opts.replaceDestination) return 'collision';
     map[newId] = map[oldId];
     delete map[oldId];
     writeLocalChatMap(storageKey, map);

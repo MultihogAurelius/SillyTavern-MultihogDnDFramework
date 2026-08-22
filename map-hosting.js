@@ -12,6 +12,27 @@ export function buildHostedPeerSitePath(hostDocument, asset) {
     return `${hostDocument.site} :: ${area.name} :: ${asset.name}`;
 }
 
+/** Reparent a mapped peer root and every descendant Location breadcrumb. */
+export function reparentHostedLocationEntries(entries, entry, canonicalSite, requestedSite) {
+    const oldLabel = String(entry?.comment || '').trim();
+    const nextLabel = String(canonicalSite || '').trim();
+    if (!oldLabel || !nextLabel || oldLabel === nextLabel) return false;
+    for (const candidate of Object.values(entries || {})) {
+        if (!candidate || candidate === entry) continue;
+        const label = String(candidate.comment || '').trim();
+        if (label.startsWith(`${oldLabel} :: `)) {
+            candidate.comment = `${nextLabel}${label.slice(oldLabel.length)}`;
+        }
+    }
+    entry.comment = nextLabel;
+    entry.key = [...new Set([
+        requestedSite,
+        nextLabel,
+        ...(Array.isArray(entry.key) ? entry.key : []),
+    ].map(value => String(value || '').trim()).filter(Boolean))].slice(0, 6);
+    return true;
+}
+
 /** Mirror runtime-owned host metadata inside an existing CORE block, idempotently. */
 export function ensureHostCoreMirror(content, hostSite, hostBrief) {
     const source = String(content || '');
