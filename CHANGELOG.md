@@ -2,6 +2,12 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.23.3] - 2026-08-22
+
+### Changed
+- **CYOA roll guidance**: choices need not always include a roll, though any choice *can*; high-stakes / problem-solving should use rolls more, downtime less.
+- **Display Groups**: `PARTY` is now an eligible module for display-only grouping (`COMBAT`, `BENCHED PARTY`, and `QUESTS` remain excluded).
+
 ## [2026.8.23.2] - 2026-08-23
 
 ### Fixed

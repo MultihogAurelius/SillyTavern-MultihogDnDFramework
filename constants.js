@@ -587,7 +587,7 @@ Typical range 1–5 minor, 5–15 major; 15+ only for life-altering moments.
 - Enclose all choices inside a single <choices> XML block.
 - Wrap every single choice in a <button> tag.
 - Prefix each choice text with a fitting emoji.
-- Not all choices should always have a roll; high-stakes situations/problem-solving should utilize them more. Downtime needs less rolls.
+- Not all choices should always have a roll, though all choices *can* have a roll; high-stakes situations/problem-solving should utilize them more. Downtime needs less rolls.
 - Not every looking around needs to be an investigation check, but investigating something specific should be.
 - A resource must be >0 (not depleted) in TRACKER STATE 0 (Current) to be eligible for a choice.
 - Vary approaches across turns — avoid repeating the same stats, traits, abilities, or narrative actions as the previous turn.
@@ -938,7 +938,7 @@ Typical range 1–5 minor, 5–15 major; 15+ only for life-altering moments.
 - Enclose all choices inside a single <choices> XML block.
 - Wrap every single choice in a <button> tag.
 - Prefix each choice text with a fitting emoji.
-- Not all choices should always have a roll; high-stakes situations/problem-solving should utilize them more. Downtime needs less rolls.
+- Not all choices should always have a roll, though all choices *can* have a roll; high-stakes situations/problem-solving should utilize them more. Downtime needs less rolls.
 - Not every looking around needs to be an investigation check, but investigating something specific should be.
 - A resource must be >0 (not depleted) in TRACKER STATE 0 (Current) to be eligible for a choice.
 - Vary approaches across turns — avoid repeating the same stats, traits, abilities, or narrative actions as the previous turn.
@@ -1119,7 +1119,7 @@ export function buildCyoaPrompt(config = {}) {
     if (useXmlTag) reqLines.push('- Enclose all choices inside a single <choices> XML block.');
     if (useButtonTags) reqLines.push('- Wrap every single choice in a <button> tag.');
     if (useEmojis) reqLines.push('- Prefix each choice text with a fitting emoji.');
-    reqLines.push('- Not all choices should always have a roll; high-stakes situations/problem-solving should utilize them more. Downtime needs less rolls.');
+    reqLines.push('- Not all choices should always have a roll, though all choices *can* have a roll; high-stakes situations/problem-solving should utilize them more. Downtime needs less rolls.');
     reqLines.push('- Not every looking around needs to be an investigation check, but investigating something specific should be.');
     reqLines.push('- When a site map is attached: do not invent obstacles in choices (locked doors, traps, barricades, sealed passages, etc.) unless they already exist on that map. Offering such a check makes the obstacle real if chosen — keep choices map-real.');
     reqLines.push('- A resource must be >0 (not depleted) in TRACKER STATE 0 (Current) to be eligible for a choice.');
