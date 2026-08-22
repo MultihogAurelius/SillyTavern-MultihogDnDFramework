@@ -104,9 +104,8 @@ Out-of-range attack attempt → note {{user}} couldn't attack due to range; ask 
             expect(source).toContain('mapped child becomes active at the deepest matching footer segment');
             expect(source).toContain('Hosted child reality includes a compact host brief');
             expect(source).toContain('may be four or more tiers');
-            expect(source).toContain('Ashford, North Residential Streets, Residential House, Kitchen Passage');
-            expect(source).toContain('Never stop at the mapped site name');
-            expect(source).toContain('Never refer to mapped BUILDINGs positionally in the footer');
+            expect(source).toContain('always append the exact current mapped area after the complete site breadcrumb');
+            expect(source).toContain('Never refer to unmapped BUILDINGs positionally in the footer');
             expect(source).toContain('Main Street, General Store');
             expect(source).toContain('private objective canon');
             expect(source).toContain('[DUNGEON_REALITY — INTERNAL GM CANON]');
