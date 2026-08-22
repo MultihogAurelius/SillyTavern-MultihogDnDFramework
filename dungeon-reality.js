@@ -1285,6 +1285,79 @@ function splitLocationSegments(location) {
         .filter(Boolean);
 }
 
+/**
+ * Exterior-relative footer leaf: position near a landmark in the district,
+ * not a named interior the party has entered.
+ * e.g. "behind the general store", "outside the inn", "near the chapel".
+ */
+const EXTERIOR_RELATIVE_LOCATION_RE = /^(?:behind|beside|besides|near|outside|around|past|across from|in front of|at the (?:back|rear|side|front) of|next to|by|along|beyond|opposite(?:\s+to)?|against)\s+(?:the\s+)?(.+)$/i;
+
+/** Explicit interior phrasing that should resolve to an existing structure name. */
+const INTERIOR_OF_LOCATION_RE = /^(?:inside|within|in)\s+(?:the\s+)?(.+)$/i;
+
+const SETTLEMENT_STRUCTURE_KINDS = new Set(['BUILDING', 'OBJECT', 'SUBDUNGEON', 'SUBINTERIOR']);
+
+/** Word-boundary containment for landmark referents ("general store" ⊂ "Hollow Creek General Store"). */
+function dungeonLabelContainsMatch(left, right) {
+    const a = normalizeDungeonLabel(left);
+    const b = normalizeDungeonLabel(right);
+    if (!a || !b) return false;
+    if (dungeonLabelsMatch(a, b)) return true;
+    const shorter = a.length <= b.length ? a : b;
+    const longer = a.length <= b.length ? b : a;
+    if (shorter.length < 8) return false;
+    return (` ${longer} `).includes(` ${shorter} `);
+}
+
+function classifyFooterInteriorLeaf(label) {
+    const text = String(label || '').trim();
+    if (!text) return { kind: 'empty', referent: '' };
+    const exterior = text.match(EXTERIOR_RELATIVE_LOCATION_RE);
+    if (exterior) return { kind: 'exterior_relative', referent: String(exterior[1] || '').trim() };
+    const interior = text.match(INTERIOR_OF_LOCATION_RE);
+    if (interior) return { kind: 'interior_of', referent: String(interior[1] || '').trim() };
+    return { kind: 'named', referent: text };
+}
+
+function findSettlementInteriorAsset(map, label) {
+    const text = String(label || '').trim();
+    if (!text) return null;
+    const exact = resolveMapAsset(map, text).asset
+        || map.assets.find(asset => dungeonLabelsMatch(asset.name, text))
+        || null;
+    if (exact) return exact;
+    return map.assets.find(asset =>
+        SETTLEMENT_STRUCTURE_KINDS.has(String(asset.kind || '').toUpperCase())
+        && dungeonLabelContainsMatch(asset.name, text)
+    ) || null;
+}
+
+/**
+ * Decide whether a footer leaf after the matched district is a real interior
+ * name, an exterior-relative landmark phrase, or an "inside X" phrasing.
+ */
+function resolveFooterInteriorAgainstMap(map, unmatchedInterior) {
+    const classified = classifyFooterInteriorLeaf(unmatchedInterior);
+    if (classified.kind === 'empty') {
+        return { interiorAsset: null, unmatchedInterior: '' };
+    }
+    // Outside / behind / near a landmark: stay on the district. Never invent a
+    // BUILDING from positional phrasing even when the landmark already exists.
+    if (classified.kind === 'exterior_relative') {
+        return { interiorAsset: null, unmatchedInterior: '' };
+    }
+    const interiorAsset = findSettlementInteriorAsset(map, unmatchedInterior)
+        || findSettlementInteriorAsset(map, classified.referent);
+    if (interiorAsset) {
+        return { interiorAsset, unmatchedInterior: '' };
+    }
+    // "inside the general store" with no matching asset → track the referent name.
+    if (classified.kind === 'interior_of') {
+        return { interiorAsset: null, unmatchedInterior: classified.referent };
+    }
+    return { interiorAsset: null, unmatchedInterior };
+}
+
 /** Top-level footer segment, used as the stable site binding unit. */
 export function getSiteRootFromLocation(location) {
     return splitLocationSegments(location)[0] || '';
@@ -1309,16 +1382,16 @@ export function resolveCurrentMapPlacement(document, currentLocation = '') {
         const part = parts[i];
         const area = resolveMapArea(map, part).area;
         if (area) {
-            const unmatchedInterior = parts.slice(i + 1).join(', ');
-            const interiorAsset = unmatchedInterior
-                ? (resolveMapAsset(map, unmatchedInterior).asset
-                    || map.assets.find(asset => dungeonLabelsMatch(asset.name, unmatchedInterior))
-                    || null)
-                : null;
-            return { area, interiorAsset, unmatchedInterior };
+            const rawInterior = parts.slice(i + 1).join(', ');
+            if (!rawInterior) return { area, interiorAsset: null, unmatchedInterior: '' };
+            const resolved = resolveFooterInteriorAgainstMap(map, rawInterior);
+            return { area, interiorAsset: resolved.interiorAsset, unmatchedInterior: resolved.unmatchedInterior };
         }
+        // Exterior-relative leaves never bind as interiors even if a wrongly
+        // named asset exists from a prior bad updater pass.
+        if (classifyFooterInteriorLeaf(part).kind === 'exterior_relative') continue;
         const asset = resolveMapAsset(map, part).asset
-            || map.assets.find(item => dungeonLabelsMatch(item.name, part))
+            || findSettlementInteriorAsset(map, part)
             || null;
         if (asset) {
             const host = resolveAssetEffectiveArea(map, asset);
@@ -1329,7 +1402,11 @@ export function resolveCurrentMapPlacement(document, currentLocation = '') {
             };
         }
     }
-    return { area: null, interiorAsset: null, unmatchedInterior: parts.at(-1) || '' };
+    const leaf = parts.at(-1) || '';
+    if (classifyFooterInteriorLeaf(leaf).kind === 'exterior_relative') {
+        return { area: null, interiorAsset: null, unmatchedInterior: '' };
+    }
+    return { area: null, interiorAsset: null, unmatchedInterior: leaf };
 }
 
 /** Deterministic first-entry target derived only from the active settlement map and GM footer. */

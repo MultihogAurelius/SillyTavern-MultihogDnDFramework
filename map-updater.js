@@ -190,7 +190,7 @@ function formatFailure(errors) {
 
 function kindRule(kind) {
     if (kind === 'SETTLEMENT') {
-        return 'Ordinary settlement structures the party enters are BUILDING assets in the current district. OBJECT is props only. SUBDUNGEON/SUBINTERIOR require explicit narrative establishment, and CreateAreaMap—not Map Updater—owns BUILDING promotion. If CURRENT LOCATION names an untracked ordinary structure, ADD_ASSET kind BUILDING. Named people are CREATURE; unnamed bands are one GROUP with count.';
+        return 'Ordinary settlement structures the party enters are BUILDING assets in the current district. OBJECT is props only. SUBDUNGEON/SUBINTERIOR require explicit narrative establishment, and CreateAreaMap—not Map Updater—owns BUILDING promotion. If CURRENT LOCATION names an untracked ordinary structure, ADD_ASSET kind BUILDING. Positional tails such as "behind the general store" or "outside the inn" stay on the district — never invent a BUILDING from that phrasing. Named people are CREATURE; unnamed bands are one GROUP with count.';
     }
     return `${kind === 'INTERIOR' ? 'INTERIOR' : 'DUNGEON'} is room-scale. If the party enters a newly invented room the map lacks, ADD_AREA from the narrative.`;
 }
@@ -250,7 +250,7 @@ ${kindRule(kind)}
 
 ## CURRENT LOCATION
 ${loaded.currentLocation || 'Unknown'}
-Parsed from the narrator status footer. A more specific interior on this line is a durable map fact. If RECENT STORY is empty, still apply CURRENT LOCATION.
+Parsed from the narrator status footer. A more specific named interior on this line is a durable map fact. Exterior-relative phrasing (behind / outside / near / in front of a landmark) is district position only — do not ADD_ASSET a BUILDING for it. If RECENT STORY is empty, still apply CURRENT LOCATION.
 ${partyRosterSection(memo)}
 ## CURRENT IN-WORLD TIME (AUTHORITATIVE)
 ${currentTime || 'Unknown'}

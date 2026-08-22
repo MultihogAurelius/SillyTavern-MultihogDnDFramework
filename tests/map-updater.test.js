@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { formatDungeonMapForUpdater } from '../dungeon-reality.js';
+import { formatDungeonMapForUpdater, resolveBuildingPopulationTarget } from '../dungeon-reality.js';
 import { DEFAULT_MAP_UPDATER_SYSTEM_PROMPT } from '../map-updater-prompt.js';
 import { validateBuildingPopulationTransaction } from '../map-updater-lib.js';
 import {
@@ -118,6 +118,38 @@ describe('Map Updater', () => {
         expect(snapshot).not.toContain('SETTLEMENT BUILDING NOT ON MAP');
     });
 
+    it('does not invent a BUILDING from an exterior-relative footer leaf behind an existing store', () => {
+        const map = {
+            version: 3,
+            site: 'Hollow Creek',
+            kind: 'SETTLEMENT',
+            areas: [{
+                id: 'main-street',
+                name: 'Main Street',
+                knowledge: 'VISITED',
+                geometry: ['East Outskirts thoroughfare.'],
+                connections: [],
+            }],
+            assets: [{
+                id: 'hollow-creek-general-store',
+                kind: 'BUILDING',
+                name: 'Hollow Creek General Store',
+                location: 'main-street',
+                state: 'ACTIVE',
+                knowledge: 'KNOWN',
+                notEntered: true,
+            }],
+        };
+        const footer = 'Hollow Creek, East Outskirts → Main Street, behind the general store';
+        const snapshot = formatDungeonMapForUpdater(map, footer);
+
+        expect(snapshot).toContain('main-street (Main Street)');
+        expect(snapshot).toContain('hollow-creek-general-store | BUILDING | Hollow Creek General Store');
+        expect(snapshot).not.toContain('SETTLEMENT BUILDING NOT ON MAP');
+        expect(snapshot).not.toContain('behind the general store');
+        expect(resolveBuildingPopulationTarget(map, footer)).toBeNull();
+    });
+
     it('ships a focused occupancy prompt and independent scheduler wiring', () => {
         const updater = readFileSync(new URL('../map-updater.js', import.meta.url), 'utf8');
         const hooks = readFileSync(new URL('../narrative-hooks.js', import.meta.url), 'utf8');
@@ -128,6 +160,9 @@ describe('Map Updater', () => {
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('OBJECT is props only');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('CreateAreaMap is the sole promotion signal');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('If CURRENT LOCATION names an untracked ordinary structure');
+        expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('Positional footer tails');
+        expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('behind the general store');
+        expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('exterior-relative footer phrases');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('"op":"ADD_ASSET"');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('"area_id":"shrine-quarter"');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('Never write {"type":"ADD_ASSET","asset":{...}}');
@@ -140,6 +175,8 @@ describe('Map Updater', () => {
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('knowledge SUSPECTED');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('A KNOWN or SUSPECTED asset reveals its effective containing area');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('notEntered:false');
+        expect(updater).toContain('Positional tails such as "behind the general store"');
+        expect(updater).toContain('Exterior-relative phrasing');
         expect(updater).toContain('formatPartyRosterForMapUpdater');
         expect(updater).toContain('## CURRENT IN-WORLD TIME (AUTHORITATIVE)');
         expect(updater).toContain('initialUserPrompt(loaded, recentStory, memo, currentTime, populationTarget)');

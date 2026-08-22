@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.23.4] - 2026-08-22
+
+### Fixed
+- **Map Updater exterior-relative footers**: phrases like `behind the general store`, `outside the inn`, or `near the chapel` stay on the district and no longer force a new `BUILDING` asset or first-entry population pass. Existing landmarks such as `Hollow Creek General Store` remain the match when the party actually enters (`inside` / named interior).
+
 ## [2026.8.23.3] - 2026-08-22
 
 ### Changed

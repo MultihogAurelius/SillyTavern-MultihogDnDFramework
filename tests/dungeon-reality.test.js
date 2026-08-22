@@ -1644,6 +1644,36 @@ The last guard falls and a loose stone reveals a niche.
         }
     });
 
+    it('keeps exterior-relative footer leaves on the district and binds inside-of leaves to the landmark', () => {
+        const map = normalizeDungeonMapDocument({
+            version: 3,
+            site: 'Hollow Creek',
+            kind: 'SETTLEMENT',
+            areas: [{ id: 'main-street', name: 'Main Street', knowledge: 'VISITED', geometry: [], connections: [] }],
+            assets: [{
+                id: 'hollow-creek-general-store',
+                kind: 'BUILDING',
+                name: 'Hollow Creek General Store',
+                location: 'main-street',
+                state: 'ACTIVE',
+                knowledge: 'KNOWN',
+                notEntered: true,
+            }],
+        });
+
+        const behind = resolveCurrentMapPlacement(map, 'Hollow Creek, East Outskirts → Main Street, behind the general store');
+        expect(behind.area?.id).toBe('main-street');
+        expect(behind.interiorAsset).toBeNull();
+        expect(behind.unmatchedInterior).toBe('');
+        expect(resolveBuildingPopulationTarget(map, 'Hollow Creek, East Outskirts → Main Street, behind the general store')).toBeNull();
+
+        const inside = resolveCurrentMapPlacement(map, 'Hollow Creek, Main Street, inside the general store');
+        expect(inside.area?.id).toBe('main-street');
+        expect(inside.interiorAsset?.id).toBe('hollow-creek-general-store');
+        expect(inside.unmatchedInterior).toBe('');
+        expect(resolveBuildingPopulationTarget(map, 'Hollow Creek, Main Street, inside the general store')?.building?.id).toBe('hollow-creek-general-store');
+    });
+
     it('preserves peaceful legacy DUNGEON maps without reclassification', () => {
         const legacy = normalizeDungeonMapDocument({
             version: 3,
