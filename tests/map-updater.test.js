@@ -209,6 +209,9 @@ describe('Map Updater', () => {
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('clearly observed UNREVEALED landmarks become KNOWN without clearing notEntered');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('BUILDING entry and Asset population');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('Derive how many and what kind of assets to add to the BUILDING based on the narrative');
+        expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('The narrator may make mistakes in the footer');
+        expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('Bullion General Store');
+        expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('short footer names still match longer BUILDING assets');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('external combat tracker (not shown to you.)');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('map-worthy child');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('"op":"ADD_ASSET"');
@@ -225,6 +228,7 @@ describe('Map Updater', () => {
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('notEntered:false');
         expect(updater).toContain('Positional tails such as "behind the general store"');
         expect(updater).toContain('SET_ASSET knowledge KNOWN on each match without clearing notEntered');
+        expect(updater).toContain('Footer leaves may shorten the asset name');
         expect(updater).toContain('On FIRST-ENTRY BUILDING POPULATION, derive interior');
         expect(updater).toContain('Derive how many and what kind of CREATURE, GROUP, OBJECT, LOOT, HAZARD, or TRAP assets');
         expect(updater).toContain('Exterior-relative phrasing');

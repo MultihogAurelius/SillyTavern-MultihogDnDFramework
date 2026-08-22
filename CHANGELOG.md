@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.24.3] - 2026-08-22
+
+### Changed
+- **Map Updater footer name drift**: short leaves like `General Store` still count as entry of the matching longer BUILDING (e.g. `Bullion General Store`); clear `notEntered` and populate normally.
+
 ## [2026.8.24.2] - 2026-08-22
 
 ### Changed

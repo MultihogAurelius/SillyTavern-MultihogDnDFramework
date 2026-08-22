@@ -1672,6 +1672,12 @@ The last guard falls and a loose stone reveals a niche.
         expect(inside.interiorAsset?.id).toBe('hollow-creek-general-store');
         expect(inside.unmatchedInterior).toBe('');
         expect(resolveBuildingPopulationTarget(map, 'Hollow Creek, Main Street, inside the general store')?.building?.id).toBe('hollow-creek-general-store');
+
+        const shortFooter = resolveCurrentMapPlacement(map, 'Hollow Creek, Main Street, General Store');
+        expect(shortFooter.area?.id).toBe('main-street');
+        expect(shortFooter.interiorAsset?.id).toBe('hollow-creek-general-store');
+        expect(shortFooter.unmatchedInterior).toBe('');
+        expect(resolveBuildingPopulationTarget(map, 'Hollow Creek, Main Street, General Store')?.building?.id).toBe('hollow-creek-general-store');
     });
 
     it('preserves peaceful legacy DUNGEON maps without reclassification', () => {

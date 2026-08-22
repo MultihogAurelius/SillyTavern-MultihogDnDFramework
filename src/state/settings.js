@@ -904,6 +904,14 @@ function getSettingsInternal(extensionSettings) {
         s.settingsVersion = '2026.8.24.2';
     }
 
+    // 2026.8.24.3: short footer names still match longer BUILDING assets.
+    if (isOlderThan(s.settingsVersion, '2026.8.24.3')) {
+        if (promptSignature(s.mapUpdaterSystemPrompt) === '13217:81c01304') {
+            s.mapUpdaterSystemPrompt = DEFAULT_MAP_UPDATER_SYSTEM_PROMPT;
+        }
+        s.settingsVersion = '2026.8.24.3';
+    }
+
     // Stamp factory version even when a release has no field rewrites
     // (8.28.0 mapped-site index is prompt/injection only).
     if (isOlderThan(s.settingsVersion, FACTORY_SETTINGS_VERSION)) {
