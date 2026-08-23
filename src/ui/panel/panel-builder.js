@@ -89,6 +89,12 @@ function premiseFromLocationContent(content) {
         .slice(0, 1200);
 }
 
+function briefDescriptionFromPrompt(prompt, site = '') {
+    const text = String(prompt || '').replace(/\s+/g, ' ').trim();
+    if (!text) return site ? `${site} is a mapped location.` : '';
+    return text.match(/^.*?[.!?](?:\s|$)/)?.[0]?.trim() || text;
+}
+
 function popupControl(root, selector) {
     return root?.querySelector?.(selector) || null;
 }
@@ -188,6 +194,7 @@ async function promptAndRunLorebookAgentMap(siteRoot, locationContent, escapeHtm
     const loreEntry = premiseFromLocationContent(locationContent);
     const premiseDefault = loreEntry
         || `${site} is a location root requested for a Persistent Map. Stay consistent with established story.`;
+    const briefDescriptionDefault = briefDescriptionFromPrompt(premiseDefault, site);
     const lookbackValue = Math.max(0, Math.min(100, Number(lookbackDefault) || 12));
     const mappedSites = typeof listMappedEvolutionSites === 'function'
         ? await listMappedEvolutionSites().catch(() => [])
@@ -204,7 +211,7 @@ async function promptAndRunLorebookAgentMap(siteRoot, locationContent, escapeHtm
                 <label style="display:flex;gap:6px;align-items:center;"><input type="radio" name="rt-map-create-mode" value="manual" onchange="var a=document.getElementById('rt-map-create-auto');var m=document.getElementById('rt-map-create-manual');if(a)a.hidden=true;if(m)m.hidden=false"> Manual</label>
             </div>
             <div id="rt-map-create-auto" style="margin-top:8px;">
-                <p style="margin:0 0 6px;">Map Architect fills entrance, kind, scale, threat, and premise from this location's lore and recent story, then generates the map.</p>
+                <p style="margin:0 0 6px;">Map Architect fills entrance, kind, scale, threat, a detailed generation prompt, and a brief description from this location's lore and recent story, then generates the map.</p>
                 <label style="display:block;">Story lookback
                     <input id="rt-map-create-lookback" type="number" min="0" max="100" value="${lookbackValue}" style="width:100%;margin-top:3px;box-sizing:border-box;">
                 </label>
@@ -237,8 +244,11 @@ async function promptAndRunLorebookAgentMap(siteRoot, locationContent, escapeHtm
                         </select>
                     </label>
                 </div>
-                <label style="display:block;margin-top:8px;">Premise
-                    <textarea id="rt-map-create-premise" style="width:100%;height:88px;margin-top:3px;box-sizing:border-box;resize:vertical;">${escapeHtml(premiseDefault)}</textarea>
+                <label style="display:block;margin-top:8px;">Map-generation prompt
+                    <textarea id="rt-map-create-prompt" style="width:100%;height:110px;margin-top:3px;box-sizing:border-box;resize:vertical;">${escapeHtml(premiseDefault)}</textarea>
+                </label>
+                <label style="display:block;margin-top:8px;">Brief description
+                    <input id="rt-map-create-brief-description" value="${escapeHtml(briefDescriptionDefault)}" style="width:100%;margin-top:3px;box-sizing:border-box;">
                 </label>
                 <details style="margin-top:8px;">
                     <summary style="cursor:pointer;">Absorb existing mapped peers (SETTLEMENT only)</summary>
@@ -270,7 +280,8 @@ async function promptAndRunLorebookAgentMap(siteRoot, locationContent, escapeHtm
                     entrance: popupValue(root, '#rt-map-create-entrance', 'Entrance') || 'Entrance',
                     scale: popupValue(root, '#rt-map-create-scale', 'MEDIUM').toUpperCase(),
                     threat: popupValue(root, '#rt-map-create-threat', defaultMapSiteThreat(kind)).toUpperCase(),
-                    premise: popupValue(root, '#rt-map-create-premise', '') || premiseDefault,
+                    prompt: popupValue(root, '#rt-map-create-prompt', '') || premiseDefault,
+                    briefDescription: popupValue(root, '#rt-map-create-brief-description', '') || briefDescriptionDefault,
                     lookback: parseLookbackValue(popupValue(root, '#rt-map-create-lookback', lookbackValue), lookbackValue),
                     lorebookNames: [...root.querySelectorAll('input[data-map-context-lorebook]:checked')]
                         .map(input => String(input.dataset.mapContextLorebook || '').trim()).filter(Boolean),
@@ -296,7 +307,8 @@ async function promptAndRunLorebookAgentMap(siteRoot, locationContent, escapeHtm
                 kind: form.kind,
                 scale: form.scale,
                 threat: form.threat,
-                premise: form.premise,
+                prompt: form.prompt,
+                brief_description: form.briefDescription,
                 include: form.include,
                 allowOffsite: true,
                 lorebookNames: form.lorebookNames,
@@ -398,8 +410,11 @@ async function promptAndCreateMappedLocation({ runMapArchitect, inferMapArchitec
                         </select>
                     </label>
                 </div>
-                 <label style="display:block;margin-top:8px;">Premise
-                    <textarea id="rt-map-loc-premise" placeholder="Established facts for CORE and the map" style="width:100%;height:88px;margin-top:3px;box-sizing:border-box;resize:vertical;"></textarea>
+                 <label style="display:block;margin-top:8px;">Map-generation prompt
+                    <textarea id="rt-map-loc-prompt" placeholder="Detailed private facts and creative guidance for Map Architect" style="width:100%;height:110px;margin-top:3px;box-sizing:border-box;resize:vertical;"></textarea>
+                 </label>
+                 <label style="display:block;margin-top:8px;">Brief description
+                    <input id="rt-map-loc-brief-description" placeholder="Brief current description for CORE and map gateways" style="width:100%;margin-top:3px;box-sizing:border-box;">
                  </label>
                  <details style="margin-top:8px;">
                      <summary style="cursor:pointer;">Absorb existing mapped peers (SETTLEMENT only)</summary>
@@ -440,7 +455,8 @@ async function promptAndCreateMappedLocation({ runMapArchitect, inferMapArchitec
                     entrance: popupValue(root, '#rt-map-loc-entrance', 'Entrance') || 'Entrance',
                     scale: popupValue(root, '#rt-map-loc-scale', 'MEDIUM').toUpperCase(),
                     threat: popupValue(root, '#rt-map-loc-threat', defaultMapSiteThreat(kind)).toUpperCase(),
-                    premise: popupValue(root, '#rt-map-loc-premise'),
+                    prompt: popupValue(root, '#rt-map-loc-prompt'),
+                    briefDescription: popupValue(root, '#rt-map-loc-brief-description'),
                     include: [...root.querySelectorAll('input[data-map-include-site]:checked')]
                         .map(input => String(input.dataset.mapIncludeSite || '').trim()).filter(Boolean),
                 };
@@ -458,19 +474,20 @@ async function promptAndCreateMappedLocation({ runMapArchitect, inferMapArchitec
 
     try {
         if (form.mode === 'manual') {
-            if (!form.premise) return { ok: false, error: 'Premise is required. It becomes the location CORE and the map brief.' };
+            if (!form.prompt || !form.briefDescription) return { ok: false, error: 'Map-generation prompt and brief description are required.' };
             await runMapArchitect({
                 site,
                 entrance: form.entrance,
                 kind: form.kind,
                 scale: form.scale,
                 threat: form.threat,
-                premise: form.premise,
+                prompt: form.prompt,
+                brief_description: form.briefDescription,
                 include: form.include,
                 allowOffsite: true,
                 requireNew: true,
                 locationKeys: form.locationKeys,
-                locationCore: form.premise,
+                locationCore: form.briefDescription,
                 lorebookNames: form.lorebookNames,
                 characterCards: form.characterCards,
             });
@@ -495,7 +512,7 @@ async function promptAndCreateMappedLocation({ runMapArchitect, inferMapArchitec
             allowOffsite: true,
             requireNew: true,
             locationKeys: inferred.keywords,
-            locationCore: inferred.premise,
+            locationCore: inferred.brief_description,
             lorebookNames: form.lorebookNames,
             characterCards: form.characterCards,
         });

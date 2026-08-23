@@ -554,7 +554,8 @@ export function registerMapArchitectTool() {
                     kind: { type: 'string', enum: ['DUNGEON', 'SETTLEMENT', 'INTERIOR'], description: 'DUNGEON = high-risk room-scale site. INTERIOR = significant lower-risk multi-room site. SETTLEMENT = city/town/village district-scale graph.' },
                     scale: { type: 'string', enum: ['SMALL', 'MEDIUM', 'LARGE'], description: 'Geographic size, not danger. DUNGEON: SMALL 4-7 rooms, MEDIUM 7-12, LARGE 12-20. SETTLEMENT: SMALL 4-7 districts, MEDIUM 6-10, LARGE 8-14.' },
                     threat: { type: 'string', enum: ['NONE', 'LOW', 'MODERATE', 'HIGH', 'DEADLY'], description: 'Site danger for occupancy and trap density. NONE forbids invented active danger. Independent of party level and scale.' },
-                    premise: { type: 'string', description: 'Objective private site facts and creative constraints: purpose/history, expected inhabitants or danger, tone, and anything that must not be contradicted. Premise facts do not by themselves grant the player knowledge.' },
+                    prompt: { type: 'string', description: 'Complete private map-generation guidance: purpose/history, topology, expected inhabitants or danger, tone, and anything that must not be contradicted. This can be detailed. Prompt facts do not by themselves grant player knowledge.' },
+                    brief_description: { type: 'string', description: 'Brief current description of the site. This is stored as the parent SUBDUNGEON/SUBINTERIOR gateway detail and may be used for the Location CORE; do not copy the full prompt.' },
                     attachTo: {
                         type: 'object',
                         additionalProperties: false,
@@ -567,15 +568,12 @@ export function registerMapArchitectTool() {
                     },
                     include: { type: 'array', items: { type: 'string' }, description: 'Optional only for first creation of a SETTLEMENT. Exact existing mapped DUNGEON/INTERIOR names to absorb as SUBDUNGEON/SUBINTERIOR peers.' },
                 },
-                required: ['site', 'entrance', 'kind', 'scale', 'threat', 'premise'],
+                required: ['site', 'entrance', 'kind', 'scale', 'threat', 'prompt', 'brief_description'],
             },
             action: async args => runMapArchitect(args),
-            formatMessage: args => {
-                const site = String(args?.site || '').trim();
-                return site
-                    ? `Generating a location map for ${site}...`
-                    : 'Generating a location map...';
-            },
+            // Map Architect owns one persistent lifecycle toast. Returning no
+            // tool-call message prevents SillyTavern from showing a duplicate.
+            formatMessage: () => '',
         });
     } catch (error) {
         console.warn('[RPG Tracker] Could not register Map Architect tool:', error);
@@ -2492,7 +2490,7 @@ async function maybeRunMapArchitectTextOpener({ chat, settings, currentType, sou
         if (!createAreaMapCommandIsComplete(args)) {
             logMapArchitectTextOpener('skip', { reason: 'incomplete_command', source, generationType: type, args });
             globalThis.toastr?.error?.(
-                'Map Architect text command is missing site, entrance, kind, or premise. Stay outside and try again next turn.',
+                'Map Architect text command is missing site, entrance, kind, prompt, or brief_description. Stay outside and try again next turn.',
                 'Map Architect',
                 { timeOut: 10000 },
             );

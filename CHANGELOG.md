@@ -2,6 +2,12 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.32] - 2026-08-24
+
+### Fixed
+- **Map prompt vs. stored gateway description**: `CreateAreaMap` now separates a detailed private `prompt` from `brief_description`. Map Architect retains full design/history/topology guidance, while only the brief description becomes a SUBDUNGEON/SUBINTERIOR gateway detail or new Location CORE. This prevents generation prompts from being copied wholesale into persistent asset JSON and repeated context.
+- **Single Map Architect notification**: Native `CreateAreaMap` calls now use only Map Architect's lifecycle notification instead of also asking SillyTavern to display a duplicate generation toast.
+
 ## [2026.8.31] - 2026-08-31
 
 ### Added
@@ -22,7 +28,6 @@ All notable changes to the **Multihog D&D Framework** will be documented in this
 - **Terminal/Direct Prompt**: Renamed the Console drawer and moved per-agent direct command fields into each terminal tab (including Map Evolution). Removed the Lorebook Agent footer 💬 prompt toggle.
 
 ### Fixed
-- **Bounded map asset details**: Map Architect, Map Updater, and Map Evolution now keep `asset.detail` to one or two short sentences (240 characters maximum). Structured output is guided to stay within budget, and oversized legacy/provider text is compacted locally without an expensive correction pass, reducing stored JSON and repeated context injection.
 - **Map Architect direct child targeting**: Explicit `Create INTERIOR/DUNGEON/SETTLEMENT map for "Site Name"` terminal commands now lock the named site and requested kind instead of reusing the active parent map's identity. This allows a SETTLEMENT to correctly host a new SUBINTERIOR/SUBDUNGEON gateway without attempting to treat the settlement document as its own child peer.
 - **Map Updater direct prompt**: Direct-command ADD_ASSET/SET_ASSET operations now require lasting `detail` descriptions, matching routine occupancy updates instead of creating bare-name assets.
 - **Offsite Map Attachment**: `CreateAreaMap` now accepts `attachTo.site` plus `attachTo.cell`, allowing the GM to attach a DUNGEON or INTERIOR to an exact AREA on any mapped parent without moving the player or first creating a BUILDING.

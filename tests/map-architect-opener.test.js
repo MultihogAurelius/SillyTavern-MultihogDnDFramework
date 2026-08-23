@@ -35,7 +35,8 @@ You step into a made-up throne room.`);
             kind: 'DUNGEON',
             scale: 'MEDIUM',
             threat: 'HIGH',
-            premise: 'Abandoned crypt. Ghouls. Do not contradict the cracked west stair.',
+            prompt: 'Abandoned crypt. Ghouls. Do not contradict the cracked west stair.',
+            brief_description: 'Abandoned crypt.',
         });
         expect(createAreaMapCommandIsComplete(parsed.args)).toBe(true);
 
@@ -54,7 +55,7 @@ You step into a made-up throne room.` : '');
         expect(stripped.command.args.site).toBe('Abbey Undercroft');
     });
 
-    it('accepts JSON inside the fence and multiline premises', () => {
+    it('accepts legacy JSON and multiline prompts', () => {
         const parsed = parseCreateAreaMapCommand(`[CREATE_AREA_MAP]
 {"site":"Riverford","entrance":"North Gate","kind":"SETTLEMENT","scale":"LARGE","premise":"River town."}
 [/CREATE_AREA_MAP]`);
@@ -70,7 +71,8 @@ kind: SETTLEMENT
 premise: Line one
 Line two
 [/CREATE_AREA_MAP]`);
-        expect(multi.args.premise).toBe('Line one\nLine two');
+        expect(multi.args.prompt).toBe('Line one\nLine two');
+        expect(multi.args.brief_description).toBe('Line one\nLine two');
         expect(stripCreateAreaMapCommand('[CREATE_AREA_MAP]\nsite: X\n[/CREATE_AREA_MAP]').text).toBe('\u200b');
     });
 
@@ -93,10 +95,28 @@ Level 6 | 08:00 AM, Day 1`);
             kind: 'DUNGEON',
             scale: 'MEDIUM',
             threat: 'HIGH',
-            premise: 'The Sunken Vault. Local rumor claims an untouched cache of lost technology and salvage lies below, but the hatch has been shunned for cycles due to unstable structure, toxic seepage, and rumors of automated defenses.',
+            prompt: 'The Sunken Vault. Local rumor claims an untouched cache of lost technology and salvage lies below, but the hatch has been shunned for cycles due to unstable structure, toxic seepage, and rumors of automated defenses.',
+            brief_description: 'The Sunken Vault.',
         });
         expect(createAreaMapCommandIsComplete(parsed.args)).toBe(true);
         expect(stripCreateAreaMapCommand(parsed.raw + '\n\nfooter').text).toBe('\u200b');
+    });
+
+    it('keeps the full generation prompt separate from the stored brief description', () => {
+        const parsed = parseCreateAreaMapCommand(`[CREATE_AREA_MAP]
+site: Ancestor Barrow
+entrance: Sealed Western Passage
+kind: DUNGEON
+scale: LARGE
+threat: DEADLY
+prompt: The detailed private design can be as long as needed.
+It includes history, inhabitants, hazards, routes, tone, and intended progression.
+brief_description: An ancient barrow built around a sealed evil.
+[/CREATE_AREA_MAP]`);
+
+        expect(parsed.args.prompt).toBe('The detailed private design can be as long as needed.\nIt includes history, inhabitants, hazards, routes, tone, and intended progression.');
+        expect(parsed.args.brief_description).toBe('An ancient barrow built around a sealed evil.');
+        expect(createAreaMapCommandIsComplete(parsed.args)).toBe(true);
     });
 
     it('treats tool as the default opener and keeps text-mode prompt rules distinct', () => {

@@ -6,8 +6,6 @@
  * chat message remaining in context.
  */
 
-import { MAP_ASSET_DETAIL_MAX_CHARS, compactMapAssetDetail } from './map-detail-limits.js';
-
 // Some models incorrectly emit `</div hidden>`. Accept that legacy/malformed
 // closing tag so an otherwise valid hidden map is not silently lost.
 const DIV_RE = /<div\b([^>]*)>([\s\S]*?)<\/div(?:\s+hidden)?>/gi;
@@ -512,7 +510,7 @@ export function normalizeDungeonMapDocument(raw, siteFallback = '') {
             location: state === 'REMOVED' && asset?.location == null ? null : String(asset?.location || '').trim(),
             state,
             knowledge: enumValue(asset?.knowledge, ASSET_KNOWLEDGE, 'UNREVEALED'),
-            detail: compactMapAssetDetail(asset?.detail || asset?.description || ''),
+            detail: String(asset?.detail || asset?.description || '').trim(),
             origin: String(asset?.origin || 'INITIAL_MAP').trim(),
         };
         if (normalized.kind === 'BUILDING') normalized.notEntered = asset?.notEntered === false ? false : true;
@@ -2280,8 +2278,7 @@ export function applyDungeonMapTransaction(document, transaction, options = {}) 
 
 const ASSET_DETAIL_SCHEMA = {
     type: 'string',
-    maxLength: MAP_ASSET_DETAIL_MAX_CHARS,
-    description: `One or two short sentences, at most ${MAP_ASSET_DETAIL_MAX_CHARS} characters. Durable occupancy or lasting condition only (what remains, destroyed remains, what is guarded). Numeric remaining members belong in count, not here. Never HP, targeting, mid-round poses, or temporary combat statuses. Never biography, history, or premise recap.`,
+    description: 'Durable occupancy or lasting condition only (what remains, destroyed remains, what is guarded). Numeric remaining members belong in count, not here. Never HP, targeting, mid-round poses, or temporary combat statuses such as frightened/held/prone.',
 };
 
 const ASSET_DURATION_SCHEMA = {

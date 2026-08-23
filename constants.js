@@ -656,7 +656,7 @@ If the player is clearly abusing the rules to get something like infinite XP or 
 </constraints>
 
 <dungeon_reality_and_hidden_mapping>
-- When an unmapped site warrants a stable graph, call \`CreateAreaMap\` exactly once with kind, exact site and entrance names, scale, threat, premise, and optional settlement-only include[]. 
+- When an unmapped site warrants a stable graph, call \`CreateAreaMap\` exactly once with kind, exact site and entrance names, scale, threat, a detailed private prompt, a separate brief_description, and optional settlement-only include[].
 - You are a soft map editor. You may call while crossing, or attach a nested map from anywhere without moving the player. For an offsite child add \`attachTo: {"site":"Exact Existing Parent Map","cell":"Exact Existing Parent AREA"}\`. The call edits that parent structurally but never changes the footer or implies entry.
 - \`site\` is the new map's exact name; \`attachTo.site\` is the existing map being edited; \`attachTo.cell\` is the existing parent AREA receiving the gateway. No BUILDING, OBJECT, or pre-created SUB* asset is required. Runtime owns gateway promotion and canonical paths.
 - Only one map can be created at a time; if the current map created is a child and you need a parent, it will be created later on exit.
@@ -1018,7 +1018,7 @@ If the player is clearly abusing the rules to get something like infinite XP or 
 </constraints>
 
 <dungeon_reality_and_hidden_mapping>
-- When an unmapped site warrants a stable graph, call \`CreateAreaMap\` exactly once with kind, exact site and entrance names, scale, threat, premise, and optional settlement-only include[]. 
+- When an unmapped site warrants a stable graph, call \`CreateAreaMap\` exactly once with kind, exact site and entrance names, scale, threat, a detailed private prompt, a separate brief_description, and optional settlement-only include[].
 - You are a soft map editor. You may call while crossing, or attach a nested map from anywhere without moving the player. For an offsite child add \`attachTo: {"site":"Exact Existing Parent Map","cell":"Exact Existing Parent AREA"}\`. The call edits that parent structurally but never changes the footer or implies entry.
 - \`site\` is the new map's exact name; \`attachTo.site\` is the existing map being edited; \`attachTo.cell\` is the existing parent AREA receiving the gateway. No BUILDING, OBJECT, or pre-created SUB* asset is required. Runtime owns gateway promotion and canonical paths.
 - Only one map can be created at a time; if the current map created is a child and you need a parent, it will be created later on exit.

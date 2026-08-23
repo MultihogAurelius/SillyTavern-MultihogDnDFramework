@@ -3,7 +3,6 @@
  * Runtime validation remains authoritative; this schema prevents providers from
  * spending the entire response on reasoning or returning a non-map message.
  */
-import { MAP_ASSET_DETAIL_MAX_CHARS } from './map-detail-limits.js';
 export const MAP_ARCHITECT_JSON_SCHEMA = Object.freeze({
     name: 'dungeon_map_v3',
     description: 'A complete private objective map for one dungeon, significant interior, or settlement.',
@@ -66,7 +65,7 @@ export const MAP_ARCHITECT_JSON_SCHEMA = Object.freeze({
                             ],
                         },
                         knowledge: { type: 'string', enum: ['UNREVEALED', 'SUSPECTED', 'KNOWN'] },
-                        detail: { type: 'string', maxLength: MAP_ASSET_DETAIL_MAX_CHARS, description: `One or two short objective sentences, at most ${MAP_ASSET_DETAIL_MAX_CHARS} characters. No biography, history, or premise recap.` },
+                        detail: { type: 'string' },
                         origin: { type: 'string', enum: ['INITIAL_MAP'] },
                         behavior: { type: 'string', minLength: 1 },
                         route: { type: 'array', items: { type: 'string', minLength: 1 } },
@@ -97,7 +96,8 @@ export const MAP_ARCHITECT_BRIEF_JSON_SCHEMA = Object.freeze({
             kind: { type: 'string', enum: ['DUNGEON', 'SETTLEMENT', 'INTERIOR'] },
             scale: { type: 'string', enum: ['SMALL', 'MEDIUM', 'LARGE'] },
             threat: { type: 'string', enum: ['NONE', 'LOW', 'MODERATE', 'HIGH', 'DEADLY'] },
-            premise: { type: 'string', minLength: 1 },
+            prompt: { type: 'string', minLength: 1, description: 'Complete private design guidance for generating the map.' },
+            brief_description: { type: 'string', minLength: 1, description: 'Brief current description suitable for the Location CORE and any parent-map gateway asset.' },
             keywords: {
                 type: 'array',
                 items: { type: 'string', minLength: 1 },
@@ -105,6 +105,6 @@ export const MAP_ARCHITECT_BRIEF_JSON_SCHEMA = Object.freeze({
                 description: 'Optional extra lorebook trigger words besides the locked site name. Do not include the site name.',
             },
         },
-        required: ['entrance', 'kind', 'scale', 'threat', 'premise'],
+        required: ['entrance', 'kind', 'scale', 'threat', 'prompt', 'brief_description'],
     },
 });

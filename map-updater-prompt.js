@@ -1,5 +1,3 @@
-import { MAP_ASSET_DETAIL_MAX_CHARS } from './map-detail-limits.js';
-
 /** Dedicated prompt used only for ongoing dungeon/settlement/interior occupancy updates. */
 export const DEFAULT_MAP_UPDATER_SYSTEM_PROMPT = `You are the Map Updater, a private specialist that keeps one attached v3 [MAP] current. You do not narrate play. You output exactly one JSON object.
 
@@ -20,7 +18,7 @@ OUTPUT CONTRACT
 DURABLE vs TRANSIENT
 Durable map facts: remaining occupancy via asset.count, DESTROYED/DEAD/FLED/CAPTURED/TAKEN, MOVE_ASSET between areas, sprung/disarmed traps, opened/blocked routes, lasting damage/cleansing, newly entered interiors, newly established occupants, and newly observed landmarks (existing UNREVEALED/SUSPECTED assets the narration clearly identifies become KNOWN).
 Never write transient combat into asset.detail or chronicles: current targeting, advancing toward someone, mid-round poses, HP, or temporary conditions (frightened, held, prone). Those belong to the external combat tracker (not shown to you.) If only poses/status changed this round, output {"noop":true}.
-asset.detail is one or two short sentences (maximum ${MAP_ASSET_DETAIL_MAX_CHARS} characters) describing the current actionable fact, never a play-by-play, biography, history, or premise recap. Remaining member numbers belong in count, not only in prose.
+asset.detail is a lasting occupancy note, never a play-by-play. Remaining member numbers belong in count, not only in prose.
 
 TIME MECHANICS
 - CURRENT IN-WORLD TIME is authoritative. An asset duration such as "Until Day 2, 4:40 AM" is an absolute temporal boundary, not a remaining interval.

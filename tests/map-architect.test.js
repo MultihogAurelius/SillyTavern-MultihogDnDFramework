@@ -3,7 +3,6 @@ import { readFileSync } from 'node:fs';
 import { parseMapArchitectResponse } from '../map-architect-parser.js';
 import { buildMapArchitectReferenceContext } from '../map-architect-context.js';
 import { MAP_ARCHITECT_BRIEF_JSON_SCHEMA, MAP_ARCHITECT_JSON_SCHEMA } from '../map-architect-schema.js';
-import { MAP_ASSET_DETAIL_MAX_CHARS } from '../map-detail-limits.js';
 import { DEFAULT_MAP_ARCHITECT_BRIEF_SYSTEM_PROMPT, DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT } from '../map-architect-prompt.js';
 import { resolveHostedCreationContext } from '../map-hosting-context.js';
 
@@ -34,7 +33,8 @@ describe('Map Architect component', () => {
             {
                 site: 'Cellar Crypt Dungeon',
                 kind: 'DUNGEON',
-                premise: 'A funerary complex.',
+                prompt: 'A very detailed funerary complex design with history and encounter guidance.',
+                briefDescription: 'A sealed funerary complex.',
                 attachTo: { site: 'Malarkey Monument', cell: 'Cellar Crypt' },
             },
         );
@@ -43,6 +43,7 @@ describe('Map Architect component', () => {
             hostAreaId: 'cellar-crypt',
             peerSite: 'Malarkey Monument :: Cellar Crypt :: Cellar Crypt Dungeon',
             expectedAssetKind: 'SUBDUNGEON',
+            briefDescription: 'A sealed funerary complex.',
             explicit: true,
             peerDepth: 2,
         });
@@ -179,7 +180,7 @@ describe('Map Architect component', () => {
         expect(hooks).toContain("enum: ['DUNGEON', 'SETTLEMENT', 'INTERIOR']");
         expect(hooks).toContain("include: { type: 'array'");
         expect(hooks).toContain("attachTo: {");
-        expect(hooks).toContain('Generating a location map for');
+        expect(hooks).toContain("formatMessage: () => ''");
         expect(hooks).toContain('isMapArchitectTextOpener(settings)');
         expect(hooks).toContain('applyMapArchitectTextOpenerCyoaCaveat');
         expect(hooks).toContain("ctx.generate('continue')");
@@ -246,8 +247,6 @@ describe('Map Architect component', () => {
         expect(MAP_ARCHITECT_JSON_SCHEMA.value.properties.threat.enum).toEqual(['NONE', 'LOW', 'MODERATE', 'HIGH', 'DEADLY']);
         expect(MAP_ARCHITECT_JSON_SCHEMA.value.properties.assets.items.properties.kind.enum)
             .toEqual(expect.arrayContaining(['OBJECT', 'BUILDING', 'SUBDUNGEON', 'SUBINTERIOR']));
-        expect(MAP_ARCHITECT_JSON_SCHEMA.value.properties.assets.items.properties.detail.maxLength)
-            .toBe(MAP_ASSET_DETAIL_MAX_CHARS);
     });
 
     it('preflights exact include peers and persists absorption/promotion in one book save', () => {
@@ -315,7 +314,7 @@ describe('Map Architect component', () => {
     it('defines a handshake-only brief contract for Auto map create', () => {
         expect(MAP_ARCHITECT_BRIEF_JSON_SCHEMA.name).toBe('map_architect_brief_v1');
         expect(MAP_ARCHITECT_BRIEF_JSON_SCHEMA.returnInvalid).toBe(true);
-        expect(MAP_ARCHITECT_BRIEF_JSON_SCHEMA.value.required).toEqual(['entrance', 'kind', 'scale', 'threat', 'premise']);
+        expect(MAP_ARCHITECT_BRIEF_JSON_SCHEMA.value.required).toEqual(['entrance', 'kind', 'scale', 'threat', 'prompt', 'brief_description']);
         expect(MAP_ARCHITECT_BRIEF_JSON_SCHEMA.value.properties.kind.enum).toEqual(['DUNGEON', 'SETTLEMENT', 'INTERIOR']);
         expect(MAP_ARCHITECT_BRIEF_JSON_SCHEMA.value.properties.scale.enum).toEqual(['SMALL', 'MEDIUM', 'LARGE']);
         expect(MAP_ARCHITECT_BRIEF_JSON_SCHEMA.value.properties.keywords.maxItems).toBe(5);
@@ -349,13 +348,13 @@ describe('Map Architect component', () => {
         expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('outside locked inclusions, normally create zero to two SUB* assets total');
         expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('Ordinary shops, inns, chapels, homes, and similar structures remain BUILDING');
         expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('exact canonical name of its future peer map');
-        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('objective private premise');
+        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('private map-generation prompt');
         expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('does not by itself establish anything as perceived, discovered, suspected, or known');
         expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('Every other area defaults to UNREVEALED');
         expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('Familiar site');
         expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('mark every area VISITED');
         expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('party\'s home');
-        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('Premise details, logical proximity, connectivity, and Architect-invented lines of sight never grant DISCOVERED knowledge');
+        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('Prompt details, logical proximity, connectivity, and Architect-invented lines of sight never grant DISCOVERED knowledge');
         expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('Every asset defaults to UNREVEALED');
         expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('Use SUSPECTED only when player-facing recent story explicitly establishes a clue or rumor');
         expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('A KNOWN or SUSPECTED asset reveals its containing area');

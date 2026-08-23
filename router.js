@@ -626,7 +626,7 @@ function allocateHostedAssetId(document, name) {
     return `${base}-${suffix}`;
 }
 
-function promoteHostedPeerAsset(hostDocument, site, expectedKind, areaId, premise, { hidden = false } = {}) {
+function promoteHostedPeerAsset(hostDocument, site, expectedKind, areaId, briefDescription, { hidden = false } = {}) {
     if (!['SETTLEMENT', 'DUNGEON', 'INTERIOR'].includes(normalizeMapSiteKind(hostDocument.kind))) {
         throw new Error(`Host "${hostDocument.site}" is not a supported mapped site.`);
     }
@@ -649,7 +649,7 @@ function promoteHostedPeerAsset(hostDocument, site, expectedKind, areaId, premis
             location: area.id,
             state: 'ACTIVE',
             knowledge: hidden ? 'UNREVEALED' : 'KNOWN',
-            detail: String(premise || '').trim(),
+            detail: String(briefDescription || '').trim(),
             origin: 'NARRATOR_ESTABLISHED',
         };
         hostDocument.assets.push(asset);
@@ -805,7 +805,7 @@ export async function persistArchitectDungeonMap(siteRoot, mapDocument, {
             requestedSite,
             hostContext.expectedAssetKind,
             hostContext.hostAreaId,
-            hostContext.premise,
+            hostContext.briefDescription,
             { hidden: !!hostContext.explicit },
         );
         const livePeerSite = buildHostedPeerSitePath(hostDocument, hostAsset);

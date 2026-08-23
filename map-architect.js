@@ -166,6 +166,12 @@ function normalizeInclude(value) {
     return [...new Set(names)];
 }
 
+function legacyBriefDescription(prompt, site) {
+    const text = String(prompt || '').replace(/\s+/g, ' ').trim();
+    if (!text) return `${site} is a mapped site.`;
+    return text.match(/^.*?[.!?](?:\s|$)/)?.[0]?.trim() || text;
+}
+
 function resolveIncludeManifest(include, sites, hostSite) {
     const manifest = [];
     for (const requested of normalizeInclude(include)) {
@@ -233,7 +239,8 @@ Entrance knowledge: ${entranceKnowledge}${entranceKnowledge === 'UNREVEALED' ? '
 Kind: ${args.kind} (${kindBrief(args.kind)})
 Scale: ${args.scale}
 Threat: ${args.threat} (${threatBrief(args.threat, args.kind)})
-Objective private premise (does not grant player knowledge): ${args.premise}
+PRIVATE MAP-GENERATION PROMPT (does not grant player knowledge):
+${args.prompt}
 Attachment: ${args.attachTo ? `Create offsite and attach beneath map "${args.attachTo.site}" in exact cell "${args.attachTo.cell}". This is a structural edit only; do not move the party or infer that they entered.` : 'No explicit offsite attachment; runtime may use the active mapped cell as shorthand.'}
 ${hostContext?.promptContext || ''}
 ${inclusionPrompt(includeManifest)}
@@ -256,7 +263,7 @@ function correctionPrompt(args, context, referenceContext, priorOutput, parseErr
     const issues = parseError
         ? [{ code: 'INVALID_JSON', path: '$', hint: parseError }]
         : errors.map(({ code, path, hint }) => ({ code, path, hint }));
-    return `CORRECTION PASS ${attempt}\nYour previous map was rejected. Return a complete corrected JSON object, not a patch.\n\nRequested site: ${args.site}\nRequested entrance: ${args.entrance}\nRequested entrance knowledge: ${entranceKnowledge}\nRequested kind: ${args.kind} (${kindBrief(args.kind)})\nScale: ${args.scale}\nThreat: ${args.threat} (${threatBrief(args.threat, args.kind)})\nObjective private premise (does not grant player knowledge): ${args.premise}\n${hostContext?.promptContext || ''}\n${inclusionPrompt(includeManifest)}\nCurrent in-world time (authoritative): ${currentTime || 'Unknown'}\n\nVALIDATION ERRORS\n${JSON.stringify(issues, null, 2)}\n\nPREVIOUS OUTPUT\n${priorOutput}\n\nRECENT STORY CONTEXT\n${context || '(No additional recent context.)'}\n\n${referenceContext || 'USER-SELECTED REFERENCE CONTEXT\n(none selected)'}\n\nOutput only the corrected JSON object. Follow the ${args.kind} instruction set.`;
+    return `CORRECTION PASS ${attempt}\nYour previous map was rejected. Return a complete corrected JSON object, not a patch.\n\nRequested site: ${args.site}\nRequested entrance: ${args.entrance}\nRequested entrance knowledge: ${entranceKnowledge}\nRequested kind: ${args.kind} (${kindBrief(args.kind)})\nScale: ${args.scale}\nThreat: ${args.threat} (${threatBrief(args.threat, args.kind)})\nPRIVATE MAP-GENERATION PROMPT (does not grant player knowledge):\n${args.prompt}\n${hostContext?.promptContext || ''}\n${inclusionPrompt(includeManifest)}\nCurrent in-world time (authoritative): ${currentTime || 'Unknown'}\n\nVALIDATION ERRORS\n${JSON.stringify(issues, null, 2)}\n\nPREVIOUS OUTPUT\n${priorOutput}\n\nRECENT STORY CONTEXT\n${context || '(No additional recent context.)'}\n\n${referenceContext || 'USER-SELECTED REFERENCE CONTEXT\n(none selected)'}\n\nOutput only the corrected JSON object. Follow the ${args.kind} instruction set.`;
 }
 
 function existingResult(siteRecord) {
@@ -285,15 +292,17 @@ async function runMapArchitectOnce(rawArgs) {
     const args = {
         site: String(rawArgs?.site || '').trim(),
         entrance: String(rawArgs?.entrance || '').trim(),
-        premise: String(rawArgs?.premise || '').trim(),
+        prompt: String(rawArgs?.prompt || rawArgs?.premise || '').trim(),
+        briefDescription: String(rawArgs?.brief_description || rawArgs?.briefDescription || '').trim(),
         kind: normalizeMapSiteKind(rawArgs?.kind),
         scale: String(rawArgs?.scale || 'MEDIUM').trim().toUpperCase(),
         threat: normalizeMapSiteThreat(rawArgs?.threat, defaultMapSiteThreat(rawArgs?.kind)),
         attachTo: normalizeMapAttachment(rawArgs?.attachTo),
     };
-    if (!args.site || !args.entrance || !args.premise) {
-        throw mapArchitectFailure('site, entrance, and premise are required. Establish those facts before a later attempt.');
+    if (!args.site || !args.entrance || !args.prompt) {
+        throw mapArchitectFailure('site, entrance, and prompt are required. Establish those facts before a later attempt.');
     }
+    if (!args.briefDescription) args.briefDescription = legacyBriefDescription(args.prompt, args.site);
     if (!['SMALL', 'MEDIUM', 'LARGE'].includes(args.scale)) args.scale = 'MEDIUM';
 
     broadcastStep('start', `Initializing Map Architect for ${args.site}...`);
@@ -443,7 +452,7 @@ ${context || '(No additional recent context.)'}
 
 ${referenceContext || 'USER-SELECTED REFERENCE CONTEXT\n(none selected)'}
 
-Infer entrance, kind, scale, threat, premise, and optional extra keywords as the GM would before calling CreateAreaMap.
+Infer entrance, kind, scale, threat, a complete private generation prompt, a brief description, and optional extra keywords as the GM would before calling CreateAreaMap.
 SETTLEMENT = the city/town/village as a whole. DUNGEON = a high-risk room graph. INTERIOR = a significant lower-risk multi-room site such as a palace, headquarters, monastery, safehouse, or recurring base. Ordinary settlement structures with no peer map are not mapped here.
 Do not include the locked site name in keywords.
 Output only the JSON object.`;
@@ -462,11 +471,12 @@ Output only the JSON object.`;
 
     const kind = normalizeMapSiteKind(parsed.value.kind);
     const entrance = String(parsed.value.entrance || '').trim();
-    const premise = String(parsed.value.premise || '').trim();
+    const prompt = String(parsed.value.prompt || '').trim();
+    const briefDescription = String(parsed.value.brief_description || '').trim();
     const scale = String(parsed.value.scale || 'MEDIUM').trim().toUpperCase();
     const threat = normalizeMapSiteThreat(parsed.value.threat, defaultMapSiteThreat(kind));
-    if (!entrance || !premise) {
-        throw new Error('Map Architect returned an incomplete map brief (entrance and premise are required).');
+    if (!entrance || !prompt || !briefDescription) {
+        throw new Error('Map Architect returned an incomplete map brief (entrance, prompt, and brief_description are required).');
     }
 
     const extraKeys = Array.isArray(parsed.value.keywords)
@@ -479,7 +489,8 @@ Output only the JSON object.`;
         kind,
         scale: ['SMALL', 'MEDIUM', 'LARGE'].includes(scale) ? scale : 'MEDIUM',
         threat,
-        premise,
+        prompt,
+        brief_description: briefDescription,
         keywords: extraKeys,
         lookback: windowSize,
         lorebookNames,

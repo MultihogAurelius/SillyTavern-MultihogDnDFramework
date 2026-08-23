@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { MAP_ASSET_DETAIL_MAX_CHARS, compactMapAssetDetail } from '../map-detail-limits.js';
 import {
     applyDungeonMapTransaction,
     buildDungeonRealityInjection,
@@ -120,20 +119,6 @@ function linearArchitectMap(site, kind, count, asset = null) {
 }
 
 describe('Map Architect validation', () => {
-    it('compacts oversized asset detail locally without rejecting the map', () => {
-        const raw = structuredClone(connectedArchitectMap);
-        raw.assets[0].detail = `${'Ancient history and redundant premise context. '.repeat(20)}Final sentence.`;
-        const result = validateDungeonMapArchitecture(raw, {
-            site: 'Abbey Undercroft', entrance: 'Cellar Landing',
-        });
-        expect(result.valid).toBe(true);
-        expect(result.document.assets[0].detail.length).toBeLessThanOrEqual(MAP_ASSET_DETAIL_MAX_CHARS);
-        expect(result.document.assets[0].detail.endsWith('…')).toBe(true);
-        expect(compactMapAssetDetail('  Short   current fact.  ')).toBe('Short current fact.');
-        expect(buildDungeonMapCommitSchema().properties.operations.items.oneOf[2].properties.detail.maxLength)
-            .toBe(MAP_ASSET_DETAIL_MAX_CHARS);
-    });
-
     it('accepts a connected graph even when its entrance route is locked', () => {
         const result = validateDungeonMapArchitecture(connectedArchitectMap, {
             site: 'Abbey Undercroft',

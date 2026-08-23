@@ -12,7 +12,7 @@ export const CREATE_AREA_MAP_OPEN_TAG = '[CREATE_AREA_MAP]';
 export const CREATE_AREA_MAP_CLOSE_TAG = '[/CREATE_AREA_MAP]';
 
 const FENCE_RE = /\[\s*CREATE_AREA_MAP\s*\]([\s\S]*?)\[\s*\/\s*CREATE_AREA_MAP\s*\]/i;
-const KEY_LINE_RE = /^\s*[*_`]*\s*(site|site_root|footer_root|footer|root|location|name|entrance|kind|scale|threat|danger|risk|threat_level|premise|include|attach_to_site|attach_to_cell)\s*[*_`]*\s*:\s*(.*)$/i;
+const KEY_LINE_RE = /^\s*[*_`]*\s*(site|site_root|footer_root|footer|root|location|name|entrance|kind|scale|threat|danger|risk|threat_level|prompt|brief_description|premise|include|attach_to_site|attach_to_cell)\s*[*_`]*\s*:\s*(.*)$/i;
 
 /** Shipped dungeon-reality opener bullets used when text mode is live. */
 export const MAP_ARCHITECT_TEXT_OPENER_CYOA_CAVEAT = 'When emitting a [CREATE_AREA_MAP] block this turn, CYOA Mode is suspended: do not append <choices>, <button> tags, numbered options, or any other end-of-output choices — even if CYOA instructions say you MUST ALWAYS end with choices. Output the block and STOP. On every other turn, CYOA choices are required as usual.';
@@ -23,7 +23,7 @@ export const MAP_ARCHITECT_TEXT_OPENER_RULES = `- When an unmapped site warrants
 - SETTLEMENT, DUNGEON, and INTERIOR maps may host DUNGEON/INTERIOR children, up to three mapped levels total. Never nest a SETTLEMENT. Similar names are distinct: Cellar Crypt is not Cellar Crypt Dungeon.
 - Never call CreateAreaMap for a BUILDING that does not warrant a stable room graph, an OBJECT prop, a district, alley, street, wilderness, road, or countryside.
 - Wilderness, roads, countryside, and other places between mapped sites are not mapped. Do not emit a map command for travel terrain or the wilds between a city and a dungeon. Narrate those normally without a site map.
-- Use these exact field names: site, entrance, kind (DUNGEON, SETTLEMENT, or INTERIOR), scale (SMALL, MEDIUM, or LARGE), threat (NONE, LOW, MODERATE, HIGH, or DEADLY), premise, optional attach_to_site plus attach_to_cell, and optional include. include must be a JSON array of exact existing DUNGEON/INTERIOR names and is allowed only while first creating a SETTLEMENT.
+- Use these exact field names: site, entrance, kind (DUNGEON, SETTLEMENT, or INTERIOR), scale (SMALL, MEDIUM, or LARGE), threat (NONE, LOW, MODERATE, HIGH, or DEADLY), prompt, brief_description, optional attach_to_site plus attach_to_cell, and optional include. prompt may contain detailed private generation guidance. brief_description is the brief current description stored on a parent gateway; never copy the full prompt into it. include must be a JSON array of exact existing DUNGEON/INTERIOR names and is allowed only while first creating a SETTLEMENT.
 - Scale is geographic size. Threat is site danger (enemy/trap density), never party level. A LARGE LOW ruin can be vast and empty; a SMALL DEADLY vault can be a meat grinder.
 [CREATE_AREA_MAP]
 site: Cellar Crypt Dungeon
@@ -33,7 +33,8 @@ scale: SMALL
 threat: HIGH
 attach_to_site: Malarkey Monument
 attach_to_cell: Cellar Crypt
-premise: A funerary complex extends beyond the sealed western passage.
+prompt: A funerary complex extends beyond the sealed western passage. Build burial chambers around a warded central prison.
+brief_description: A sealed funerary complex surrounding an ancient warded prison.
 [/CREATE_AREA_MAP]
 - ${MAP_ARCHITECT_TEXT_OPENER_CYOA_CAVEAT}
 - A \`[MAPPED_SITES — INTERNAL]\` block lists every existing peer map. Do not recreate a listed map. A listed SETTLEMENT may still contain an unmapped SUB* asset or a BUILDING deliberately promoted by a DUNGEON/INTERIOR call. DUNGEON_REALITY is attached while the footer matches a mapped site, or for one turn when player input names it exactly.
@@ -144,15 +145,19 @@ function normalizeArgs(raw, fallbackText = '') {
         raw?.name,
         inferSiteFromFooter(fallbackText),
     );
-    let premise = String(raw?.premise || '').trim();
+    let prompt = String(raw?.prompt || raw?.premise || '').trim();
     if (displayName && site && displayName.toLowerCase() !== site.toLowerCase()
-        && !premise.toLowerCase().includes(displayName.toLowerCase())) {
-        premise = premise ? `${displayName}. ${premise}` : displayName;
+        && !prompt.toLowerCase().includes(displayName.toLowerCase())) {
+        prompt = prompt ? `${displayName}. ${prompt}` : displayName;
     }
+    const briefDescription = String(raw?.brief_description || raw?.briefDescription || '').trim()
+        || prompt.match(/^.*?[.!?](?:\s|$)/)?.[0]?.trim()
+        || prompt;
     const normalized = {
         site,
         entrance: String(raw?.entrance || '').trim(),
-        premise,
+        prompt,
+        brief_description: briefDescription,
         kind: normalizeMapSiteKind(raw?.kind),
         scale: normalizeScale(raw?.scale),
         threat: normalizeMapSiteThreat(
@@ -194,31 +199,37 @@ function parseKeyedBody(body, fallbackText = '') {
         entrance: '',
         kind: '',
         scale: 'MEDIUM',
+        prompt: '',
+        brief_description: '',
         premise: '',
         include: '',
         attach_to_site: '',
         attach_to_cell: '',
     };
     let currentKey = null;
-    const premiseParts = [];
+    const promptParts = [];
+    const briefParts = [];
     for (const line of trimmed.split(/\r?\n/)) {
         const match = line.match(KEY_LINE_RE);
         if (match) {
             currentKey = match[1].toLowerCase();
             const rest = String(match[2] || '');
-            if (currentKey === 'premise') premiseParts.push(rest);
+            if (currentKey === 'prompt' || currentKey === 'premise') promptParts.push(rest);
+            else if (currentKey === 'brief_description') briefParts.push(rest);
             else args[currentKey] = rest.trim();
             continue;
         }
-        if (currentKey === 'premise') premiseParts.push(line);
+        if (currentKey === 'prompt' || currentKey === 'premise') promptParts.push(line);
+        else if (currentKey === 'brief_description') briefParts.push(line);
     }
-    if (premiseParts.length) args.premise = premiseParts.join('\n').trim();
+    if (promptParts.length) args.prompt = promptParts.join('\n').trim();
+    if (briefParts.length) args.brief_description = briefParts.join('\n').trim();
     return normalizeArgs(args, fallbackText);
 }
 
 /**
  * @param {string} text
- * @returns {{ args: { site: string, entrance: string, kind: string, scale: string, threat: string, premise: string }, preamble: string, raw: string } | null}
+ * @returns {{ args: { site: string, entrance: string, kind: string, scale: string, threat: string, prompt: string, brief_description: string }, preamble: string, raw: string } | null}
  */
 export function parseCreateAreaMapCommand(text) {
     const original = String(text || '');
@@ -231,7 +242,7 @@ export function parseCreateAreaMapCommand(text) {
 }
 
 export function createAreaMapCommandIsComplete(args) {
-    return !!(args?.site && args?.entrance && args?.premise && args?.kind);
+    return !!(args?.site && args?.entrance && args?.prompt && args?.brief_description && args?.kind);
 }
 
 /**
