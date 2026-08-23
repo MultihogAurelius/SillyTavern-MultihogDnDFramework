@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { parseMapArchitectResponse } from '../map-architect-parser.js';
 import { buildMapArchitectReferenceContext } from '../map-architect-context.js';
 import { MAP_ARCHITECT_BRIEF_JSON_SCHEMA, MAP_ARCHITECT_JSON_SCHEMA } from '../map-architect-schema.js';
+import { MAP_ASSET_DETAIL_MAX_CHARS } from '../map-detail-limits.js';
 import { DEFAULT_MAP_ARCHITECT_BRIEF_SYSTEM_PROMPT, DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT } from '../map-architect-prompt.js';
 import { resolveHostedCreationContext } from '../map-hosting-context.js';
 
@@ -245,6 +246,8 @@ describe('Map Architect component', () => {
         expect(MAP_ARCHITECT_JSON_SCHEMA.value.properties.threat.enum).toEqual(['NONE', 'LOW', 'MODERATE', 'HIGH', 'DEADLY']);
         expect(MAP_ARCHITECT_JSON_SCHEMA.value.properties.assets.items.properties.kind.enum)
             .toEqual(expect.arrayContaining(['OBJECT', 'BUILDING', 'SUBDUNGEON', 'SUBINTERIOR']));
+        expect(MAP_ARCHITECT_JSON_SCHEMA.value.properties.assets.items.properties.detail.maxLength)
+            .toBe(MAP_ASSET_DETAIL_MAX_CHARS);
     });
 
     it('preflights exact include peers and persists absorption/promotion in one book save', () => {

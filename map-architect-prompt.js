@@ -1,3 +1,5 @@
+import { MAP_ASSET_DETAIL_MAX_CHARS } from './map-detail-limits.js';
+
 /** Dedicated prompt used only when the GM calls CreateAreaMap. */
 export const DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT = `You are the Map Architect, a private specialist that creates one complete attached v3 [MAP].
 
@@ -29,6 +31,7 @@ AREAS AND PASSAGES
 
 ASSETS
 - Each asset is {"id":"stable-kebab-id","kind":"CREATURE|GROUP|TRAP|HAZARD|OBJECT|BUILDING|SUBDUNGEON|SUBINTERIOR|LOOT|BARRIER|ALARM|EFFECT|OTHER","name":"concise label","location":"area-id","state":"ACTIVE","knowledge":"UNREVEALED|SUSPECTED|KNOWN","detail":"objective current fact","origin":"INITIAL_MAP"}.
+- Keep asset.detail to one or two short sentences and at most ${MAP_ASSET_DETAIL_MAX_CHARS} characters. Record only the asset's current actionable identity, appearance, function, or condition. Never put its biography, ancient history, full premise, design intent, expected encounters, investigation guidance, or tone notes in detail; those belong in the premise/context and must not be copied into the map.
 - BUILDING is SETTLEMENT-only. SUBDUNGEON and SUBINTERIOR are runtime-owned gateways that may exist on SETTLEMENT, DUNGEON, or INTERIOR maps within the three-level nesting limit. OBJECT is a non-structural prop on every map kind.
 - Every initial Architect asset must reference an area ID directly. BUILDING supports contained assets later, but the Architect always creates it empty; first-entry Map Updater or off-screen Map Evolution owns its contents. Do not emit notEntered—the runtime stamps it.
 - Choose the most accurate allowed initial state. Live traps and alarms are ARMED; a neutralized mechanism is DEACTIVATED. Every asset must occupy exactly one existing area.

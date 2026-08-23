@@ -3,6 +3,7 @@
  * Runtime validation remains authoritative; this schema prevents providers from
  * spending the entire response on reasoning or returning a non-map message.
  */
+import { MAP_ASSET_DETAIL_MAX_CHARS } from './map-detail-limits.js';
 export const MAP_ARCHITECT_JSON_SCHEMA = Object.freeze({
     name: 'dungeon_map_v3',
     description: 'A complete private objective map for one dungeon, significant interior, or settlement.',
@@ -65,7 +66,7 @@ export const MAP_ARCHITECT_JSON_SCHEMA = Object.freeze({
                             ],
                         },
                         knowledge: { type: 'string', enum: ['UNREVEALED', 'SUSPECTED', 'KNOWN'] },
-                        detail: { type: 'string' },
+                        detail: { type: 'string', maxLength: MAP_ASSET_DETAIL_MAX_CHARS, description: `One or two short objective sentences, at most ${MAP_ASSET_DETAIL_MAX_CHARS} characters. No biography, history, or premise recap.` },
                         origin: { type: 'string', enum: ['INITIAL_MAP'] },
                         behavior: { type: 'string', minLength: 1 },
                         route: { type: 'array', items: { type: 'string', minLength: 1 } },
