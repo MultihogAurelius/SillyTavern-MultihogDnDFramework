@@ -2,7 +2,7 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
-## [2026.8.24.17] - 2026-08-23
+## [2026.8.27] - 2026-08-27
 
 ### Added
 - **Tabbed Agent Console**: The Lorebook Agent panel Console drawer now has tabs for State Tracker, Lorebook Agent, Map Updater, Map Evolution, and Map Architect. Each agent keeps its own live terminal feed; Agent Log History remains on the Lorebook Agent tab only.
