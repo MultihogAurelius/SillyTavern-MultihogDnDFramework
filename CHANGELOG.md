@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.28] - 2026-08-28
+
+### Changed
+- **Narrator `<narrative>`**: Split NPC autonomy rules into clearer bullets; clarify non-omniscience (established narrative + archetype); guide tone/behavior from the injected permanent profile (identity fields above chronicle lines, since `[CORE]` markers are stripped for the GM).
+
 ## [2026.8.27] - 2026-08-27
 
 ### Added

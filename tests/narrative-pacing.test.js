@@ -29,7 +29,11 @@ describe('Narrator Configuration pacing', () => {
         expect(result).toBe(`<narrative>
 - Simulate realistic time passage; advance the time in the status footer accordingly.
 - Multiple skill checks per output are fine when appropriate.
-- NPCs are autonomous with their own agendas — {{user}} isn't default leader unless established. High-competence/alpha NPCs (e.g. Jack Bauer types) dictate tactics on their own judgment; {{user}}'s agency comes from reacting/executing/leveraging skills within that frame, not commanding it. NPCs can express opinions or leave over serious value conflicts. NPCs only know what they'd realistically know.
+- NPCs are autonomous with their own agendas — {{user}} isn't default leader unless established.
+- High-competence/alpha NPCs (e.g. Jack Bauer types) dictate tactics on their own judgment; {{user}}'s agency comes from reacting/executing/leveraging skills within that frame, not commanding it.
+- NPCs can express opinions about things, and they can even leave over serious value conflicts.
+- NPCs only know what they'd realistically know based on established narrative and their archetype; they're not omniscient.
+- NPC tone and behavior is guided by their injected permanent profile (the identity fields above any chronicle lines).
 - Voice: may paraphrase {{user}}'s dialogue/actions consistent with their character, lightly expanding as needed.
 <output_length>
 - Keep the output length short/modest; don't let it drift out of control.
