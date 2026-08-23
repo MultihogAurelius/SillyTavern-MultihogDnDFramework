@@ -199,16 +199,6 @@ describe('dungeon map graph', () => {
         expect(graph.nodes.every(node => node.revealed && !node.fog)).toBe(true);
     });
 
-    it('adds left and right drag sockets only for the graphical editor', () => {
-        const graph = buildDungeonMapGraph(midExplorationMap, { playerFacing: false });
-        const ordinary = renderDungeonMapGraphSvg(graph, { compact: false });
-        const editable = renderDungeonMapGraphSvg(graph, { compact: false, editorPorts: true });
-        expect(ordinary).not.toContain('data-port-area');
-        expect(editable).toContain('rt-map-editor-port-left');
-        expect(editable).toContain('rt-map-editor-port-right');
-        expect(editable).toContain('data-port-area="cellar-landing"');
-    });
-
     it('lays out ranks from the entrance and keeps reciprocal routes as one edge', () => {
         const graph = buildDungeonMapGraph(midExplorationMap, { playerFacing: true });
         const layout = layoutDungeonMapGraph(graph, { compact: true });

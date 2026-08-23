@@ -55,8 +55,6 @@ import {
 } from './dungeon-reality.js';
 import { recordLiveDungeonMapSnapshot } from './src/state/dungeon-map-history.js';
 import { buildHostedPeerSitePath, ensureHostCoreMirror, MAX_HOSTED_MAP_DEPTH, reparentHostedLocationEntries, stampHostedPeerDocument } from './map-hosting.js';
-import { resolveHostedCreationContext } from './map-hosting-context.js';
-import { validateMapEditorDocument } from './map-editor-lib.js';
 import { clearEvolutionHistoryForSite, setSiteEvolutionIntervalOverride } from './map-evolution-lib.js';
 import {
     buildWorldProgressionLocationDossiers,
@@ -694,7 +692,6 @@ export async function persistArchitectDungeonMap(siteRoot, mapDocument, {
     locationCore = '',
     includeManifest = [],
     hostContext = null,
-    editorMetadata = null,
 } = {}) {
     const ctx = SillyTavern.getContext();
     const settings = getSettings();
@@ -789,17 +786,6 @@ export async function persistArchitectDungeonMap(siteRoot, mapDocument, {
             extensions: {},
         };
         bookData.entries[nextUid] = rootEntry;
-    }
-
-    if (editorMetadata) {
-        const core = String(editorMetadata.core || '').trim();
-        const coreBlock = `[CORE]\n${core || `${requestedSite} is a mapped site. Its private map stores current objective reality; child Location entries preserve player-observable history.`}\n[/CORE]`;
-        if (/\[CORE\][\s\S]*?\[\/CORE\]/i.test(rootEntry.content || '')) {
-            rootEntry.content = String(rootEntry.content || '').replace(/\[CORE\][\s\S]*?\[\/CORE\]/i, coreBlock);
-        } else {
-            rootEntry.content = `${coreBlock}\n\n${String(rootEntry.content || '').trim()}`.trim();
-        }
-        rootEntry.key = locationKeysForNewRoot(requestedSite, editorMetadata.keywords || []);
     }
 
     let persistedDocument = existingAttachment
@@ -913,11 +899,7 @@ export async function persistArchitectDungeonMap(siteRoot, mapDocument, {
  * Replace the root Location's [MAP] from manual JSON editing in the map inspector.
  * Does not create new roots or overwrite a site that lost its map attachment.
  */
-export async function persistManualDungeonMapDocument(siteRoot, mapDocument, {
-    core = null,
-    keywords = null,
-    expectedMap = '',
-} = {}) {
+export async function persistManualDungeonMapDocument(siteRoot, mapDocument) {
     const ctx = SillyTavern.getContext();
     const settings = getSettings();
     const prefix = getLivePrefix();
@@ -940,9 +922,6 @@ export async function persistManualDungeonMapDocument(siteRoot, mapDocument, {
     const existingAttachment = getDungeonMapAttachment(rootEntry);
     if (!existingAttachment) throw new Error(`"${site}" has no private map to edit.`);
     const existingDocument = parseDungeonMapDocument(existingAttachment.content, existingAttachment.siteRoot).document;
-    if (expectedMap && serializeDungeonMapDocument(existingDocument) !== String(expectedMap)) {
-        throw new Error('This map changed after the editor opened. Reload the live map or export your draft before trying again.');
-    }
     const oldHost = String(existingDocument.hostSite || '').trim();
     const newHost = String(mapDocument.hostSite || '').trim();
     const oldBrief = String(existingDocument.hostBrief || '').trim();
@@ -958,16 +937,6 @@ export async function persistManualDungeonMapDocument(siteRoot, mapDocument, {
         rootEntry.content,
         serializeDungeonMapDocument(mapDocument),
     );
-    if (core != null) {
-        const coreBody = String(core || '').trim();
-        const coreBlock = `[CORE]\n${coreBody}\n[/CORE]`;
-        if (/\[CORE\][\s\S]*?\[\/CORE\]/i.test(rootEntry.content || '')) {
-            rootEntry.content = String(rootEntry.content || '').replace(/\[CORE\][\s\S]*?\[\/CORE\]/i, coreBlock);
-        } else {
-            rootEntry.content = `${coreBlock}\n\n${String(rootEntry.content || '').trim()}`.trim();
-        }
-    }
-    if (keywords != null) rootEntry.key = locationKeysForNewRoot(site, keywords);
     reconcileDungeonMapAreaKnowledge(rootEntry, bookData.entries);
     rootEntry.disable = true;
 
@@ -991,92 +960,6 @@ export async function persistManualDungeonMapDocument(siteRoot, mapDocument, {
         entryId: `${bookName}::${rootEntry.uid}`,
         document: mapDocument,
     };
-}
-
-function extractMapEditorCore(content) {
-    return String(content || '').match(/\[CORE\]([\s\S]*?)\[\/CORE\]/i)?.[1]?.trim() || '';
-}
-
-/** Load location metadata and map relationships required by the graphical editor. */
-export async function loadMapEditorLocation(siteRoot = '') {
-    const ctx = SillyTavern.getContext();
-    const prefix = getLivePrefix();
-    if (!prefix) throw new Error('No campaign prefix is available for the Locations lorebook.');
-    const bookName = `${prefix}_Locations`;
-    const known = await isWorldInfoBookKnown(bookName, ctx);
-    const bookData = known ? await loadWorldInfoFresh(bookName, ctx) : null;
-    const site = String(siteRoot || '').trim();
-    const entry = site ? Object.values(bookData?.entries || {}).find(candidate => String(candidate?.comment || '').trim() === site) : null;
-    const attachment = entry ? getDungeonMapAttachment(entry) : null;
-    const document = attachment ? parseDungeonMapDocument(attachment.content, attachment.siteRoot).document : null;
-    const mapped = listMappedSiteDocuments(bookData?.entries || {}, bookName);
-    const linkedGatewayIds = [];
-    if (document) {
-        for (const child of mapped) {
-            if (String(child.document?.hostSite || '') !== String(document.site || '')) continue;
-            const leaf = String(child.siteRoot || '').split(' :: ').pop();
-            const gateway = (document.assets || []).find(asset => ['SUBDUNGEON', 'SUBINTERIOR'].includes(asset.kind) && asset.name === leaf);
-            if (gateway) linkedGatewayIds.push(gateway.id);
-        }
-    }
-    return {
-        bookName,
-        exists: !!entry,
-        mapped: !!document,
-        entryId: entry ? `${bookName}::${entry.uid}` : '',
-        siteRoot: site || String(entry?.comment || ''),
-        core: extractMapEditorCore(entry?.content),
-        keywords: Array.isArray(entry?.key) ? [...entry.key] : [],
-        document,
-        expectedMap: document ? serializeDungeonMapDocument(document) : '',
-        linkedGatewayIds,
-        mappedSites: mapped.map(item => ({
-            siteRoot: item.siteRoot,
-            kind: item.document?.kind,
-            hostSite: item.document?.hostSite || '',
-            areas: (item.document?.areas || []).map(area => ({ id: area.id, name: area.name })),
-        })),
-    };
-}
-
-/** Atomic graphical-editor commit for new roots, unmapped roots, existing maps, and hosted peers. */
-export async function persistMapEditorDocument({
-    siteRoot,
-    document: mapDocument,
-    core = '',
-    keywords = [],
-    expectedMap = '',
-    attachTo = null,
-} = {}) {
-    const site = String(siteRoot || '').trim();
-    const live = await loadMapEditorLocation(site);
-    const validation = validateMapEditorDocument(mapDocument, {
-        site,
-        originalDocument: live.document,
-        linkedGatewayIds: live.linkedGatewayIds,
-    });
-    if (!validation.valid) {
-        throw new Error(validation.errors.map(item => `${item.path}: ${item.message}`).join(' '));
-    }
-    if (live.mapped) {
-        return persistManualDungeonMapDocument(site, mapDocument, { core, keywords, expectedMap });
-    }
-    const current = await syncDungeonMapsToLocationLorebook(SillyTavern.getContext().chat || [], { capture: false });
-    const args = {
-        site,
-        kind: mapDocument.kind,
-        premise: String(core || '').trim() || `${site} is a mapped site.`,
-        attachTo,
-    };
-    const hostContext = resolveHostedCreationContext(current, findLatestDungeonLocation(SillyTavern.getContext().chat || []), args);
-    return persistArchitectDungeonMap(site, mapDocument, {
-        allowOffsite: true,
-        requireNew: !live.exists,
-        locationKeys: keywords,
-        locationCore: core,
-        hostContext,
-        editorMetadata: { core, keywords },
-    });
 }
 
 /** True when a Location root with this site name already exists. */

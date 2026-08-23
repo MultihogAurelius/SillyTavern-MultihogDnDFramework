@@ -7,7 +7,6 @@ import { buildDungeonMapGraph, renderDungeonMapGraphSvg, renderDungeonMapReadabl
 import { renderDungeonGraphAssetTipHtml } from '../../../dungeon-map-icons.js';
 import { serializeDungeonMapDocument, parseEditableDungeonMapJson } from '../../../dungeon-reality.js';
 import { describeEvolutionBacklog, formatEvolutionElapsedMinutes, stripEvolutionDigestSitePrefix } from '../../../map-evolution-lib.js';
-import { openMapEditor } from './map-editor.js';
 
 export const DUNGEON_MAP_DETACHED_KEY = 'rpg_tracker_dungeon_map_detached';
 export const DUNGEON_MAP_GEOMETRY_KEY = 'rpg_tracker_geometry_dungeon_map';
@@ -393,7 +392,6 @@ export async function openDungeonMapReadablePopup(mapDocument, { siteLabel = '',
         <div class="rt-dungeon-map-subtitle">Revealed rooms, routes, and known assets. Unrevealed map facts and material Evolution details stay hidden unless you turn on Reveal All.</div>
         <div class="rt-dungeon-map-toolbar">
             <label class="rt-dungeon-map-reveal-toggle"><input type="checkbox" class="rt-dungeon-map-reveal-all"${revealAll ? ' checked' : ''}> Reveal All</label>
-            <button type="button" class="menu_button interactable rt-dungeon-map-edit"><i class="fa-solid fa-pen-ruler"></i> Edit Map</button>
         </div>
         <section class="rt-dungeon-map-updater-section">
             <div class="rt-dungeon-map-updater-header">
@@ -505,10 +503,6 @@ export async function openDungeonMapReadablePopup(mapDocument, { siteLabel = '',
         persistDungeonMapRevealAll(revealAll);
         paint();
         refreshDungeonMapViews();
-    });
-    popupDom.querySelector('.rt-dungeon-map-edit')?.addEventListener('click', async () => {
-        await openMapEditor({ siteRoot: site, document: currentDocument });
-        await reloadInspectorFromLiveMap({ resetRaw: true });
     });
     for (const button of popupDom.querySelectorAll('[data-map-view]')) {
         button.addEventListener('click', () => {

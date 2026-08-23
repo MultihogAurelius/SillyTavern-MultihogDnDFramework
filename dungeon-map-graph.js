@@ -274,22 +274,18 @@ function nodeClass(node) {
 /**
  * Render a player-facing (or full) graph as inline SVG.
  * @param {object} graph from buildDungeonMapGraph
- * @param {{ compact?: boolean, siteRoot?: string, editorPorts?: boolean }} [options]
+ * @param {{ compact?: boolean, siteRoot?: string }} [options]
  */
-export function renderDungeonMapGraphSvg(graph, { compact = true, siteRoot = '', editorPorts = false } = {}) {
+export function renderDungeonMapGraphSvg(graph, { compact = true, siteRoot = '' } = {}) {
     const layout = layoutDungeonMapGraph(graph, { compact });
     if (!layout.nodes.length) {
         return '<div class="rt-dungeon-graph-empty">No revealed rooms yet.</div>';
     }
     const fontSize = compact ? MAP_NODE_FONT.compact : MAP_NODE_FONT.expanded;
-    const editableNodeIds = new Set(layout.nodes.filter(node => !node.fog).map(node => node.id));
     const edges = layout.edges.map(edge => {
         const title = escapeXml([edge.state, edge.detail].filter(Boolean).join(' — '));
         const stateClass = `rt-dungeon-graph-edge rt-dungeon-graph-edge-${String(edge.state || 'OPEN').toLowerCase()}`;
-        const interactive = editableNodeIds.has(edge.from) && editableNodeIds.has(edge.to)
-            ? ` data-edge-from="${escapeXml(edge.from)}" data-edge-to="${escapeXml(edge.to)}" role="button" tabindex="0"`
-            : '';
-        return `<line class="${stateClass}"${interactive} x1="${edge.x1}" y1="${edge.y1}" x2="${edge.x2}" y2="${edge.y2}"><title>${title}</title></line>`;
+        return `<line class="${stateClass}" x1="${edge.x1}" y1="${edge.y1}" x2="${edge.x2}" y2="${edge.y2}"><title>${title}</title></line>`;
     }).join('');
     const nodes = layout.nodes.map(node => {
         const label = node.fog ? '?' : truncateLabel(node.name, compact ? 16 : 22);
@@ -311,10 +307,7 @@ export function renderDungeonMapGraphSvg(graph, { compact = true, siteRoot = '',
         const icons = node.fog || !(node.icons || []).length
             ? ''
             : renderAreaAssetIconsSvg(node.icons, { cx: node.cx, y: node.iconY, compact });
-        const ports = editorPorts && !node.fog
-            ? `<circle class="rt-map-editor-port rt-map-editor-port-left" data-port-area="${escapeXml(node.id)}" data-port-side="left" cx="${node.x}" cy="${node.cy}" r="6" role="button" tabindex="0"><title>Drag to connect ${escapeXml(node.name)}</title></circle><circle class="rt-map-editor-port rt-map-editor-port-right" data-port-area="${escapeXml(node.id)}" data-port-side="right" cx="${node.x + node.width}" cy="${node.cy}" r="6" role="button" tabindex="0"><title>Drag to connect ${escapeXml(node.name)}</title></circle>`
-            : '';
-        return `<g ${attrs.join(' ')}>${shape}<text x="${node.cx}" y="${textY}" text-anchor="middle" dominant-baseline="middle" font-size="${fontSize}">${escapeXml(label)}</text>${icons}${ports}</g>`;
+        return `<g ${attrs.join(' ')}>${shape}<text x="${node.cx}" y="${textY}" text-anchor="middle" dominant-baseline="middle" font-size="${fontSize}">${escapeXml(label)}</text>${icons}</g>`;
     }).join('');
     return `<svg xmlns="http://www.w3.org/2000/svg" class="rt-dungeon-graph-svg" viewBox="0 0 ${layout.width} ${layout.height}" width="${layout.width}" height="${layout.height}" role="img" draggable="false" aria-label="${escapeXml(graph.site || 'Site map')}">${edges}${nodes}</svg>`;
 }
