@@ -24,6 +24,7 @@ import { extractDungeonMapSection, parseDungeonMapDocument, stripDungeonMapSecti
 import { clearMemoAndMapHistory, getDungeonMapHistoryEntry } from '../../state/dungeon-map-history.js';
 import { isLocationMappingEnabled } from '../../state/section-enabled.js';
 import { openDungeonMapReadablePopup } from './dungeon-map-panel.js';
+import { openMapEditor } from './map-editor.js';
 import { buildAddLibraryNpcToPartyPrompt, buildApplyLibraryCardAsPcPrompt, extractLibraryIdentityContent, findLibraryNpcByName, getNpcLibrary, sanitizeNpcLibraryRecords } from '../../../npc-library-lib.js';
 
 const MAPS_GUIDE_HTML = `
@@ -43,7 +44,8 @@ const MAPS_GUIDE_HTML = `
         <p>The deepest complete footer path activates. Similar names remain distinct — “Cellar Crypt” does not match “Cellar Crypt Dungeon” — while leaving a peer reactivates its direct parent map.</p>
         <p>You can also create maps manually from the “+ Add Mapped Location” button in the Locations header, or you can press the “+ MAP” button on any Location lore entry header.</p>
         <h3 style="margin:18px 0 6px;color:#bae6fd;">Editing Maps</h3>
-        <p>You can edit maps directly by editing the JSON object. Open a map, then click on “&lt;/&gt; Raw JSON”. I will later add a proper graphical map editor. For now this is the only way.</p>
+        <p>Use <strong>Map Editor</strong> in the Locations header to build a location and map entirely by hand. The pencil beside an unmapped “+ MAP” attaches a hand-built map to that Location, and <strong>Edit Map</strong> in an existing map inspector opens any AI-created or manual map. The editor provides a selectable topology graph, structured area/route/asset forms, undo and redo, strict validation, portable JSON import/export, and an advanced raw JSON tab.</p>
+        <p>New DUNGEON and INTERIOR maps can also be hosted inside an exact area of an existing map. The editor derives the nested breadcrumb and saves the parent gateway and child map together.</p>
         <h3 style="margin:18px 0 6px;color:#bae6fd;">World Progression and Map Evolution interaction</h3>
         <p>Map Evolution sees World Progression entries. For example, if the location is Moonbrook and World Progression makes an event, “there is a goblin invasion on Moonbrook,” Map Evolution sees this as an input and may spawn goblins there who begin to wreak havoc. The GM also sees the World Report, so it will know globally that this is going on even if you’re not in there inside the mapped location. The systems all work together.</p>
     </div>`;
@@ -2159,7 +2161,7 @@ export function createPanel(dependencies) {
                             ${isNpcBook ? '<button type="button" class="rt-npc-manager-btn" title="NPC/PC Manager — library, add to story, import/export"><i class="fa-solid fa-users-gear"></i> NPC/PC Manager</button>' : ''}
                             ${isNpcBook ? '<button class="rt-npc-settings-btn" title="NPC Settings" style="background:none;border:none;cursor:pointer;font-size:11px;opacity:0.5;padding:0;margin:0;width:14px;height:14px;display:inline-flex;align-items:center;justify-content:center;color:var(--rt-text-muted);flex-shrink:0;line-height:1;" onclick="event.stopPropagation()">⚙️</button>' : ''}
                             ${isLocBook ? '<button type="button" class="rt-loc-maps-guide-btn" title="Learn how Persistent Maps work"><i class="fa-solid fa-circle-info"></i> Maps Guide</button>' : ''}
-                            ${isLocBook && dungeonRealityEnabled ? '<button type="button" class="rt-loc-add-mapped-btn" title="Create a new location root and generate its private map"><i class="fa-solid fa-plus"></i> Add Mapped Location</button>' : ''}
+                            ${isLocBook && dungeonRealityEnabled ? '<button type="button" class="rt-loc-add-mapped-btn" title="Create a new location root and generate its private map"><i class="fa-solid fa-plus"></i> Add Mapped Location</button><button type="button" class="rt-loc-map-editor-btn" title="Create a location and map by hand"><i class="fa-solid fa-pen-ruler"></i> Map Editor</button>' : ''}
                             ${isLocBook ? '<button class="rt-loc-settings-btn" title="Location Settings" style="background:none;border:none;cursor:pointer;font-size:11px;opacity:0.5;padding:0;margin:0;width:14px;height:14px;display:inline-flex;align-items:center;justify-content:center;color:var(--rt-text-muted);flex-shrink:0;line-height:1;" onclick="event.stopPropagation()">⚙️</button>' : ''}
                         `;
 
@@ -2435,6 +2437,14 @@ export function createPanel(dependencies) {
                                         } finally {
                                             addMappedBtn.disabled = false;
                                         }
+                                    });
+                                }
+                                const mapEditorBtn = folderHdr.querySelector('.rt-loc-map-editor-btn');
+                                if (mapEditorBtn) {
+                                    mapEditorBtn.addEventListener('click', async (e) => {
+                                        e.stopPropagation();
+                                        await openMapEditor();
+                                        await refreshManifest();
                                     });
                                 }
                                 const locSettingsBtn = folderHdr.querySelector('.rt-loc-settings-btn');
@@ -3661,7 +3671,7 @@ export function createPanel(dependencies) {
                                         if (node.item?.has_dungeon_map) {
                                             dungeonMapBadgeHtml = `<span class="rt-dungeon-map-actions"><button class="rt-dungeon-map-badge" type="button" title="View private dungeon map (alpha) attached to this root Location"><i class="fa-solid fa-map-location-dot"></i> MAP</button><button class="rt-dungeon-map-delete" type="button" title="Remove the private map from this Location (keeps CORE)"><i class="fa-solid fa-xmark"></i></button></span>`;
                                         } else if (isLocationRoot) {
-                                            dungeonMapBadgeHtml = `<span class="rt-dungeon-map-actions"><button class="rt-dungeon-map-create" type="button" title="Create a private map for this location root"><i class="fa-solid fa-plus"></i> MAP</button></span>`;
+                                            dungeonMapBadgeHtml = `<span class="rt-dungeon-map-actions"><button class="rt-dungeon-map-create" type="button" title="Create a private map for this location root"><i class="fa-solid fa-plus"></i> MAP</button><button class="rt-dungeon-map-editor-create" type="button" title="Build this map by hand"><i class="fa-solid fa-pen-ruler"></i></button></span>`;
                                         }
                                     }
 
@@ -3757,6 +3767,14 @@ export function createPanel(dependencies) {
                                             } finally {
                                                 dungeonMapCreateBtn.disabled = false;
                                             }
+                                        });
+                                    }
+                                    const dungeonMapEditorCreateBtn = entryHdr.querySelector('.rt-dungeon-map-editor-create');
+                                    if (dungeonMapEditorCreateBtn) {
+                                        dungeonMapEditorCreateBtn.addEventListener('click', async (e) => {
+                                            e.stopPropagation();
+                                            await openMapEditor({ siteRoot: String(node.name || '').trim() });
+                                            await refreshManifest();
                                         });
                                     }
 

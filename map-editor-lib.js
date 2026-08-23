@@ -101,11 +101,15 @@ export function validateMapEditorDocument(raw, { site = '', originalDocument = n
 
     const areas = Array.isArray(raw.areas) ? raw.areas : [];
     const assets = Array.isArray(raw.assets) ? raw.assets : [];
+    const allowedArea = new Set(['id', 'name', 'knowledge', 'geometry', 'connections']);
+    const allowedConnection = new Set(['to', 'state', 'detail']);
+    const allowedAsset = new Set(['id', 'kind', 'name', 'location', 'state', 'knowledge', 'detail', 'origin', 'behavior', 'route', 'faction', 'owner', 'duration', 'count', 'notEntered', 'cause', 'actor', 'changed_at', 'last_location']);
     const areaIds = new Set();
     const areaNames = new Set();
     for (const [index, area] of areas.entries()) {
         const path = `$.areas[${index}]`;
         if (!area || typeof area !== 'object' || Array.isArray(area)) { errors.push(issue('INVALID_AREA', path, 'Area must be an object.')); continue; }
+        for (const key of Object.keys(area)) if (!allowedArea.has(key)) errors.push(issue('UNKNOWN_FIELD', `${path}.${key}`, `Unsupported area field "${key}".`));
         if (!ID_RE.test(String(area.id || ''))) errors.push(issue('INVALID_AREA_ID', `${path}.id`, 'Area ID must be unique kebab-case.'));
         else if (areaIds.has(area.id)) errors.push(issue('DUPLICATE_AREA_ID', `${path}.id`, `Duplicate area ID "${area.id}".`));
         else areaIds.add(area.id);
@@ -120,6 +124,7 @@ export function validateMapEditorDocument(raw, { site = '', originalDocument = n
         for (const [connectionIndex, connection] of area.connections.entries()) {
             const connectionPath = `${path}.connections[${connectionIndex}]`;
             if (!connection || typeof connection !== 'object' || Array.isArray(connection)) { errors.push(issue('INVALID_CONNECTION', connectionPath, 'Connection must be an object.')); continue; }
+            for (const key of Object.keys(connection)) if (!allowedConnection.has(key)) errors.push(issue('UNKNOWN_FIELD', `${connectionPath}.${key}`, `Unsupported connection field "${key}".`));
             if (!nonEmptyString(connection.to)) errors.push(issue('MISSING_CONNECTION_TARGET', `${connectionPath}.to`, 'Connection target is required.'));
             else if (connection.to === area.id) errors.push(issue('SELF_CONNECTION', `${connectionPath}.to`, 'An area cannot connect to itself.'));
             else if (targets.has(connection.to)) errors.push(issue('DUPLICATE_CONNECTION', `${connectionPath}.to`, 'Each outgoing target may appear only once.'));
@@ -147,6 +152,7 @@ export function validateMapEditorDocument(raw, { site = '', originalDocument = n
     for (const [index, asset] of assets.entries()) {
         const path = `$.assets[${index}]`;
         if (!asset || typeof asset !== 'object' || Array.isArray(asset)) continue;
+        for (const key of Object.keys(asset)) if (!allowedAsset.has(key)) errors.push(issue('UNKNOWN_FIELD', `${path}.${key}`, `Unsupported asset field "${key}".`));
         if (!nonEmptyString(asset.name)) errors.push(issue('MISSING_ASSET_NAME', `${path}.name`, 'Asset name is required.'));
         if (!MAP_ASSET_KINDS.includes(asset.kind)) errors.push(issue('INVALID_ASSET_KIND', `${path}.kind`, `Kind must be ${MAP_ASSET_KINDS.join(', ')}.`));
         if (SETTLEMENT_ONLY_KINDS.has(asset.kind) && raw.kind !== 'SETTLEMENT') errors.push(issue('ASSET_KIND_NOT_ALLOWED', `${path}.kind`, `${asset.kind} is settlement-only.`));

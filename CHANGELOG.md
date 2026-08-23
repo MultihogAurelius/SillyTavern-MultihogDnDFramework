@@ -5,10 +5,16 @@ All notable changes to the **Multihog D&D Framework** will be documented in this
 ## [2026.8.24.17] - 2026-08-23
 
 ### Added
+- **Graph-First Map Editing**: Area nodes now expose left/right connection sockets. Dragging between sockets draws a live curved preview and creates a reciprocal route; clicking a node opens an action menu for details, assets, connected-area creation, and guarded deletion.
+- **Graphical Map Editor**: Create complete Location roots and persistent maps without AI, or live-edit any existing AI/manual map through a selectable topology graph, structured area/route/asset forms, raw JSON, undo/redo, strict validation, and atomic saves.
+- **Community Map Packages**: Copy, download, and import portable `multihog_map_package_v1` JSON with suggested CORE and keywords. Imports rebind site/host identity safely and never write until the draft is validated and saved.
+- **Manual Hosted Maps**: The editor can place new DUNGEON/INTERIOR maps inside an exact parent-map area using the same atomic gateway promotion, derived breadcrumb, host metadata, and three-level nesting rules as Map Architect.
 - **Tabbed Agent Console**: The Lorebook Agent panel Console drawer now has tabs for State Tracker, Lorebook Agent, Map Updater, Map Evolution, and Map Architect. Each agent keeps its own live terminal feed; Agent Log History remains on the Lorebook Agent tab only.
 - **Terminal/Direct Prompt**: Renamed the Console drawer and moved per-agent direct command fields into each terminal tab (including Map Evolution). Removed the Lorebook Agent footer 💬 prompt toggle.
 
 ### Fixed
+- **Map Editor live validation**: Location-name validation now refreshes while typing instead of waiting for the field to lose focus.
+- **Map Editor launch buttons**: Header and per-Location editor actions now use the same compact sizing, colors, borders, and hover treatment as Maps Guide / Add Mapped Location / + MAP.
 - **Map Updater direct prompt**: Direct-command ADD_ASSET/SET_ASSET operations now require lasting `detail` descriptions, matching routine occupancy updates instead of creating bare-name assets.
 - **Offsite Map Attachment**: `CreateAreaMap` now accepts `attachTo.site` plus `attachTo.cell`, allowing the GM to attach a DUNGEON or INTERIOR to an exact AREA on any mapped parent without moving the player or first creating a BUILDING.
 - **Three-Level Map Nesting**: SETTLEMENT, DUNGEON, and INTERIOR maps can host DUNGEON/INTERIOR peers up to three mapped documents deep. Parent gateway creation, host stamping, and inactive-parent persistence remain atomic.
