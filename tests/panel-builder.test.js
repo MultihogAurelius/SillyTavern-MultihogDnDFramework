@@ -191,7 +191,7 @@ describe('panel builder', () => {
         expect(source).toContain("toastr['info']('Starting Map Evolution pass...')");
     });
 
-    it('shares Stop and Lorebook Terminal with Map Updater without NPC auto-portraits', () => {
+    it('shares Stop and tabbed Agent Console with Map Updater without NPC auto-portraits', () => {
         const source = readFileSync(new URL('../src/ui/panel/panel-builder.js', import.meta.url), 'utf8');
         const indexSource = readFileSync(new URL('../index.js', import.meta.url), 'utf8');
         expect(source).toContain('stopRouterPass()');
@@ -199,9 +199,10 @@ describe('panel builder', () => {
         expect(source).toContain('stopMapEvolutionPass()');
         expect(source).toContain("skipped === 'stopped'");
         expect(source).toContain("toastr['info']('Stopped.', 'Map Updater')");
-        expect(source).toContain("step.metadata?.source !== 'map_updater'");
-        expect(source).toContain("step.metadata?.source !== 'map_evolution'");
+        expect(source).toContain("source === 'lorebook_agent'");
         expect(source).toContain('checkAndTriggerAutoGenerations(refreshAll)');
+        expect(source).toContain('rt-agent-terminal-tabs');
+        expect(source).toContain('resolveTerminalSource');
         expect(indexSource).toContain("stopBtn.style.display = busy ? 'flex' : 'none'");
         expect(indexSource).toContain('const busy = !!running || isMapUpdaterRunning() || isMapEvolutionRunning()');
         expect(indexSource).toContain('stopMapUpdaterPass');

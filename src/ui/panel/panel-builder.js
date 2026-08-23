@@ -4,6 +4,16 @@ import { wireAgentWorldProgression } from './panel-world-progression.js';
 import { wireAgentMapEvolution } from './panel-map-evolution.js';
 import { wireAgentActivity } from './panel-agent-activity.js';
 import { buildPanelMarkup } from './panel-markup.js';
+import {
+    AGENT_PANEL_RUNNING_SOURCES,
+    AGENT_TERMINAL_TAB_IDS,
+    createEmptyTerminalBuffers,
+    isValidTerminalTab,
+    MANIFEST_REFRESH_SOURCES,
+    renderTerminalPane,
+    resolveTerminalSource,
+} from './agent-terminal.js';
+import { wireAgentTerminalDirectPrompts } from './agent-terminal-direct.js';
 import { createSceneViewController } from './panel-scene-view.js';
 import { createCoalescedRefresh } from './refresh-coalescer.js';
 import { getCardAppearanceSynopsis as buildCardAppearanceSynopsis, getCardLibraryBlurb } from './card-synopsis.js';
@@ -29,8 +39,8 @@ const MAPS_GUIDE_HTML = `
         <p>Even better, while you’re away, Map Evolution may run and bring something like a rival adventuring group to the same passage and they may begin to clear it for you or something. They may blow it up with explosives, and you may come back to an open passage! The reason for the opened path is recorded by Map Evolution, so the GM knows why the passage is open. And you’ll likely find the adventuring group inside, which will make for a very interesting encounter indeed. “Wait, you opened the collapsed path <em>FOR me?</em>”</p>
         <h3 style="margin:18px 0 6px;color:#bae6fd;">How Are They Created and Injected in Context?</h3>
         <p>The GM creates a district-scale SETTLEMENT map for a town or city, a room-scale DUNGEON map for a significant dangerous complex, or a room-scale INTERIOR map for a significant low-risk multi-room site. Ordinary shops, inns, chapels, and homes are BUILDING assets on their settlement district; props and set-dressing are OBJECT assets. Wilderness and insignificant places are not mapped.</p>
-        <p>A settlement may absorb existing DUNGEON or INTERIOR maps when it is first created. The settlement receives matching SUBDUNGEON or SUBINTERIOR assets, while each peer keeps its independent room graph and remembers its host. Calling CreateAreaMap for an exact settlement building or nested site is the explicit promotion signal; Map Updater and Map Evolution never guess that promotion.</p>
-        <p>The deepest exact footer match activates: a mapped nested peer wins over its host, while a BUILDING or unmapped SUB site keeps the settlement active. Leaving the peer reactivates the settlement. Partial names, aliases, and fuzzy matches do not activate a map.</p>
+        <p>A settlement may absorb existing DUNGEON or INTERIOR maps when it is first created. The GM may also attach a new DUNGEON or INTERIOR from anywhere by naming an exact existing parent map and one of its AREA cells; no BUILDING or player movement is required. SETTLEMENT, DUNGEON, and INTERIOR maps may host child peers up to three mapped levels. CreateAreaMap owns these SUBDUNGEON/SUBINTERIOR gateways; Map Updater and Map Evolution never guess or edit them.</p>
+        <p>The deepest complete footer path activates. Similar names remain distinct — “Cellar Crypt” does not match “Cellar Crypt Dungeon” — while leaving a peer reactivates its direct parent map.</p>
         <p>You can also create maps manually from the “+ Add Mapped Location” button in the Locations header, or you can press the “+ MAP” button on any Location lore entry header.</p>
         <h3 style="margin:18px 0 6px;color:#bae6fd;">Editing Maps</h3>
         <p>You can edit maps directly by editing the JSON object. Open a map, then click on “&lt;/&gt; Raw JSON”. I will later add a proper graphical map editor. For now this is the only way.</p>
@@ -5679,78 +5689,6 @@ ${namingRule}`;
             });
         }
 
-        const agentPromptBtn = queryAgentUi('#rt-agent-prompt-btn');
-        if (agentPromptBtn) {
-            agentPromptBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const btn = /** @type {HTMLElement} */ (e.currentTarget);
-                const bar = /** @type {HTMLElement} */ (agentPanel.querySelector('#rt-agent-prompt-bar'));
-                const isVisible = bar.style.display !== 'none';
-                bar.style.display = isVisible ? 'none' : 'flex';
-                btn.classList.toggle('active', !isVisible);
-                if (!isVisible) {
-                    const input = /** @type {HTMLElement} */ (agentPanel.querySelector('#rt-agent-prompt-input'));
-                    if (input) input.focus();
-                }
-            });
-        }
-
-        const agentPromptSend = async () => {
-            const input = /** @type {HTMLTextAreaElement} */ (agentPanel.querySelector('#rt-agent-prompt-input'));
-            if (!input) return;
-            const msg = input.value.trim();
-            if (!msg) return;
-
-            const s = getSettings();
-            const dlInput = /** @type {HTMLInputElement} */ (agentPanel.querySelector('#rt-agent-prompt-context-val'));
-            const lookback = dlInput ? (parseInt(dlInput.value) || 10) : (s.routerDirectLookback || 10);
-
-            input.value = '';
-            s.routerDirectPrompt = '';
-            saveSettings();
-
-            if (agentPromptBtn) agentPromptBtn.classList.remove('active');
-            const bar = /** @type {HTMLElement} */ (agentPanel.querySelector('#rt-agent-prompt-bar'));
-            if (bar) bar.style.display = 'none';
-
-            const { chat } = SillyTavern.getContext();
-            const combinedNarrative = getNarrativeBlocks(chat, -1, !!s.routerIncludeHidden);
-            toastr['info']("Running agent with specific command...");
-            await runRouterPass(combinedNarrative, msg, lookback, true);
-        };
-
-        const agentPromptSendBtn = agentPanel.querySelector('#rt-agent-prompt-send');
-        if (agentPromptSendBtn) {
-            agentPromptSendBtn.addEventListener('click', async (e) => {
-                e.stopPropagation();
-                await agentPromptSend();
-            });
-        }
-
-        const agentPromptInput = agentPanel.querySelector('#rt-agent-prompt-input');
-        if (agentPromptInput) {
-            agentPromptInput.addEventListener('input', (e) => {
-                const s = getSettings();
-                s.routerDirectPrompt = (/** @type {HTMLTextAreaElement} */ (e.target)).value;
-                saveSettings();
-            });
-            agentPromptInput.addEventListener('keydown', (/** @type {KeyboardEvent} */ e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    agentPromptSend();
-                }
-            });
-        }
-
-        const agentPromptContextVal = agentPanel.querySelector('#rt-agent-prompt-context-val');
-        if (agentPromptContextVal) {
-            agentPromptContextVal.addEventListener('change', (e) => {
-                const s = getSettings();
-                s.routerDirectLookback = parseInt((/** @type {HTMLInputElement} */ (e.target)).value) || 10;
-                saveSettings();
-            });
-        }
-
         const lookbackInp = /** @type {HTMLInputElement} */ (agentPanel.querySelector('#rt-agent-router-lookback'));
         if (lookbackInp) {
             lookbackInp.addEventListener('input', (e) => {
@@ -6329,10 +6267,67 @@ ${namingRule}`;
     });
     const { syncAgentNav, syncLastRunDisplay, updateUndoLabel } = agentActivity;
 
-    let _routerSteps = [];
-    const terminal = agentPanel.querySelector('#rt-agent-router-terminal');
-    const terminalClear = agentPanel.querySelector('#rt-agent-router-terminal-clear');
+    let _terminalSteps = createEmptyTerminalBuffers();
+    const terminalPanes = Object.fromEntries(
+        AGENT_TERMINAL_TAB_IDS.map(id => {
+            const pane = agentPanel.querySelector(`#rt-agent-terminal-${id}`);
+            const feed = pane?.querySelector('.rt-agent-terminal-feed') || pane;
+            return [id, feed];
+        }),
+    );
+    const terminalClear = agentPanel.querySelector('#rt-agent-terminal-clear');
     const logClear = agentPanel.querySelector('#rt-agent-router-log-clear');
+    const logHistorySection = agentPanel.querySelector('#rt-agent-terminal-log-history');
+    const terminalTabButtons = agentPanel.querySelectorAll('.rt-agent-terminal-tab-btn');
+
+    const renderTerminalPaneForSource = (source) => {
+        const feed = terminalPanes[source];
+        if (!feed) return;
+        feed.innerHTML = renderTerminalPane(_terminalSteps[source], renderLorebookTerminal);
+        const pane = agentPanel.querySelector(`#rt-agent-terminal-${source}`);
+        if (pane?.classList.contains('rt-agent-terminal-pane-active')) {
+            feed.scrollTop = feed.scrollHeight;
+        }
+    };
+
+    const getActiveTerminalTab = () => {
+        const s = getSettings();
+        return isValidTerminalTab(s.agentTerminalTab) ? s.agentTerminalTab : 'lorebook_agent';
+    };
+
+    const applyTerminalTab = (tabId, { persist = true } = {}) => {
+        const nextTab = isValidTerminalTab(tabId) ? tabId : 'lorebook_agent';
+        if (persist) {
+            const s = getSettings();
+            s.agentTerminalTab = nextTab;
+            localStorage.setItem('rpg_tracker_agent_terminal_tab', nextTab);
+        }
+        terminalTabButtons.forEach(btn => {
+            const isActive = btn.getAttribute('data-terminal-tab') === nextTab;
+            btn.classList.toggle('rt-agent-view-mode-btn-active', isActive);
+            btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
+        });
+        AGENT_TERMINAL_TAB_IDS.forEach(id => {
+            const pane = agentPanel.querySelector(`#rt-agent-terminal-${id}`);
+            if (pane) pane.classList.toggle('rt-agent-terminal-pane-active', id === nextTab);
+        });
+        if (logHistorySection) {
+            logHistorySection.style.display = nextTab === 'lorebook_agent' ? 'block' : 'none';
+        }
+        const activePane = terminalPanes[nextTab];
+        if (activePane) activePane.scrollTop = activePane.scrollHeight;
+    };
+
+    applyTerminalTab(getActiveTerminalTab(), { persist: false });
+
+    const terminalTabs = agentPanel.querySelector('#rt-agent-terminal-tabs');
+    if (terminalTabs) {
+        terminalTabs.addEventListener('click', (e) => {
+            const btn = e.target.closest('.rt-agent-terminal-tab-btn');
+            if (!btn || btn.classList.contains('rt-agent-view-mode-btn-active')) return;
+            applyTerminalTab(btn.getAttribute('data-terminal-tab'));
+        });
+    }
 
     document.addEventListener('rt_map_updater_status', () => {
         updateAgentStatusIndicator(isRouterRunning());
@@ -6343,31 +6338,33 @@ ${namingRule}`;
 
     document.addEventListener('rt_lore_agent_step', (e) => {
         const step = (/** @type {CustomEvent} */ (e)).detail;
-        console.log('[RPG Tracker] rt_lore_agent_step event received. Type:', step?.type, 'Content:', step?.content, 'Terminal exists:', !!terminal);
-        if (!terminal) {
-            console.warn('[RPG Tracker] rt_lore_agent_step event ignored because terminal element is null/missing.');
-            return;
-        }
+        const source = resolveTerminalSource(step?.metadata);
+        const hasAnyPane = AGENT_TERMINAL_TAB_IDS.some(id => terminalPanes[id]);
+        if (!hasAnyPane) return;
 
         if (step.type === 'start') {
-            _routerSteps = [];
-            runtimeState.loreRedoStack = [];
-            syncAgentNav();
-            updateAgentStatusIndicator(true);
+            _terminalSteps[source] = [];
+            if (source === 'lorebook_agent') {
+                runtimeState.loreRedoStack = [];
+                syncAgentNav();
+            }
+            if (AGENT_PANEL_RUNNING_SOURCES.has(source)) {
+                updateAgentStatusIndicator(true);
+            }
         }
-        _routerSteps.push(step);
-
-        terminal.innerHTML = renderLorebookTerminal(_routerSteps);
-        terminal.scrollTop = terminal.scrollHeight;
+        _terminalSteps[source].push(step);
+        renderTerminalPaneForSource(source);
 
         // Refresh Campaign Records after the pass fully completes — at this point
         // all applyAction writes and saveWorldInfo cache-busts are guaranteed done.
         if (step.type === 'finish' || step.type === 'error') {
-            console.log(`[RPG Tracker] Lorebook Agent step "${step.type}" matched. Refreshing manifest...`);
-            refreshManifest();
-            updateAgentStatusIndicator(false);
-            if (step.type === 'finish' && step.metadata?.source !== 'map_updater' && step.metadata?.source !== 'map_evolution') {
-                console.log('[RPG Tracker] Lorebook Agent pass finished. Invoking checkAndTriggerAutoGenerations...');
+            if (MANIFEST_REFRESH_SOURCES.has(source)) {
+                refreshManifest();
+            }
+            if (AGENT_PANEL_RUNNING_SOURCES.has(source)) {
+                updateAgentStatusIndicator(false);
+            }
+            if (step.type === 'finish' && source === 'lorebook_agent') {
                 checkAndTriggerAutoGenerations(refreshAll);
             }
         }
@@ -6375,8 +6372,9 @@ ${namingRule}`;
 
     if (terminalClear) {
         terminalClear.addEventListener('click', () => {
-            _routerSteps = [];
-            if (terminal) terminal.innerHTML = '<div style="opacity: 0.4; font-size: 0.769em; font-style: italic;">Waiting for agent activity...</div>';
+            const activeTab = getActiveTerminalTab();
+            _terminalSteps[activeTab] = [];
+            renderTerminalPaneForSource(activeTab);
         });
     }
 
@@ -6388,6 +6386,25 @@ ${namingRule}`;
             runtimeState.renderRouterUI();
         });
     }
+
+    wireAgentTerminalDirectPrompts({
+        agentPanel,
+        getSettings,
+        saveSettings,
+        agentsBusy: () => isRouterRunning() || isMapUpdaterRunning() || isMapEvolutionRunning(),
+        getNarrativeBlocks,
+        runRouterPass,
+        sendDirectPrompt,
+        runMapUpdaterPass,
+        runMapEvolutionPass,
+        listMappedEvolutionSites,
+        promptMappedEvolutionSites,
+        runMapArchitect,
+        inferMapArchitectArgs,
+        escapeHtml,
+        updateAgentStatusIndicator,
+        isRouterRunning,
+    });
 
 
 

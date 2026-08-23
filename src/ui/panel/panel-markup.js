@@ -1,4 +1,6 @@
 /** Produces the static Tracker and Lorebook Agent panel structure. */
+import { AGENT_TERMINAL_TABS, resolveActiveTerminalTab } from './agent-terminal.js';
+
 export function buildPanelMarkup({ settings, agentPanelCollapsedClass }) {
     return `
             <div class="rt-resizer-tr" id="rt-resizer-tr" title="Resize from top-right"></div>
@@ -194,29 +196,94 @@ export function buildPanelMarkup({ settings, agentPanelCollapsedClass }) {
                         <button id="rt-agent-add-custom-tag" style="width: 100%; background: #333; border: 1px solid #444; color: #ddd; font-size: 0.769em; padding: 2px; border-radius: 3px; cursor: pointer; margin-top: 4px; flex-shrink: 0;">+ Add Custom Tag</button>
                     </div>
 
-                    <!-- Console Collapsible Header -->
+                    <!-- Terminal/Direct Prompt Collapsible Header -->
                     <div id="rt-agent-console-header" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; cursor: pointer; padding-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.08); user-select: none; flex-shrink: 0;">
                         <div style="font-weight: bold; font-size: 0.846em; display: flex; align-items: center; gap: 6px; color: var(--rt-text-muted);">
-                            <i class="fa-solid ${settings.agentConsoleOpen !== false ? 'fa-chevron-down' : 'fa-chevron-right'}" id="rt-agent-console-toggle-icon"></i> Console
+                            <i class="fa-solid ${settings.agentConsoleOpen !== false ? 'fa-chevron-down' : 'fa-chevron-right'}" id="rt-agent-console-toggle-icon"></i> Terminal/Direct Prompt
                         </div>
                     </div>
 
-                    <!-- Console Section Drawer -->
+                    <!-- Terminal/Direct Prompt Section Drawer -->
                     <div id="rt-agent-console-drawer" style="display: ${settings.agentConsoleOpen !== false ? 'block' : 'none'}; margin-bottom: 10px; flex-shrink: 0;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
-                            <div style="font-weight: bold; opacity: 0.8; font-size: 0.846em;">Lorebook Terminal:</div>
-                            <button id="rt-agent-router-terminal-clear" style="background: transparent; border: none; color: #ff5555; font-size: 0.692em; cursor: pointer; opacity: 0.7;">Clear</button>
+                        ${(() => {
+            const activeTab = resolveActiveTerminalTab(settings.agentTerminalTab);
+            const directConfig = {
+                state_tracker: {
+                    draft: settings.stateTrackerDirectPrompt || '',
+                    lookback: settings.directPromptContext ?? 5,
+                    lookbackMax: 50,
+                    lookbackMin: 0,
+                    placeholder: 'Instruct the tracker model… (Enter to send, Shift+Enter for newline)',
+                },
+                lorebook_agent: {
+                    draft: settings.routerDirectPrompt || '',
+                    lookback: settings.routerDirectLookback || 10,
+                    lookbackMax: 100,
+                    lookbackMin: 1,
+                    placeholder: 'Instruct the Lorebook Agent… (Enter to send, Shift+Enter for newline)',
+                },
+                map_updater: {
+                    draft: settings.mapUpdaterDirectPrompt || '',
+                    lookback: settings.mapUpdaterDirectLookback ?? 10,
+                    lookbackMax: 100,
+                    lookbackMin: 0,
+                    placeholder: 'Instruct Map Updater for the active map… (Enter to send, Shift+Enter for newline)',
+                },
+                map_evolution: {
+                    draft: settings.mapEvolutionDirectPrompt || '',
+                    lookback: settings.mapEvolutionDirectLookback ?? 10,
+                    lookbackMax: 100,
+                    lookbackMin: 0,
+                    placeholder: 'Instruct Map Evolution… (Enter to send, Shift+Enter for newline)',
+                },
+                map_architect: {
+                    draft: settings.mapArchitectDirectPrompt || '',
+                    lookback: settings.mapArchitectDirectLookback ?? 10,
+                    lookbackMax: 100,
+                    lookbackMin: 0,
+                    placeholder: 'Instruct Map Architect for the current site… (Enter to send, Shift+Enter for newline)',
+                },
+            };
+            const tabButtons = AGENT_TERMINAL_TABS.map(tab => {
+                const isActive = tab.id === activeTab;
+                return `<button type="button" class="rt-agent-view-mode-btn rt-agent-terminal-tab-btn${isActive ? ' rt-agent-view-mode-btn-active' : ''}" data-terminal-tab="${tab.id}" role="tab" aria-selected="${isActive ? 'true' : 'false'}">${tab.label}</button>`;
+            }).join('');
+            const panes = AGENT_TERMINAL_TABS.map(tab => {
+                const isActive = tab.id === activeTab;
+                const cfg = directConfig[tab.id] || { draft: '', lookback: 10, lookbackMax: 100, lookbackMin: 0, placeholder: 'Instruct…' };
+                return `<div id="rt-agent-terminal-${tab.id}" class="rt-agent-terminal-pane${isActive ? ' rt-agent-terminal-pane-active' : ''}">
+                            <div class="rt-agent-terminal-shell">
+                                <div class="rt-agent-terminal-feed"></div>
+                                <div class="rt-agent-terminal-direct-bar">
+                                    <span class="rt-agent-terminal-direct-prompt" aria-hidden="true">$</span>
+                                    <textarea class="rt-agent-terminal-direct-input" id="rt-terminal-direct-${tab.id}" rows="1" data-terminal-tab="${tab.id}" placeholder="${cfg.placeholder}">${cfg.draft}</textarea>
+                                    <div class="rt-agent-terminal-direct-actions">
+                                        <label class="rt-lookback-field rt-agent-terminal-direct-lookback-label" title="Recent message lookback for this direct run">
+                                            <span class="rt-lookback-field-label rt-agent-terminal-direct-lookback-text">Lookback:</span>
+                                            <input type="text" inputmode="numeric" pattern="[0-9]*" class="rt-lookback-field-input rt-agent-terminal-direct-lookback" id="rt-terminal-direct-lookback-${tab.id}" data-terminal-tab="${tab.id}" min="${cfg.lookbackMin}" max="${cfg.lookbackMax}" value="${cfg.lookback}">
+                                        </label>
+                                        <button type="button" class="rt-agent-terminal-direct-run" data-terminal-tab="${tab.id}" title="Run command">↵</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>`;
+            }).join('');
+            return `
+                        <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 5px;">
+                            <div class="rt-agent-view-mode-switch rt-agent-terminal-tabs" id="rt-agent-terminal-tabs" role="tablist" aria-label="Terminal/Direct Prompt">${tabButtons}</div>
+                            <button id="rt-agent-terminal-clear" style="background: transparent; border: none; color: #ff5555; font-size: 0.692em; cursor: pointer; opacity: 0.7; flex-shrink: 0;">Clear</button>
                         </div>
-                        <div id="rt-agent-router-terminal" style="background: var(--rt-card-bg); border: var(--rt-border); border-radius: 4px; padding: 8px; min-height: 80px; max-height: 200px; overflow-y: auto; margin-bottom: 10px; font-family: var(--rt-font-mono);">
-                            <div style="opacity: 0.4; font-size: 0.769em; font-style: italic; color: var(--rt-text-muted);">Waiting for agent activity...</div>
-                        </div>
+                        <div id="rt-agent-terminal-panes">${panes}</div>`;
+        })()}
 
+                        <div id="rt-agent-terminal-log-history" style="display: ${resolveActiveTerminalTab(settings.agentTerminalTab) === 'lorebook_agent' ? 'block' : 'none'};">
                         <hr style="border-color: rgba(255,255,255,0.05); margin: 10px 0;">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
                             <div style="font-weight: bold; opacity: 0.8; font-size: 0.846em;">Agent Log History:</div>
                             <button id="rt-agent-router-log-clear" style="background: transparent; border: none; color: #ff5555; font-size: 0.692em; cursor: pointer; opacity: 0.7;">Clear</button>
                         </div>
                         <div id="rt-agent-router-log" style="display: flex; flex-direction: column; gap: 5px; margin-bottom: 15px; max-height: 150px; overflow-y: auto;">
+                        </div>
                         </div>
                     </div>
 
@@ -362,16 +429,6 @@ export function buildPanelMarkup({ settings, agentPanelCollapsedClass }) {
                         </div>
                     </div>
                 </div>
-                <div class="rpg-tracker-prompt-bar" id="rt-agent-prompt-bar" style="display:none; border-top: var(--rt-border); box-sizing: border-box;">
-                    <textarea class="rpg-tracker-prompt-input" id="rt-agent-prompt-input" rows="2" placeholder="Instruct the agent model… (Enter to send, Shift+Enter for newline)">${settings.routerDirectPrompt || ''}</textarea>
-                    <div style="display: flex; flex-direction: column; gap: 4px; align-items: center; justify-content: flex-end;">
-                        <div class="rt-prompt-ctx-control" style="font-size: 0.692em; display: flex; flex-direction: column; align-items: center; gap: 0;" title="Direct lookback: last N chat messages (user and assistant) for this manual run.">
-                            <input type="text" inputmode="numeric" pattern="[0-9]*" id="rt-agent-prompt-context-val" value="${settings.routerDirectLookback || 10}" min="1" max="100" style="width: 28px; height: 16px; font-size: 0.692em; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); color: white; border-radius: 3px; text-align: center; padding: 0;">
-                            <span style="opacity: 0.5; font-size: 8px; line-height: 1;">msg</span>
-                        </div>
-                        <button class="rpg-tracker-prompt-send" id="rt-agent-prompt-send" title="Run command">▶</button>
-                    </div>
-                </div>
                 <div class="rpg-tracker-footer" id="rt-agent-footer">
                     <div class="rt-footer-starfield" aria-hidden="true"></div>
                     <div class="rt-agent-footer-left">
@@ -386,7 +443,6 @@ export function buildPanelMarkup({ settings, agentPanelCollapsedClass }) {
                     </div>
                     <div class="rt-agent-footer-right">
                         <div id="rt-agent-last-run"></div>
-                        <button class="rpg-tracker-icon-btn rt-footer-prompt-btn" id="rt-agent-prompt-btn" title="Toggle direct prompt">💬</button>
                     </div>
                 </div>
                 <div class="rt-resizer-br" id="rt-agent-resizer-br" title="Resize from bottom-right"></div>
@@ -404,11 +460,11 @@ export function buildPanelMarkup({ settings, agentPanelCollapsedClass }) {
             </div>
             <div class="rpg-tracker-prompt-bar" id="rpg-tracker-prompt-bar" style="display:none;">
                 <textarea class="rpg-tracker-prompt-input" id="rpg-tracker-prompt-input" rows="2" placeholder="Instruct the tracker model… (Enter to send, Shift+Enter for newline)"></textarea>
-                <div style="display: flex; flex-direction: column; gap: 4px; align-items: center; justify-content: flex-end;">
-                    <div class="rt-prompt-ctx-control" style="font-size: 0.692em; display: flex; flex-direction: column; align-items: center; gap: 0;" title="Context: number of recent messages to include">
-                        <input type="text" inputmode="numeric" pattern="[0-9]*" id="rt-prompt-context-val" value="${settings.directPromptContext || 5}" min="0" max="50" style="width: 28px; height: 16px; font-size: 0.692em; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); color: white; border-radius: 3px; text-align: center; padding: 0;">
-                        <span style="opacity: 0.5; font-size: 8px; line-height: 1;">msg</span>
-                    </div>
+                <div class="rpg-tracker-prompt-actions">
+                    <label class="rt-lookback-field rt-prompt-ctx-control" title="Lookback: number of recent messages to include">
+                        <span class="rt-lookback-field-label">Lookback:</span>
+                        <input type="text" inputmode="numeric" pattern="[0-9]*" class="rt-lookback-field-input" id="rt-prompt-context-val" value="${settings.directPromptContext || 5}" min="0" max="50">
+                    </label>
                     <button class="rpg-tracker-prompt-send" id="rpg-tracker-prompt-send" title="Send instruction">▶</button>
                 </div>
             </div>

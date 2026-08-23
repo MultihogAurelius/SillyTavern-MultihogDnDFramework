@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { formatDungeonMapForUpdater, resolveBuildingIntentPopulationTarget, resolveBuildingPopulationTarget } from '../dungeon-reality.js';
 import { DEFAULT_MAP_UPDATER_SYSTEM_PROMPT } from '../map-updater-prompt.js';
-import { validateBuildingPopulationTransaction } from '../map-updater-lib.js';
+import { DEFAULT_MAP_UPDATER_DIRECT_SYSTEM_PROMPT, selectMapUpdaterSystemPrompt } from '../map-updater-direct-prompt.js';
+import { validateBuildingPopulationTransaction, validatePartyMemberRemovalTransaction } from '../map-updater-lib.js';
 import {
     extractPartyMemberNames,
     formatPartyRosterForMapUpdater,
@@ -77,6 +78,51 @@ describe('Map Updater', () => {
         const updater = readFileSync(new URL('../map-updater.js', import.meta.url), 'utf8');
         expect(updater).toContain('if (value.noop === true) return true');
         expect(updater).toContain('return Array.isArray(value.operations) && value.operations.length === 0');
+    });
+
+    it('uses a compact direct-command prompt without autonomous updater policy', () => {
+        expect(DEFAULT_MAP_UPDATER_DIRECT_SYSTEM_PROMPT.length)
+            .toBeLessThan(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT.length / 3);
+        expect(DEFAULT_MAP_UPDATER_DIRECT_SYSTEM_PROMPT).toContain('Apply the user\'s explicit instruction');
+        expect(DEFAULT_MAP_UPDATER_DIRECT_SYSTEM_PROMPT).toContain('Make only the minimum changes needed');
+        expect(DEFAULT_MAP_UPDATER_DIRECT_SYSTEM_PROMPT).toContain('Do not change anything the instruction did not ask to change');
+        expect(DEFAULT_MAP_UPDATER_DIRECT_SYSTEM_PROMPT).toContain('REMOVE_ASSET');
+        expect(DEFAULT_MAP_UPDATER_DIRECT_SYSTEM_PROMPT).toContain('detail is the lasting on-map description');
+        expect(DEFAULT_MAP_UPDATER_DIRECT_SYSTEM_PROMPT).toContain('Never ADD_ASSET with only a bare name');
+        expect(DEFAULT_MAP_UPDATER_DIRECT_SYSTEM_PROMPT).toContain('"detail":"A palm-sized leaded-glass seal');
+        expect(DEFAULT_MAP_UPDATER_DIRECT_SYSTEM_PROMPT).not.toContain('TIME MECHANICS');
+        expect(DEFAULT_MAP_UPDATER_DIRECT_SYSTEM_PROMPT).not.toContain('KIND: SETTLEMENT');
+        expect(DEFAULT_MAP_UPDATER_DIRECT_SYSTEM_PROMPT).not.toContain('BUILDING entry and Asset population');
+        expect(DEFAULT_MAP_UPDATER_DIRECT_SYSTEM_PROMPT).not.toContain('Streetscape observation');
+        expect(selectMapUpdaterSystemPrompt('Remove the chair.', 'NORMAL')).toBe(DEFAULT_MAP_UPDATER_DIRECT_SYSTEM_PROMPT);
+        expect(selectMapUpdaterSystemPrompt('   ', 'NORMAL')).toBe('NORMAL');
+    });
+
+    it('requires every PARTY-matching CREATURE to be removed while leaving residents and GROUPs alone', () => {
+        const map = {
+            assets: [
+                { id: 'seraphina', kind: 'CREATURE', name: 'Seraphina Nightshade' },
+                { id: 'kael', kind: 'CREATURE', name: 'Kael' },
+                { id: 'resident', kind: 'CREATURE', name: 'Odran' },
+                { id: 'kael-patrol', kind: 'GROUP', name: 'Kael Patrol' },
+            ],
+        };
+        const memo = '[PARTY]\nSeraphina: 42/42 HP\nStatus: Healthy\nKael: 30/30 HP\nStatus: Healthy\n[/PARTY]';
+
+        const noopIssues = validatePartyMemberRemovalTransaction({ noop: true }, map, memo);
+        expect(noopIssues).toHaveLength(2);
+        expect(noopIssues.every(issue => issue.code === 'PARTY_CREATURE_MUST_BE_REMOVED')).toBe(true);
+        expect(noopIssues.map(issue => issue.hint).join('\n')).toContain('seraphina');
+        expect(noopIssues.map(issue => issue.hint).join('\n')).toContain('kael');
+        expect(noopIssues.map(issue => issue.hint).join('\n')).not.toContain('resident');
+        expect(noopIssues.map(issue => issue.hint).join('\n')).not.toContain('kael-patrol');
+
+        expect(validatePartyMemberRemovalTransaction({
+            operations: [
+                { op: 'REMOVE_ASSET', asset_id: 'seraphina' },
+                { op: 'REMOVE_ASSET', asset_id: 'kael' },
+            ],
+        }, map, memo)).toEqual([]);
     });
 
     it('widens auto RECENT STORY to at least 10 user turns for first-entry BUILDING population', () => {
@@ -240,7 +286,7 @@ describe('Map Updater', () => {
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('KIND: SETTLEMENT');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('ADD_ASSET kind BUILDING');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('OBJECT is props only');
-        expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('CreateAreaMap is the sole promotion signal');
+        expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('CreateAreaMap is the sole gateway creation and promotion signal');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('If CURRENT LOCATION names an untracked ordinary structure');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('Positional footer tails');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('behind the general store');
@@ -257,7 +303,7 @@ describe('Map Updater', () => {
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('Bullion General Store');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('short footer names still match longer BUILDING assets');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('external combat tracker (not shown to you.)');
-        expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('map-worthy child');
+        expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('gateways may exist on SETTLEMENT, DUNGEON, or INTERIOR maps');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('REMOVE vs DESTROYED (both valid');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('Default for kills and destroyed things');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('REMOVE_ASSET is additional, not a substitute for DESTROYED');
@@ -265,6 +311,7 @@ describe('Map Updater', () => {
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('"area_id":"shrine-quarter"');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('Never write {"type":"ADD_ASSET","asset":{...}}');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('Never ADD_ASSET the player or anyone listed in the supplied [PARTY] names');
+        expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('If an existing CREATURE asset matches a supplied [PARTY] name, REMOVE_ASSET');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('Never ADD_ASSET six identical ghouls');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('TIME MECHANICS');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('set duration to ""');
@@ -290,6 +337,9 @@ describe('Map Updater', () => {
         expect(updater).toContain('(MANDATORY THIS PASS)');
         expect(updater).toContain('shouldForceBuildingPopulationPass');
         expect(updater).toContain('PARTY_MEMBER_NOT_AN_ASSET');
+        expect(updater).toContain('SITE EXIT CLEANUP (MANDATORY REVIEW)');
+        expect(updater).toContain("trigger === 'site_exit'");
+        expect(updater).toContain('deferWatermark');
         expect(updater).toContain('mapRuntimeConnectionSource');
         expect(updater).not.toContain('mapArchitectConnectionSource');
         expect(updater).toContain('mapUpdaterMaxTokens');
@@ -300,6 +350,13 @@ describe('Map Updater', () => {
         expect(updater).toContain('siteRoot = null');
         expect(updater).toContain('loadDungeonMapContextForSite');
         expect(updater).toContain('DIRECT INSTRUCTION (THIS PASS ONLY)');
+        expect(updater).toContain('selectMapUpdaterSystemPrompt');
+        expect(updater).toContain("const directPass = !!instruction");
+        expect(updater).toContain('directPass || inspectorPass');
+        expect(updater).toContain('DIRECT INSTRUCTION (AUTHORITATIVE SCOPE)');
+        expect(updater).toContain('Do not derive extra maintenance work from it');
+        expect(updater).toContain("directPass\n                ? []");
+        expect(updater).toContain('formatLocationSection(loaded, { inspectorPass, exitPass, previousLocation })');
         expect(updater).toContain('export async function onMapUpdaterUserMessage(messageId)');
         expect(updater).toContain('resolveBuildingIntentPopulationTarget');
         expect(updater).toContain('if (settings.mapUpdaterEnabled === false && !isManual)');
@@ -310,12 +367,20 @@ describe('Map Updater', () => {
         const updaterLib = readFileSync(new URL('../map-updater-lib.js', import.meta.url), 'utf8');
         expect(updaterLib).toContain('export function resolveMapUpdaterStoryWindow');
         expect(updaterLib).toContain('export const BUILDING_POPULATION_MIN_LOOKBACK_TURNS = 10');
+        expect(updaterLib).toContain('PARTY_CREATURE_MUST_BE_REMOVED');
         expect(hooks).toContain('runMapUpdaterPass');
         expect(hooks).toContain('mapUpdaterRunEvery');
         expect(hooks).toContain('maybeRollbackMapUpdaterForSwipe');
+        expect(hooks).toContain('mapUpdaterLastSiteRoot');
+        expect(hooks).toContain('mapUpdaterPendingExitRoot');
+        expect(hooks).toContain("trigger: 'site_exit'");
+        expect(hooks).toContain("exitResult?.skipped === 'busy'");
+        expect(hooks).toContain("exitResult?.skipped === 'stopped'");
         expect(hooks).toContain('maybeRunMapEvolution');
         const index = readFileSync(new URL('../index.js', import.meta.url), 'utf8');
         expect(index).toContain('event_types.MESSAGE_SENT, onMapUpdaterUserMessage');
+        expect(index).toContain("s.mapUpdaterLastSiteRoot = p.mapUpdaterLastSiteRoot || ''");
+        expect(index).toContain("s.mapUpdaterPendingExitRoot = p.mapUpdaterPendingExitRoot || ''");
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).not.toContain('EVOLVED');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).not.toContain('Map Evolution');
         expect(settingsMarkup).toContain('id="rpg_map_updater_run_every"');

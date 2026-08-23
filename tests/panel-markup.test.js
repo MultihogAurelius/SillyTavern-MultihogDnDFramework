@@ -36,6 +36,20 @@ describe('panel markup', () => {
         expect(markup.indexOf('rt-agent-map-evo-header')).toBeLessThan(markup.indexOf('rt-agent-world-header'));
         expect(markup).toContain('Visuals/Map');
         expect(markup).not.toContain('>Visualization Mode<');
+        expect(markup).toContain('id="rt-agent-terminal-tabs"');
+        expect(markup).toContain('id="rt-agent-terminal-lorebook_agent"');
+        expect(markup).toContain('id="rt-agent-terminal-state_tracker"');
+        expect(markup).toContain('id="rt-agent-terminal-map_updater"');
+        expect(markup).toContain('id="rt-agent-terminal-map_evolution"');
+        expect(markup).toContain('id="rt-agent-terminal-map_architect"');
+        expect(markup).toContain('id="rt-agent-terminal-log-history"');
+        expect(markup).toContain('Terminal/Direct Prompt');
+        expect(markup).toContain('id="rt-terminal-direct-lorebook_agent"');
+        expect(markup).toContain('id="rt-terminal-direct-map_evolution"');
+        expect(markup).toContain('id="rt-terminal-direct-map_architect"');
+        expect(markup).not.toContain('Lorebook Terminal:');
+        expect(markup).not.toContain('id="rt-agent-prompt-btn"');
+        expect(markup).not.toContain('id="rt-agent-prompt-bar"');
     });
 
     it('renders Map Evolution and World Progression agent controls from settings', () => {

@@ -1271,12 +1271,21 @@
 /* ĂÂ˘Ă˘âŹÂĂ˘âÂŹĂÂ˘Ă˘âŹÂĂ˘âÂŹ Direct Prompt Bar ĂÂ˘Ă˘âŹÂĂ˘âÂŹĂÂ˘Ă˘âŹÂĂ˘âÂŹ */
 .rpg-tracker-prompt-bar {
     display: flex;
-    gap: 6px;
+    gap: 8px;
     padding: 6px 8px;
     border-top: 1px solid rgba(255, 255, 255, 0.07);
     background: rgba(0, 0, 0, 0.25);
     flex-shrink: 0;
-    align-items: flex-end;
+    align-items: center;
+}
+
+.rpg-tracker-prompt-actions {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    flex-shrink: 0;
 }
 
 .rpg-tracker-prompt-input {
@@ -6156,6 +6165,227 @@ textarea.rt-cr-input {
     50% { transform: scale(1.15); opacity: 0.75; }
 }
 
+/* Agent Console tabbed terminal */
+.rt-agent-terminal-tabs {
+    flex: 1;
+    min-width: 0;
+}
+
+.rt-agent-terminal-tabs .rt-agent-view-mode-btn {
+    font-size: 0.62em;
+    padding: 4px 2px;
+    letter-spacing: 0;
+}
+
+.rt-agent-terminal-pane {
+    display: none;
+    margin-bottom: 10px;
+}
+
+.rt-agent-terminal-pane-active {
+    display: block;
+}
+
+.rt-agent-terminal-shell {
+    display: flex;
+    flex-direction: column;
+    background: rgba(0, 0, 0, 0.42);
+    border: var(--rt-border);
+    border-radius: 4px;
+    overflow: hidden;
+    font-family: var(--rt-font-mono);
+}
+
+.rt-agent-terminal-feed {
+    height: 148px;
+    min-height: 148px;
+    max-height: 148px;
+    overflow-y: auto;
+    padding: 6px 10px;
+    color: var(--rt-text);
+    box-sizing: border-box;
+}
+
+.rt-agent-terminal-direct-bar {
+    display: flex;
+    gap: 6px;
+    align-items: flex-start;
+    padding: 4px 8px 6px;
+    background: transparent;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    flex-shrink: 0;
+}
+
+.rt-agent-terminal-direct-prompt {
+    flex-shrink: 0;
+    margin-top: 1px;
+    font-family: var(--rt-font-mono);
+    font-size: 0.85em;
+    font-weight: bold;
+    color: #2ecc71;
+    line-height: 1.35;
+    user-select: none;
+}
+
+.rt-agent-terminal-direct-input {
+    flex: 1;
+    min-width: 0;
+    height: 1.35em;
+    min-height: 1.35em;
+    max-height: 6.75em;
+    resize: none;
+    overflow-y: hidden;
+    font-family: var(--rt-font-mono);
+    font-size: 0.8em;
+    line-height: 1.35;
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    outline: none !important;
+    color: var(--rt-text, #e8e8e8) !important;
+    padding: 0 !important;
+    margin: 0;
+    field-sizing: content;
+}
+
+.rt-agent-terminal-direct-input::placeholder {
+    color: var(--rt-text-muted, #777);
+    opacity: 0.55;
+    font-style: italic;
+}
+
+.rt-agent-terminal-direct-input:focus {
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+.rt-agent-terminal-direct-actions {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 4px;
+    flex-shrink: 0;
+    padding-top: 0;
+}
+
+.rt-lookback-field {
+    display: inline-flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 4px;
+    margin: 0;
+    opacity: 1;
+    white-space: nowrap;
+    font-size: 0.65em;
+    font-family: Consolas, Monaco, monospace !important;
+    color: #c8c8c8 !important;
+}
+
+.rt-lookback-field-label {
+    color: #c8c8c8 !important;
+    font-family: Consolas, Monaco, monospace !important;
+    font-size: inherit;
+    opacity: 1;
+}
+
+.rt-lookback-field-input {
+    width: 28px;
+    height: 16px;
+    font-size: inherit;
+    font-family: Consolas, Monaco, monospace !important;
+    background: #1a1a1a !important;
+    border: 1px solid #666 !important;
+    color: #e8e8e8 !important;
+    border-radius: 2px;
+    text-align: center;
+    padding: 0;
+    margin: 0;
+    box-shadow: none !important;
+    outline: none !important;
+    caret-color: #e8e8e8;
+}
+
+.rt-lookback-field-input:focus {
+    border-color: #999 !important;
+    background: #222 !important;
+    color: #e8e8e8 !important;
+}
+
+/* Alias legacy class names onto the shared lookback field styles */
+.rt-agent-terminal-direct-lookback-label,
+.rt-map-updater-direct-lookback-label,
+.rt-prompt-ctx-control {
+    display: inline-flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 4px;
+    margin: 0;
+    opacity: 1;
+    white-space: nowrap;
+    font-size: 0.65em;
+    font-family: Consolas, Monaco, monospace !important;
+    color: #c8c8c8 !important;
+}
+
+.rt-agent-terminal-direct-lookback-text {
+    color: #c8c8c8 !important;
+    font-family: Consolas, Monaco, monospace !important;
+    font-size: inherit;
+    opacity: 1;
+}
+
+.rt-agent-terminal-direct-lookback,
+.rt-map-updater-direct-lookback,
+.rt-prompt-ctx-control .rt-lookback-field-input,
+#rt-prompt-context-val {
+    width: 28px;
+    height: 16px;
+    font-size: inherit;
+    font-family: Consolas, Monaco, monospace !important;
+    background: #1a1a1a !important;
+    border: 1px solid #666 !important;
+    color: #e8e8e8 !important;
+    border-radius: 2px;
+    text-align: center;
+    padding: 0;
+    margin: 0;
+    box-shadow: none !important;
+    outline: none !important;
+    caret-color: #e8e8e8;
+}
+
+.rt-agent-terminal-direct-lookback:focus,
+.rt-map-updater-direct-lookback:focus,
+#rt-prompt-context-val:focus {
+    border-color: #999 !important;
+    background: #222 !important;
+    color: #e8e8e8 !important;
+}
+
+.rt-agent-terminal-direct-run {
+    min-width: 18px;
+    padding: 0 2px;
+    line-height: 1.2;
+    font-size: 0.85em;
+    font-family: var(--rt-font-mono);
+    background: transparent;
+    border: none;
+    color: var(--rt-text-muted);
+    cursor: pointer;
+    opacity: 0.7;
+}
+
+.rt-agent-terminal-direct-run:hover {
+    color: #2ecc71;
+    opacity: 1;
+}
+
+.rt-agent-terminal-pane:not(.rt-agent-terminal-pane-active) .rt-agent-terminal-direct-bar {
+    display: none;
+}
+
 /* ĂÂ˘Ă˘âŹÂĂ˘âÂŹĂÂ˘Ă˘âŹÂĂ˘âÂŹ Connection Settings Panels ĂÂ˘Ă˘âŹÂĂ˘âÂŹĂÂ˘Ă˘âŹÂĂ˘âÂŹ */
 /* Central Connections & Models settings */
 .rt-connections-models-intro {
@@ -8058,21 +8288,6 @@ textarea.rt-cr-input {
     box-sizing: border-box;
     line-height: 1.35;
     padding: 5px 8px;
-}
-.rt-map-updater-direct-lookback-label {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 0.72em;
-    opacity: 0.8;
-    margin: 0;
-}
-.rt-map-updater-direct-lookback {
-    width: 34px;
-    text-align: center;
-    font-size: 0.78em;
-    padding: 2px 4px;
-    margin: 0;
 }
 .rt-map-updater-direct-status {
     font-size: 0.72em;

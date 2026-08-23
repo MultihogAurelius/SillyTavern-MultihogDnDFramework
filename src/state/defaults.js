@@ -107,6 +107,8 @@ export function buildDefaultSettings() {
 
         agentConsoleOpen: true,
 
+        agentTerminalTab: 'lorebook_agent',
+
         agentModulesOpen: true,
 
         agentMapEvolutionOpen: false,
@@ -541,6 +543,8 @@ You may be asked to use Markers: ((PLS)), ((B)), ((XB)), ((BDG)), ((HGT)). These
         lookbackMessages: 2,
 
         directPromptContext: 5,
+
+        stateTrackerDirectPrompt: '',
 
         historyIndex: -1,
 
@@ -1376,11 +1380,23 @@ Rules:
 
         mapUpdaterLastRunAt: 0,
 
+        mapUpdaterLastSiteRoot: '',
+
+        mapUpdaterPendingExitRoot: '',
+
         mapUpdaterDirectPrompt: '',
 
         mapUpdaterDirectLookback: 10,
 
         mapUpdaterDirectPromptOpen: false,
+
+        mapEvolutionDirectPrompt: '',
+
+        mapEvolutionDirectLookback: 10,
+
+        mapArchitectDirectPrompt: '',
+
+        mapArchitectDirectLookback: 10,
 
         mapEvolutionEnabled: true,
 
@@ -1556,7 +1572,7 @@ You may be asked to use Markers: ((PLS)), ((B)), ((XB)), ((BDG)), ((HGT)). These
 
 /** Latest settings migration version — factory reset skips legacy upgrade paths at or below this. */
 
-export const FACTORY_SETTINGS_VERSION = '2026.8.24.14';
+export const FACTORY_SETTINGS_VERSION = '2026.8.24.17';
 
 
 /** Remove extension UI keys from localStorage so a factory reset does not rehydrate stale panel state. */

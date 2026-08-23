@@ -39,7 +39,8 @@ const MAP_SECTION_RE = /\[MAP\]([\s\S]*?)\[\/MAP\]/i;
 const AREA_KNOWLEDGE = ['UNREVEALED', 'DISCOVERED', 'VISITED'];
 const ASSET_KNOWLEDGE = ['UNREVEALED', 'SUSPECTED', 'KNOWN'];
 const ASSET_KINDS = ['CREATURE', 'GROUP', 'TRAP', 'HAZARD', 'OBJECT', 'BUILDING', 'SUBDUNGEON', 'SUBINTERIOR', 'LOOT', 'BARRIER', 'ALARM', 'EFFECT', 'OTHER'];
-const SETTLEMENT_ONLY_ASSET_KINDS = ['BUILDING', 'SUBDUNGEON', 'SUBINTERIOR'];
+const SETTLEMENT_ONLY_ASSET_KINDS = ['BUILDING'];
+const HOSTED_GATEWAY_ASSET_KINDS = ['SUBDUNGEON', 'SUBINTERIOR'];
 const ASSET_CONTAINER_CHILD_KINDS = Object.freeze({
     BUILDING: ['CREATURE', 'GROUP', 'OBJECT', 'LOOT', 'HAZARD', 'TRAP'],
     CREATURE: ['OBJECT', 'LOOT'],
@@ -86,6 +87,9 @@ export const MAP_KILL_STATES = KILL_STATES;
 export const MAP_ASSET_KINDS = ASSET_KINDS;
 export const MAP_ASSET_STATES = ASSET_STATES;
 export const MAP_ASSET_CONTAINER_CHILD_KINDS = ASSET_CONTAINER_CHILD_KINDS;
+export const MAP_AREA_KNOWLEDGE = AREA_KNOWLEDGE;
+export const MAP_ASSET_KNOWLEDGE = ASSET_KNOWLEDGE;
+export const MAP_CONNECTION_STATES = CONNECTION_STATES;
 const ASSET_STATE_INPUT_ENUM = [...ASSET_STATES, ...Object.keys(ASSET_STATE_ALIASES)];
 
 export function isKillState(state) {
@@ -608,7 +612,7 @@ export function canonicalizeReciprocalConnectionDetails(areas) {
  * Unlike normalizeDungeonMapDocument(), this never repairs missing topology or
  * silently invents IDs: the Map Architect gets actionable errors and retries.
  */
-export function validateDungeonMapArchitecture(raw, { site = '', entrance = '', scale = '', kind = '', threat = '' } = {}) {
+export function validateDungeonMapArchitecture(raw, { site = '', entrance = '', entranceKnowledge = 'VISITED', scale = '', kind = '', threat = '' } = {}) {
     const errors = [];
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
         return {
@@ -695,11 +699,14 @@ export function validateDungeonMapArchitecture(raw, { site = '', entrance = '', 
         else if (areaNames.has(nameKey)) errors.push(architectureError('DUPLICATE_AREA_NAME', `${path}.name`, name, 'Every area name must be distinguishable.'));
         else areaNames.add(nameKey);
         if (!AREA_KNOWLEDGE.includes(area.knowledge)) errors.push(architectureError('INVALID_AREA_KNOWLEDGE', `${path}.knowledge`, area.knowledge, `Use one of: ${AREA_KNOWLEDGE.join(', ')}.`));
-        if (index === 0 && area.knowledge !== 'VISITED') errors.push(architectureError('ENTRANCE_NOT_VISITED', `${path}.knowledge`, area.knowledge, 'The first/entrance area must be VISITED.'));
+        if (index === 0 && area.knowledge !== entranceKnowledge) errors.push(architectureError('ENTRANCE_KNOWLEDGE_MISMATCH', `${path}.knowledge`, area.knowledge, `The first/entrance area must use requested knowledge ${entranceKnowledge}.`));
         if (index > 0 && area.knowledge === 'VISITED' && !allAreasVisited) {
             errors.push(architectureError('PREMATURELY_VISITED', `${path}.knowledge`, area.knowledge, 'Only the entrance is VISITED on initial creation unless every area is VISITED for a story-established familiar site; otherwise use DISCOVERED or UNREVEALED.'));
         }
-        if (index === 0 && entrance && name && !dungeonLabelsMatch(name, entrance)) {
+        if (entranceKnowledge !== 'VISITED' && area.knowledge === 'VISITED') {
+            errors.push(architectureError('OFFSITE_AREA_VISITED', `${path}.knowledge`, area.knowledge, 'Explicit offsite structural creation does not establish that the party visited any child-map area.'));
+        }
+        if (index === 0 && entrance && name && !dungeonLabelIdentitiesMatch(name, entrance)) {
             errors.push(architectureError('ENTRANCE_MISMATCH', `${path}.name`, name, `The first area must match the requested entrance: "${entrance}".`));
         }
         if (!Array.isArray(area.geometry)) errors.push(architectureError('INVALID_GEOMETRY', `${path}.geometry`, area.geometry, 'Supply an array of durable geometry strings.'));
@@ -791,6 +798,9 @@ export function validateDungeonMapArchitecture(raw, { site = '', entrance = '', 
         if (!ASSET_KINDS.includes(asset.kind)) errors.push(architectureError('INVALID_ASSET_KIND', `${path}.kind`, asset.kind, `Use one of: ${ASSET_KINDS.join(', ')}.`));
         if (SETTLEMENT_ONLY_ASSET_KINDS.includes(asset.kind) && resolvedKind !== 'SETTLEMENT') {
             errors.push(architectureError('ASSET_KIND_NOT_ALLOWED', `${path}.kind`, asset.kind, `${asset.kind} is allowed only on SETTLEMENT maps.`));
+        }
+        if (HOSTED_GATEWAY_ASSET_KINDS.includes(asset.kind) && resolvedKind !== 'SETTLEMENT') {
+            errors.push(architectureError('RUNTIME_OWNED_GATEWAY', `${path}.kind`, asset.kind, `${asset.kind} gateways on DUNGEON/INTERIOR parents are inserted by CreateAreaMap attachment, not invented inside the new map JSON.`));
         }
         const assetState = coerceAssetState(asset.state);
         if (!ASSET_STATES.includes(assetState)) errors.push(architectureError('INVALID_ASSET_STATE', `${path}.state`, asset.state, `Use one of: ${ASSET_STATES.join(', ')}.`));
@@ -1299,7 +1309,7 @@ const EXTERIOR_RELATIVE_LOCATION_RE = /^(?:behind|beside|besides|near|outside|ar
 /** Explicit interior phrasing that should resolve to an existing structure name. */
 const INTERIOR_OF_LOCATION_RE = /^(?:inside|within|in)\s+(?:the\s+)?(.+)$/i;
 
-const SETTLEMENT_STRUCTURE_KINDS = new Set(['BUILDING', 'OBJECT', 'SUBDUNGEON', 'SUBINTERIOR']);
+const FOOTER_REFERENTIAL_STRUCTURE_KINDS = new Set(['BUILDING', 'OBJECT']);
 
 /** Word-boundary containment for landmark referents ("general store" ⊂ "Hollow Creek General Store"). */
 function dungeonLabelContainsMatch(left, right) {
@@ -1327,11 +1337,11 @@ function findSettlementInteriorAsset(map, label) {
     const text = String(label || '').trim();
     if (!text) return null;
     const exact = resolveMapAsset(map, text).asset
-        || map.assets.find(asset => dungeonLabelsMatch(asset.name, text))
+        || map.assets.find(asset => dungeonLabelIdentitiesMatch(asset.name, text))
         || null;
     if (exact) return exact;
     return map.assets.find(asset =>
-        SETTLEMENT_STRUCTURE_KINDS.has(String(asset.kind || '').toUpperCase())
+        FOOTER_REFERENTIAL_STRUCTURE_KINDS.has(String(asset.kind || '').toUpperCase())
         && dungeonLabelContainsMatch(asset.name, text)
     ) || null;
 }
@@ -1526,7 +1536,7 @@ function dungeonLabelEditDistanceMatch(left, right) {
  * site ("Forest Near the Hall of the Ember-Ancestors") must not count as inside it.
  */
 export function dungeonSiteRootsMatch(left, right) {
-    return dungeonLabelEditDistanceMatch(left, right);
+    return dungeonLabelIdentitiesMatch(left, right);
 }
 
 function locationPathMatchScore(location, siteRoot) {
@@ -1584,6 +1594,22 @@ export function dungeonLabelsMatch(left, right) {
     if (shorter.length < 8 || !longer.startsWith(shorter)) return false;
     const next = longer[shorter.length];
     return next === ' ' || (next === 's' && longer.length === shorter.length + 1);
+}
+
+/**
+ * Structural identity for map sites, areas, assets, and attachment addresses.
+ * Unlike dungeonLabelsMatch(), whole-word prefixes are never aliases: adding
+ * "Dungeon", "Interior", "Depths", etc. creates a different map cell.
+ * Small spelling drift remains acceptable only when both labels have the same
+ * number of normalized words.
+ */
+export function dungeonLabelIdentitiesMatch(left, right) {
+    const a = normalizeDungeonLabel(left);
+    const b = normalizeDungeonLabel(right);
+    if (!a || !b) return false;
+    if (a === b) return true;
+    if (a.split(/\s+/).length !== b.split(/\s+/).length) return false;
+    return dungeonLabelEditDistanceMatch(a, b);
 }
 
 /** Upgrade a prose/older JSON [MAP] section to the v3 geometry/assets model. */
@@ -1734,8 +1760,14 @@ function resolveMapArea(document, ref) {
     const normalized = normalizeDungeonLabel(received);
     const exactNames = document.areas.filter(area => normalizeDungeonLabel(area.name) === normalized);
     if (exactNames.length === 1) return { area: exactNames[0], candidates: exactNames };
-    const fuzzy = document.areas.filter(area => dungeonLabelsMatch(area.name, received));
+    const fuzzy = document.areas.filter(area => dungeonLabelIdentitiesMatch(area.name, received));
     return { area: fuzzy.length === 1 ? fuzzy[0] : null, candidates: fuzzy.length ? fuzzy : exactNames };
+}
+
+/** Resolve one structural map area without applying prose prefix/containment aliases. */
+export function resolveMapAreaIdentity(document, ref) {
+    const map = normalizeDungeonMapDocument(document, document?.site);
+    return resolveMapArea(map, ref);
 }
 
 function resolveMapAsset(document, ref) {
@@ -2006,7 +2038,11 @@ export function applyDungeonMapTransaction(document, transaction, options = {}) 
             if (kind && SETTLEMENT_ONLY_ASSET_KINDS.includes(kind) && normalizeMapSiteKind(working.kind) !== 'SETTLEMENT') {
                 errors.push(mapError('ASSET_KIND_NOT_ALLOWED', `${path}.kind`, kind, `${kind} is allowed only on SETTLEMENT maps.`));
             }
+            if (kind && HOSTED_GATEWAY_ASSET_KINDS.includes(kind)) {
+                errors.push(mapError('RUNTIME_OWNED_GATEWAY', `${path}.kind`, kind, 'CreateAreaMap is the only operation allowed to create a SUBDUNGEON/SUBINTERIOR gateway.'));
+            }
             if (!name || !kind || !state || !knowledge || !locationResult.id
+                || HOSTED_GATEWAY_ASSET_KINDS.includes(kind)
                 || (SETTLEMENT_ONLY_ASSET_KINDS.includes(kind) && normalizeMapSiteKind(working.kind) !== 'SETTLEMENT')) continue;
             const duplicateCandidates = working.assets.filter(asset => normalizeDungeonLabel(asset.name) === normalizeDungeonLabel(name) && asset.state !== 'REMOVED');
             const distinctFrom = new Set(cleanStringList(operation.distinct_from));
@@ -2061,6 +2097,14 @@ export function applyDungeonMapTransaction(document, transaction, options = {}) 
             }
             const asset = assetResult.asset;
             const previousState = asset.state;
+            if (HOSTED_GATEWAY_ASSET_KINDS.includes(asset.kind)) {
+                const forbiddenSetFields = ['name', 'state', 'behavior', 'route', 'faction', 'owner', 'duration', 'count', 'notEntered'];
+                const mutatesStructure = op !== 'SET_ASSET' || forbiddenSetFields.some(field => operation[field] !== undefined);
+                if (mutatesStructure) {
+                    errors.push(mapError('RUNTIME_OWNED_GATEWAY', `${path}.asset_id`, asset.id, 'CreateAreaMap owns gateway identity and placement. Map transactions may only update its knowledge or descriptive detail.'));
+                    continue;
+                }
+            }
             if (evidence === 'AUTONOMOUS' && !asset.behavior && !asset.route?.length) {
                 errors.push(mapError('AUTONOMY_NOT_ALLOWED', `${path}.evidence`, evidence, 'Autonomous asset changes require an explicit behavior or route on the existing asset.'));
                 continue;
@@ -2616,6 +2660,8 @@ export function listMappedSiteSummaries(sites) {
         };
         const hostSite = String(parsed?.hostSite || '').trim();
         if (hostSite) row.hostSite = hostSite;
+        const cells = (parsed?.areas || []).map(area => String(area?.name || '').trim()).filter(Boolean);
+        if (cells.length) row.cells = cells;
         rows.push(row);
     }
     rows.sort((a, b) => a.siteRoot.localeCompare(b.siteRoot, undefined, { sensitivity: 'base' }));
@@ -2629,10 +2675,10 @@ export function listMappedSiteSummaries(sites) {
 export function buildMappedSitesInjection(sites) {
     const rows = listMappedSiteSummaries(sites);
     const lines = rows.length
-        ? rows.map(row => `- ${row.siteRoot} (${row.kind}${row.hostSite ? `; inside ${row.hostSite}` : ''})`)
+        ? rows.map(row => `- ${row.siteRoot} (${row.kind}${row.hostSite ? `; inside ${row.hostSite}` : ''})${row.cells?.length ? `\n  attachTo.cell choices: ${row.cells.join(' | ')}` : ''}`)
         : ['- None.'];
     const guidance = rows.length
-        ? 'Every site below already has a private map. Do not call CreateAreaMap again for a listed map. A mapped SETTLEMENT may still contain an unmapped SUBDUNGEON/SUBINTERIOR, and an ordinary BUILDING may be deliberately promoted by a DUNGEON/INTERIOR CreateAreaMap call when it becomes map-worthy. DUNGEON_REALITY is attached while the Location footer matches a listed site, or for one turn when the player input contains the exact complete site name; this list is the complete index.'
+        ? 'Every site below already has a private map. Do not recreate one. To attach a new DUNGEON/INTERIOR from anywhere, use attachTo.site = the exact listed map path and attachTo.cell = one exact cell choice printed beneath it. No BUILDING or player movement is required; the runtime creates the SUB* gateway. SETTLEMENT, DUNGEON, and INTERIOR may host children up to three mapped levels; SETTLEMENT itself cannot be nested. DUNGEON_REALITY is attached while the footer matches a mapped site, or for one turn when player input names it exactly.'
         : 'No private maps exist yet. CreateAreaMap is allowed for a new unmapped dungeon, settlement, or significant interior.';
     return `[MAPPED_SITES — INTERNAL]\n${guidance}\n\n${lines.join('\n')}\n[/MAPPED_SITES]\n`;
 }

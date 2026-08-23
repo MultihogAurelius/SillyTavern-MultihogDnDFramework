@@ -12,25 +12,28 @@ export const CREATE_AREA_MAP_OPEN_TAG = '[CREATE_AREA_MAP]';
 export const CREATE_AREA_MAP_CLOSE_TAG = '[/CREATE_AREA_MAP]';
 
 const FENCE_RE = /\[\s*CREATE_AREA_MAP\s*\]([\s\S]*?)\[\s*\/\s*CREATE_AREA_MAP\s*\]/i;
-const KEY_LINE_RE = /^\s*[*_`]*\s*(site|site_root|footer_root|footer|root|location|name|entrance|kind|scale|threat|danger|risk|threat_level|premise|include)\s*[*_`]*\s*:\s*(.*)$/i;
+const KEY_LINE_RE = /^\s*[*_`]*\s*(site|site_root|footer_root|footer|root|location|name|entrance|kind|scale|threat|danger|risk|threat_level|premise|include|attach_to_site|attach_to_cell)\s*[*_`]*\s*:\s*(.*)$/i;
 
 /** Shipped dungeon-reality opener bullets used when text mode is live. */
 export const MAP_ARCHITECT_TEXT_OPENER_CYOA_CAVEAT = 'When emitting a [CREATE_AREA_MAP] block this turn, CYOA Mode is suspended: do not append <choices>, <button> tags, numbered options, or any other end-of-output choices — even if CYOA instructions say you MUST ALWAYS end with choices. Output the block and STOP. On every other turn, CYOA choices are required as usual.';
 
 export const MAP_ARCHITECT_TEXT_OPENER_RULES = `- When an unmapped site warrants a persistent graph, output a [CREATE_AREA_MAP] ... [/CREATE_AREA_MAP] block and STOP. You may establish the crossing in prose before the block; do not write prose after it. Do not design or emit the hidden map yourself.
 - DUNGEON is a high-risk room graph. INTERIOR is a significant lower-risk multi-room site such as a palace, headquarters, monastery, or recurring base. SETTLEMENT is the city/town/village as a whole at district scale.
-- Inside a mapped settlement, ordinary shops, inns, chapels, and houses remain BUILDING assets with no peer map. Call DUNGEON or INTERIOR for the exact building name only when it deliberately warrants promotion; CreateAreaMap is the explicit promotion signal.
+- You are a soft map editor. A nested map may be attached from anywhere without moving the player or first creating a BUILDING. Add attach_to_site (exact existing parent map) and attach_to_cell (exact existing parent AREA). site is the new child-map name; attach_to_cell is where its gateway belongs. The runtime creates/promotes SUB* and edits inactive parents. Omit both fields for a standalone map or deliberate active-cell shorthand.
+- SETTLEMENT, DUNGEON, and INTERIOR maps may host DUNGEON/INTERIOR children, up to three mapped levels total. Never nest a SETTLEMENT. Similar names are distinct: Cellar Crypt is not Cellar Crypt Dungeon.
 - Never call CreateAreaMap for a BUILDING that does not warrant a stable room graph, an OBJECT prop, a district, alley, street, wilderness, road, or countryside.
 - Wilderness, roads, countryside, and other places between mapped sites are not mapped. Do not emit a map command for travel terrain or the wilds between a city and a dungeon. Narrate those normally without a site map.
-- Use these exact field names: site, entrance, kind (DUNGEON, SETTLEMENT, or INTERIOR), scale (SMALL, MEDIUM, or LARGE), threat (NONE, LOW, MODERATE, HIGH, or DEADLY), premise, and optional include. include must be a JSON array of exact existing DUNGEON/INTERIOR names and is allowed only while first creating a SETTLEMENT.
+- Use these exact field names: site, entrance, kind (DUNGEON, SETTLEMENT, or INTERIOR), scale (SMALL, MEDIUM, or LARGE), threat (NONE, LOW, MODERATE, HIGH, or DEADLY), premise, optional attach_to_site plus attach_to_cell, and optional include. include must be a JSON array of exact existing DUNGEON/INTERIOR names and is allowed only while first creating a SETTLEMENT.
 - Scale is geographic size. Threat is site danger (enemy/trap density), never party level. A LARGE LOW ruin can be vast and empty; a SMALL DEADLY vault can be a meat grinder.
 [CREATE_AREA_MAP]
-site: Abbey Undercroft
-entrance: Cellar Landing
+site: Cellar Crypt Dungeon
+entrance: Crypt Threshold
 kind: DUNGEON
-scale: MEDIUM
+scale: SMALL
 threat: HIGH
-premise: Abandoned crypt. Ghouls. Do not contradict the cracked west stair.
+attach_to_site: Malarkey Monument
+attach_to_cell: Cellar Crypt
+premise: A funerary complex extends beyond the sealed western passage.
 [/CREATE_AREA_MAP]
 - ${MAP_ARCHITECT_TEXT_OPENER_CYOA_CAVEAT}
 - A \`[MAPPED_SITES — INTERNAL]\` block lists every existing peer map. Do not recreate a listed map. A listed SETTLEMENT may still contain an unmapped SUB* asset or a BUILDING deliberately promoted by a DUNGEON/INTERIOR call. DUNGEON_REALITY is attached while the footer matches a mapped site, or for one turn when player input names it exactly.
@@ -159,6 +162,9 @@ function normalizeArgs(raw, fallbackText = '') {
     };
     const include = normalizeInclude(raw?.include);
     if (include.length) normalized.include = include;
+    const attachSite = pickFirst(raw?.attachTo?.site, raw?.attach_to_site);
+    const attachCell = pickFirst(raw?.attachTo?.cell, raw?.attach_to_cell);
+    if (attachSite || attachCell) normalized.attachTo = { site: attachSite, cell: attachCell };
     return normalized;
 }
 
@@ -190,6 +196,8 @@ function parseKeyedBody(body, fallbackText = '') {
         scale: 'MEDIUM',
         premise: '',
         include: '',
+        attach_to_site: '',
+        attach_to_cell: '',
     };
     let currentKey = null;
     const premiseParts = [];

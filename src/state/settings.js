@@ -144,6 +144,12 @@ function getSettingsInternal(extensionSettings) {
     } else {
         localStorage.setItem('rpg_tracker_agent_console_open', String(s.agentConsoleOpen));
     }
+    if (localStorage.getItem('rpg_tracker_agent_terminal_tab') !== null) {
+        const tab = localStorage.getItem('rpg_tracker_agent_terminal_tab');
+        s.agentTerminalTab = ['state_tracker', 'lorebook_agent', 'map_updater', 'map_evolution', 'map_architect'].includes(tab) ? tab : 'lorebook_agent';
+    } else {
+        localStorage.setItem('rpg_tracker_agent_terminal_tab', String(s.agentTerminalTab || 'lorebook_agent'));
+    }
     if (localStorage.getItem('rpg_tracker_agent_map_evo_open') !== null) {
         s.agentMapEvolutionOpen = localStorage.getItem('rpg_tracker_agent_map_evo_open') === 'true';
     } else {
@@ -946,6 +952,30 @@ function getSettingsInternal(extensionSettings) {
             s.mapUpdaterSystemPrompt = DEFAULT_MAP_UPDATER_SYSTEM_PROMPT;
         }
         s.settingsVersion = '2026.8.24.9';
+    }
+
+    // 2026.8.24.15: active PARTY members cannot remain CREATURE map assets.
+    // Replace only the untouched prompt shipped by the preceding release.
+    if (isOlderThan(s.settingsVersion, '2026.8.24.15')) {
+        if (promptSignature(s.mapUpdaterSystemPrompt) === '16608:8a2263ff') {
+            s.mapUpdaterSystemPrompt = DEFAULT_MAP_UPDATER_SYSTEM_PROMPT;
+        }
+        s.settingsVersion = '2026.8.24.15';
+    }
+
+    // 2026.8.24.17: bounded recursive map hosting and explicit offsite
+    // attachTo guidance. Replace only untouched shipped map prompts.
+    if (isOlderThan(s.settingsVersion, '2026.8.24.17')) {
+        if (promptSignature(s.mapArchitectSystemPrompt) === '18194:ff193c43') {
+            s.mapArchitectSystemPrompt = DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT;
+        }
+        if (promptSignature(s.mapUpdaterSystemPrompt) === '16929:720ad8e2') {
+            s.mapUpdaterSystemPrompt = DEFAULT_MAP_UPDATER_SYSTEM_PROMPT;
+        }
+        if (promptSignature(s.mapEvolutionSystemPrompt) === '19809:21b3adcd') {
+            s.mapEvolutionSystemPrompt = DEFAULT_MAP_EVOLUTION_SYSTEM_PROMPT;
+        }
+        s.settingsVersion = '2026.8.24.17';
     }
 
     // Stamp factory version even when a release has no field rewrites

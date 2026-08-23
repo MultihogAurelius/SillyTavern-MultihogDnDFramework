@@ -19,6 +19,7 @@ import { isLocationMappingEnabled } from './src/state/section-enabled.js';
 import { parseMapArchitectResponse } from './map-architect-parser.js';
 import { DEFAULT_MAP_EVOLUTION_SYSTEM_PROMPT } from './map-evolution-prompt.js';
 import { DEFAULT_MAP_EVOLUTION_COMPRESS_SYSTEM_PROMPT } from './map-evolution-compress-prompt.js';
+import { selectMapEvolutionSystemPrompt } from './map-evolution-direct-prompt.js';
 import {
     appendEvolutionBacklogEntry,
     appendEvolutionThreads,
@@ -351,13 +352,37 @@ function triggerHeadline(trigger) {
     return 'INTERVAL RESTLESSNESS';
 }
 
-function initialUserPrompt({ site, trigger, worldReports, digest, bubble, currentLocation, partyIsHere, timeWindow, backlog, threads }) {
+function formatDirectInstructionBlock(directInstruction) {
+    const text = String(directInstruction || '').trim();
+    if (!text) return '';
+    return `\n## DIRECT INSTRUCTION (THIS PASS ONLY)\nFollow this user instruction for this evolution pass. It does not override JSON output rules or the durable-only contract.\n${text}\n`;
+}
+
+function initialUserPrompt({ site, trigger, worldReports, digest, bubble, currentLocation, partyIsHere, timeWindow, backlog, threads, directInstruction = '' }) {
     const kind = normalizeMapSiteKind(site.document?.kind);
     const bubbleLine = bubble.area
         ? `${bubble.area.id} (${bubble.area.name})${bubble.combatActive ? ' — combat is active' : ''}`
         : '(Party is not inside this site. No freeze.)';
     const reportBlock = formatWorldReportPressures(worldReports);
     const digestBlock = String(digest || '').trim() || '(None yet this period.)';
+    const instruction = String(directInstruction || '').trim();
+    if (instruction) {
+        return `${triggerHeadline(trigger)}
+Exact site root: ${site.siteRoot}
+Kind: ${kind}
+
+## PLAYER BUBBLE (FROZEN)
+${partyIsHere ? bubbleLine : '(Party is not inside this site. No freeze.)'}
+Do not MOVE, ADD, SET, or REMOVE assets in the frozen area. Do not SET_CONNECTION or SET_AREA on it.
+
+## CURRENT LOCATION
+${currentLocation || 'Unknown'}
+
+## CURRENT MAP
+${formatDungeonMapForEvolution(site.document, partyIsHere ? currentLocation : '')}
+${formatDirectInstructionBlock(instruction)}
+Output only the required JSON object. Apply only the direct instruction. Prefer {"noop":true} when the instruction cannot be applied safely.`;
+    }
     return `${triggerHeadline(trigger)}
 Exact site root: ${site.siteRoot}
 Kind: ${kind}
@@ -400,7 +425,7 @@ ${digestBlock}
 Output only the required JSON object. Include report_outcomes when World Report pressures are supplied: [{"report_id":"exact supplied id","status":"materialized|already_realized_by_play|considered"}]. Prefer durable change when in-world time has passed, but only if it makes logical and narrative sense for this site. Hours plus several living occupants may yield several operations when several would stir; idle occupants may stay. Use {"noop":true} only when this site would not plausibly stir.`;
 }
 
-function correctionPrompt({ site, trigger, worldReports, digest, bubble, currentLocation, partyIsHere, timeWindow, backlog, threads, priorOutput, errors, attempt }) {
+function correctionPrompt({ site, trigger, worldReports, digest, bubble, currentLocation, partyIsHere, timeWindow, backlog, threads, priorOutput, errors, attempt, directInstruction = '' }) {
     return `CORRECTION PASS ${attempt}
 Your previous map evolution was rejected. Return a complete corrected JSON object, not a patch. Reuse the same operation_id unless the error says to mint a new one.
 
@@ -414,7 +439,7 @@ Field reminder: Every operation needs cause. DEAD/DESTROYED also needs actor ("p
 PREVIOUS OUTPUT
 ${priorOutput}
 
-${initialUserPrompt({ site, trigger, worldReports, digest, bubble, currentLocation, partyIsHere, timeWindow, backlog, threads })}`;
+${initialUserPrompt({ site, trigger, worldReports, digest, bubble, currentLocation, partyIsHere, timeWindow, backlog, threads, directInstruction })}`;
 }
 
 function swipeSnapshotKey(ctx, message, swipeId = message?.swipe_id ?? 0) {
@@ -479,6 +504,7 @@ async function evolveOneSite({
     signal,
     snapshot,
     ctx,
+    directInstruction = '',
 }) {
     const partyIsHere = !!(currentLocation && (
         normalizeDungeonLabel(currentLocation).includes(normalizeDungeonLabel(site.siteRoot))
@@ -503,7 +529,11 @@ async function evolveOneSite({
         settings.mapEvolutionThreadsBySite,
         site.siteRoot,
     );
-    const systemPrompt = `${String(settings.mapEvolutionSystemPrompt || DEFAULT_MAP_EVOLUTION_SYSTEM_PROMPT).trim()}
+    const instruction = String(directInstruction || '').trim();
+    const basePrompt = String(settings.mapEvolutionSystemPrompt || DEFAULT_MAP_EVOLUTION_SYSTEM_PROMPT).trim();
+    const systemPrompt = instruction
+        ? selectMapEvolutionSystemPrompt(instruction, basePrompt)
+        : `${basePrompt}
 
 AUTHORITATIVE TIME-SCALE CONTRACT
 - The supplied Last Evolved timestamp is the scheduler watermark for this exact site.
@@ -528,7 +558,7 @@ AUTHORITATIVE CAUSAL THREAD CONTRACT
 - Do not invent a killer when actor is unknown.
 - Third-party killing is allowed when it makes logical and narrative sense.`;
     let prompt = initialUserPrompt({
-        site, trigger, worldReports, digest, bubble, currentLocation, partyIsHere, timeWindow, backlog, threads,
+        site, trigger, worldReports, digest, bubble, currentLocation, partyIsHere, timeWindow, backlog, threads, directInstruction: instruction,
     });
     let lastIssues = [];
     let lastOutput = '';
@@ -553,7 +583,7 @@ AUTHORITATIVE CAUSAL THREAD CONTRACT
             if (attempt < MAX_CORRECTION_ATTEMPTS) {
                 prompt = correctionPrompt({
                     site, trigger, worldReports, digest, bubble, currentLocation, partyIsHere, timeWindow, backlog, threads,
-                    priorOutput: output, errors: lastIssues, attempt: attempt + 1,
+                    priorOutput: output, errors: lastIssues, attempt: attempt + 1, directInstruction: instruction,
                 });
                 continue;
             }
@@ -582,7 +612,7 @@ AUTHORITATIVE CAUSAL THREAD CONTRACT
             if (attempt < MAX_CORRECTION_ATTEMPTS) {
                 prompt = correctionPrompt({
                     site, trigger, worldReports, digest, bubble, currentLocation, partyIsHere, timeWindow, backlog, threads,
-                    priorOutput: output, errors: lastIssues, attempt: attempt + 1,
+                    priorOutput: output, errors: lastIssues, attempt: attempt + 1, directInstruction: instruction,
                 });
                 continue;
             }
@@ -600,7 +630,7 @@ AUTHORITATIVE CAUSAL THREAD CONTRACT
             if (attempt < MAX_CORRECTION_ATTEMPTS && mapResult.retryable !== false) {
                 prompt = correctionPrompt({
                     site, trigger, worldReports, digest, bubble, currentLocation, partyIsHere, timeWindow, backlog, threads,
-                    priorOutput: output, errors: lastIssues, attempt: attempt + 1,
+                    priorOutput: output, errors: lastIssues, attempt: attempt + 1, directInstruction: instruction,
                 });
                 continue;
             }
@@ -680,6 +710,7 @@ function dungeonRootsEqual(left, right) {
  *   periodLabel?: string,
  *   isManual?: boolean,
  *   siteRoots?: string[],
+ *   directInstruction?: string,
  * }} [options]
  */
 export async function runMapEvolutionPass({
@@ -687,9 +718,11 @@ export async function runMapEvolutionPass({
     periodLabel = '',
     isManual = false,
     siteRoots = null,
+    directInstruction = '',
 } = {}) {
     hydrateWorldProgressionFromChatState();
     const settings = getSettings();
+    const instruction = String(directInstruction || '').trim();
     if (settings.mapEvolutionEnabled === false && !isManual) return { skipped: 'disabled' };
     if (!isLocationMappingEnabled(settings)) return { skipped: 'location_mapping_off' };
     if (_mapEvolutionRunning || _mapEvolutionStarting || isRouterRunning()) {
@@ -746,7 +779,7 @@ export async function runMapEvolutionPass({
                 site,
                 books,
                 trigger,
-                worldReports: pendingWorldReportsForSite(recentWorldReports, site.siteRoot, settings),
+                worldReports: instruction ? [] : pendingWorldReportsForSite(recentWorldReports, site.siteRoot, settings),
                 digest: digestLines.join('\n'),
                 currentLocation,
                 currentTime,
@@ -754,6 +787,7 @@ export async function runMapEvolutionPass({
                 signal,
                 snapshot,
                 ctx,
+                directInstruction: instruction,
             });
             results.push(siteResult);
             if (siteResult?.digestLine) digestLines.push(siteResult.digestLine);

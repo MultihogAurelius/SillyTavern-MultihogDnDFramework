@@ -345,9 +345,9 @@ export function renderDungeonMapEmbedHtml(graph, { detached = false, siteRoot = 
             <div class="rt-map-updater-direct-bar">
                 <textarea class="rt-map-updater-direct-input text_pole" rows="2" placeholder="Instruct Map Updater for this run only… (Enter to run, Shift+Enter for newline)"></textarea>
                 <div class="rt-map-updater-direct-actions">
-                    <label class="rt-map-updater-direct-lookback-label" title="Recent story lookback for this manual Map Updater run">
-                        Ctx
-                        <input type="text" inputmode="numeric" pattern="[0-9]*" class="rt-map-updater-direct-lookback" min="0" max="100" value="10">
+                    <label class="rt-lookback-field rt-map-updater-direct-lookback-label" title="Recent story lookback for this manual Map Updater run">
+                        <span class="rt-lookback-field-label">Lookback:</span>
+                        <input type="text" inputmode="numeric" pattern="[0-9]*" class="rt-lookback-field-input rt-map-updater-direct-lookback" min="0" max="100" value="10">
                     </label>
                     <button type="button" class="rt-map-updater-direct-run menu_button interactable"><i class="fa-solid fa-play"></i> Run</button>
                 </div>

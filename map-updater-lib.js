@@ -210,3 +210,33 @@ export function isPartyMemberAssetName(assetName, partyNames) {
             || name.startsWith(`${asset} `);
     });
 }
+
+/**
+ * PARTY members live in the player bubble, never as durable map occupancy.
+ * Require every matching CREATURE already on the map to be explicitly removed.
+ * GROUP assets are intentionally outside this invariant.
+ */
+export function validatePartyMemberRemovalTransaction(transaction, document, memo) {
+    const partyNames = extractPartyMemberNames(memo);
+    if (!partyNames.length) return [];
+
+    const matchingAssets = (Array.isArray(document?.assets) ? document.assets : []).filter(asset =>
+        String(asset?.kind || '').toUpperCase() === 'CREATURE'
+        && isPartyMemberAssetName(asset?.name, partyNames));
+    if (!matchingAssets.length) return [];
+
+    const removedIds = new Set((Array.isArray(transaction?.operations) ? transaction.operations : [])
+        .filter(operation => String(operation?.op || '').toUpperCase() === 'REMOVE_ASSET')
+        .map(operation => normalizeAssetRef(operation?.asset_id))
+        .filter(Boolean));
+
+    return matchingAssets.flatMap(asset => {
+        const assetId = String(asset?.id || asset?.name || '').trim();
+        if (removedIds.has(normalizeAssetRef(assetId))) return [];
+        return [{
+            code: 'PARTY_CREATURE_MUST_BE_REMOVED',
+            path: 'operations',
+            hint: `"${asset?.name || assetId}" is now an active [PARTY] member but still exists as CREATURE asset "${assetId}". Include REMOVE_ASSET with asset_id "${assetId}"; PARTY members are not map assets.`,
+        }];
+    });
+}

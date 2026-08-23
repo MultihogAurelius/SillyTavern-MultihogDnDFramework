@@ -184,6 +184,17 @@ export function persistMapUpdaterLastRunTimestamp(epochMs = Date.now()) {
     }
 }
 
+/** Persist Map Updater active-site and pending-exit bookkeeping. */
+export function persistMapUpdaterState() {
+    const s = getSettings();
+    const chatId = getActiveChatId();
+    if (s.chatLinkEnabled && chatId) {
+        saveChatState(chatId);
+    } else {
+        void requestSettingsSave();
+    }
+}
+
 /** Persist Map Evolution per-site timers and last-site watermark. */
 export function persistMapEvolutionState() {
     const s = getSettings();
@@ -458,6 +469,8 @@ export function saveChatState(chatId, opts = {}) {
         routerLastRunAt: s.routerLastRunAt ?? 0,
         mapUpdaterLastRunChatLength: s.mapUpdaterLastRunChatLength ?? 0,
         mapUpdaterLastRunAt: s.mapUpdaterLastRunAt ?? 0,
+        mapUpdaterLastSiteRoot: s.mapUpdaterLastSiteRoot || '',
+        mapUpdaterPendingExitRoot: s.mapUpdaterPendingExitRoot || '',
         mapEvolutionLastFiredBySite: JSON.parse(JSON.stringify(s.mapEvolutionLastFiredBySite || {})),
         mapEvolutionBacklogBySite: JSON.parse(JSON.stringify(s.mapEvolutionBacklogBySite || {})),
         mapEvolutionThreadsBySite: JSON.parse(JSON.stringify(s.mapEvolutionThreadsBySite || {})),
@@ -474,9 +487,14 @@ export function saveChatState(chatId, opts = {}) {
         pcCharacterBlockSeeded: !!s.pcCharacterBlockSeeded,
         routerDirectPrompt: s.routerDirectPrompt || '',
         routerDirectLookback: s.routerDirectLookback || 10,
+        stateTrackerDirectPrompt: s.stateTrackerDirectPrompt || '',
         mapUpdaterDirectPrompt: s.mapUpdaterDirectPrompt || '',
         mapUpdaterDirectLookback: s.mapUpdaterDirectLookback ?? s.routerLookback ?? 10,
         mapUpdaterDirectPromptOpen: !!s.mapUpdaterDirectPromptOpen,
+        mapEvolutionDirectPrompt: s.mapEvolutionDirectPrompt || '',
+        mapEvolutionDirectLookback: s.mapEvolutionDirectLookback ?? 10,
+        mapArchitectDirectPrompt: s.mapArchitectDirectPrompt || '',
+        mapArchitectDirectLookback: s.mapArchitectDirectLookback ?? 10,
         routerDefaultPosition: s.routerDefaultPosition ?? 4,
         routerDefaultDepth: s.routerDefaultDepth ?? 4,
         routerDefaultOrder: s.routerDefaultOrder ?? 100,

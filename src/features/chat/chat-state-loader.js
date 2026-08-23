@@ -75,6 +75,8 @@ export function createChatStateLoader({
     s.routerLastRunAt = saved.routerLastRunAt ?? 0;
     s.mapUpdaterLastRunChatLength = saved.mapUpdaterLastRunChatLength ?? 0;
     s.mapUpdaterLastRunAt = saved.mapUpdaterLastRunAt ?? 0;
+    s.mapUpdaterLastSiteRoot = saved.mapUpdaterLastSiteRoot || '';
+    s.mapUpdaterPendingExitRoot = saved.mapUpdaterPendingExitRoot || '';
     s.mapEvolutionLastFiredBySite = JSON.parse(JSON.stringify(saved.mapEvolutionLastFiredBySite || {}));
     s.mapEvolutionBacklogBySite = JSON.parse(JSON.stringify(saved.mapEvolutionBacklogBySite || {}));
     s.mapEvolutionThreadsBySite = JSON.parse(JSON.stringify(saved.mapEvolutionThreadsBySite || {}));
@@ -90,9 +92,14 @@ export function createChatStateLoader({
     s.mapEvolutionWorldReportApplications = JSON.parse(JSON.stringify(saved.mapEvolutionWorldReportApplications || {}));
     s.pcCharacterBlockSeeded = !!saved.pcCharacterBlockSeeded;
     s.routerDirectPrompt = saved.routerDirectPrompt || '';
+    s.stateTrackerDirectPrompt = saved.stateTrackerDirectPrompt || '';
     s.mapUpdaterDirectPrompt = saved.mapUpdaterDirectPrompt || '';
     s.mapUpdaterDirectLookback = saved.mapUpdaterDirectLookback ?? saved.routerLookback ?? 10;
     s.mapUpdaterDirectPromptOpen = !!saved.mapUpdaterDirectPromptOpen;
+    s.mapEvolutionDirectPrompt = saved.mapEvolutionDirectPrompt || '';
+    s.mapEvolutionDirectLookback = saved.mapEvolutionDirectLookback ?? 10;
+    s.mapArchitectDirectPrompt = saved.mapArchitectDirectPrompt || '';
+    s.mapArchitectDirectLookback = saved.mapArchitectDirectLookback ?? 10;
     s.worldProgressionLookback = saved.worldProgressionLookback ?? 20;
     s.worldProgressionHistoryLookback = saved.worldProgressionHistoryLookback ?? 0;
     s.worldProgressionInjectionPosition = saved.worldProgressionInjectionPosition ?? 4;

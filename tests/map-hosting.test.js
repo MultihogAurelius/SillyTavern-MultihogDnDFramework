@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildHostedPeerBrief, buildHostedPeerSitePath, ensureHostCoreMirror, reparentHostedLocationEntries, stampHostedPeerDocument } from '../map-hosting.js';
+import { getDungeonMapAttachment, parseDungeonMapDocument } from '../dungeon-reality.js';
 
 const host = {
     version: 3,
@@ -26,6 +27,22 @@ describe('nested map hosting', () => {
         expect(buildHostedPeerSitePath(host, asset)).toBe('Rustport :: Dock Ward :: Flooded Sewers');
     });
 
+    it('derives a recursive child path from an INTERIOR parent cell', () => {
+        const interior = {
+            version: 3,
+            site: 'Malarkey :: Old Ward :: Malarkey Monument',
+            kind: 'INTERIOR',
+            areas: [{ id: 'cellar-crypt', name: 'Cellar Crypt', geometry: ['A low stone vault.'], connections: [] }],
+            assets: [],
+        };
+        const child = { id: 'crypt-dungeon', kind: 'SUBDUNGEON', name: 'Cellar Crypt Dungeon', location: 'cellar-crypt' };
+        expect(buildHostedPeerSitePath(interior, child)).toBe(
+            'Malarkey :: Old Ward :: Malarkey Monument :: Cellar Crypt :: Cellar Crypt Dungeon',
+        );
+        expect(stampHostedPeerDocument({ version: 3, site: child.name, kind: 'DUNGEON', areas: [], assets: [] }, interior, child))
+            .toMatchObject({ hostSite: interior.site, kind: 'DUNGEON' });
+    });
+
     it('derives the exact deterministic host brief from the first district geometry fact', () => {
         expect(buildHostedPeerBrief(host, asset)).toBe(
             'Contained in Rustport, Dock Ward. Warehouse piers smell of brine. Exit returns to Dock Ward in Rustport.',
@@ -50,6 +67,36 @@ describe('nested map hosting', () => {
         expect(child.comment).toBe('Rustport :: Dock Ward :: Flooded Sewers :: Treatment Grate');
         expect(grandchild.comment).toBe('Rustport :: Dock Ward :: Flooded Sewers :: Treatment Grate :: Pump Room');
         expect(unrelated.comment).toBe('Flooded Sewers Annex');
+    });
+
+    it('rebases mapped descendant site and host metadata with the parent breadcrumb', () => {
+        const root = {
+            comment: 'Flooded Sewers',
+            key: ['Flooded Sewers'],
+            content: `[CORE]\nStandalone sewers.\n[/CORE]\n[MAP]\n${JSON.stringify({ version: 3, site: 'Flooded Sewers', kind: 'DUNGEON', areas: [], assets: [] })}\n[/MAP]`,
+        };
+        const childSite = 'Flooded Sewers :: Pump Room :: Bone Vault';
+        const child = {
+            comment: childSite,
+            key: ['Bone Vault'],
+            content: `[CORE]\nA hidden vault.\nHost Site: Flooded Sewers\nHost Brief: Contained in Flooded Sewers, Pump Room. Exit returns there.\n[/CORE]\n[MAP]\n${JSON.stringify({
+                version: 3,
+                site: childSite,
+                kind: 'DUNGEON',
+                hostSite: 'Flooded Sewers',
+                hostBrief: 'Contained in Flooded Sewers, Pump Room. Exit returns there.',
+                areas: [],
+                assets: [],
+            })}\n[/MAP]`,
+        };
+        const entries = { 1: root, 2: child };
+        reparentHostedLocationEntries(entries, root, 'Rustport :: Dock Ward :: Flooded Sewers', 'Flooded Sewers');
+        const attachment = getDungeonMapAttachment(child);
+        const document = parseDungeonMapDocument(attachment.content, attachment.siteRoot).document;
+        expect(document.site).toBe('Rustport :: Dock Ward :: Flooded Sewers :: Pump Room :: Bone Vault');
+        expect(document.hostSite).toBe('Rustport :: Dock Ward :: Flooded Sewers');
+        expect(document.hostBrief).toContain('Contained in Rustport :: Dock Ward :: Flooded Sewers, Pump Room.');
+        expect(child.content).toContain('Host Site: Rustport :: Dock Ward :: Flooded Sewers');
     });
 
     it('mirrors host lines inside CORE idempotently without disturbing other lore', () => {

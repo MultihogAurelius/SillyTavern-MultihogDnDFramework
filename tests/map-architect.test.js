@@ -4,8 +4,100 @@ import { parseMapArchitectResponse } from '../map-architect-parser.js';
 import { buildMapArchitectReferenceContext } from '../map-architect-context.js';
 import { MAP_ARCHITECT_BRIEF_JSON_SCHEMA, MAP_ARCHITECT_JSON_SCHEMA } from '../map-architect-schema.js';
 import { DEFAULT_MAP_ARCHITECT_BRIEF_SYSTEM_PROMPT, DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT } from '../map-architect-prompt.js';
+import { resolveHostedCreationContext } from '../map-hosting-context.js';
+
+function mappedRecord(siteRoot, entryId, kind, areas, hostSite = '') {
+    return {
+        siteRoot,
+        entryId,
+        mapChunks: [JSON.stringify({
+            version: 3,
+            site: siteRoot,
+            kind,
+            ...(hostSite ? { hostSite, hostBrief: `Contained in ${hostSite}.` } : {}),
+            areas,
+            assets: [],
+        })],
+    };
+}
 
 describe('Map Architect component', () => {
+    it('resolves an explicit offsite AREA attachment on an INTERIOR without a BUILDING', () => {
+        const monument = mappedRecord('Malarkey Monument', 'Book::1', 'INTERIOR', [
+            { id: 'ritual-workroom', name: 'Ritual Workroom', knowledge: 'VISITED', geometry: [], connections: [] },
+            { id: 'cellar-crypt', name: 'Cellar Crypt', knowledge: 'VISITED', geometry: [], connections: [] },
+        ]);
+        const context = resolveHostedCreationContext(
+            { sites: { monument } },
+            'Faraway Coast, Harbor',
+            {
+                site: 'Cellar Crypt Dungeon',
+                kind: 'DUNGEON',
+                premise: 'A funerary complex.',
+                attachTo: { site: 'Malarkey Monument', cell: 'Cellar Crypt' },
+            },
+        );
+        expect(context).toMatchObject({
+            hostSite: 'Malarkey Monument',
+            hostAreaId: 'cellar-crypt',
+            peerSite: 'Malarkey Monument :: Cellar Crypt :: Cellar Crypt Dungeon',
+            expectedAssetKind: 'SUBDUNGEON',
+            explicit: true,
+            peerDepth: 2,
+        });
+        expect(context.promptContext).toContain('PARENT MAP CELL (LOCKED CONTEXT)');
+        expect(context.promptContext).toContain('Target cell: Cellar Crypt [cellar-crypt]');
+        expect(context.promptContext).toContain('Do not duplicate parent-cell occupants or props');
+    });
+
+    it('keeps similar attachment cell names distinct and returns exact choices', () => {
+        const monument = mappedRecord('Malarkey Monument', 'Book::1', 'INTERIOR', [
+            { id: 'cellar-crypt', name: 'Cellar Crypt', knowledge: 'VISITED', geometry: [], connections: [] },
+        ]);
+        expect(() => resolveHostedCreationContext(
+            { sites: { monument } },
+            '',
+            {
+                site: 'Lower Vault',
+                kind: 'DUNGEON',
+                premise: 'Hidden vault.',
+                attachTo: { site: 'Malarkey Monument', cell: 'Cellar Crypt Dungeon' },
+            },
+        )).toThrow(/Available cells: Cellar Crypt/);
+    });
+
+    it('allows three mapped levels and rejects a fourth', () => {
+        const root = mappedRecord('Malarkey', 'Book::1', 'SETTLEMENT', [
+            { id: 'old-ward', name: 'Old Ward', knowledge: 'VISITED', geometry: [], connections: [] },
+        ]);
+        const monument = mappedRecord(
+            'Malarkey :: Old Ward :: Monument',
+            'Book::2',
+            'INTERIOR',
+            [{ id: 'cellar', name: 'Cellar', knowledge: 'VISITED', geometry: [], connections: [] }],
+            'Malarkey',
+        );
+        const crypt = mappedRecord(
+            'Malarkey :: Old Ward :: Monument :: Cellar :: Crypt Dungeon',
+            'Book::3',
+            'DUNGEON',
+            [{ id: 'western-seal', name: 'Western Seal', knowledge: 'VISITED', geometry: [], connections: [] }],
+            'Malarkey :: Old Ward :: Monument',
+        );
+        const sites = { root, monument, crypt };
+        expect(resolveHostedCreationContext({ sites: { root, monument } }, '', {
+            site: 'Crypt Dungeon',
+            kind: 'DUNGEON',
+            premise: 'Nested crypt.',
+            attachTo: { site: monument.siteRoot, cell: 'Cellar' },
+        }).peerDepth).toBe(3);
+        expect(() => resolveHostedCreationContext({ sites }, '', {
+            site: 'Buried Sanctum',
+            kind: 'INTERIOR',
+            premise: 'Too deep.',
+            attachTo: { site: crypt.siteRoot, cell: 'Western Seal' },
+        })).toThrow(/limited to 3 mapped levels/);
+    });
     it('builds explicit lorebook and character-card context independently from story lookback', async () => {
         const context = await buildMapArchitectReferenceContext({
             loadWorldInfo: async (name) => name === 'Eldoria Lore'
@@ -60,15 +152,23 @@ describe('Map Architect component', () => {
         expect(defaults).not.toContain('maxActiveKeysMigratedTo12');
     });
 
+    it('broadcasts Map Architect lifecycle steps to the Agent Console', () => {
+        const architect = readFileSync(new URL('../map-architect.js', import.meta.url), 'utf8');
+        expect(architect).toContain("metadata: { source: 'map_architect', ...metadata }");
+        expect(architect).toContain("broadcastStep('start', `Initializing Map Architect for ${args.site}...`)");
+        expect(architect).toContain("broadcastStep('finish', `Map Architect finished for ${args.site}.`)");
+        expect(architect).toContain("broadcastStep('error', describeFailure(error))");
+    });
+
     it('registers a hidden narrator tool and a dedicated connection path', () => {
         const hooks = readFileSync(new URL('../narrative-hooks.js', import.meta.url), 'utf8');
         const architect = readFileSync(new URL('../map-architect.js', import.meta.url), 'utf8');
         const router = readFileSync(new URL('../router.js', import.meta.url), 'utf8');
-        expect(hooks).toContain('SETTLEMENT is a district graph');
-        expect(hooks).toContain('Ordinary shops, inns, houses, and chapels remain BUILDING assets');
-        expect(hooks).toContain('Never map OBJECT props, wilderness, roads, or districts');
-        expect(hooks).toContain('A listed mapped peer is reused');
-        expect(hooks).toContain('exiting an initially standalone peer into a newly established settlement');
+        expect(hooks).toContain('You are also a soft map editor');
+        expect(hooks).toContain('without moving the player and without first creating a BUILDING');
+        expect(hooks).toContain('attachTo.site');
+        expect(hooks).toContain('attachTo.cell');
+        expect(hooks).toContain('Nesting is limited to three mapped levels');
         expect(hooks).toContain('buildMappedSitesInjection');
         expect(architect).toContain('mapSiteFooterMismatchHint');
         expect(architect).toContain('Live location footer:');
@@ -77,12 +177,15 @@ describe('Map Architect component', () => {
         expect(hooks).toContain("enum: ['NONE', 'LOW', 'MODERATE', 'HIGH', 'DEADLY']");
         expect(hooks).toContain("enum: ['DUNGEON', 'SETTLEMENT', 'INTERIOR']");
         expect(hooks).toContain("include: { type: 'array'");
+        expect(hooks).toContain("attachTo: {");
         expect(hooks).toContain('Generating a location map for');
         expect(hooks).toContain('isMapArchitectTextOpener(settings)');
         expect(hooks).toContain('applyMapArchitectTextOpenerCyoaCaveat');
         expect(hooks).toContain("ctx.generate('continue')");
         expect(hooks).toContain('clearAssistantReasoning(message)');
         expect(hooks).toContain('seedMapArchitectContinueText');
+        expect(hooks).toContain('if (args.attachTo)');
+        expect(hooks).toContain("completed_offsite_attachment");
         expect(hooks).toContain('buildMapArchitectContinueBrief');
         expect(hooks).toContain('!narrationContinue');
         expect(hooks).toContain('maybeRunMapArchitectTextOpener');
@@ -148,19 +251,21 @@ describe('Map Architect component', () => {
         const architect = readFileSync(new URL('../map-architect.js', import.meta.url), 'utf8');
         const router = readFileSync(new URL('../router.js', import.meta.url), 'utf8');
         const hosting = readFileSync(new URL('../map-hosting.js', import.meta.url), 'utf8');
+        const hostingContext = readFileSync(new URL('../map-hosting-context.js', import.meta.url), 'utf8');
         expect(architect).toContain('resolveIncludeManifest(include, current.sites, args.site)');
         expect(architect).toContain('settlementAbsorptionMatchesCurrentPeer(args.kind, currentLocation, includeManifest)');
         expect(architect).toContain('include must name one existing mapped DUNGEON or INTERIOR exactly');
         expect(architect).toContain('INCLUDED EXISTING PEERS (LOCKED)');
         expect(architect).toContain('Create exactly one asset named');
         expect(architect).toContain('resolveHostedCreationContext');
-        expect(architect).toContain('peerSite: buildHostedPeerSitePath(hostDocument, hostedAsset)');
-        expect(architect).toContain("const expectedAssetKind = args.kind === 'INTERIOR' ? 'SUBINTERIOR' : 'SUBDUNGEON'");
+        expect(hostingContext).toContain('peerSite: buildHostedPeerSitePath(hostDocument, hostedAsset)');
+        expect(hostingContext).toContain("const expectedAssetKind = args.kind === 'INTERIOR' ? 'SUBINTERIOR' : 'SUBDUNGEON'");
+        expect(hostingContext).toContain('MAX_HOSTED_MAP_DEPTH');
 
         const start = router.indexOf('export async function persistArchitectDungeonMap');
         const end = router.indexOf('export async function persistManualDungeonMapDocument', start);
         const persistence = router.slice(start, end);
-        expect(persistence).toContain('promoteSettlementPeerAsset');
+        expect(persistence).toContain('promoteHostedPeerAsset');
         expect(persistence).toContain('findArchitectMapEntry');
         expect(persistence).toContain('reparentHostedLocationEntries');
         expect(persistence).toContain('persistedDocument.site = site');
@@ -181,7 +286,7 @@ describe('Map Architect component', () => {
     it('migrates only untouched shipped prompts to the new taxonomy defaults', () => {
         const defaults = readFileSync(new URL('../src/state/defaults.js', import.meta.url), 'utf8');
         const settings = readFileSync(new URL('../src/state/settings.js', import.meta.url), 'utf8');
-        expect(defaults).toContain("FACTORY_SETTINGS_VERSION = '2026.8.24.14'");
+        expect(defaults).toContain("FACTORY_SETTINGS_VERSION = '2026.8.24.17'");
         expect(settings).toContain('promptSignature');
         expect(settings).toContain("'14870:8b5acf86'");
         expect(settings).toContain("'9025:d21f2f49'");
@@ -196,6 +301,9 @@ describe('Map Architect component', () => {
         expect(settings).toContain("'13803:3665a0ba'");
         expect(settings).toContain("'14305:798ad4c6'");
         expect(settings).toContain("'17180:395cfd6b'");
+        expect(settings).toContain("'18194:ff193c43'");
+        expect(settings).toContain("'16929:720ad8e2'");
+        expect(settings).toContain("'19809:21b3adcd'");
         expect(settings).toContain('DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT');
         expect(settings).toContain('DEFAULT_MAP_UPDATER_SYSTEM_PROMPT');
         expect(settings).toContain('DEFAULT_MAP_EVOLUTION_SYSTEM_PROMPT');

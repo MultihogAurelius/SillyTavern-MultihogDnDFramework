@@ -107,13 +107,15 @@ Level 6 | 08:00 AM, Day 1`);
         expect(MAP_ARCHITECT_TEXT_OPENER_RULES).toContain('Scale is geographic size');
         expect(MAP_ARCHITECT_TEXT_OPENER_RULES).toContain('Use these exact field names');
         expect(MAP_ARCHITECT_TEXT_OPENER_RULES).toContain('SETTLEMENT is the city/town/village as a whole');
-        expect(MAP_ARCHITECT_TEXT_OPENER_RULES).toContain('ordinary shops, inns, chapels, and houses remain BUILDING');
+        expect(MAP_ARCHITECT_TEXT_OPENER_RULES).toContain('soft map editor');
+        expect(MAP_ARCHITECT_TEXT_OPENER_RULES).toContain('attach_to_site');
+        expect(MAP_ARCHITECT_TEXT_OPENER_RULES).toContain('without moving the player or first creating a BUILDING');
         expect(MAP_ARCHITECT_TEXT_OPENER_RULES).toContain('places between mapped sites are not mapped');
         expect(MAP_ARCHITECT_TEXT_OPENER_RULES).toContain('[MAPPED_SITES — INTERNAL]');
-        expect(MAP_ARCHITECT_TEXT_OPENER_RULES).toContain('A listed SETTLEMENT may still contain an unmapped SUB* asset');
+        expect(MAP_ARCHITECT_TEXT_OPENER_RULES).toContain('three mapped levels');
         expect(MAP_ARCHITECT_TEXT_OPENER_RULES).toContain('CYOA Mode');
         expect(MAP_ARCHITECT_TEXT_OPENER_RULES).toContain(MAP_ARCHITECT_TEXT_OPENER_CYOA_CAVEAT);
-        expect(MAP_ARCHITECT_TEXT_OPENER_RULES).toContain('CreateAreaMap is the explicit promotion signal');
+        expect(MAP_ARCHITECT_TEXT_OPENER_RULES).toContain('runtime creates/promotes SUB*');
         expect(MAP_ARCHITECT_OPENER_RADIO_NAMES).toEqual([
             'rpg_map_architect_opener',
             'rpg_map_architect_opener_components',
@@ -147,6 +149,21 @@ premise: A significant peaceful guild complex.
 [/CREATE_AREA_MAP]`);
         expect(interior.args.kind).toBe('INTERIOR');
         expect(interior.args.threat).toBe('LOW');
+    });
+
+    it('parses an explicit offsite parent-map attachment', () => {
+        const parsed = parseCreateAreaMapCommand(`[CREATE_AREA_MAP]
+site: Cellar Crypt Dungeon
+entrance: Crypt Threshold
+kind: DUNGEON
+scale: SMALL
+threat: HIGH
+attach_to_site: Malarkey Monument
+attach_to_cell: Cellar Crypt
+premise: A funerary complex extends beyond the western seal.
+[/CREATE_AREA_MAP]`);
+        expect(parsed.args.attachTo).toEqual({ site: 'Malarkey Monument', cell: 'Cellar Crypt' });
+        expect(parsed.args.site).toBe('Cellar Crypt Dungeon');
     });
 
     it('parses a regenerate-turn fence with footer after the close tag', () => {

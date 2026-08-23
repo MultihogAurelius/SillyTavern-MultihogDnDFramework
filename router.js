@@ -28,6 +28,7 @@ import {
     detachDungeonMapFromLocationEntry,
     buildDungeonSitesFromLocationEntries,
     collectDungeonMapCandidates,
+    dungeonLabelIdentitiesMatch,
     dungeonLabelsMatch,
     dungeonSiteRootsMatch,
     normalizeDungeonLabel,
@@ -53,7 +54,7 @@ import {
     DUNGEON_MAP_OPERATION_IDS_KEY,
 } from './dungeon-reality.js';
 import { recordLiveDungeonMapSnapshot } from './src/state/dungeon-map-history.js';
-import { buildHostedPeerSitePath, ensureHostCoreMirror, reparentHostedLocationEntries, stampHostedPeerDocument } from './map-hosting.js';
+import { buildHostedPeerSitePath, ensureHostCoreMirror, MAX_HOSTED_MAP_DEPTH, reparentHostedLocationEntries, stampHostedPeerDocument } from './map-hosting.js';
 import { clearEvolutionHistoryForSite, setSiteEvolutionIntervalOverride } from './map-evolution-lib.js';
 import {
     buildWorldProgressionLocationDossiers,
@@ -286,7 +287,7 @@ function parseTextAction(text) {
  */
 function broadcastStep(type, content, metadata = {}) {
     document.dispatchEvent(new CustomEvent('rt_lore_agent_step', {
-        detail: { type, content, metadata, timestamp: Date.now() }
+        detail: { type, content, metadata: { source: 'lorebook_agent', ...metadata }, timestamp: Date.now() }
     }));
 }
 
@@ -625,18 +626,18 @@ function allocateHostedAssetId(document, name) {
     return `${base}-${suffix}`;
 }
 
-function promoteSettlementPeerAsset(hostDocument, site, expectedKind, areaId, premise) {
-    if (normalizeMapSiteKind(hostDocument.kind) !== 'SETTLEMENT') {
-        throw new Error(`Host "${hostDocument.site}" is not a SETTLEMENT map.`);
+function promoteHostedPeerAsset(hostDocument, site, expectedKind, areaId, premise, { hidden = false } = {}) {
+    if (!['SETTLEMENT', 'DUNGEON', 'INTERIOR'].includes(normalizeMapSiteKind(hostDocument.kind))) {
+        throw new Error(`Host "${hostDocument.site}" is not a supported mapped site.`);
     }
     const area = (hostDocument.areas || []).find(item => item.id === areaId);
-    if (!area) throw new Error(`Could not resolve the host district for "${site}".`);
-    const matches = (hostDocument.assets || []).filter(asset => String(asset.name || '').trim() === site && asset.state !== 'REMOVED');
-    if (matches.length > 1) throw new Error(`Settlement contains more than one active asset named "${site}".`);
+    if (!area) throw new Error(`Could not resolve the host map cell for "${site}".`);
+    const matches = (hostDocument.assets || []).filter(asset => dungeonLabelIdentitiesMatch(asset.name, site) && asset.state !== 'REMOVED');
+    if (matches.length > 1) throw new Error(`Host map contains more than one active asset named "${site}".`);
     let asset = matches[0] || null;
     if (asset) {
         if (![expectedKind, 'BUILDING', 'OBJECT'].includes(asset.kind)) {
-            throw new Error(`Settlement asset "${site}" is ${asset.kind}; expected ${expectedKind}.`);
+            throw new Error(`Host-map asset "${site}" is ${asset.kind}; expected ${expectedKind}.`);
         }
         asset.kind = expectedKind;
         asset.location = area.id;
@@ -647,7 +648,7 @@ function promoteSettlementPeerAsset(hostDocument, site, expectedKind, areaId, pr
             name: site,
             location: area.id,
             state: 'ACTIVE',
-            knowledge: 'KNOWN',
+            knowledge: hidden ? 'UNREVEALED' : 'KNOWN',
             detail: String(premise || '').trim(),
             origin: 'NARRATOR_ESTABLISHED',
         };
@@ -699,6 +700,9 @@ export async function persistArchitectDungeonMap(siteRoot, mapDocument, {
     const site = String(hostContext?.peerSite || requestedSite).trim();
     if (!prefix) throw new Error('No campaign prefix is available for the Locations lorebook.');
     if (!requestedSite || !site) throw new Error('Map Architect requires an exact site root.');
+    if (hostContext && Number(hostContext.peerDepth) > MAX_HOSTED_MAP_DEPTH) {
+        throw new Error(`Nested maps are limited to ${MAX_HOSTED_MAP_DEPTH} mapped levels.`);
+    }
 
     const bookName = `${prefix}_Locations`;
     const bookKnown = await isWorldInfoBookKnown(bookName, ctx);
@@ -793,15 +797,16 @@ export async function persistArchitectDungeonMap(siteRoot, mapDocument, {
         const hostEntry = bookData.entries?.[hostUid];
         const hostAttachment = getDungeonMapAttachment(hostEntry);
         if (!hostEntry || !hostAttachment || String(hostEntry.comment || '').trim() !== hostContext.hostSite) {
-            throw new Error(`Host settlement "${hostContext.hostSite}" changed before the peer could be saved.`);
+            throw new Error(`Host map "${hostContext.hostSite}" changed before the peer could be saved.`);
         }
         const hostDocument = parseDungeonMapDocument(hostAttachment.content, hostContext.hostSite).document;
-        const hostAsset = promoteSettlementPeerAsset(
+        const hostAsset = promoteHostedPeerAsset(
             hostDocument,
             requestedSite,
             hostContext.expectedAssetKind,
             hostContext.hostAreaId,
             hostContext.premise,
+            { hidden: !!hostContext.explicit },
         );
         const livePeerSite = buildHostedPeerSitePath(hostDocument, hostAsset);
         if (livePeerSite !== site) {

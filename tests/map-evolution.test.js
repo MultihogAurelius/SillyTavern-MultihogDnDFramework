@@ -84,7 +84,7 @@ describe('Map Evolution', () => {
         expect(DEFAULT_MAP_EVOLUTION_SYSTEM_PROMPT).toContain('logical and narrative sense');
         expect(DEFAULT_MAP_EVOLUTION_SYSTEM_PROMPT).toContain('ACCUMULATED EVOLUTION BACKLOG');
         expect(DEFAULT_MAP_EVOLUTION_SYSTEM_PROMPT).toContain('frequent short intervals have not been treated as independent resets');
-        expect(DEFAULT_MAP_EVOLUTION_SYSTEM_PROMPT).toContain('CreateAreaMap owns peer-map promotion');
+        expect(DEFAULT_MAP_EVOLUTION_SYSTEM_PROMPT).toContain('CreateAreaMap owns peer-map attachment');
         expect(DEFAULT_MAP_EVOLUTION_SYSTEM_PROMPT).toContain('INTERIOR: evolve room-scale');
         expect(DEFAULT_MAP_EVOLUTION_SYSTEM_PROMPT).toContain('and larger unrest');
         expect(DEFAULT_MAP_EVOLUTION_SYSTEM_PROMPT).toContain('BUILDING may contain CREATURE/GROUP/OBJECT/LOOT/HAZARD/TRAP');
@@ -862,8 +862,8 @@ describe('Map Evolution', () => {
         expect(updater).not.toContain('EVOLVED');
         expect(updater).not.toContain('groundMapsAfterWorldProgression');
 
-        expect(hooks).toContain('await runMapUpdaterPass()');
-        expect(hooks.indexOf('await runMapUpdaterPass()')).toBeLessThan(hooks.indexOf('await maybeRunWorldProgression()'));
+        expect(hooks).toContain('mapResult = await runMapUpdaterPass');
+        expect(hooks.indexOf('mapResult = await runMapUpdaterPass')).toBeLessThan(hooks.indexOf('await maybeRunWorldProgression()'));
         expect(hooks.indexOf('await maybeRunWorldProgression()')).toBeLessThan(hooks.indexOf('await maybeRunMapEvolution()'));
         expect(hooks).not.toContain('groundMapsAfterWorldProgression');
         expect(hooks).toContain('maybeRollbackMapEvolutionForSwipe');

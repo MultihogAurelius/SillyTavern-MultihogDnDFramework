@@ -53,6 +53,7 @@ import {
     unshiftMemoAndMapHistory,
 } from './src/state/dungeon-map-history.js';
 import { createPanel as buildPanel } from './src/ui/panel/panel-builder.js';
+import { broadcastStateTrackerStep } from './src/ui/panel/agent-terminal.js';
 import { createChatStateLoader } from './src/features/chat/chat-state-loader.js';
 import { stripDungeonMapSection } from './dungeon-reality.js';
 import { cloneCampaignStackToPrefix } from './src/features/chat/clone-campaign-stack.js';
@@ -2346,12 +2347,14 @@ async function runStateModelPass(narrativeOutput, isFullContext = false, overrid
 
     if (!generateRaw) {
         console.error("[RPG Tracker] generateRaw not found in context.");
+        broadcastStateTrackerStep('error', 'State Tracker unavailable: text generation is not connected.');
         return;
     }
 
     try {
         runtimeState.stateModelRunning = true;
         updateStatusIndicator('running');
+        broadcastStateTrackerStep('start', isFullContext ? 'Initializing State Tracker full audit...' : 'Initializing State Tracker pass...');
 
         // Abort previous if any
         if (runtimeState.stateController) runtimeState.stateController.abort();
@@ -2523,6 +2526,11 @@ async function runStateModelPass(narrativeOutput, isFullContext = false, overrid
             if (isFullContext && chunks.length > 1) {
                 toastr.info(`Running Full Audit: Chunk ${i + 1} of ${chunks.length}...`, "RPG Tracker", { timeOut: 5000 });
                 updateStatusIndicator('running', `Chunk ${i + 1}/${chunks.length}`);
+                broadcastStateTrackerStep('thought', `Processing full-audit chunk ${i + 1} of ${chunks.length}...`);
+            } else if (chunks.length > 1) {
+                broadcastStateTrackerStep('thought', `Processing chunk ${i + 1} of ${chunks.length}...`);
+            } else {
+                broadcastStateTrackerStep('thought', isFullContext ? 'Analyzing narrative history...' : 'Analyzing recent narrative...');
             }
 
             const chatLog = chunks[i].join('\n\n');
@@ -2576,6 +2584,13 @@ async function runStateModelPass(narrativeOutput, isFullContext = false, overrid
                 if (relationshipCommands.length) {
                     await applyStateTrackerRelationshipCommands(relationshipCommands);
                 }
+                const changed = merged !== memoBeforeThisChunk;
+                broadcastStateTrackerStep(
+                    'result',
+                    changed
+                        ? `Memo updated after chunk ${i + 1}/${chunks.length}${relationshipCommands.length ? ` (${relationshipCommands.length} relationship command${relationshipCommands.length === 1 ? '' : 's'})` : ''}.`
+                        : `Memo unchanged after chunk ${i + 1}/${chunks.length}.`,
+                );
 
                 // Stamp the pre-commit memo snapshot and result on the message for swipe rollback/restore
                 if (getSettings().stateTrackerSwipeRollback !== false) {
@@ -2596,14 +2611,22 @@ async function runStateModelPass(narrativeOutput, isFullContext = false, overrid
             }
         }
 
+        if (signal.aborted) {
+            broadcastStateTrackerStep('error', 'Stopped by user.');
+        } else {
+            broadcastStateTrackerStep('finish', isFullContext ? 'State Tracker full audit complete.' : 'State Tracker pass complete.');
+        }
+
         if (settings.debugMode) console.log("[RPG Tracker] State Model pass complete.");
         return lastDelta;
     } catch (error) {
         if (error.name === 'AbortError') {
             if (settings.debugMode) console.log("[RPG Tracker] State Model pass aborted by user.");
+            broadcastStateTrackerStep('error', 'Stopped by user.');
             return;
         }
         console.error("[RPG Tracker] State Model pass failed:", error);
+        broadcastStateTrackerStep('error', String(error?.message || error));
     } finally {
         runtimeState.stateModelRunning = false;
         runtimeState.stateController = null;
@@ -2737,6 +2760,7 @@ export async function sendDirectPrompt(message, options = {}) {
     try {
         runtimeState.stateModelRunning = true;
         updateStatusIndicator('running');
+        broadcastStateTrackerStep('start', 'Processing direct State Tracker instruction...');
 
         // Abort previous if any
         if (runtimeState.stateController) runtimeState.stateController.abort();
@@ -2793,6 +2817,7 @@ export async function sendDirectPrompt(message, options = {}) {
             `## USER INSTRUCTION\n${message}\n\n` +
             `## OUTPUT ONLY CHANGED OR NEW SECTIONS:`;
 
+        broadcastStateTrackerStep('thought', 'Requesting memo update from State Tracker...');
         const result = await sendStateRequest(options.connectionSettings || settings, systemPrompt, userPrompt, signal, { stream: true, debugSource: 'Tracker' });
 
         if (result && typeof result === 'string') {
@@ -2839,22 +2864,28 @@ export async function sendDirectPrompt(message, options = {}) {
                 refreshRenderedView();
                 saveSettings();
                 if (settings.chatLinkEnabled && runtimeState.currentChatId) saveChatState(runtimeState.currentChatId);
+                broadcastStateTrackerStep('result', 'Memo updated from direct instruction.');
+                broadcastStateTrackerStep('finish', 'Direct State Tracker instruction complete.');
                 toastr['success']('Tracker updated.', 'RPG Tracker');
                 return { success: true, status: 'changed', changed: true, message: 'State Tracker updated.' };
             } else {
+                broadcastStateTrackerStep('finish', 'No memo changes were needed.');
                 toastr['info']('No changes were made.', 'RPG Tracker');
                 return { success: true, status: 'unchanged', changed: false, message: 'State Tracker made no changes.' };
             }
         } else {
+            broadcastStateTrackerStep('error', 'State Tracker returned no output.');
             toastr['warning']('State Model returned no output. Check your API connection and State Model settings.', 'RPG Tracker');
             return { success: false, status: 'no_output', changed: false, message: 'State Tracker returned no output.' };
         }
     } catch (err) {
         if (err.name === 'AbortError') {
             if (settings.debugMode) console.log("[RPG Tracker] Direct prompt aborted by user.");
+            broadcastStateTrackerStep('error', 'Stopped by user.');
             return { success: false, status: 'cancelled', changed: false, message: 'State Tracker command was cancelled.' };
         }
         console.error('[RPG Tracker] Direct prompt failed:', err);
+        broadcastStateTrackerStep('error', String(err?.message || err));
         toastr['error']('Direct prompt failed. Check console.', 'RPG Tracker');
         return { success: false, status: 'failed', changed: false, message: err?.message || 'State Tracker command failed.' };
     } finally {
@@ -2887,6 +2918,10 @@ function loadProfile(name) {
     s.lastDelta = p.lastDelta ?? '';
     s.routerLookback = p.routerLookback || 4;
     s.routerDirectPrompt = p.routerDirectPrompt || '';
+    s.stateTrackerDirectPrompt = p.stateTrackerDirectPrompt || '';
+    s.mapUpdaterDirectPrompt = p.mapUpdaterDirectPrompt || '';
+    s.mapEvolutionDirectPrompt = p.mapEvolutionDirectPrompt || '';
+    s.mapArchitectDirectPrompt = p.mapArchitectDirectPrompt || '';
     s.worldProgressionLookback = p.worldProgressionLookback ?? 20;
     s.worldProgressionHistoryLookback = p.worldProgressionHistoryLookback ?? 0;
     s.worldProgressionLocationsPerReport = p.worldProgressionLocationsPerReport ?? 3;
@@ -2951,6 +2986,10 @@ function loadProfile(name) {
     s.mapUpdaterRunEvery = Math.max(1, Number(p.mapUpdaterRunEvery) || 1);
     s.mapUpdaterMaxTokens = p.mapUpdaterMaxTokens ?? 25000;
     s.mapUpdaterSystemPrompt = p.mapUpdaterSystemPrompt || DEFAULT_MAP_UPDATER_SYSTEM_PROMPT;
+    s.mapUpdaterLastRunChatLength = p.mapUpdaterLastRunChatLength ?? 0;
+    s.mapUpdaterLastRunAt = p.mapUpdaterLastRunAt ?? 0;
+    s.mapUpdaterLastSiteRoot = p.mapUpdaterLastSiteRoot || '';
+    s.mapUpdaterPendingExitRoot = p.mapUpdaterPendingExitRoot || '';
     s.mapEvolutionEnabled = p.mapEvolutionEnabled !== false;
     s.mapEvolutionIntervalHours = Math.max(1, Number(p.mapEvolutionIntervalHours) || 8);
     s.mapEvolutionOnSiteIntervalHours = (() => {

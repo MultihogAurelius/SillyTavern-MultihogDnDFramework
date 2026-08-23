@@ -2,6 +2,34 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.24.17] - 2026-08-23
+
+### Added
+- **Tabbed Agent Console**: The Lorebook Agent panel Console drawer now has tabs for State Tracker, Lorebook Agent, Map Updater, Map Evolution, and Map Architect. Each agent keeps its own live terminal feed; Agent Log History remains on the Lorebook Agent tab only.
+- **Terminal/Direct Prompt**: Renamed the Console drawer and moved per-agent direct command fields into each terminal tab (including Map Evolution). Removed the Lorebook Agent footer 💬 prompt toggle.
+
+### Fixed
+- **Map Updater direct prompt**: Direct-command ADD_ASSET/SET_ASSET operations now require lasting `detail` descriptions, matching routine occupancy updates instead of creating bare-name assets.
+- **Offsite Map Attachment**: `CreateAreaMap` now accepts `attachTo.site` plus `attachTo.cell`, allowing the GM to attach a DUNGEON or INTERIOR to an exact AREA on any mapped parent without moving the player or first creating a BUILDING.
+- **Three-Level Map Nesting**: SETTLEMENT, DUNGEON, and INTERIOR maps can host DUNGEON/INTERIOR peers up to three mapped documents deep. Parent gateway creation, host stamping, and inactive-parent persistence remain atomic.
+
+### Changed
+- **Soft Map Editor Guidance**: native-tool and text-opener instructions now use a short structural-address contract. The mapped-site index prints exact targetable cell names, and attachment errors return exact alternatives for a one-step retry.
+- **Offsite Knowledge Safety**: explicit structural attachment no longer implies player movement or visitation; the new child entrance begins UNREVEALED, while active-location creation retains its VISITED entrance behavior.
+- **Strict Structural Names**: map sites and areas use identity matching that keeps whole-word extensions distinct, so `Cellar Crypt` and `Cellar Crypt Dungeon` cannot collapse into the same cell while small same-token-count typos remain tolerated.
+- **Recursive Gateway Invariant**: SUBDUNGEON and SUBINTERIOR assets are valid on room-scale parent maps, while Map Updater and Map Evolution are explicitly forbidden from creating, moving, renaming, or removing these runtime-owned gateways.
+
+## [2026.8.24.16] - 2026-08-23
+
+### Changed
+- **Map Updater Direct Prompt**: direct map commands now use a compact dedicated system/request prompt that performs only the explicit instruction. Routine occupancy, time, building-population, and unrelated PARTY-cleanup guidance stays exclusive to normal Map Updater passes.
+
+## [2026.8.24.15] - 2026-08-23
+
+### Fixed
+- **Map Updater site exits**: leaving a mapped site now forces one final targeted occupancy pass so NPCs established as departing with the player can be removed from the old map. Map-to-map transitions clean the departed site before the destination's normal updater cadence.
+- **PARTY members on maps**: an existing CREATURE that joins `[PARTY]` must be removed with `REMOVE_ASSET`; prompt guidance and correction validation enforce that PARTY remains outside durable map occupancy.
+
 ## [2026.8.24.14] - 2026-08-23
 
 ### Added

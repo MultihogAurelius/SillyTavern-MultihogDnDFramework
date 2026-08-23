@@ -19,4 +19,10 @@ describe('chat state loader', () => {
         expect(source).toContain("hasOwnProperty.call(saved, 'npcRelationshipValues')");
         expect(source).toContain("hasOwnProperty.call(saved, 'npcRelationshipLog')");
     });
+
+    it('restores Map Updater exit bookkeeping from the active chat partition', () => {
+        const source = readFileSync(new URL('../src/features/chat/chat-state-loader.js', import.meta.url), 'utf8');
+        expect(source).toContain("s.mapUpdaterLastSiteRoot = saved.mapUpdaterLastSiteRoot || ''");
+        expect(source).toContain("s.mapUpdaterPendingExitRoot = saved.mapUpdaterPendingExitRoot || ''");
+    });
 });

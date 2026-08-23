@@ -12,11 +12,11 @@
  * circular import. This will be cleaned up when index.js is split.
  */
 
-import { getSettings, hydrateWorldProgressionFromChatState, persistWorldProgressionTimer, persistRouterLastRunWatermark, getNpcRelationshipMax, clampRelationshipValue, relationshipBarPct, getFriendshipTier, getAffectionTier, applyRelTierBadgeElement, showRelationshipFloatFeedback, saveChatState, getActiveChatId, getRelationshipUpdateMode, RELATIONSHIP_UPDATE_MODES, shouldProcessRegexRelationshipUpdates, stripCoreMarkersForNarrator } from './state-manager.js';
+import { getSettings, hydrateWorldProgressionFromChatState, persistWorldProgressionTimer, persistRouterLastRunWatermark, persistMapUpdaterLastRunTimestamp, persistMapUpdaterLastRunWatermark, persistMapUpdaterState, getNpcRelationshipMax, clampRelationshipValue, relationshipBarPct, getFriendshipTier, getAffectionTier, applyRelTierBadgeElement, showRelationshipFloatFeedback, saveChatState, getActiveChatId, getRelationshipUpdateMode, RELATIONSHIP_UPDATE_MODES, shouldProcessRegexRelationshipUpdates, stripCoreMarkersForNarrator } from './state-manager.js';
 import { syncCombatProfile, isCombatActive } from './llm-client.js';
 import { parseQuestsFromMemo, extractCurrentTimeStr, cleanMessageContent, formatInWorldTime, memoForGmContext, stripPromptInjectionsFromUserText, stripCyoaAndPacingInjections } from './memo-processor.js';
 import { runRouterPass, saveSceneToLorebook, scanAssistantOutputForKeywords, parseInWorldMinutes, runWorldProgressionPass, updateLorebookEntry, getLorebookManifest, rollbackRouterPass, isRouterRunning, syncDungeonMapsToLocationLorebook } from './router.js';
-import { maybeRollbackMapUpdaterForSwipe, runMapUpdaterPass, shouldForceBuildingPopulationPass, stopMapUpdaterPass } from './map-updater.js';
+import { getActiveMapUpdaterSiteRoot, maybeRollbackMapUpdaterForSwipe, runMapUpdaterPass, shouldForceBuildingPopulationPass, stopMapUpdaterPass } from './map-updater.js';
 import { maybeRollbackMapEvolutionForSwipe, maybeRunMapEvolution, stopMapEvolutionPass } from './map-evolution.js';
 import { formatNarratorSiteActivity } from './map-evolution-lib.js';
 import { shiftMemoAndMapHistory } from './src/state/dungeon-map-history.js';
@@ -35,6 +35,7 @@ import {
     getDungeonMessageText,
     getSiteRootFromLocation,
     looksLikeDungeonSite,
+    normalizeDungeonLabel,
     resolveActiveDungeonSite,
     resolveMentionedDungeonSites,
     stripCapturedDungeonMapsFromPrompt,
@@ -544,16 +545,26 @@ export function registerMapArchitectTool() {
         registerFunctionTool({
             name: 'CreateAreaMap',
             displayName: 'Map Architect',
-            description: 'Creates and saves one private objective map. DUNGEON is a high-risk room graph, INTERIOR is a significant lower-risk multi-room site, and SETTLEMENT is a district graph. Inside a mapped settlement, call DUNGEON or INTERIOR for an exact BUILDING/SUB* name only when it deliberately warrants promotion to a peer map; the call atomically promotes/links it. Ordinary shops, inns, houses, and chapels remain BUILDING assets with no peer map. Never map OBJECT props, wilderness, roads, or districts. A listed mapped peer is reused; a listed SETTLEMENT may still contain an unmapped SUB* site. include[] is creation-only for a new SETTLEMENT and absorbs exact existing DUNGEON/INTERIOR peers. When exiting an initially standalone peer into a newly established settlement, immediately create that SETTLEMENT with the active peer in include[]. The runtime validates, persists, and returns compact private canon.',
+            description: 'Create and save one private objective map. You are also a soft map editor: a map may be created and attached from anywhere, without moving the player and without first creating a BUILDING. For a standalone map, omit attachTo. For a nested map, set attachTo.site to the exact existing parent map and attachTo.cell to the exact parent AREA that receives the gateway. site names the new child map; attachTo.cell names where it belongs, so similar names such as Cellar Crypt and Cellar Crypt Dungeon remain different. Example: site="Cellar Crypt Dungeon", attachTo={site:"Malarkey Monument", cell:"Cellar Crypt"}. Request only DUNGEON, INTERIOR, or SETTLEMENT; runtime creates/promotes the appropriate SUB* gateway, canonical path, host metadata, and inactive-parent edit. Explicit attachTo never changes the Location footer or implies entry. Nesting is limited to three mapped levels. If attachTo is omitted while a mapped site is active, runtime may use the active cell as shorthand. Never create placeholder structures, move the party merely to authorize creation, map OBJECT props/wilderness/roads/districts, or call again after success. include[] remains creation-only for a new SETTLEMENT that absorbs exact standalone DUNGEON/INTERIOR peers.',
             parameters: {
                 type: 'object',
                 properties: {
-                    site: { type: 'string', description: 'Copy the exact mapped-site name character-for-character. For a nested peer, use the exact BUILDING/SUB* name, not the settlement root or district. Never translate, transliterate, expand, or retitle.' },
-                    entrance: { type: 'string', description: 'Copy the named entrance exactly as printed: a settlement gate/square/docks, or the dungeon door. Never translate it. This becomes the first VISITED map area.' },
+                    site: { type: 'string', description: 'Exact name of the map being created. This is not the parent map or parent cell. Copy it character-for-character; never translate or retitle it.' },
+                    entrance: { type: 'string', description: 'Exact first area inside the new map: a gate, threshold, landing, door, square, or docks. Never translate it. Explicit offsite attachment leaves it UNREVEALED; active-location creation marks it VISITED.' },
                     kind: { type: 'string', enum: ['DUNGEON', 'SETTLEMENT', 'INTERIOR'], description: 'DUNGEON = high-risk room-scale site. INTERIOR = significant lower-risk multi-room site. SETTLEMENT = city/town/village district-scale graph.' },
                     scale: { type: 'string', enum: ['SMALL', 'MEDIUM', 'LARGE'], description: 'Geographic size, not danger. DUNGEON: SMALL 4-7 rooms, MEDIUM 7-12, LARGE 12-20. SETTLEMENT: SMALL 4-7 districts, MEDIUM 6-10, LARGE 8-14.' },
                     threat: { type: 'string', enum: ['NONE', 'LOW', 'MODERATE', 'HIGH', 'DEADLY'], description: 'Site danger for occupancy and trap density. NONE forbids invented active danger. Independent of party level and scale.' },
                     premise: { type: 'string', description: 'Objective private site facts and creative constraints: purpose/history, expected inhabitants or danger, tone, and anything that must not be contradicted. Premise facts do not by themselves grant the player knowledge.' },
+                    attachTo: {
+                        type: 'object',
+                        additionalProperties: false,
+                        description: 'Optional structural address for a nested map. Use it from any player location. Omit it only for a standalone map or when deliberately using the active-cell shorthand.',
+                        properties: {
+                            site: { type: 'string', description: 'Exact canonical name/path of the existing parent map being edited.' },
+                            cell: { type: 'string', description: 'Exact existing AREA name on the parent map that receives the new map gateway. No BUILDING or asset is required.' },
+                        },
+                        required: ['site', 'cell'],
+                    },
                     include: { type: 'array', items: { type: 'string' }, description: 'Optional only for first creation of a SETTLEMENT. Exact existing mapped DUNGEON/INTERIOR names to absorb as SUBDUNGEON/SUBINTERIOR peers.' },
                 },
                 required: ['site', 'entrance', 'kind', 'scale', 'threat', 'premise'],
@@ -2492,6 +2503,12 @@ async function maybeRunMapArchitectTextOpener({ chat, settings, currentType, sou
         logMapArchitectTextOpener('running', { source, generationType: type, site: siteLabel });
         await runMapArchitect(args);
         clearAssistantReasoning(message);
+        if (args.attachTo) {
+            _pendingMapArchitectResult = null;
+            _mapArchitectNarrationContinue = false;
+            logMapArchitectTextOpener('completed_offsite_attachment', { source, generationType: type, site: siteLabel });
+            return true;
+        }
         applyAssistantMessageText(
             SillyTavern.getContext(),
             message,
@@ -2898,17 +2915,68 @@ export async function onGenerationEnded() {
         });
         document.dispatchEvent(new CustomEvent('rt_generation_tick'));
     }
-    const forceBuildingPopulation = countsTowardRunEvery
+    const mapUpdaterAvailable = countsTowardRunEvery
         && settings.mapUpdaterEnabled !== false
-        && isLocationMappingEnabled(settings)
-        && await shouldForceBuildingPopulationPass();
-    const shouldTryMapUpdater = countsTowardRunEvery
-        && settings.mapUpdaterEnabled !== false
-        && isLocationMappingEnabled(settings)
+        && isLocationMappingEnabled(settings);
+    const forceBuildingPopulation = mapUpdaterAvailable && await shouldForceBuildingPopulationPass();
+    const shouldTryMapUpdater = mapUpdaterAvailable
         && (_mapUpdaterAutoTick >= mapEvery || forceBuildingPopulation);
-    if (shouldTryMapUpdater) {
-        const mapResult = await runMapUpdaterPass();
+
+    let exitResult = null;
+    let holdExitBookkeeping = false;
+    let currentRoot = '';
+    let exitDeferredWatermark = false;
+    if (mapUpdaterAvailable) {
+        currentRoot = await getActiveMapUpdaterSiteRoot();
+        const previousRoot = String(settings.mapUpdaterLastSiteRoot || '').trim();
+        let pendingExitRoot = String(settings.mapUpdaterPendingExitRoot || '').trim();
+        const rootsDiffer = normalizeDungeonLabel(previousRoot) !== normalizeDungeonLabel(currentRoot);
+        let bookkeepingChanged = false;
+
+        if (!pendingExitRoot && previousRoot && rootsDiffer) {
+            pendingExitRoot = previousRoot;
+            settings.mapUpdaterPendingExitRoot = previousRoot;
+            bookkeepingChanged = true;
+        }
+
+        if (pendingExitRoot) {
+            exitDeferredWatermark = shouldTryMapUpdater;
+            exitResult = await runMapUpdaterPass({
+                siteRoot: pendingExitRoot,
+                trigger: 'site_exit',
+                deferWatermark: exitDeferredWatermark,
+            });
+            holdExitBookkeeping = exitResult?.skipped === 'busy' || exitResult?.skipped === 'stopped';
+            if (!holdExitBookkeeping) {
+                settings.mapUpdaterPendingExitRoot = '';
+                settings.mapUpdaterLastSiteRoot = currentRoot;
+                bookkeepingChanged = true;
+            }
+            recordSchedulerEvent('map_updater_exit_pass', {
+                siteRoot: pendingExitRoot,
+                currentRoot: currentRoot || null,
+                skipped: exitResult?.skipped || null,
+                ok: exitResult?.ok === true,
+                noop: exitResult?.noop === true,
+                pending: holdExitBookkeeping,
+            });
+        } else if (normalizeDungeonLabel(previousRoot) !== normalizeDungeonLabel(currentRoot)) {
+            settings.mapUpdaterLastSiteRoot = currentRoot;
+            bookkeepingChanged = true;
+        }
+
+        if (bookkeepingChanged) persistMapUpdaterState();
+    }
+
+    let mapResult = null;
+    if (shouldTryMapUpdater && !holdExitBookkeeping) {
+        const exitStampedSwipe = exitResult?.ok === true && exitResult?.noop !== true;
+        mapResult = await runMapUpdaterPass({ stampSwipe: !exitStampedSwipe });
         const skipped = mapResult?.skipped;
+        if (exitDeferredWatermark && skipped) {
+            persistMapUpdaterLastRunWatermark(ctx.chat?.length || 0);
+            persistMapUpdaterLastRunTimestamp();
+        }
         if (!skipped || !['no_active_map', 'dungeon_reality_off', 'location_mapping_off', 'disabled', 'busy'].includes(skipped)) {
             setMapUpdaterAutoTick(0, 'map_updater_fire_threshold', { generationType: currentType ?? null, runEvery: mapEvery });
         }
@@ -2917,6 +2985,7 @@ export async function onGenerationEnded() {
             ok: mapResult?.ok === true,
             noop: mapResult?.noop === true,
             forcedBuildingPopulation: forceBuildingPopulation,
+            afterExit: !!exitResult,
         });
     }
 

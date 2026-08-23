@@ -8,6 +8,7 @@ import {
     attachDungeonMapToLocationEntry,
     buildDungeonSitesFromLocationEntries,
     collectDungeonMapCandidates,
+    dungeonLabelIdentitiesMatch,
     dungeonLabelsMatch,
     extractDungeonMapSection,
     extractFooterLocation,
@@ -128,6 +129,25 @@ describe('Map Architect validation', () => {
         expect(result.document.threat).toBe('HIGH');
     });
 
+    it('creates explicit offsite child maps without claiming any area was visited', () => {
+        const offsite = structuredClone(connectedArchitectMap);
+        offsite.areas[0].knowledge = 'UNREVEALED';
+        const accepted = validateDungeonMapArchitecture(offsite, {
+            site: 'Abbey Undercroft',
+            entrance: 'Cellar Landing',
+            entranceKnowledge: 'UNREVEALED',
+        });
+        expect(accepted.valid).toBe(true);
+        const leakedVisit = structuredClone(offsite);
+        leakedVisit.areas[1].knowledge = 'VISITED';
+        const rejected = validateDungeonMapArchitecture(leakedVisit, {
+            site: 'Abbey Undercroft',
+            entrance: 'Cellar Landing',
+            entranceKnowledge: 'UNREVEALED',
+        });
+        expect(rejected.errors.some(error => error.code === 'OFFSITE_AREA_VISITED')).toBe(true);
+    });
+
     it('automatically discovers the effective area of known or suspected assets', () => {
         const raw = {
             version: 3,
@@ -245,13 +265,19 @@ describe('Map Architect validation', () => {
         expect(settlementResult.errors.some(error => error.code === 'HOSTED_SETTLEMENT')).toBe(true);
     });
 
-    it('enforces settlement-only structured asset kinds while OBJECT remains universal', () => {
-        for (const assetKind of ['BUILDING', 'SUBDUNGEON', 'SUBINTERIOR']) {
-            const rejected = validateDungeonMapArchitecture(
+    it('keeps BUILDING settlement-only and reserves room-map SUB* insertion for runtime attachment', () => {
+        const rejected = validateDungeonMapArchitecture(
+            linearArchitectMap('Guild Hall', 'INTERIOR', 2, { kind: 'BUILDING' }),
+            { site: 'Guild Hall', entrance: 'Entrance', kind: 'INTERIOR' },
+        );
+        expect(rejected.errors.some(error => error.code === 'ASSET_KIND_NOT_ALLOWED')).toBe(true);
+        for (const assetKind of ['SUBDUNGEON', 'SUBINTERIOR']) {
+            const accepted = validateDungeonMapArchitecture(
                 linearArchitectMap('Guild Hall', 'INTERIOR', 2, { kind: assetKind }),
                 { site: 'Guild Hall', entrance: 'Entrance', kind: 'INTERIOR' },
             );
-            expect(rejected.errors.some(error => error.code === 'ASSET_KIND_NOT_ALLOWED')).toBe(true);
+            expect(accepted.errors.some(error => error.code === 'ASSET_KIND_NOT_ALLOWED')).toBe(false);
+            expect(accepted.errors.some(error => error.code === 'RUNTIME_OWNED_GATEWAY')).toBe(true);
         }
         const objectMap = validateDungeonMapArchitecture(
             linearArchitectMap('Guild Hall', 'INTERIOR', 2, { kind: 'OBJECT' }),
@@ -381,6 +407,35 @@ describe('Map Architect validation', () => {
         expect(mapSiteMatchesLiveFooter('Ashgate Maintenance Tunnels', 'Kuzne, Ashgate Maintenance Tunnels, Junction Chamber Theta')).toBe(true);
         expect(mapSiteMatchesLiveFooter('Invented Title', '')).toBe(true);
         expect(mapSiteFooterMismatchHint('Undermountain Level 6 — The Grinding Halls', footer)).toContain('Never translate');
+    });
+
+    it('keeps structural suffix names distinct while tolerating same-word-count typos', () => {
+        expect(dungeonLabelsMatch('Cellar Crypt', 'Cellar Crypt Dungeon')).toBe(true);
+        expect(dungeonLabelIdentitiesMatch('Cellar Crypt', 'Cellar Crypt Dungeon')).toBe(false);
+        expect(dungeonLabelIdentitiesMatch('Cellar Crypt Dungeon', 'Cellar Crypt Dungeom')).toBe(true);
+        expect(locationContainsSiteRoot(
+            'Malarkey Monument, Cellar Crypt, Cellar Crypt Dungeon',
+            'Malarkey Monument :: Cellar Crypt :: Cellar Crypt Dungeon',
+        )).toBe(true);
+        expect(locationContainsSiteRoot('Malarkey Monument, Cellar Crypt', 'Cellar Crypt Dungeon')).toBe(false);
+        const placement = resolveCurrentMapPlacement({
+            version: 3,
+            site: 'Malarkey Monument',
+            kind: 'INTERIOR',
+            areas: [{ id: 'cellar-crypt', name: 'Cellar Crypt', knowledge: 'VISITED', geometry: [], connections: [] }],
+            assets: [{
+                id: 'cellar-crypt-gateway',
+                kind: 'SUBDUNGEON',
+                name: 'Cellar Crypt',
+                location: 'cellar-crypt',
+                state: 'ACTIVE',
+                knowledge: 'KNOWN',
+                detail: '',
+                origin: 'NARRATOR_ESTABLISHED',
+            }],
+        }, 'Malarkey Monument, Cellar Crypt, Cellar Crypt Dungeon');
+        expect(placement.area?.name).toBe('Cellar Crypt');
+        expect(placement.interiorAsset).toBeNull();
     });
 
     it('accepts pack count on initial assets and rejects count 0', () => {
@@ -814,6 +869,38 @@ Area: Ossuary Behind Rotten Tapestry
         });
         expect(oldAliasWrite.ok).toBe(false);
         expect(oldAliasWrite.errors.some(error => error.code === 'INVALID_ENUM')).toBe(true);
+    });
+
+    it('reserves SUB* gateway creation and structural edits for CreateAreaMap', () => {
+        const map = {
+            version: 3,
+            site: 'Malarkey Monument',
+            kind: 'INTERIOR',
+            areas: [{ id: 'cellar-crypt', name: 'Cellar Crypt', knowledge: 'VISITED', geometry: [], connections: [] }],
+            assets: [{
+                id: 'crypt-dungeon', kind: 'SUBDUNGEON', name: 'Cellar Crypt Dungeon', location: 'cellar-crypt',
+                state: 'ACTIVE', knowledge: 'UNREVEALED', detail: 'A hosted peer gateway.', origin: 'NARRATOR_ESTABLISHED',
+            }],
+        };
+        const added = applyDungeonMapTransaction(map, {
+            operation_id: 'day1-invalid-sub-add',
+            operations: [{
+                op: 'ADD_ASSET', evidence: 'CONFIRMED', name: 'Lower Vault', kind: 'SUBDUNGEON',
+                location: 'cellar-crypt', state: 'ACTIVE', knowledge: 'UNREVEALED', cause: 'A new nested map was proposed.',
+            }],
+        });
+        expect(added.errors.some(error => error.code === 'RUNTIME_OWNED_GATEWAY')).toBe(true);
+        const moved = applyDungeonMapTransaction(map, {
+            operation_id: 'day1-invalid-sub-move',
+            operations: [{ op: 'MOVE_ASSET', evidence: 'CONFIRMED', asset_id: 'crypt-dungeon', to: 'cellar-crypt', cause: 'Attempted gateway move.' }],
+        });
+        expect(moved.errors.some(error => error.code === 'RUNTIME_OWNED_GATEWAY')).toBe(true);
+        const revealed = applyDungeonMapTransaction(map, {
+            operation_id: 'day1-sub-revealed',
+            operations: [{ op: 'SET_ASSET', evidence: 'CONFIRMED', asset_id: 'crypt-dungeon', knowledge: 'KNOWN', detail: 'The entrance is now known.', cause: 'The party discovered the entrance.' }],
+        });
+        expect(revealed.ok).toBe(true);
+        expect(revealed.document.assets[0].knowledge).toBe('KNOWN');
     });
 
     it('requires blocked geometry to be changed before an asset traverses it', () => {
@@ -1555,13 +1642,14 @@ The last guard falls and a loose stone reveals a niche.
             incomplete: { siteRoot: 'Ghost Site', mapChunks: [] },
         };
         expect(listMappedSiteSummaries(sites)).toEqual([
-            { siteRoot: 'Ember Mine', kind: 'DUNGEON' },
-            { siteRoot: 'Thornbrook', kind: 'SETTLEMENT' },
+            { siteRoot: 'Ember Mine', kind: 'DUNGEON', cells: ['Site Overview'] },
+            { siteRoot: 'Thornbrook', kind: 'SETTLEMENT', cells: ['Site Overview'] },
         ]);
         const index = buildMappedSitesInjection(sites);
         expect(index).toContain('- Ember Mine (DUNGEON)');
         expect(index).toContain('- Thornbrook (SETTLEMENT)');
-        expect(index).toContain('A mapped SETTLEMENT may still contain an unmapped SUBDUNGEON/SUBINTERIOR');
+        expect(index).toContain('attachTo.site');
+        expect(index).toContain('attachTo.cell choices: Site Overview');
         expect(index).not.toContain('Ghost Site');
         expect(index).not.toContain('"version"');
     });
@@ -1581,7 +1669,7 @@ The last guard falls and a loose stone reveals a niche.
             sewers: { siteRoot: hostedDocument.site, mapChunks: [JSON.stringify(hostedDocument)] },
         };
         expect(listMappedSiteSummaries(sites)).toEqual([
-            { siteRoot: hostedDocument.site, kind: 'DUNGEON', hostSite: 'Rustport' },
+            { siteRoot: hostedDocument.site, kind: 'DUNGEON', hostSite: 'Rustport', cells: ['Treatment Grate'] },
         ]);
         expect(buildMappedSitesInjection(sites)).toContain(`- ${hostedDocument.site} (DUNGEON; inside Rustport)`);
 

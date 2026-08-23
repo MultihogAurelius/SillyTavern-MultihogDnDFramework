@@ -165,6 +165,19 @@ describe('saveChatState', () => {
         expect(part.mapEvolutionThreadsBySite).not.toBe(s.mapEvolutionThreadsBySite);
     });
 
+    it('snapshots Map Updater exit bookkeeping in the chat partition', () => {
+        const s = getSettings();
+        s.mapUpdaterLastSiteRoot = 'Ember Mine';
+        s.mapUpdaterPendingExitRoot = 'Forgotten Tomb';
+
+        saveChatState('map-updater-exit-chat', { skipDiskWrite: true });
+
+        expect(s.chatStates['map-updater-exit-chat']).toMatchObject({
+            mapUpdaterLastSiteRoot: 'Ember Mine',
+            mapUpdaterPendingExitRoot: 'Forgotten Tomb',
+        });
+    });
+
     it('rehydrates World Progression and Map Evolution watermarks from the active chat partition', () => {
         const s = getSettings();
         s.chatLinkEnabled = true;

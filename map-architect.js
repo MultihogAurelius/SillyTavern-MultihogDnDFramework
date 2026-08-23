@@ -12,7 +12,6 @@ import {
     normalizeMapSiteThreat,
     defaultMapSiteThreat,
     parseDungeonMapDocument,
-    resolveCurrentMapPlacement,
     settlementAbsorptionMatchesCurrentPeer,
     stripCapturedDungeonMapsFromPrompt,
     canonicalizeReciprocalConnectionDetails,
@@ -20,7 +19,7 @@ import {
 } from './dungeon-reality.js';
 import { locationRootExists, persistArchitectDungeonMap, syncDungeonMapsToLocationLorebook } from './router.js';
 import { DEFAULT_MAP_ARCHITECT_BRIEF_SYSTEM_PROMPT, DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT } from './map-architect-prompt.js';
-import { buildHostedPeerSitePath } from './map-hosting.js';
+import { normalizeMapAttachment, resolveHostedCreationContext } from './map-hosting-context.js';
 import { parseMapArchitectResponse } from './map-architect-parser.js';
 import { MAP_ARCHITECT_BRIEF_JSON_SCHEMA, MAP_ARCHITECT_JSON_SCHEMA } from './map-architect-schema.js';
 import { extractCurrentTimeStr } from './memo-processor.js';
@@ -33,6 +32,12 @@ const architectRuns = new Map();
 const MAX_CORRECTION_ATTEMPTS = 2;
 
 const architectToasts = new Map();
+
+function broadcastStep(type, content, metadata = {}) {
+    document.dispatchEvent(new CustomEvent('rt_lore_agent_step', {
+        detail: { type, content, metadata: { source: 'map_architect', ...metadata }, timestamp: Date.now() },
+    }));
+}
 
 function siteToastLabel(site) {
     return String(site || 'location').trim() || 'location';
@@ -206,38 +211,6 @@ function inclusionValidationErrors(document, manifest) {
     return errors;
 }
 
-function resolveHostedCreationContext(current, currentLocation, args) {
-    if (!currentLocation || !['DUNGEON', 'INTERIOR'].includes(args.kind)) return null;
-    const hostCandidates = Object.values(current.sites || {}).filter(record => {
-        if (!record?.mapChunks?.length || record.siteRoot === args.site) return false;
-        if (!locationContainsSiteRoot(currentLocation, record.siteRoot)) return false;
-        return parseDungeonMapDocument(record.mapChunks[0], record.siteRoot).document.kind === 'SETTLEMENT';
-    });
-    if (hostCandidates.length !== 1) return null;
-    const active = hostCandidates[0];
-    const hostDocument = parseDungeonMapDocument(active.mapChunks[0], active.siteRoot).document;
-    const exactAsset = hostDocument.assets.find(asset => String(asset.name || '').trim() === args.site) || null;
-    const expectedAssetKind = args.kind === 'INTERIOR' ? 'SUBINTERIOR' : 'SUBDUNGEON';
-    if (exactAsset && !['BUILDING', 'OBJECT', expectedAssetKind].includes(exactAsset.kind)) {
-        throw mapArchitectFailure(`Settlement asset "${args.site}" is ${exactAsset.kind}; ${args.kind} requires ${expectedAssetKind}.`);
-    }
-    const placement = resolveCurrentMapPlacement(hostDocument, currentLocation);
-    const hostArea = exactAsset
-        ? hostDocument.areas.find(area => area.id === exactAsset.location)
-        : placement.area;
-    if (!hostArea) return null;
-    const hostedAsset = exactAsset || { name: args.site, location: hostArea.id };
-    return {
-        hostSite: active.siteRoot,
-        hostEntryId: active.entryId,
-        hostAreaId: hostArea.id,
-        assetName: args.site,
-        peerSite: buildHostedPeerSitePath(hostDocument, hostedAsset),
-        expectedAssetKind,
-        premise: args.premise,
-    };
-}
-
 function findExistingArchitectSite(sites, requestedSite, hostContext = null) {
     const records = Object.values(sites || {});
     if (!hostContext) {
@@ -252,14 +225,17 @@ function findExistingArchitectSite(sites, requestedSite, hostContext = null) {
     });
 }
 
-function initialUserPrompt(args, context, referenceContext = '', currentLocation = '', currentTime = '', includeManifest = []) {
+function initialUserPrompt(args, context, referenceContext = '', currentLocation = '', currentTime = '', includeManifest = [], hostContext = null, entranceKnowledge = 'VISITED') {
     return `CREATE ONE PRIVATE MAP
 Exact site root: ${args.site}
 Entrance area: ${args.entrance}
+Entrance knowledge: ${entranceKnowledge}${entranceKnowledge === 'UNREVEALED' ? ' (offsite structural creation; the party has not entered)' : ''}
 Kind: ${args.kind} (${kindBrief(args.kind)})
 Scale: ${args.scale}
 Threat: ${args.threat} (${threatBrief(args.threat, args.kind)})
 Objective private premise (does not grant player knowledge): ${args.premise}
+Attachment: ${args.attachTo ? `Create offsite and attach beneath map "${args.attachTo.site}" in exact cell "${args.attachTo.cell}". This is a structural edit only; do not move the party or infer that they entered.` : 'No explicit offsite attachment; runtime may use the active mapped cell as shorthand.'}
+${hostContext?.promptContext || ''}
 ${inclusionPrompt(includeManifest)}
 Live location footer: ${currentLocation || '(none yet)'}
 Current in-world time (authoritative): ${currentTime || 'Unknown'}
@@ -276,11 +252,11 @@ ${referenceContext || 'USER-SELECTED REFERENCE CONTEXT\n(none selected)'}
 Output only the required JSON object. Follow the ${args.kind} instruction set.`;
 }
 
-function correctionPrompt(args, context, referenceContext, priorOutput, parseError, errors, attempt, currentTime = '', includeManifest = []) {
+function correctionPrompt(args, context, referenceContext, priorOutput, parseError, errors, attempt, currentTime = '', includeManifest = [], hostContext = null, entranceKnowledge = 'VISITED') {
     const issues = parseError
         ? [{ code: 'INVALID_JSON', path: '$', hint: parseError }]
         : errors.map(({ code, path, hint }) => ({ code, path, hint }));
-    return `CORRECTION PASS ${attempt}\nYour previous map was rejected. Return a complete corrected JSON object, not a patch.\n\nRequested site: ${args.site}\nRequested entrance: ${args.entrance}\nRequested kind: ${args.kind} (${kindBrief(args.kind)})\nScale: ${args.scale}\nThreat: ${args.threat} (${threatBrief(args.threat, args.kind)})\nObjective private premise (does not grant player knowledge): ${args.premise}\n${inclusionPrompt(includeManifest)}\nCurrent in-world time (authoritative): ${currentTime || 'Unknown'}\n\nVALIDATION ERRORS\n${JSON.stringify(issues, null, 2)}\n\nPREVIOUS OUTPUT\n${priorOutput}\n\nRECENT STORY CONTEXT\n${context || '(No additional recent context.)'}\n\n${referenceContext || 'USER-SELECTED REFERENCE CONTEXT\n(none selected)'}\n\nOutput only the corrected JSON object. Follow the ${args.kind} instruction set.`;
+    return `CORRECTION PASS ${attempt}\nYour previous map was rejected. Return a complete corrected JSON object, not a patch.\n\nRequested site: ${args.site}\nRequested entrance: ${args.entrance}\nRequested entrance knowledge: ${entranceKnowledge}\nRequested kind: ${args.kind} (${kindBrief(args.kind)})\nScale: ${args.scale}\nThreat: ${args.threat} (${threatBrief(args.threat, args.kind)})\nObjective private premise (does not grant player knowledge): ${args.premise}\n${hostContext?.promptContext || ''}\n${inclusionPrompt(includeManifest)}\nCurrent in-world time (authoritative): ${currentTime || 'Unknown'}\n\nVALIDATION ERRORS\n${JSON.stringify(issues, null, 2)}\n\nPREVIOUS OUTPUT\n${priorOutput}\n\nRECENT STORY CONTEXT\n${context || '(No additional recent context.)'}\n\n${referenceContext || 'USER-SELECTED REFERENCE CONTEXT\n(none selected)'}\n\nOutput only the corrected JSON object. Follow the ${args.kind} instruction set.`;
 }
 
 function existingResult(siteRecord) {
@@ -313,11 +289,14 @@ async function runMapArchitectOnce(rawArgs) {
         kind: normalizeMapSiteKind(rawArgs?.kind),
         scale: String(rawArgs?.scale || 'MEDIUM').trim().toUpperCase(),
         threat: normalizeMapSiteThreat(rawArgs?.threat, defaultMapSiteThreat(rawArgs?.kind)),
+        attachTo: normalizeMapAttachment(rawArgs?.attachTo),
     };
     if (!args.site || !args.entrance || !args.premise) {
         throw mapArchitectFailure('site, entrance, and premise are required. Establish those facts before a later attempt.');
     }
     if (!['SMALL', 'MEDIUM', 'LARGE'].includes(args.scale)) args.scale = 'MEDIUM';
+
+    broadcastStep('start', `Initializing Map Architect for ${args.site}...`);
 
     const ctx = SillyTavern.getContext();
     const settings = getSettings();
@@ -336,6 +315,7 @@ async function runMapArchitectOnce(rawArgs) {
     const currentLocation = findLatestDungeonLocation(ctx.chat || []);
     const absorbsCurrentPeer = settlementAbsorptionMatchesCurrentPeer(args.kind, currentLocation, includeManifest);
     const hostContext = resolveHostedCreationContext(current, currentLocation, args);
+    const entranceKnowledge = hostContext?.explicit ? 'UNREVEALED' : 'VISITED';
     const existing = findExistingArchitectSite(current.sites, args.site, hostContext);
     if (existing?.mapChunks?.length) {
         if (includeManifest.length) {
@@ -347,8 +327,13 @@ async function runMapArchitectOnce(rawArgs) {
         if (hostContext) {
             const existingDocument = parseDungeonMapDocument(existing.mapChunks[0], existing.siteRoot).document;
             const saved = await persistArchitectDungeonMap(args.site, existingDocument, { hostContext });
-            return `[MAP_ARCHITECT_RESULT — PRIVATE]\nThe existing peer map was preserved and linked inside ${hostContext.hostSite}.\n\n${formatDungeonMapForNarrator(saved.document)}\n\nKeep unseen facts private and continue narration from the player-observable entrance.\n[/MAP_ARCHITECT_RESULT]`;
+            const continuation = hostContext.explicit
+                ? 'This was an offsite structural edit. Keep the current player location and narration unchanged.'
+                : 'Keep unseen facts private and continue narration from the player-observable entrance.';
+            broadcastStep('finish', `Linked existing map for ${args.site} inside ${hostContext.hostSite}.`);
+            return `[MAP_ARCHITECT_RESULT — PRIVATE]\nThe existing peer map was preserved and linked inside ${hostContext.hostSite}.\n\n${formatDungeonMapForNarrator(saved.document)}\n\n${continuation}\n[/MAP_ARCHITECT_RESULT]`;
         }
+        broadcastStep('finish', `Reused existing map for ${args.site}.`);
         return existingResult(existing);
     }
     if (rawArgs?.requireNew && await locationRootExists(args.site)) {
@@ -364,10 +349,12 @@ async function runMapArchitectOnce(rawArgs) {
     const referenceContext = await buildMapArchitectReferenceContext(ctx, rawArgs);
     const currentTime = currentTimeFrom(settings);
     const systemPrompt = String(settings.mapArchitectSystemPrompt || DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).trim();
-    let prompt = initialUserPrompt(args, context, referenceContext, currentLocation, currentTime, includeManifest);
+    let prompt = initialUserPrompt(args, context, referenceContext, currentLocation, currentTime, includeManifest, hostContext, entranceKnowledge);
     let lastIssues = [];
 
     for (let attempt = 0; attempt <= MAX_CORRECTION_ATTEMPTS; attempt++) {
+        if (attempt > 0) broadcastStep('thought', `Correction pass ${attempt} for ${args.site}...`);
+        else broadcastStep('thought', `Generating ${args.kind.toLowerCase()} map for ${args.site}...`);
         const output = await sendStateRequest(
             requestSettings(settings),
             systemPrompt,
@@ -378,7 +365,7 @@ async function runMapArchitectOnce(rawArgs) {
         const parsed = parseMapArchitectResponse(output);
         if (parsed.value?.areas) canonicalizeReciprocalConnectionDetails(parsed.value.areas);
         const baseValidation = parsed.value
-            ? validateDungeonMapArchitecture(parsed.value, { site: args.site, entrance: args.entrance, scale: args.scale, kind: args.kind, threat: args.threat })
+            ? validateDungeonMapArchitecture(parsed.value, { site: args.site, entrance: args.entrance, entranceKnowledge, scale: args.scale, kind: args.kind, threat: args.threat })
             : { valid: false, errors: [] };
         const includeErrors = baseValidation.valid ? inclusionValidationErrors(baseValidation.document, includeManifest) : [];
         const validation = includeErrors.length
@@ -397,18 +384,25 @@ async function runMapArchitectOnce(rawArgs) {
                 hostContext,
             });
             const status = saved.existing ? 'A concurrent map already existed and was preserved.' : `Map saved to ${saved.entryId}.`;
-            return `[MAP_ARCHITECT_RESULT — PRIVATE]\n${status}\nTreat this as objective current canon. Do not expose unseen facts.\n\n${formatDungeonMapForNarrator(saved.document)}\n\nContinue narration from ${args.entrance}; reveal only what the player can perceive.\n[/MAP_ARCHITECT_RESULT]`;
+            const continuation = hostContext?.explicit
+                ? 'This was an offsite structural edit. Do not move the player, change the Location footer, or narrate entry into the new map.'
+                : `Continue narration from ${args.entrance}; reveal only what the player can perceive.`;
+            broadcastStep('result', status);
+            broadcastStep('finish', `Map Architect finished for ${args.site}.`);
+            return `[MAP_ARCHITECT_RESULT — PRIVATE]\n${status}\nTreat this as objective current canon. Do not expose unseen facts.\n\n${formatDungeonMapForNarrator(saved.document)}\n\n${continuation}\n[/MAP_ARCHITECT_RESULT]`;
         }
         lastIssues = parsed.error
             ? [{ code: 'INVALID_JSON', path: '$', hint: parsed.error }]
             : validation.errors;
         if (attempt < MAX_CORRECTION_ATTEMPTS) {
-            prompt = correctionPrompt(args, context, referenceContext, output, parsed.error, validation.errors, attempt + 1, currentTime, includeManifest);
+            prompt = correctionPrompt(args, context, referenceContext, output, parsed.error, validation.errors, attempt + 1, currentTime, includeManifest, hostContext, entranceKnowledge);
         }
     }
 
     const concise = lastIssues.slice(0, 12).map(issue => `${issue.code} at ${issue.path}: ${issue.hint}`).join('; ');
-    throw mapArchitectFailure(`The architect could not produce a valid connected map after ${MAX_CORRECTION_ATTEMPTS + 1} attempts. Nothing was saved. Problems: ${concise}`);
+    const failureMessage = `The architect could not produce a valid connected map after ${MAX_CORRECTION_ATTEMPTS + 1} attempts. Nothing was saved. Problems: ${concise}`;
+    broadcastStep('error', failureMessage);
+    throw mapArchitectFailure(failureMessage);
 }
 
 /**
@@ -495,7 +489,7 @@ Output only the JSON object.`;
 
 /** Dedupe parallel/repeated tool calls for the same site within one generation. */
 export function runMapArchitect(args) {
-    const key = normalizeKey(args?.site);
+    const key = normalizeKey([args?.attachTo?.site, args?.attachTo?.cell, args?.site].filter(Boolean).join(' :: '));
     if (architectRuns.has(key)) return architectRuns.get(key);
     startMapArchitectToast(args?.site);
     const run = runMapArchitectOnce(args)
@@ -506,7 +500,8 @@ export function runMapArchitect(args) {
         .catch(error => {
             finishMapArchitectToast(args?.site, false);
             console.error('[RPG Tracker] Map Architect failed:', error);
-            if (String(error?.message || '').includes('[MAP_ARCHITECT_ERROR')) throw error;
+            broadcastStep('error', describeFailure(error));
+            if (/\[MAP_ARCHITECT_(?:ERROR|ATTACHMENT_ERROR)/.test(String(error?.message || ''))) throw error;
             throw mapArchitectFailure(`Map Architect failed before a validated map could be saved: ${describeFailure(error)}`);
         })
         .finally(() => architectRuns.delete(key));

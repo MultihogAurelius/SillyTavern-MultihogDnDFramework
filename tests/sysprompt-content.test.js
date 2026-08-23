@@ -87,11 +87,14 @@ Out-of-range attack attempt → note {{user}} couldn't attack due to range; ask 
             expect(source).toContain('ordinary named shops, inns, chapels, and houses are BUILDING');
             expect(source).toContain('Only one map can be created at a time');
             expect(source).toContain('unmapped "transition space" between granularly mapped areas of interest');
-            expect(source).toContain('A map-worthy high-risk map within a SETTLEMENT is a SUBDUNGEON');
+            expect(source).toContain('A map-worthy high-risk child is a SUBDUNGEON');
+            expect(source).toContain('attach a nested map from anywhere without moving the player');
+            expect(source).toContain('No BUILDING, OBJECT, or pre-created SUB* asset is required');
+            expect(source).toContain('limited to three mapped documents');
             expect(source).toContain('fresh chat may begin inside a standalone DUNGEON/INTERIOR');
             expect(source).toContain('include: ["Exact Current SUB* Name"]');
             expect(source).toContain('leave the child standalone');
-            expect(source).toContain('Promotion first reclassifies the BUILDING');
+            expect(source).toContain('runtime creates the SUBDUNGEON/SUBINTERIOR gateway');
             expect(source).toContain('Importance alone is not sufficient');
             expect(source).toContain('BUILDING interiors use lazy asset generation and are empty on initialization');
             expect(source).toContain('When the player expresses the intent to enter BUILDING');
@@ -106,8 +109,8 @@ Out-of-range attack attempt → note {{user}} couldn't attack due to range; ask 
             expect(source).toContain('creation-only for SETTLEMENT absorption');
             expect(source).toContain('BUILDING has no map unless explicitly promoted');
             expect(source).toContain('exact canonical names, never translated, expanded, or retitled');
-            expect(source).toContain('BUILDING keeps the SETTLEMENT active');
-            expect(source).toContain('mapped child becomes active at the deepest matching footer segment');
+            expect(source).toContain('BUILDING keeps its parent map active');
+            expect(source).toContain('mapped child becomes active at the deepest complete matching footer path');
             expect(source).toContain('Hosted child reality includes a compact host brief');
             expect(source).toContain('may be four or more tiers');
             expect(source).toContain('always append the exact current mapped area after the complete site breadcrumb');
