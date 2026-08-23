@@ -23,6 +23,16 @@ function parseLookback(raw, fallback = 10) {
     return Number.isFinite(n) ? Math.max(0, n) : fallback;
 }
 
+/** Extract an explicit Map Architect creation target from a natural direct command. */
+export function parseMapArchitectCreateDirective(value) {
+    const text = String(value || '').trim();
+    const match = text.match(/\bcreate\s+(?:an?\s+)?(SETTLEMENT|DUNGEON|INTERIOR)\s+map\s+for\s+(?:"([^"]+)"|'([^']+)'|([^:\r\n]+?))\s*(?::|$)/i);
+    if (!match) return null;
+    const site = String(match[2] || match[3] || match[4] || '').trim();
+    if (!site) return null;
+    return { kind: match[1].toUpperCase(), site };
+}
+
 /**
  * @param {object} options
  * @param {HTMLElement} options.agentPanel
@@ -225,9 +235,11 @@ export function wireAgentTerminalDirectPrompts({
         }
 
         if (tabId === 'map_architect') {
-            const siteRoot = await resolveCurrentSiteRoot();
+            const directive = parseMapArchitectCreateDirective(msg);
+            const activeSiteRoot = await resolveCurrentSiteRoot();
+            const siteRoot = directive?.site || activeSiteRoot;
             if (!siteRoot) {
-                toastr.warning('No current mapped site for Map Architect. Open a mapped location first.', 'Map Architect');
+                toastr.warning('Name a site with “Create INTERIOR/DUNGEON/SETTLEMENT map for \"Site Name\"”, or open a mapped location first.', 'Map Architect');
                 return;
             }
             toastr['info'](`Running Map Architect for ${siteRoot}...`);
@@ -237,6 +249,7 @@ export function wireAgentTerminalDirectPrompts({
                     userBrief: msg,
                     lookback,
                 });
+                if (directive) args.kind = directive.kind;
                 await runMapArchitect(args);
                 toastr['success'](`Map Architect finished for ${siteRoot}.`, 'Map Architect');
             } catch (error) {

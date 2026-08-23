@@ -22,6 +22,7 @@ All notable changes to the **Multihog D&D Framework** will be documented in this
 - **Terminal/Direct Prompt**: Renamed the Console drawer and moved per-agent direct command fields into each terminal tab (including Map Evolution). Removed the Lorebook Agent footer 💬 prompt toggle.
 
 ### Fixed
+- **Map Architect direct child targeting**: Explicit `Create INTERIOR/DUNGEON/SETTLEMENT map for "Site Name"` terminal commands now lock the named site and requested kind instead of reusing the active parent map's identity. This allows a SETTLEMENT to correctly host a new SUBINTERIOR/SUBDUNGEON gateway without attempting to treat the settlement document as its own child peer.
 - **Map Updater direct prompt**: Direct-command ADD_ASSET/SET_ASSET operations now require lasting `detail` descriptions, matching routine occupancy updates instead of creating bare-name assets.
 - **Offsite Map Attachment**: `CreateAreaMap` now accepts `attachTo.site` plus `attachTo.cell`, allowing the GM to attach a DUNGEON or INTERIOR to an exact AREA on any mapped parent without moving the player or first creating a BUILDING.
 - **Three-Level Map Nesting**: SETTLEMENT, DUNGEON, and INTERIOR maps can host DUNGEON/INTERIOR peers up to three mapped documents deep. Parent gateway creation, host stamping, and inactive-parent persistence remain atomic.

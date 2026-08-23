@@ -1,8 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { DEFAULT_MAP_EVOLUTION_DIRECT_SYSTEM_PROMPT, selectMapEvolutionSystemPrompt } from '../map-evolution-direct-prompt.js';
+import { parseMapArchitectCreateDirective } from '../src/ui/panel/agent-terminal-direct.js';
 
 describe('agent terminal direct prompts', () => {
+    it('targets an explicitly named child map instead of reusing the active settlement identity', () => {
+        expect(parseMapArchitectCreateDirective('Create INTERIOR map for "Main Building": Lobby → Cafeteria Hall')).toEqual({
+            kind: 'INTERIOR',
+            site: 'Main Building',
+        });
+        expect(parseMapArchitectCreateDirective('create a dungeon map for Old Mine: Entry to shaft')).toEqual({
+            kind: 'DUNGEON',
+            site: 'Old Mine',
+        });
+        expect(parseMapArchitectCreateDirective('Improve the current map topology.')).toBeNull();
+    });
+
     it('moves Lorebook Agent direct prompt into Terminal tabs and removes footer toggle', () => {
         const markup = readFileSync(new URL('../src/ui/panel/panel-markup.js', import.meta.url), 'utf8');
         const builder = readFileSync(new URL('../src/ui/panel/panel-builder.js', import.meta.url), 'utf8');
@@ -19,6 +32,8 @@ describe('agent terminal direct prompts', () => {
         expect(direct).toContain("runRouterPass(combinedNarrative, msg, lookback, true)");
         expect(direct).toContain('directInstruction: msg');
         expect(direct).toContain('inferMapArchitectArgs');
+        expect(direct).toContain('const siteRoot = directive?.site || activeSiteRoot');
+        expect(direct).toContain('args.kind = directive.kind');
     });
 
     it('persists per-agent direct prompt drafts', () => {
