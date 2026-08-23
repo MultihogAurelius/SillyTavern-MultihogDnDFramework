@@ -9,10 +9,16 @@ export function isBaseSectionEnabled(tag, settings) {
     return mods[tag] !== false;
 }
 
+/** Returns the unlocked override that belongs to the current chat/setup. */
+export function findActiveUnlockedBaseOverride(library, tag) {
+    return (library || []).find(p =>
+        p.origin === 'unlocked_base' && p.baseTag === tag && p._chatSetupMember !== false,
+    ) || null;
+}
+
 /** Whether the section that actually occupies a base slot is currently enabled. */
 export function isEffectiveSectionEnabled(tag, settings) {
-    const override = (settings.customSyspromptLibrary || [])
-        .find(p => p.origin === 'unlocked_base' && p.baseTag === tag && p._chatSetupMember !== false);
+    const override = findActiveUnlockedBaseOverride(settings.customSyspromptLibrary, tag);
     return override ? !!override.enabled : isBaseSectionEnabled(tag, settings);
 }
 
@@ -30,10 +36,6 @@ export function setLocationMappingEnabled(enabled, settings) {
     if (!settings) return;
     if (!settings.syspromptModules) settings.syspromptModules = {};
     settings.syspromptModules[LOCATION_MAPPING_SECTION_TAG] = !!enabled;
-    const override = (settings.customSyspromptLibrary || []).find(p =>
-        p.origin === 'unlocked_base'
-        && p.baseTag === LOCATION_MAPPING_SECTION_TAG
-        && p._chatSetupMember !== false,
-    );
+    const override = findActiveUnlockedBaseOverride(settings.customSyspromptLibrary, LOCATION_MAPPING_SECTION_TAG);
     if (override) override.enabled = !!enabled;
 }

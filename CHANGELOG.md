@@ -2,7 +2,10 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
-## [2026.8.28] - 2026-08-28
+## [2026.8.29] - 2026-08-29
+
+### Fixed
+- **Control Room cartridge isolation**: Editing or re-locking an unlocked built-in prompt section now targets only the override active in the current setup, instead of an older inactive override retained in another cartridge/chat's shared snippet library.
 
 ### Changed
 - **Narrator `<narrative>`**: Split NPC autonomy rules into clearer bullets; clarify non-omniscience (established narrative + archetype); guide tone/behavior from the injected permanent profile (identity fields above chronicle lines, since `[CORE]` markers are stripped for the GM).

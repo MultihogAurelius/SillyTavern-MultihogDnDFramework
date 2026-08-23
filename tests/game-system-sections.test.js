@@ -1,8 +1,34 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { isEffectiveSectionEnabled, isLocationMappingEnabled, setLocationMappingEnabled, LOCATION_MAPPING_SECTION_TAG } from '../src/state/section-enabled.js';
+import { findActiveUnlockedBaseOverride, isEffectiveSectionEnabled, isLocationMappingEnabled, setLocationMappingEnabled, LOCATION_MAPPING_SECTION_TAG } from '../src/state/section-enabled.js';
 
 describe('effective system-prompt section state', () => {
+    it('ignores an inactive override from another cartridge when resolving an unlocked base section', () => {
+        const inactiveZombieFooter = {
+            id: 'zombie-footer',
+            origin: 'unlocked_base',
+            baseTag: 'end_of_output_footer',
+            content: '<end_of_output_footer>Zombie footer</end_of_output_footer>',
+            enabled: false,
+            _chatSetupMember: false,
+        };
+        const activeFreshFooter = {
+            id: 'fresh-footer',
+            origin: 'unlocked_base',
+            baseTag: 'end_of_output_footer',
+            content: '<end_of_output_footer>Factory footer</end_of_output_footer>',
+            enabled: true,
+            _chatSetupMember: true,
+        };
+        const settings = {
+            customSyspromptLibrary: [inactiveZombieFooter, activeFreshFooter],
+        };
+
+        expect(findActiveUnlockedBaseOverride(settings.customSyspromptLibrary, 'end_of_output_footer'))
+            .toBe(activeFreshFooter);
+        expect(isEffectiveSectionEnabled('end_of_output_footer', settings)).toBe(true);
+    });
+
     it('keeps an enabled unlocked CYOA override active when the base toggle is off', () => {
         const settings = {
             syspromptModules: { CYOA_mode: false },

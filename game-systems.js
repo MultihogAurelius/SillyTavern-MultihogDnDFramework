@@ -28,7 +28,7 @@ import {
     autoApplySysprompt,
     fetchBaseSyspromptRaw,
 } from './src/app/runtime-bridge.js';
-import { isBaseSectionEnabled, isEffectiveSectionEnabled, setLocationMappingEnabled, LOCATION_MAPPING_SECTION_TAG } from './src/state/section-enabled.js';
+import { findActiveUnlockedBaseOverride, isBaseSectionEnabled, isEffectiveSectionEnabled, setLocationMappingEnabled, LOCATION_MAPPING_SECTION_TAG } from './src/state/section-enabled.js';
 import { isMapArchitectTextOpener, MAP_ARCHITECT_TEXT_OPENER_RULES, syncMapArchitectOpenerNestedVisibility } from './map-architect-opener.js';
 import { normalizeGmContent, unwrapManagedSectionContent } from './src/state/sysprompt-content.js';
 import { buildNarrativePacingSection } from './src/state/narrative-pacing.js';
@@ -350,9 +350,7 @@ const NARRATOR_TOGGLE_IDS = {
 const LOCATION_MAPPING_TOGGLE_TITLE = 'Alpha: builds persistent district-scale settlements and room-scale dungeons or significant interiors. Settlement buildings remain assets unless CreateAreaMap explicitly promotes them. Expect sharp edges.';
 
 export function isSectionUnlocked(settings, tag) {
-    return (settings.customSyspromptLibrary || []).some(p =>
-        p.origin === 'unlocked_base' && p.baseTag === tag && p._chatSetupMember !== false,
-    );
+    return !!findActiveUnlockedBaseOverride(settings.customSyspromptLibrary, tag);
 }
 
 /** Enables/disables a built-in base section and keeps the Narrator Configuration UI in sync. */
@@ -612,9 +610,7 @@ export function getSectionRowDescriptor(key, settings, baseSectionMap) {
     const library = settings.customSyspromptLibrary || [];
     if (key.startsWith('base:')) {
         const tag = key.slice(5);
-        const override = library.find(p =>
-            p.origin === 'unlocked_base' && p.baseTag === tag && p._chatSetupMember !== false,
-        );
+        const override = findActiveUnlockedBaseOverride(library, tag);
         if (override) {
             return {
                 key, kind: 'unlocked', tag,
@@ -2640,10 +2636,10 @@ export async function unlockBaseSection(tag, options = {}) {
 export async function relockBaseSection(tag, options = {}) {
     const { deferPersistence = false } = options;
     const settings = getSettings();
-    const removedIds = (settings.customSyspromptLibrary || [])
-        .filter(p => p.origin === 'unlocked_base' && p.baseTag === tag)
-        .map(p => p.id);
-    settings.customSyspromptLibrary = (settings.customSyspromptLibrary || []).filter(p => !(p.origin === 'unlocked_base' && p.baseTag === tag));
+    const activeOverride = findActiveUnlockedBaseOverride(settings.customSyspromptLibrary, tag);
+    const removedIds = activeOverride ? [activeOverride.id] : [];
+    settings.customSyspromptLibrary = (settings.customSyspromptLibrary || [])
+        .filter(p => p !== activeOverride);
     removeChatSetupCatalogEntries(settings, { syspromptIds: removedIds });
 
     if (!settings.syspromptModules) settings.syspromptModules = {};
@@ -2663,7 +2659,7 @@ export async function relockBaseSection(tag, options = {}) {
 export async function editUnlockedSection(tag, options = {}) {
     const { deferPersistence = false } = options;
     const settings = getSettings();
-    const item = (settings.customSyspromptLibrary || []).find(p => p.origin === 'unlocked_base' && p.baseTag === tag);
+    const item = findActiveUnlockedBaseOverride(settings.customSyspromptLibrary, tag);
     if (!item) return;
 
     const generateSection = async (desc) => {
