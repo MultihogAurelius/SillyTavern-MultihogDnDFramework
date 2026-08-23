@@ -978,6 +978,16 @@ function getSettingsInternal(extensionSettings) {
         s.settingsVersion = '2026.8.24.17';
     }
 
+    // 2026.8.32.1: Map Architect now locks topology first and runs the
+    // customizable system prompt only for content placement. Replace only the
+    // untouched one-pass prompt; preserve user-authored customization.
+    if (isOlderThan(s.settingsVersion, '2026.8.32.1')) {
+        if (promptSignature(s.mapArchitectSystemPrompt) === '18972:6771d6ba') {
+            s.mapArchitectSystemPrompt = DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT;
+        }
+        s.settingsVersion = '2026.8.32.1';
+    }
+
     // Stamp factory version even when a release has no field rewrites
     // (8.28.0 mapped-site index is prompt/injection only).
     if (isOlderThan(s.settingsVersion, FACTORY_SETTINGS_VERSION)) {

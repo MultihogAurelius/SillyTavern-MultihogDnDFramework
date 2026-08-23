@@ -2,8 +2,17 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { parseMapArchitectResponse } from '../map-architect-parser.js';
 import { buildMapArchitectReferenceContext } from '../map-architect-context.js';
-import { MAP_ARCHITECT_BRIEF_JSON_SCHEMA, MAP_ARCHITECT_JSON_SCHEMA } from '../map-architect-schema.js';
-import { DEFAULT_MAP_ARCHITECT_BRIEF_SYSTEM_PROMPT, DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT } from '../map-architect-prompt.js';
+import {
+    MAP_ARCHITECT_ASSETS_JSON_SCHEMA,
+    MAP_ARCHITECT_BRIEF_JSON_SCHEMA,
+    MAP_ARCHITECT_JSON_SCHEMA,
+    MAP_ARCHITECT_TOPOLOGY_JSON_SCHEMA,
+} from '../map-architect-schema.js';
+import {
+    DEFAULT_MAP_ARCHITECT_BRIEF_SYSTEM_PROMPT,
+    DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT,
+    DEFAULT_MAP_ARCHITECT_TOPOLOGY_SYSTEM_PROMPT,
+} from '../map-architect-prompt.js';
 import { resolveHostedCreationContext } from '../map-hosting-context.js';
 
 function mappedRecord(siteRoot, entryId, kind, areas, hostSite = '') {
@@ -50,6 +59,9 @@ describe('Map Architect component', () => {
         expect(context.promptContext).toContain('PARENT MAP CELL (LOCKED CONTEXT)');
         expect(context.promptContext).toContain('Target cell: Cellar Crypt [cellar-crypt]');
         expect(context.promptContext).toContain('Do not duplicate parent-cell occupants or props');
+        expect(context.topologyPromptContext).toContain('PARENT MAP CELL (LOCKED STRUCTURAL CONTEXT)');
+        expect(context.topologyPromptContext).toContain('Target cell: Cellar Crypt [cellar-crypt]');
+        expect(context.topologyPromptContext).not.toMatch(/asset/i);
     });
 
     it('keeps similar attachment cell names distinct and returns exact choices', () => {
@@ -225,7 +237,10 @@ describe('Map Architect component', () => {
         expect(router).toContain('detachDungeonMapFromLocationEntry');
         expect(architect).toContain('mapArchitectConnectionSource');
         expect(architect).not.toContain('mapRuntimeConnectionSource');
-        expect(architect).toContain("{ jsonSchema: MAP_ARCHITECT_JSON_SCHEMA, stream: true, debugSource: 'Map Architect' }");
+        expect(architect).toContain("{ jsonSchema: MAP_ARCHITECT_TOPOLOGY_JSON_SCHEMA, stream: true, debugSource: 'Map Architect: Topology' }");
+        expect(architect).toContain("{ jsonSchema: MAP_ARCHITECT_ASSETS_JSON_SCHEMA, stream: true, debugSource: 'Map Architect: Assets' }");
+        expect(architect).toContain('Topology locked with ${topology.areas.length} areas');
+        expect(architect).toContain('persistArchitectDungeonMap(args.site, completedMap');
         expect(architect).toContain('CreateAreaMap');
         expect(architect).toContain('Threat: ${args.threat}');
         expect(architect).toContain('Current in-world time (authoritative): ${currentTime');
@@ -238,6 +253,10 @@ describe('Map Architect component', () => {
     });
 
     it('defines the complete structured map response contract', () => {
+        expect(MAP_ARCHITECT_TOPOLOGY_JSON_SCHEMA.value.required).toEqual(['version', 'site', 'kind', 'threat', 'areas']);
+        expect(MAP_ARCHITECT_TOPOLOGY_JSON_SCHEMA.value.properties).not.toHaveProperty('assets');
+        expect(MAP_ARCHITECT_ASSETS_JSON_SCHEMA.value.required).toEqual(['assets']);
+        expect(Object.keys(MAP_ARCHITECT_ASSETS_JSON_SCHEMA.value.properties)).toEqual(['assets']);
         expect(MAP_ARCHITECT_JSON_SCHEMA.name).toBe('dungeon_map_v3');
         expect(MAP_ARCHITECT_JSON_SCHEMA.returnInvalid).toBe(true);
         expect(MAP_ARCHITECT_JSON_SCHEMA.value.required).toEqual(['version', 'site', 'areas', 'assets']);
@@ -288,7 +307,7 @@ describe('Map Architect component', () => {
     it('migrates only untouched shipped prompts to the new taxonomy defaults', () => {
         const defaults = readFileSync(new URL('../src/state/defaults.js', import.meta.url), 'utf8');
         const settings = readFileSync(new URL('../src/state/settings.js', import.meta.url), 'utf8');
-        expect(defaults).toContain("FACTORY_SETTINGS_VERSION = '2026.8.24.17'");
+        expect(defaults).toContain("FACTORY_SETTINGS_VERSION = '2026.8.32.1'");
         expect(settings).toContain('promptSignature');
         expect(settings).toContain("'14870:8b5acf86'");
         expect(settings).toContain("'9025:d21f2f49'");
@@ -306,6 +325,7 @@ describe('Map Architect component', () => {
         expect(settings).toContain("'18194:ff193c43'");
         expect(settings).toContain("'16929:720ad8e2'");
         expect(settings).toContain("'19809:21b3adcd'");
+        expect(settings).toContain("'18972:6771d6ba'");
         expect(settings).toContain('DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT');
         expect(settings).toContain('DEFAULT_MAP_UPDATER_SYSTEM_PROMPT');
         expect(settings).toContain('DEFAULT_MAP_EVOLUTION_SYSTEM_PROMPT');
@@ -324,63 +344,33 @@ describe('Map Architect component', () => {
         expect(DEFAULT_MAP_ARCHITECT_BRIEF_SYSTEM_PROMPT).not.toContain('CREATE ONE PRIVATE MAP');
     });
 
-    it('tells the architect to populate incidental objects instead of leaving them for later', () => {
-        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('Write every human-readable string in the same language and script');
-        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('Do not translate, transliterate, expand, or retitle them');
-        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('human-readable strings in the campaign language');
-        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('Threat is a site fact, never matched to party level');
-        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('Scale is size, not danger');
-        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('"threat":"NONE|LOW|MODERATE|HIGH|DEADLY"');
-        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).not.toContain('need not pre-invent');
-        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('copy that exact same string onto the reverse connection');
-        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('Never give a reciprocal pair two different detail strings');
-        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('Occasional hub/nexus layouts are welcome');
-        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('one area may have many routes');
-        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('KIND: DUNGEON');
-        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('KIND: INTERIOR');
-        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('KIND: SETTLEMENT');
-        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('never an alley, house, shop, rooftop, or street');
-        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('Areas are districts, gates, plazas');
-        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('Ordinary named structures are BUILDING assets');
-        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('Stalls, wells, statues, altars, and other props are OBJECT');
-        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('locked inclusion manifest');
-        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('may organically establish a SUBDUNGEON');
-        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('outside locked inclusions, normally create zero to two SUB* assets total');
-        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('Ordinary shops, inns, chapels, homes, and similar structures remain BUILDING');
-        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('exact canonical name of its future peer map');
-        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('private map-generation prompt');
-        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('does not by itself establish anything as perceived, discovered, suspected, or known');
-        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('Every other area defaults to UNREVEALED');
-        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('Familiar site');
-        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('mark every area VISITED');
-        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('party\'s home');
-        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('Prompt details, logical proximity, connectivity, and Architect-invented lines of sight never grant DISCOVERED knowledge');
-        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('Every asset defaults to UNREVEALED');
-        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('Use SUSPECTED only when player-facing recent story explicitly establishes a clue or rumor');
-        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('A KNOWN or SUSPECTED asset reveals its containing area');
-        expect(DEFAULT_MAP_ARCHITECT_BRIEF_SYSTEM_PROMPT).toContain('does not grant the player knowledge of any area or asset');
-        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('INDEPENDENT SCHEMA SNIPPETS');
-        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('orbital science fiction');
-        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('submerged research complex');
-        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('fairy-tale diplomacy');
-        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('near-future city');
-        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).not.toContain('Hall of the Ember-Ancestors');
-        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).not.toContain('Morrowfen');
-        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('a neutralized mechanism is DEACTIVATED');
-        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('"origin":"INITIAL_MAP"');
-        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('"state":"LOCKED"');
-        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('Never make a chapel, inn, shop, or house its own settlement area');
-        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('Never use kind NPC');
-        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('ONE GROUP asset with optional integer count');
-        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('"count":7');
-        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('Never split a pack into many identical CREATURE assets');
-        expect(MAP_ARCHITECT_JSON_SCHEMA.value.properties.assets.items.properties.count).toMatchObject({
+    it('keeps topology and content placement as strictly separate prompts', () => {
+        expect(DEFAULT_MAP_ARCHITECT_TOPOLOGY_SYSTEM_PROMPT).toContain('topology specialist');
+        expect(DEFAULT_MAP_ARCHITECT_TOPOLOGY_SYSTEM_PROMPT).toContain('Every connection must have a reverse connection');
+        expect(DEFAULT_MAP_ARCHITECT_TOPOLOGY_SYSTEM_PROMPT).toContain('byte-identical detail');
+        expect(DEFAULT_MAP_ARCHITECT_TOPOLOGY_SYSTEM_PROMPT).toContain('Geometry contains only the architectural envelope and fixed spatial structure');
+        expect(DEFAULT_MAP_ARCHITECT_TOPOLOGY_SYSTEM_PROMPT).toContain('Never inventory a room inside geometry');
+        expect(DEFAULT_MAP_ARCHITECT_TOPOLOGY_SYSTEM_PROMPT).toContain('company banner, reception desk, notice board');
+        expect(DEFAULT_MAP_ARCHITECT_TOPOLOGY_SYSTEM_PROMPT).toContain('if it could reasonably be examined, used, owned, searched, taken, damaged independently');
+        expect(DEFAULT_MAP_ARCHITECT_TOPOLOGY_SYSTEM_PROMPT).toContain('Familiar-site exception');
+        expect(DEFAULT_MAP_ARCHITECT_TOPOLOGY_SYSTEM_PROMPT).toContain('SMALL 4-7, MEDIUM 7-12, LARGE 12-20');
+        expect(DEFAULT_MAP_ARCHITECT_TOPOLOGY_SYSTEM_PROMPT).not.toMatch(/asset/i);
+
+        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('content-placement specialist');
+        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('do not alter, reproduce, rename, reorder, or add areas or connections');
+        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('functional rooms normally receive at least one meaningful item');
+        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('important rooms usually receive 2-4');
+        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('MEDIUM 16-28');
+        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('Do not create a BARRIER merely to duplicate');
+        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('Every entry defaults to UNREVEALED');
+        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('Never split a real group into identical singleton entries');
+        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('single cook, clerk, guard, servant');
+        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('GROUP must never use count:1');
+        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('Until Day 2, 4:40 AM');
+        expect(MAP_ARCHITECT_ASSETS_JSON_SCHEMA.value.properties.assets.items.properties.count).toMatchObject({
             type: 'integer', minimum: 1, maximum: 99,
         });
-        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('TIME MECHANICS');
-        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('duration field as an absolute in-world timestamp');
-        expect(DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT).toContain('Until Day 2, 4:40 AM');
-        expect(MAP_ARCHITECT_JSON_SCHEMA.value.properties.assets.items.properties.duration.description)
+        expect(MAP_ARCHITECT_ASSETS_JSON_SCHEMA.value.properties.assets.items.properties.duration.description)
             .toContain('absolute in-world temporal boundary');
     });
 });

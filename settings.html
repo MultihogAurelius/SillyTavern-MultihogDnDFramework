@@ -1416,7 +1416,7 @@
                             <div class="inline-drawer-content">
                                 <div class="flex-container flexFlowColumn gap-1">
                                     <div style="font-size: 0.8em; opacity: 0.72; line-height: 1.4;">
-                                        When the narrator first enters an unmapped dungeon or settlement, this dedicated agent runs once. Dungeons get a complete room-scale map; towns and cities get a district-scale map. The architect validates every passage and entity reference, stores it in the root Location entry, and returns a compact private version to the narrator.
+                                        When the narrator first enters an unmapped site, Map Architect first generates and locks its room/district topology, then runs a separate content-placement pass against those exact area IDs. Nothing is stored until both passes validate.
                                     </div>
                                     <small style="display:block; font-weight:bold; opacity:0.65; text-transform:uppercase; font-size:0.7em; letter-spacing:0.4px;">Opener</small>
                                     <label class="checkbox_label" title="Default. The narrator calls CreateAreaMap; SillyTavern pauses the turn until the map is ready.">
@@ -1434,15 +1434,15 @@
                                         <label style="flex:1; min-width:140px;">Story Lookback
                                             <input id="rpg_map_architect_lookback" type="text" inputmode="numeric" pattern="[0-9]*" min="0" max="100" class="text_pole" title="Recent chat messages supplied to Map Architect as established context." />
                                         </label>
-                                        <label style="flex:1; min-width:140px;">Max Output Tokens
-                                            <input id="rpg_map_architect_max_tokens" type="text" inputmode="numeric" pattern="[0-9]*" min="1000" max="32000" value="25000" class="text_pole" title="Maximum generation length for the complete JSON map." />
+                                        <label style="flex:1; min-width:140px;">Max Output Tokens per Pass
+                                            <input id="rpg_map_architect_max_tokens" type="text" inputmode="numeric" pattern="[0-9]*" min="1000" max="32000" value="25000" class="text_pole" title="Maximum generation length for each of the topology and content-placement responses." />
                                         </label>
                                     </div>
                                     <div class="flex-container gap-1" style="align-items:center; margin-bottom:4px;">
-                                        <span style="font-size:0.78em; opacity:0.65; flex:1;">Used only during CreateAreaMap / text-command opener runs.</span>
-                                        <button id="rpg_map_architect_reset_prompt" class="menu_button interactable" style="font-size:0.75em; padding:2px 8px;" title="Reset to the shipped Map Architect prompt"><i class="fa-solid fa-arrow-rotate-left"></i> Reset</button>
+                                        <span style="font-size:0.78em; opacity:0.65; flex:1;">Content-placement system prompt. The topology pass uses a separate strict structural contract.</span>
+                                        <button id="rpg_map_architect_reset_prompt" class="menu_button interactable" style="font-size:0.75em; padding:2px 8px;" title="Reset to the shipped Map Architect content-placement prompt"><i class="fa-solid fa-arrow-rotate-left"></i> Reset</button>
                                     </div>
-                                    <textarea id="rpg_map_architect_system_prompt" class="text_pole" rows="14" style="width:100%; font-size:0.78em; font-family:monospace; resize:vertical; box-sizing:border-box;" placeholder="Dedicated Map Architect system prompt"></textarea>
+                                    <textarea id="rpg_map_architect_system_prompt" class="text_pole" rows="14" style="width:100%; font-size:0.78em; font-family:monospace; resize:vertical; box-sizing:border-box;" placeholder="Map Architect content-placement system prompt"></textarea>
                                 </div>
                             </div>
                         </div>

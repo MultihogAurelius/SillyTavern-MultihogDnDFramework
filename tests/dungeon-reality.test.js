@@ -148,7 +148,7 @@ describe('Map Architect validation', () => {
         expect(rejected.errors.some(error => error.code === 'OFFSITE_AREA_VISITED')).toBe(true);
     });
 
-    it('automatically discovers the effective area of known or suspected assets', () => {
+    it('requires initial known/suspected assets to respect the locked area knowledge', () => {
         const raw = {
             version: 3,
             site: 'Hollow Creek',
@@ -173,8 +173,14 @@ describe('Map Architect validation', () => {
         const architect = validateDungeonMapArchitecture(architectRaw, {
             site: 'Hollow Creek', entrance: 'East Outskirts', kind: 'SETTLEMENT',
         });
-        expect(architect.valid).toBe(true);
-        expect(architect.document.areas.find(area => area.id === 'main-street')?.knowledge).toBe('DISCOVERED');
+        expect(architect.valid).toBe(false);
+        expect(architect.errors.some(error => error.code === 'ASSET_KNOWLEDGE_AREA_MISMATCH')).toBe(true);
+
+        architectRaw.areas[1].knowledge = 'DISCOVERED';
+        const correctedArchitect = validateDungeonMapArchitecture(architectRaw, {
+            site: 'Hollow Creek', entrance: 'East Outskirts', kind: 'SETTLEMENT',
+        });
+        expect(correctedArchitect.valid).toBe(true);
 
         const updated = applyDungeonMapTransaction({ ...structuredClone(raw), assets: [] }, {
             operation_id: 'hollow-creek-store-spotted',
@@ -438,7 +444,7 @@ describe('Map Architect validation', () => {
         expect(placement.interiorAsset).toBeNull();
     });
 
-    it('accepts pack count on initial assets and rejects count 0', () => {
+    it('accepts real pack counts and rejects zero or one-member groups', () => {
         const withCount = structuredClone(connectedArchitectMap);
         withCount.assets[0].kind = 'GROUP';
         withCount.assets[0].name = 'Listening Ghoul Pack';
@@ -458,6 +464,16 @@ describe('Map Architect validation', () => {
         });
         expect(rejected.valid).toBe(false);
         expect(rejected.errors.some(error => error.code === 'INVALID_COUNT')).toBe(true);
+
+        const singletonGroup = structuredClone(withCount);
+        singletonGroup.assets[0].name = 'Company Cook';
+        singletonGroup.assets[0].count = 1;
+        const singletonRejected = validateDungeonMapArchitecture(singletonGroup, {
+            site: 'Abbey Undercroft',
+            entrance: 'Cellar Landing',
+        });
+        expect(singletonRejected.valid).toBe(false);
+        expect(singletonRejected.errors.some(error => error.code === 'GROUP_COUNT_TOO_SMALL')).toBe(true);
     });
 
     it('uses district-scale area counts for SETTLEMENT maps and stamps kind', () => {

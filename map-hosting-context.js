@@ -55,6 +55,15 @@ function buildHostCellPrompt(hostDocument, hostArea) {
     return `PARENT MAP CELL (LOCKED CONTEXT)\nParent map: ${hostDocument.site} (${hostDocument.kind})\nTarget cell: ${hostArea.name} [${hostArea.id}]\nCell knowledge: ${hostArea.knowledge}\nGeometry:\n${(hostArea.geometry || []).map(line => `- ${line}`).join('\n') || '- none'}\nParent routes:\n${routes.map(line => `- ${line}`).join('\n') || '- none'}\nExisting parent-cell assets:\n${assets.map(asset => `- ${asset.id}: ${asset.kind} "${asset.name}" (${asset.state}, ${asset.knowledge})${asset.detail ? ` — ${asset.detail}` : ''}`).join('\n') || '- none'}\nThe target cell remains on the parent map and receives the child gateway. The child map begins at its requested entrance. Do not duplicate parent-cell occupants or props inside the child unless the map-generation prompt or recent story explicitly establishes that they crossed the gateway.`;
 }
 
+function buildHostTopologyPrompt(hostDocument, hostArea) {
+    const areasById = new Map((hostDocument.areas || []).map(area => [area.id, area]));
+    const routes = (hostArea.connections || []).map(connection => {
+        const target = areasById.get(connection.to);
+        return `${target?.name || connection.to} (${connection.state})${connection.detail ? ` — ${connection.detail}` : ''}`;
+    });
+    return `PARENT MAP CELL (LOCKED STRUCTURAL CONTEXT)\nParent map: ${hostDocument.site} (${hostDocument.kind})\nTarget cell: ${hostArea.name} [${hostArea.id}]\nCell knowledge: ${hostArea.knowledge}\nGeometry:\n${(hostArea.geometry || []).map(line => `- ${line}`).join('\n') || '- none'}\nParent routes:\n${routes.map(line => `- ${line}`).join('\n') || '- none'}\nThe target cell remains on the parent map. The child graph begins at its requested entrance.`;
+}
+
 /** Resolve an explicit offsite attachment or the active-map shorthand. */
 export function resolveHostedCreationContext(current, currentLocation, args) {
     const attachTo = normalizeMapAttachment(args.attachTo);
@@ -125,6 +134,7 @@ export function resolveHostedCreationContext(current, currentLocation, args) {
         peerSite: buildHostedPeerSitePath(hostDocument, hostedAsset),
         expectedAssetKind,
         briefDescription: args.briefDescription,
+        topologyPromptContext: buildHostTopologyPrompt(hostDocument, hostArea),
         promptContext: buildHostCellPrompt(hostDocument, hostArea),
         explicit: !!attachTo,
         hostDepth: chain.length,

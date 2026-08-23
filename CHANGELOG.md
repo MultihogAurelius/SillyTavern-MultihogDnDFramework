@@ -2,6 +2,12 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.33] - 2026-08-24
+
+### Changed
+- **Two-stage Map Architect**: Initial generation now validates and locks an areas/connections-only topology before a separate asset-only placement request. The topology prompt contains no asset contract, placement cannot rewrite the graph, corrections remain local to the failed stage, and nothing is persisted until the merged map validates. Content guidance now targets materially populated functional spaces without duplicating ordinary connection states as barrier assets.
+- **Cleaner topology/content boundary**: Topology geometry now explicitly excludes furnishing-style room inventories, with contrastive examples for desks, banners, boards, tools, and other independently interactable contents. Content placement treats every single worker or creature as `CREATURE`; `GROUP` with `count: 1` is rejected before persistence.
+
 ## [2026.8.32] - 2026-08-24
 
 ### Fixed

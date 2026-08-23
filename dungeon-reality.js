@@ -810,6 +810,17 @@ export function validateDungeonMapArchitecture(raw, { site = '', entrance = '', 
         }
         if (!ASSET_KNOWLEDGE.includes(asset.knowledge)) errors.push(architectureError('INVALID_ASSET_KNOWLEDGE', `${path}.knowledge`, asset.knowledge, `Use one of: ${ASSET_KNOWLEDGE.join(', ')}.`));
         if (!areaIds.has(asset.location)) errors.push(architectureError('UNKNOWN_ASSET_LOCATION', `${path}.location`, asset.location, 'Place every initial asset in an existing area.'));
+        else if (['KNOWN', 'SUSPECTED'].includes(asset.knowledge)) {
+            const containingArea = areas.find(area => area?.id === asset.location);
+            if (containingArea?.knowledge === 'UNREVEALED') {
+                errors.push(architectureError(
+                    'ASSET_KNOWLEDGE_AREA_MISMATCH',
+                    `${path}.knowledge`,
+                    asset.knowledge,
+                    'A KNOWN or SUSPECTED initial asset must occupy a DISCOVERED or VISITED area. The locked topology cannot be changed during content placement, so use UNREVEALED here.',
+                ));
+            }
+        }
         if (typeof asset.detail !== 'string') errors.push(architectureError('INVALID_ASSET_DETAIL', `${path}.detail`, asset.detail, 'Supply a concise string; use "" when no detail is needed.'));
         if (asset.origin !== 'INITIAL_MAP') errors.push(architectureError('INVALID_ASSET_ORIGIN', `${path}.origin`, asset.origin, 'Initial Map Architect assets must use origin "INITIAL_MAP".'));
         for (const field of ['behavior', 'faction', 'owner', 'duration', 'cause', 'actor', 'changed_at']) {
@@ -821,6 +832,8 @@ export function validateDungeonMapArchitecture(raw, { site = '', entrance = '', 
             const count = Math.floor(Number(asset.count));
             if (!Number.isFinite(count) || count < 1 || count > MAX_ASSET_COUNT) {
                 errors.push(architectureError('INVALID_COUNT', `${path}.count`, asset.count, `count is living members of this one asset (1-${MAX_ASSET_COUNT}). Packs stay one GROUP with count; use DESTROYED/DEAD instead of 0.`));
+            } else if (asset.kind === 'GROUP' && count < 2) {
+                errors.push(architectureError('GROUP_COUNT_TOO_SMALL', `${path}.count`, asset.count, 'A GROUP must contain at least 2 members. Represent one cook, clerk, guard, servant, animal, construct, or other single being as CREATURE.'));
             }
         }
         if (asset.route !== undefined) {
