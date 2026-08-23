@@ -400,6 +400,7 @@
                                     <div class="flex-container flexFlowColumn gap-1">
                                         <div style="font-size: 0.72em; opacity: 0.55; line-height: 1.35; margin-bottom: 2px;">
                                             These are the system prompts sent to the LLM to write an image-generation prompt. The NPC/PC prompt receives the full lorebook entry verbatim — including any custom <code>[CORE]</code> field you've added (e.g. an "Image Tags" section via the NPC Section Editor), so you can instruct it to prioritize that field by name. Tokens: <code>{{name}}</code> is replaced with the entity's name, <code>{{wordtarget}}</code> is replaced with the word target set below.
+                                            <br>Use <b>Factory Art Styles</b> below to swap the art-style guidance across all three prompts, or <b>Save Setup</b> to keep your own presets. <b>Fantasy (Default)</b> matches the historical Multihog prompts and is what Reset restores.
                                         </div>
 
                                         <div style="display:flex; align-items:center; gap:8px; margin-bottom: 4px;">
@@ -434,9 +435,10 @@
                                         <div class="flex-container gap-1" style="margin-top: 6px;">
                                             <button id="rpg_portrait_prompt_preset_save_btn" class="menu_button interactable" style="flex: 1; font-size: 11px;"><i class="fa-solid fa-bookmark"></i> Save Setup to Library</button>
                                         </div>
-                                        <div id="rpg_portrait_prompt_presets_container" style="display:none; margin-top: 8px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 8px;">
-                                            <b style="font-size: 0.85em; opacity: 0.8;">Saved Setups</b>
-                                            <div id="rpg_portrait_prompt_presets_list" class="flex-container flexFlowColumn gap-1"></div>
+                                        <div id="rpg_portrait_prompt_presets_container" style="margin-top: 8px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 8px;">
+                                            <b style="font-size: 0.85em; opacity: 0.8;">Portrait Prompt Presets</b>
+                                            <div style="font-size: 0.7em; opacity: 0.5; margin: 2px 0 4px;">Click a style or saved setup to load it into the templates above.</div>
+                                            <div id="rpg_portrait_prompt_presets_list" class="flex-container flexFlowColumn gap-1" style="max-height: 220px; overflow-y: auto; padding-right: 4px;"></div>
                                         </div>
                                     </div>
                                 </div>

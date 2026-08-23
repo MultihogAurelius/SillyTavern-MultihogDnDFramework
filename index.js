@@ -1,5 +1,5 @@
 import { EXAMPLES, COLOR_EXAMPLES, DEFAULT_STOCK_PROMPTS, RT_PROMPTS, BLOCK_ICONS, BLOCK_ORDER, PAGE_SIZE, NO_PAGINATE, buildOnboardingXpHint, buildOnboardingTimeHint, buildStartingGearHint, buildOnboardingActiveBlocks, buildCombatAndSkillScalingHint, resolveTimePromptKey, resolveTimePromptDisplayTag, buildCyoaPrompt, DEFAULT_CYOA_SLOTS, refreshCyoaConfigToShipped, formatTimeOfDay } from './constants.js';
-import { MODULE_NAME, DEFAULT_MODULES, MODULE_BOOK_CATEGORY, FULL_REVIEW_STATE_SYSTEM_PROMPT, FULL_REVIEW_USER_PROMPT_SUFFIX, getSettings, getBarBackground, migrateCustomFields, saveChatState, getActiveChatId, shouldPreserveLiveChatStateOnBoot, writeModuleSchemaBackup, getPendingModuleSchemaBackup, applyModuleSchemaBackup, applyDeletedCustomTagTombstones, recordDeletedCustomTags, clearDeletedCustomTagTombstones, saveProfile, deleteProfile, getEffectiveRouterCampaignPrefix, sanitizeCampaignPrefixString, buildNpcInstruction, LOREBOOK_FULL_AUDIT_INSTRUCTION, loadStockPromptsFromProfile, getNpcRelationshipMax, getNpcRelationshipMaxDefault, clampRelationshipValue, relationshipBarPct, getFriendshipTier, getAffectionTier, getRelTierBadgeStyle, getRelTierDetailedStyle, getRelTierDetailedLabelStyle, applyRelTierBadgeElement, sanitizeRouterState, rebuildAllModuleInstructions, adjustAllStoredTemplatesForTimeFormat, DEFAULT_NPC_SECTIONS, DEFAULT_PC_SECTIONS, computeBundledPromptsFingerprint, computeBundledPromptsFingerprintForSnapshot, normalizeBundledPromptsSnapshot, buildBundledPromptsSnapshot, getSnapshotCategoryBlocks, getPromptCategoryImpactBadge, PROMPT_DEFAULTS_CATEGORIES, PROMPT_DEFAULTS_CATEGORY_LABELS, getDefaultPortraitLocationSystemPrompt, isShippedPortraitLocationSystemPrompt, applyFactoryReset, clearExtensionLocalStorageUiState, stripChatStateGlobalUiPrefs, buildStateTrackerRelationshipCommandInstruction, extractStateTrackerRelationshipCommands, getRelationshipUpdateMode, RELATIONSHIP_UPDATE_MODES, resetLorebookPromptTemplates, writeCriticalSettingsBackup, stampCriticalSettingsSynced, applyCriticalSettingsBackup, isMainSyspromptBackupEnabled, captureMainSyspromptBackup, restoreMainSyspromptStash, hydrateMainSyspromptBackup, getEffectiveBackupText, getLiveMainSyspromptText, setLiveMainSyspromptText, maybeRestoreMainIfTrackerDisabled, isMainSyspromptSourceReady } from './state-manager.js';
+import { MODULE_NAME, DEFAULT_MODULES, MODULE_BOOK_CATEGORY, FULL_REVIEW_STATE_SYSTEM_PROMPT, FULL_REVIEW_USER_PROMPT_SUFFIX, getSettings, getBarBackground, migrateCustomFields, saveChatState, getActiveChatId, shouldPreserveLiveChatStateOnBoot, writeModuleSchemaBackup, getPendingModuleSchemaBackup, applyModuleSchemaBackup, applyDeletedCustomTagTombstones, recordDeletedCustomTags, clearDeletedCustomTagTombstones, saveProfile, deleteProfile, getEffectiveRouterCampaignPrefix, sanitizeCampaignPrefixString, buildNpcInstruction, LOREBOOK_FULL_AUDIT_INSTRUCTION, loadStockPromptsFromProfile, getNpcRelationshipMax, getNpcRelationshipMaxDefault, clampRelationshipValue, relationshipBarPct, getFriendshipTier, getAffectionTier, getRelTierBadgeStyle, getRelTierDetailedStyle, getRelTierDetailedLabelStyle, applyRelTierBadgeElement, sanitizeRouterState, rebuildAllModuleInstructions, adjustAllStoredTemplatesForTimeFormat, DEFAULT_NPC_SECTIONS, DEFAULT_PC_SECTIONS, computeBundledPromptsFingerprint, computeBundledPromptsFingerprintForSnapshot, normalizeBundledPromptsSnapshot, buildBundledPromptsSnapshot, getSnapshotCategoryBlocks, getPromptCategoryImpactBadge, PROMPT_DEFAULTS_CATEGORIES, PROMPT_DEFAULTS_CATEGORY_LABELS, getDefaultPortraitLocationSystemPrompt, getDefaultPortraitNpcSystemPrompt, getDefaultPortraitCharacterSystemPrompt, isShippedPortraitLocationSystemPrompt, findShippedPortraitLocationPresetId, FACTORY_PORTRAIT_PROMPT_PRESETS, resolveFactoryPortraitPromptBundle, getFactoryPortraitPromptPresetNameSet, DEFAULT_PORTRAIT_PROMPT_PRESET_ID, applyFactoryReset, clearExtensionLocalStorageUiState, stripChatStateGlobalUiPrefs, buildStateTrackerRelationshipCommandInstruction, extractStateTrackerRelationshipCommands, getRelationshipUpdateMode, RELATIONSHIP_UPDATE_MODES, resetLorebookPromptTemplates, writeCriticalSettingsBackup, stampCriticalSettingsSynced, applyCriticalSettingsBackup, isMainSyspromptBackupEnabled, captureMainSyspromptBackup, restoreMainSyspromptStash, hydrateMainSyspromptBackup, getEffectiveBackupText, getLiveMainSyspromptText, setLiveMainSyspromptText, maybeRestoreMainIfTrackerDisabled, isMainSyspromptSourceReady } from './state-manager.js';
 import { snapshotChatSetup, chatSetupsMatch, syncChatSetupCatalogs, removeChatSetupCatalogEntries, clearChatBoundActivations } from './src/state/chat-setup.js';
 import { buildDirectPromptSystemPrompt, DIRECT_PROMPT_SYSTEM_MODES } from './src/state/direct-prompt-system.js';
 import { diffTextLines, diffHasChanges } from './prompt-diff.js';
@@ -1117,12 +1117,16 @@ function setPortraitLocationPromptTextarea(text) {
 function syncPortraitLocationPromptForNpcToggle(settings, includePresentNpcs, opts = {}) {
     const fromSettings = settings.portraitLocationSystemPrompt || '';
     const fromTextarea = String($('#rpg_portrait_location_system_prompt').val() || '');
+    const styleId = findShippedPortraitLocationPresetId(fromSettings)
+        || findShippedPortraitLocationPresetId(fromTextarea)
+        || settings.activePortraitPromptPresetId
+        || DEFAULT_PORTRAIT_PROMPT_PRESET_ID;
     const shouldSwap = !!opts.force
         || !fromSettings.trim()
         || isShippedPortraitLocationSystemPrompt(fromSettings)
         || isShippedPortraitLocationSystemPrompt(fromTextarea);
     if (!shouldSwap) return;
-    settings.portraitLocationSystemPrompt = getDefaultPortraitLocationSystemPrompt(includePresentNpcs);
+    settings.portraitLocationSystemPrompt = getDefaultPortraitLocationSystemPrompt(includePresentNpcs, styleId);
     setPortraitLocationPromptTextarea(settings.portraitLocationSystemPrompt);
 }
 
@@ -3444,27 +3448,69 @@ async function showLorebookAgentDocumentation() {
     await Popup.show.confirm('📖 Lorebook Agent Documentation', content, RT_HELP_POPUP_OPTS);
 }
 
+/**
+ * Apply a portrait prompt preset bundle into settings + visible textareas.
+ * @param {object} settings
+ * @param {{ npcSystemPrompt?: string, characterSystemPrompt?: string, locationSystemPrompt?: string, includePresentNpcs?: boolean, wordTarget?: number }} bundle
+ * @param {{ activeId?: string|null }} [meta]
+ */
+function applyPortraitPromptPresetBundle(settings, bundle, meta = {}) {
+    if (bundle.npcSystemPrompt !== undefined) {
+        settings.portraitNpcSystemPrompt = bundle.npcSystemPrompt || '';
+    }
+    if (bundle.characterSystemPrompt !== undefined) {
+        settings.portraitCharacterSystemPrompt = bundle.characterSystemPrompt || '';
+    }
+    if (bundle.locationSystemPrompt !== undefined) {
+        settings.portraitLocationSystemPrompt = bundle.locationSystemPrompt || '';
+    }
+    if (bundle.includePresentNpcs !== undefined) {
+        settings.portraitLocationIncludePresentNpcs = !!bundle.includePresentNpcs;
+    }
+    if (bundle.wordTarget !== undefined) {
+        settings.portraitPromptWordTarget = bundle.wordTarget;
+    }
+    if (meta.activeId !== undefined) {
+        settings.activePortraitPromptPresetId = meta.activeId || '';
+    }
+
+    $('#rpg_portrait_npc_system_prompt').val(settings.portraitNpcSystemPrompt);
+    $('#rpg_portrait_character_system_prompt').val(settings.portraitCharacterSystemPrompt);
+    if (bundle.locationSystemPrompt !== undefined) {
+        setPortraitLocationPromptTextarea(settings.portraitLocationSystemPrompt);
+    }
+    if (bundle.includePresentNpcs !== undefined) {
+        $('#rpg_portrait_location_include_present_npcs').prop('checked', !!settings.portraitLocationIncludePresentNpcs);
+    }
+    if (bundle.wordTarget !== undefined) {
+        $('#rpg_portrait_prompt_word_target').val(settings.portraitPromptWordTarget);
+    }
+    syncLocationImageDependentUi(settings);
+}
+
 function refreshPortraitPromptPresetsList() {
     const settings = getSettings();
     const container = document.getElementById('rpg_portrait_prompt_presets_container');
     const list = document.getElementById('rpg_portrait_prompt_presets_list');
     if (!container || !list) return;
 
-    const entries = Object.entries(settings.savedPortraitPromptPresets || {});
-    if (entries.length === 0) {
-        container.style.display = 'none';
-        return;
-    }
-
     container.style.display = 'block';
     list.innerHTML = '';
 
-    entries.forEach(([name, preset]) => {
+    const appendSectionLabel = (label) => {
+        const header = document.createElement('div');
+        header.textContent = label;
+        header.style.cssText = 'font-size:0.78em;font-weight:bold;opacity:0.7;margin:6px 0 2px;';
+        list.appendChild(header);
+    };
+
+    const appendRow = ({ name, title, onLoad, onDelete, active }) => {
         const row = document.createElement('div');
         row.className = 'flex-container alignitemscenter gap-1';
-        row.style.background = 'rgba(255,255,255,0.05)';
+        row.style.background = active ? 'rgba(120,180,255,0.12)' : 'rgba(255,255,255,0.05)';
         row.style.padding = '4px 8px';
         row.style.borderRadius = '4px';
+        if (active) row.style.outline = '1px solid rgba(120,180,255,0.35)';
 
         const nameSpan = document.createElement('span');
         nameSpan.textContent = name;
@@ -3472,54 +3518,70 @@ function refreshPortraitPromptPresetsList() {
         nameSpan.style.fontSize = '0.85em';
         nameSpan.style.cursor = 'pointer';
         nameSpan.className = 'interactable';
-        nameSpan.title = 'Click to load this portrait prompt setup';
-        nameSpan.addEventListener('click', () => {
-            settings.portraitNpcSystemPrompt = preset.npcSystemPrompt || '';
-            settings.portraitCharacterSystemPrompt = preset.characterSystemPrompt || '';
-            if (preset.locationSystemPrompt !== undefined) {
-                settings.portraitLocationSystemPrompt = preset.locationSystemPrompt || '';
-            }
-            if (preset.includePresentNpcs !== undefined) {
-                settings.portraitLocationIncludePresentNpcs = !!preset.includePresentNpcs;
-            }
-            if (preset.wordTarget !== undefined) {
-                settings.portraitPromptWordTarget = preset.wordTarget;
-            }
-            saveSettings();
-
-            $('#rpg_portrait_npc_system_prompt').val(settings.portraitNpcSystemPrompt);
-            $('#rpg_portrait_character_system_prompt').val(settings.portraitCharacterSystemPrompt);
-            if (preset.locationSystemPrompt !== undefined) {
-                setPortraitLocationPromptTextarea(settings.portraitLocationSystemPrompt);
-            }
-            if (preset.includePresentNpcs !== undefined) {
-                $('#rpg_portrait_location_include_present_npcs').prop('checked', !!settings.portraitLocationIncludePresentNpcs);
-            }
-            if (preset.wordTarget !== undefined) {
-                $('#rpg_portrait_prompt_word_target').val(settings.portraitPromptWordTarget);
-            }
-            syncLocationImageDependentUi(settings);
-
-            toastr['success'](`Loaded portrait prompt setup: ${name}`, 'Portrait Prompt Library');
-        });
-
-        const delBtn = document.createElement('i');
-        delBtn.className = 'fa-solid fa-trash-can interactable';
-        delBtn.style.fontSize = '0.8em';
-        delBtn.style.opacity = '0.5';
-        delBtn.title = 'Delete setup';
-        delBtn.addEventListener('click', () => {
-            if (confirm(`Are you sure you want to delete the portrait prompt setup "${name}"?`)) {
-                delete settings.savedPortraitPromptPresets[name];
-                saveSettings();
-                refreshPortraitPromptPresetsList();
-                toastr['info'](`Deleted setup: ${name}`, 'Portrait Prompt Library');
-            }
-        });
+        nameSpan.title = title || 'Click to load this portrait prompt setup';
+        nameSpan.addEventListener('click', onLoad);
 
         row.appendChild(nameSpan);
-        row.appendChild(delBtn);
+
+        if (typeof onDelete === 'function') {
+            const delBtn = document.createElement('i');
+            delBtn.className = 'fa-solid fa-trash-can interactable';
+            delBtn.style.fontSize = '0.8em';
+            delBtn.style.opacity = '0.5';
+            delBtn.title = 'Delete setup';
+            delBtn.addEventListener('click', onDelete);
+            row.appendChild(delBtn);
+        }
+
         list.appendChild(row);
+    };
+
+    appendSectionLabel('Factory Art Styles');
+    for (const preset of FACTORY_PORTRAIT_PROMPT_PRESETS) {
+        appendRow({
+            name: preset.name,
+            title: preset.description || `Load factory style: ${preset.name}`,
+            active: settings.activePortraitPromptPresetId === preset.id,
+            onLoad: () => {
+                const includeNpcs = !!settings.portraitLocationIncludePresentNpcs;
+                const bundle = resolveFactoryPortraitPromptBundle(preset.id, includeNpcs);
+                applyPortraitPromptPresetBundle(settings, {
+                    npcSystemPrompt: bundle.npcSystemPrompt,
+                    characterSystemPrompt: bundle.characterSystemPrompt,
+                    locationSystemPrompt: bundle.locationSystemPrompt,
+                    wordTarget: bundle.wordTarget,
+                }, { activeId: preset.id });
+                saveSettings();
+                refreshPortraitPromptPresetsList();
+                toastr['success'](`Loaded factory style: ${preset.name}`, 'Portrait Prompt Library');
+            },
+        });
+    }
+
+    const entries = Object.entries(settings.savedPortraitPromptPresets || {});
+    appendSectionLabel(entries.length ? 'Your Saved Setups' : 'Your Saved Setups (none yet)');
+    entries.forEach(([name, preset]) => {
+        appendRow({
+            name,
+            active: settings.activePortraitPromptPresetId === `user:${name}`,
+            onLoad: () => {
+                applyPortraitPromptPresetBundle(settings, preset, { activeId: `user:${name}` });
+                saveSettings();
+                refreshPortraitPromptPresetsList();
+                toastr['success'](`Loaded portrait prompt setup: ${name}`, 'Portrait Prompt Library');
+            },
+            onDelete: () => {
+                if (confirm(`Are you sure you want to delete the portrait prompt setup "${name}"?`)) {
+                    delete settings.savedPortraitPromptPresets[name];
+                    if (settings.activePortraitPromptPresetId === `user:${name}`) {
+                        settings.activePortraitPromptPresetId = '';
+                    }
+                    saveSettings();
+                    refreshPortraitPromptPresetsList();
+                    toastr['info'](`Deleted setup: ${name}`, 'Portrait Prompt Library');
+                }
+            },
+        });
     });
 }
 
@@ -7415,17 +7477,23 @@ function organizeConnectionSettingsUI() {
 
         $('#rpg_portrait_npc_system_prompt').val(settings.portraitNpcSystemPrompt).on('input', function () {
             settings.portraitNpcSystemPrompt = String($(this).val() || '');
+            settings.activePortraitPromptPresetId = '';
             saveSettings();
+            refreshPortraitPromptPresetsList();
         });
 
         $('#rpg_portrait_character_system_prompt').val(settings.portraitCharacterSystemPrompt).on('input', function () {
             settings.portraitCharacterSystemPrompt = String($(this).val() || '');
+            settings.activePortraitPromptPresetId = '';
             saveSettings();
+            refreshPortraitPromptPresetsList();
         });
 
         $('#rpg_portrait_location_system_prompt').val(settings.portraitLocationSystemPrompt || '').on('input', function () {
             settings.portraitLocationSystemPrompt = String($(this).val() || '');
+            settings.activePortraitPromptPresetId = '';
             saveSettings();
+            refreshPortraitPromptPresetsList();
         });
 
         $('#rpg_portrait_location_include_present_npcs').prop('checked', !!settings.portraitLocationIncludePresentNpcs).on('change', function () {
@@ -7451,13 +7519,15 @@ function organizeConnectionSettingsUI() {
             if (extensionSettings[MODULE_NAME]) {
                 delete extensionSettings[MODULE_NAME].portraitNpcSystemPrompt;
             }
-            const freshDefault = getSettings().portraitNpcSystemPrompt;
+            const freshDefault = getDefaultPortraitNpcSystemPrompt();
 
             const s = getSettings();
             s.portraitNpcSystemPrompt = freshDefault;
+            s.activePortraitPromptPresetId = '';
 
             $('#rpg_portrait_npc_system_prompt').val(freshDefault);
             saveSettings();
+            refreshPortraitPromptPresetsList();
             toastr['success']('NPC/PC Portrait Prompt reset to default.', 'RPG Tracker');
         });
 
@@ -7468,13 +7538,15 @@ function organizeConnectionSettingsUI() {
             if (extensionSettings[MODULE_NAME]) {
                 delete extensionSettings[MODULE_NAME].portraitCharacterSystemPrompt;
             }
-            const freshDefault = getSettings().portraitCharacterSystemPrompt;
+            const freshDefault = getDefaultPortraitCharacterSystemPrompt();
 
             const s = getSettings();
             s.portraitCharacterSystemPrompt = freshDefault;
+            s.activePortraitPromptPresetId = '';
 
             $('#rpg_portrait_character_system_prompt').val(freshDefault);
             saveSettings();
+            refreshPortraitPromptPresetsList();
             toastr['success']('Character/Party/Combat Portrait Prompt reset to default.', 'RPG Tracker');
         });
 
@@ -7489,9 +7561,11 @@ function organizeConnectionSettingsUI() {
             const s = getSettings();
             const freshDefault = getDefaultPortraitLocationSystemPrompt(!!s.portraitLocationIncludePresentNpcs);
             s.portraitLocationSystemPrompt = freshDefault;
+            s.activePortraitPromptPresetId = '';
 
             setPortraitLocationPromptTextarea(freshDefault);
             saveSettings();
+            refreshPortraitPromptPresetsList();
             toastr['success']('Location Scene Prompt reset to default.', 'RPG Tracker');
         });
 
@@ -7499,6 +7573,10 @@ function organizeConnectionSettingsUI() {
             const name = prompt('Enter a name for this portrait prompt setup:', 'My Portrait Prompts');
             if (!name || !name.trim()) return;
             const trimmedName = name.trim();
+            if (getFactoryPortraitPromptPresetNameSet().has(trimmedName.toLowerCase())) {
+                toastr['warning'](`"${trimmedName}" is a factory art style name. Choose a different name for your saved setup.`, 'Portrait Prompt Library');
+                return;
+            }
             if (settings.savedPortraitPromptPresets && settings.savedPortraitPromptPresets[trimmedName]) {
                 if (!confirm(`A setup named "${trimmedName}" already exists. Overwrite?`)) return;
             }
@@ -7510,6 +7588,7 @@ function organizeConnectionSettingsUI() {
                 includePresentNpcs: !!settings.portraitLocationIncludePresentNpcs,
                 wordTarget: settings.portraitPromptWordTarget,
             };
+            settings.activePortraitPromptPresetId = `user:${trimmedName}`;
             saveSettings();
             refreshPortraitPromptPresetsList();
             toastr['success'](`Saved "${trimmedName}" to library.`, 'Portrait Prompt Library');

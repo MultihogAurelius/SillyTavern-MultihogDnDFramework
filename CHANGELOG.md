@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.30] - 2026-08-30
+
+### Added
+- **Portrait Prompt Art-Style Presets**: Portrait Prompt Templates now ship factory art-style presets (Fantasy Default, Anime, Photorealistic, Oil Painting, Comic Book, Watercolor, Dark Fantasy). Click to load a style across NPC/PC, Character/Party/Combat, and Location Scene prompts. User Save Setup library remains available underneath; factory names are reserved. Present-NPC location toggle still swaps only within the active shipped style. Preset list scrolls in its own pane.
+
 ## [2026.8.29] - 2026-08-29
 
 ### Fixed

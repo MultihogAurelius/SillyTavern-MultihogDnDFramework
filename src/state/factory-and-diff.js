@@ -535,6 +535,7 @@ const CARTRIDGE_PAYLOAD_KEYS = [
     'portraitCharacterSystemPrompt',
     'portraitLocationSystemPrompt',
     'portraitPromptWordTarget',
+    'activePortraitPromptPresetId',
     'savedPortraitPromptPresets',
     'npcCoreSections',
     'pcCoreSections',
@@ -621,7 +622,7 @@ export const CARTRIDGE_PAYLOAD_GROUPS = [
         description: 'NPC and character portrait prompt templates, word target, saved presets',
         keys: [
             'portraitNpcSystemPrompt', 'portraitCharacterSystemPrompt', 'portraitLocationSystemPrompt',
-            'portraitPromptWordTarget', 'savedPortraitPromptPresets',
+            'portraitPromptWordTarget', 'activePortraitPromptPresetId', 'savedPortraitPromptPresets',
         ],
     },
     {
