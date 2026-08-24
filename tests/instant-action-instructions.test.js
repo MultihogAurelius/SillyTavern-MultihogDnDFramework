@@ -5,9 +5,11 @@ import {
     buildInstantActionOpeningMessage,
     buildInstantActionPromptSection,
     extractInstantActionLevel,
+    getInstantActionLevelRange,
     MAX_INSTANT_ACTION_INSTRUCTION_LENGTH,
     normalizeInstantActionInstructions,
     resolveInstantActionPlayerCardWords,
+    rollInstantActionLevel,
 } from '../src/state/instant-action-instructions.js';
 
 const quickStartSource = readFileSync(new URL('../quickstart.js', import.meta.url), 'utf8');
@@ -55,7 +57,7 @@ describe('Instant Action instructions', () => {
         expect(creatorSource).toContain('extractInstantActionLevel(instantActionInstructions)');
     });
 
-    it('lets Initial Setup override the onboarding level dropdown', () => {
+    it('lets Initial Setup override the rolled Instant Action level', () => {
         expect(extractInstantActionLevel('A level 7 ranger.')).toBe(7);
         expect(extractInstantActionLevel('lvl 3 wizard')).toBe(3);
         expect(extractInstantActionLevel('a 7th-level ranger with a crossbow')).toBe(7);
@@ -63,6 +65,17 @@ describe('Instant Action instructions', () => {
         expect(extractInstantActionLevel('')).toBeNull();
         expect(creatorSource).toContain('extractedLevel ?? (opts.level || 1)');
         expect(creatorSource).toContain('STARTING LEVEL: ${level} (mandatory — the character MUST be exactly Level ${level}).');
+    });
+
+    it('rolls a random level between 1 and 10 for Instant Action instead of using Other Ways', () => {
+        const { min, max } = getInstantActionLevelRange();
+        expect(min).toBe(1);
+        expect(max).toBe(10);
+        expect(rollInstantActionLevel(() => 0)).toBe(1);
+        expect(rollInstantActionLevel(() => 0.999)).toBe(10);
+        expect(rollInstantActionLevel(() => 0.5)).toBe(6);
+        expect(quickStartSource).toContain('rollInstantActionLevel(secureRandom)');
+        expect(quickStartSource).not.toMatch(/onboardingLevel \|\| 1\)/);
     });
 
     it('exposes a selectable Player Card word count in Instant Action', () => {

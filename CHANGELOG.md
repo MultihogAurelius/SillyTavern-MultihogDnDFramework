@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.34] - 2026-08-24
+
+### Fixed
+- **Instant Action level**: no longer inherits the Other Ways to Begin level dropdown. Each run now rolls a random level from 1–10; Initial Setup still overrides when it names an explicit level. Systems set to N/A — No Levels remain level-free.
+
 ## [2026.8.33] - 2026-08-24
 
 ### Changed

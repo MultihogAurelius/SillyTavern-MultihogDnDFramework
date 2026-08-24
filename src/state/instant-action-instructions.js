@@ -32,6 +32,27 @@ export function extractInstantActionLevel(value) {
     return null;
 }
 
+const INSTANT_ACTION_LEVEL_MIN = 1;
+const INSTANT_ACTION_LEVEL_MAX = 10;
+
+/**
+ * Roll a random starting level for Instant Action (1–10 inclusive).
+ * Instant Action does not use the Other Ways level dropdown — only Initial Setup
+ * can override this roll when it names an explicit level.
+ * @param {() => number} [random] 0..1 RNG for tests
+ * @returns {number}
+ */
+export function rollInstantActionLevel(random = Math.random) {
+    const r = random();
+    const span = INSTANT_ACTION_LEVEL_MAX - INSTANT_ACTION_LEVEL_MIN + 1;
+    return INSTANT_ACTION_LEVEL_MIN + Math.floor(r * span);
+}
+
+/** @returns {{ min: number, max: number }} */
+export function getInstantActionLevelRange() {
+    return { min: INSTANT_ACTION_LEVEL_MIN, max: INSTANT_ACTION_LEVEL_MAX };
+}
+
 /** Prompt section shared with Instant Action character generation. */
 export function buildInstantActionPromptSection(value) {
     const instructions = normalizeInstantActionInstructions(value);

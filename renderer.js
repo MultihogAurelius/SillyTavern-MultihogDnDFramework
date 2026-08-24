@@ -1994,7 +1994,7 @@ function formatValueToCurrency(totalCp, detectedCurrency) {
 
                 <div class="rt-quickstart" id="rt-quickstart">
                     <div class="rt-quickstart-title">⚡ Instant Action</div>
-                    <div class="rt-quickstart-sub">Choose a genre, optionally enter a name or Initial Setup, then begin. Leave the name blank to let the AI choose it. The extension uses your Narrator Configuration, rolls everything you leave unspecified, and builds a Lorebook Agent Player Card plus a name-only ST persona. Uncheck Send Starter Message if you want to type your own first action instead of letting the AI open the campaign.</div>
+                    <div class="rt-quickstart-sub">Choose a genre, optionally enter a name or Initial Setup, then begin. Leave the name blank to let the AI choose it. The extension uses your Narrator Configuration, rolls a random level (1–10), class, and other unspecified details, and builds a Lorebook Agent Player Card plus a name-only ST persona. Uncheck Send Starter Message if you want to type your own first action instead of letting the AI open the campaign.</div>
                     <div class="rt-quickstart-genres" role="group" aria-label="Quick Start genre">
                         <button type="button" class="rt-quickstart-genre-btn" data-genre="fantasy" aria-pressed="false">⚔️ Fantasy</button>
                         <button type="button" class="rt-quickstart-genre-btn" data-genre="realistic" aria-pressed="false">🏙️ Modern</button>
