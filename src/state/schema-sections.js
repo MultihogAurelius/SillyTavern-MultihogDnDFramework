@@ -3,7 +3,7 @@
  */
 
 export const DEFAULT_NPC_SECTIONS = [
-    { id: 'sec_species', name: 'Species', description: 'Species/race and any subtype — static identity that essentially never changes after the NPC is first recorded.', icon: '🧬', color: '#0ea5e9' },
+    { id: 'sec_species', name: 'Species', description: 'Species/race, any subtype, and gender — static identity that essentially never changes after the NPC is first recorded.', icon: '🧬', color: '#0ea5e9' },
     { id: 'sec_body', name: 'Body', description: 'Signature/default physical look: build, age, face, hair, eyes, skin, scars, natural body language. Not a transient outfit-of-the-scene, pose, or momentary activity — only changes that become their new lasting look. Do NOT describe worn gear here — see Worn Equipment.', icon: '👁️', color: '#d4a940' },
     { id: 'sec_equipment', name: 'Worn Equipment', description: 'Currently worn/carried gear only — weapons, armor, clothing, accessories visible on the character. NOT coins, bags of loot, inventory lists, or pocket items. Updates whenever what they visibly have equipped changes; copy from what the narrative explicitly shows them wearing/wielding.', icon: '🎽', color: '#f59e0b' },
     { id: 'sec_personality', name: 'Personality', description: 'Stable temperament and drives — not today\'s mood, fear, or stress.', icon: '🧠', color: '#8b5cf6' },

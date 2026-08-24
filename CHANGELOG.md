@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.35] - 2026-08-24
+
+### Changed
+- **NPC Species CORE field**: factory Species guidance now includes gender (alongside race/subtype). Untouched factory Species descriptions and matching section presets are refreshed on upgrade; custom Species text is left alone. PC Species already asked for gender.
+
 ## [2026.8.34] - 2026-08-24
 
 ### Fixed

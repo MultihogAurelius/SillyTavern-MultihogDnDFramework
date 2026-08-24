@@ -70,6 +70,8 @@ describe('router.js core-field gating wiring', () => {
         expect(names).toEqual(expect.arrayContaining(['Species', 'Body', 'Worn Equipment']));
         expect(schemaSource).toContain('Not a transient outfit-of-the-scene');
         expect(schemaSource).toContain('Do NOT describe worn gear here — see Worn Equipment.');
+        const species = DEFAULT_NPC_SECTIONS.find(s => s.id === 'sec_species');
+        expect(species?.description).toMatch(/gender/i);
     });
 
     it('prompts nudge chronicle entries for notable existing-NPC moments', () => {

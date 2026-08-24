@@ -490,7 +490,7 @@ LA is aware of keyword activations inside one container (extension scanner and/o
 
 The old combined `Appearance/Species` CORE field is split into three separate sections (for both NPCs and the Player Character):
 
-- **Species** — static identity (species, race, subtype). Essentially frozen once a character is first recorded; never auto-updated.
+- **Species** — static identity (species, race, subtype, and gender). Essentially frozen once a character is first recorded; never auto-updated.
 - **Body** — signature/default *physical* look (build, face, hair, scars, etc.). No worn gear here.
 - **Worn Equipment** — currently worn/carried gear only (weapons, armor, clothing, accessories). Not coins, loot piles, or inventory lists. Updates whenever the narrative explicitly shows a change to what they have equipped.
 

@@ -988,6 +988,28 @@ function getSettingsInternal(extensionSettings) {
         s.settingsVersion = '2026.8.32.1';
     }
 
+    // 2026.8.35: NPC Species CORE field now asks for gender (alongside race/subtype).
+    // Refresh only untouched factory Species descriptions; leave custom edits alone.
+    if (isOlderThan(s.settingsVersion, '2026.8.35')) {
+        const OLD_NPC_SPECIES_DESC = 'Species/race and any subtype — static identity that essentially never changes after the NPC is first recorded.';
+        const newNpcSpeciesDesc = DEFAULT_NPC_SECTIONS.find(sec => sec.id === 'sec_species')?.description;
+        const refreshSpeciesDesc = (sections) => {
+            if (!Array.isArray(sections) || !newNpcSpeciesDesc) return;
+            for (const sec of sections) {
+                if (sec?.id === 'sec_species' && sec.description === OLD_NPC_SPECIES_DESC) {
+                    sec.description = newNpcSpeciesDesc;
+                }
+            }
+        };
+        refreshSpeciesDesc(s.npcCoreSections);
+        if (s.npcSectionPresets && typeof s.npcSectionPresets === 'object') {
+            for (const preset of Object.values(s.npcSectionPresets)) {
+                refreshSpeciesDesc(preset?.sections || preset);
+            }
+        }
+        s.settingsVersion = '2026.8.35';
+    }
+
     // Stamp factory version even when a release has no field rewrites
     // (8.28.0 mapped-site index is prompt/injection only).
     if (isOlderThan(s.settingsVersion, FACTORY_SETTINGS_VERSION)) {
