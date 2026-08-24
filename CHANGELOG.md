@@ -2,6 +2,14 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.42] - 2026-08-25
+
+### Added
+- **Unified NPC and PC Card settings**: The Campaign Records card-settings popup and settings drawer now expose both NPC and Player Character section editors.
+
+### Fixed
+- **Map Evolution selections survive reloads**: Tick scope, count, randomization, and selected mapped sites are preserved in the active chat partition. Discrete map-selection and per-map interval changes now bypass the normal debounced save so an immediate reload does not discard them.
+
 ## [2026.8.41] - 2026-08-24
 
 ### Added
