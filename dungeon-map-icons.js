@@ -33,7 +33,7 @@ const CROSS_OVERLAY = '<path d="M2.3 2.3 L9.7 9.7 M9.7 2.3 L2.3 9.7" fill="none"
 
 export const MAP_ICON_SIZE = { compact: 16.9, expanded: 18.2 };
 export const MAP_ICON_GAP = 6;
-export const MAP_ICON_MAX = { compact: 6, expanded: 7 };
+export const MAP_ICON_MAX = { compact: 5, expanded: 6 };
 export const MAP_NODE_FONT = { compact: 13, expanded: 15.6 };
 
 const ICON_STACK = {
@@ -189,6 +189,26 @@ export function renderDungeonGraphAssetTipHtml(asset = {}) {
     }`;
 }
 
+function serializeOverflowAssets(icons = []) {
+    return escapeXml(JSON.stringify(icons.map(icon => ({
+        name: icon.name,
+        kind: icon.kind,
+        state: icon.state,
+        knowledge: icon.knowledge,
+        detail: icon.detail,
+        count: icon.count,
+    }))));
+}
+
+/** Stacked inspector cards for assets hidden behind a +N overflow badge. */
+export function renderDungeonGraphOverflowTipHtml(assets = []) {
+    const list = Array.isArray(assets) ? assets : [];
+    if (!list.length) return '';
+    return `<div class="rt-dungeon-graph-overflow-tip">${
+        list.map(asset => `<div class="rt-dungeon-graph-overflow-tip-item">${renderDungeonGraphAssetTipHtml(asset)}</div>`).join('')
+    }</div>`;
+}
+
 /**
  * Render a centered icon row for a room node.
  * @param {object[]} icons
@@ -213,7 +233,12 @@ export function renderAreaAssetIconsSvg(icons, { cx, y, compact = true } = {}) {
     });
     if (overflow > 0) {
         const label = `+${overflow}`;
-        parts.push(`<text class="rt-dungeon-graph-icon-overflow" x="${x + size / 2}" y="${y}" text-anchor="middle" dominant-baseline="middle" font-size="${overflowSize}">${label}</text>`);
+        const hidden = list.slice(max);
+        const slotX = x;
+        parts.push(`<g class="rt-dungeon-graph-icon-overflow" data-overflow-assets="${serializeOverflowAssets(hidden)}" transform="translate(${slotX},${top})">
+        <rect class="rt-dungeon-graph-icon-overflow-hit" x="0" y="0" width="${size}" height="${size}" fill="transparent" pointer-events="all"></rect>
+        <text x="${size / 2}" y="${size / 2}" text-anchor="middle" dominant-baseline="middle" font-size="${overflowSize}" pointer-events="none">${label}</text>
+    </g>`);
     }
     return `<g class="rt-dungeon-graph-icons">${parts.join('')}</g>`;
 }

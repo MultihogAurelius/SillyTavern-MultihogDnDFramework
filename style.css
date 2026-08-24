@@ -8555,8 +8555,29 @@ textarea.rt-cr-input {
     opacity: 0.55;
 }
 .rt-dungeon-graph-icon-overflow {
+    pointer-events: auto;
+    cursor: default;
+}
+.rt-dungeon-graph-icon-overflow text {
     fill: var(--rt-text, #e8e8e8);
     pointer-events: none;
+}
+.rt-dungeon-graph-icon-overflow-hit {
+    fill: transparent;
+    stroke: none;
+    pointer-events: all;
+}
+.rt-dungeon-graph-asset-tip-overflow {
+    max-width: 280px;
+}
+.rt-dungeon-graph-overflow-tip {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.rt-dungeon-graph-overflow-tip-item + .rt-dungeon-graph-overflow-tip-item {
+    border-top: 1px solid var(--rt-map-accent-medium, rgba(255, 170, 0, 0.25));
+    padding-top: 6px;
 }
 .rt-dungeon-graph-asset-tip {
     position: fixed;

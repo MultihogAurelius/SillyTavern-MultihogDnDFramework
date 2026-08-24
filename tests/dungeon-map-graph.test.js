@@ -7,7 +7,7 @@ import {
     renderDungeonMapReadableHtml,
     resolveDungeonGraphCurrentArea,
 } from '../dungeon-map-graph.js';
-import { collectAreaAssetIcons, MAP_ICON_SIZE, mapAssetIconMood, mapAssetIconToken, renderDungeonGraphAssetTipHtml } from '../dungeon-map-icons.js';
+import { collectAreaAssetIcons, MAP_ICON_MAX, MAP_ICON_SIZE, mapAssetIconMood, mapAssetIconToken, renderAreaAssetIconsSvg, renderDungeonGraphAssetTipHtml, renderDungeonGraphOverflowTipHtml } from '../dungeon-map-icons.js';
 import { getLocationLeaf, resolveCurrentMapPlacement, resolveDungeonMapForLocation } from '../dungeon-reality.js';
 
 const midExplorationMap = {
@@ -484,6 +484,33 @@ describe('dungeon map graph', () => {
         expect(html).toContain('KNOWN');
         expect(html).toContain('Heat-rune on the threshold.');
         expect(renderDungeonGraphAssetTipHtml({ name: 'Pack', kind: 'GROUP', count: 6 })).toContain('×6');
+    });
+
+    it('caps visible node icons and embeds overflow assets for hover tips', () => {
+        const icons = Array.from({ length: 8 }, (_, index) => ({
+            token: 'CREATURE_LIVE',
+            kind: 'CREATURE',
+            mood: 'LIVE',
+            knowledge: 'KNOWN',
+            state: 'ACTIVE',
+            name: `Occupant ${index + 1}`,
+            detail: `Detail ${index + 1}`,
+            count: null,
+        }));
+        const svg = renderAreaAssetIconsSvg(icons, { cx: 70, y: 30, compact: true });
+        expect(MAP_ICON_MAX.compact).toBe(5);
+        expect(svg.match(/data-icon="/g)).toHaveLength(5);
+        expect(svg).toContain('rt-dungeon-graph-icon-overflow');
+        expect(svg).toContain('+3');
+        expect(svg).toContain('data-overflow-assets');
+        expect(svg).toContain('Occupant 6');
+        expect(svg).not.toContain('data-asset-name="Occupant 6"');
+
+        const overflowHtml = renderDungeonGraphOverflowTipHtml(icons.slice(MAP_ICON_MAX.compact));
+        expect(overflowHtml).toContain('Occupant 6');
+        expect(overflowHtml).toContain('Occupant 8');
+        expect(overflowHtml).toContain('rt-dungeon-graph-overflow-tip-item');
+        expect(overflowHtml.match(/rt-dungeon-graph-asset-tip-head/g)).toHaveLength(3);
     });
 
     it('renders knowledge-filtered BUILDING contents beneath the container and on its district node', () => {
