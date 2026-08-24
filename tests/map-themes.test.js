@@ -84,5 +84,6 @@ describe('map themes', () => {
         expect(style).toContain('color: var(--rt-map-loot, #ffcc4a);');
         expect(style).toContain('border: 1px solid var(--rt-map-frame, #ffaa00);');
         expect(style).toContain('background: var(--rt-map-textbox, #0c0c0c);');
+        expect(style).not.toMatch(/\.rt-dungeon-graph-icon \{[^}]*filter:\s*drop-shadow/);
     });
 });

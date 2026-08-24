@@ -8512,10 +8512,9 @@ textarea.rt-cr-input {
     outline: none;
 }
 .rt-dungeon-graph-icon {
-    pointer-events: auto;
+    pointer-events: none;
     color: var(--rt-map-accent, #ffaa00);
     opacity: 1;
-    filter: drop-shadow(0 0 0.55px var(--rt-map-accent-strong, rgba(255, 170, 0, 0.7)));
 }
 .rt-dungeon-graph-node .rt-dungeon-graph-icon-art {
     fill: currentColor;
@@ -8526,6 +8525,9 @@ textarea.rt-cr-input {
     fill: transparent;
     stroke: none;
     pointer-events: all;
+}
+.rt-dungeon-graph-icon path {
+    pointer-events: none;
 }
 .rt-dungeon-graph-icon-creature { color: var(--rt-map-creature, #ffffff); }
 .rt-dungeon-graph-icon-group { color: var(--rt-map-group, #ffffff); }
@@ -8555,7 +8557,7 @@ textarea.rt-cr-input {
     opacity: 0.55;
 }
 .rt-dungeon-graph-icon-overflow {
-    pointer-events: auto;
+    pointer-events: none;
     cursor: default;
 }
 .rt-dungeon-graph-icon-overflow text {

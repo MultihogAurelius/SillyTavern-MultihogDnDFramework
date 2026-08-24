@@ -28,8 +28,8 @@ const KIND_ART = {
     OTHER: new URL('./src/ui/SVG/other.svg', import.meta.url).href,
 };
 
-const SLASH_OVERLAY = '<path d="M2 10.1 L10.1 2" fill="none" stroke="#0b1220" stroke-width="2.5" stroke-linecap="round"/><path d="M2 10.1 L10.1 2" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>';
-const CROSS_OVERLAY = '<path d="M2.3 2.3 L9.7 9.7 M9.7 2.3 L2.3 9.7" fill="none" stroke="#0b1220" stroke-width="2.4" stroke-linecap="round"/><path d="M2.3 2.3 L9.7 9.7 M9.7 2.3 L2.3 9.7" fill="none" stroke="currentColor" stroke-width="1.15" stroke-linecap="round"/>';
+const SLASH_OVERLAY = '<path d="M2 10.1 L10.1 2" fill="none" stroke="#0b1220" stroke-width="2.5" stroke-linecap="round" pointer-events="none"/><path d="M2 10.1 L10.1 2" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" pointer-events="none"/>';
+const CROSS_OVERLAY = '<path d="M2.3 2.3 L9.7 9.7 M9.7 2.3 L2.3 9.7" fill="none" stroke="#0b1220" stroke-width="2.4" stroke-linecap="round" pointer-events="none"/><path d="M2.3 2.3 L9.7 9.7 M9.7 2.3 L2.3 9.7" fill="none" stroke="currentColor" stroke-width="1.15" stroke-linecap="round" pointer-events="none"/>';
 
 export const MAP_ICON_SIZE = { compact: 16.9, expanded: 18.2 };
 export const MAP_ICON_GAP = 6;

@@ -223,6 +223,7 @@ export function bindDungeonMapPan(root) {
 }
 
 const ASSET_TIP_ID = 'rt-dungeon-graph-asset-tip';
+let activeAssetTipAnchor = null;
 
 function resolveAssetTipHost(anchor) {
     return (anchor instanceof Element && anchor.closest('dialog, .popup')) || document.body;
@@ -243,6 +244,7 @@ function ensureDungeonMapAssetTip(host = document.body) {
 
 export function hideDungeonMapAssetTip() {
     const tip = document.getElementById(ASSET_TIP_ID);
+    activeAssetTipAnchor = null;
     if (!tip || tip.hidden) return;
     tip.hidden = true;
     tip.classList.remove('rt-dungeon-graph-asset-tip-overflow');
@@ -279,6 +281,7 @@ function positionDungeonMapAssetTip(tip, anchor) {
 }
 
 function showDungeonMapAssetTip(icon) {
+    if (activeAssetTipAnchor === icon) return;
     const tip = ensureDungeonMapAssetTip(resolveAssetTipHost(icon));
     tip.classList.remove('rt-dungeon-graph-asset-tip-overflow');
     tip.innerHTML = renderDungeonGraphAssetTipHtml({
@@ -290,10 +293,12 @@ function showDungeonMapAssetTip(icon) {
         count: icon.getAttribute('data-asset-count'),
     });
     tip.hidden = false;
+    activeAssetTipAnchor = icon;
     positionDungeonMapAssetTip(tip, icon);
 }
 
 function showDungeonMapOverflowTip(overflowEl) {
+    if (activeAssetTipAnchor === overflowEl) return;
     const raw = overflowEl.getAttribute('data-overflow-assets');
     if (!raw) return;
     let assets;
@@ -307,6 +312,7 @@ function showDungeonMapOverflowTip(overflowEl) {
     tip.classList.add('rt-dungeon-graph-asset-tip-overflow');
     tip.innerHTML = renderDungeonGraphOverflowTipHtml(assets);
     tip.hidden = false;
+    activeAssetTipAnchor = overflowEl;
     positionDungeonMapAssetTip(tip, overflowEl);
 }
 
@@ -333,13 +339,12 @@ export function bindDungeonMapAssetPopups(root) {
         scroll.addEventListener('pointerover', (event) => {
             const icon = iconFromEventTarget(event.target);
             const overflow = overflowFromEventTarget(event.target);
-            if (icon && scroll.contains(icon)) {
-                showDungeonMapAssetTip(icon);
-                return;
-            }
-            if (overflow && scroll.contains(overflow)) {
-                showDungeonMapOverflowTip(overflow);
-            }
+            const next = (icon && scroll.contains(icon)) ? icon
+                : (overflow && scroll.contains(overflow)) ? overflow
+                    : null;
+            if (!next || next === activeAssetTipAnchor) return;
+            if (next === icon) showDungeonMapAssetTip(icon);
+            else showDungeonMapOverflowTip(overflow);
         });
         scroll.addEventListener('pointerout', (event) => {
             const fromIcon = iconFromEventTarget(event.target);

@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.45] - 2026-08-25
+
+### Fixed
+- **Map asset hover lag**: Removed per-icon CSS drop-shadow compositing and stopped rebuilding the hover card on every child pointer event, so sweeping across node assets stays smooth.
+
 ## [2026.8.44] - 2026-08-25
 
 ### Changed
