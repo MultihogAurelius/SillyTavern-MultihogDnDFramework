@@ -1,7 +1,7 @@
 ### 📢 New: Persistent maps and autonomous map evolution/activity. The framework now generates persistent maps that are automatically updated and even evolved offscreen. Dungeons are also no longer hallucinated but skill checks actually matter. Explore a dungeon or a town, leave, come back later, and continue. What you come back is likely not the exact same thanks to Map Evolution. The dungeon might've repopulated, enemies might've set up ambushes, started their proto-cultural projects, and so on. Settlements evolve too.
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/b014936b-8e96-4871-89d4-aba48f22af67" width="75%" alt="Combat in progress" />
+  <img src="https://github.com/user-attachments/assets/368d05be-009b-4f0d-b753-5c3cf8ae7dad" width="75%" alt="Combat in progress" />
   <br>
   <em>Dungeon Area Map</em>
 </p>
@@ -13,6 +13,7 @@
 </p>
 
 ---
+
 
 # Multihog D&D Framework
 
