@@ -22,7 +22,7 @@ import {
 
 /** @type {{ id: string, icon: string, label: string, match: RegExp }[]} */
 const TAB_DEFS = [
-    { id: 'general', icon: 'fa-gears', label: 'General', match: /General\s*&\s*Visuals/i },
+    { id: 'general', icon: 'fa-gears', label: 'General & Visuals', match: /General\s*&\s*Visuals/i },
     { id: 'connections', icon: 'fa-plug', label: 'Connections', match: /Connections/i },
     { id: 'gamesystems', icon: 'fa-dice-d20', label: 'Game Systems', match: /Game Systems/i },
     { id: 'statetracker', icon: 'fa-brain', label: 'State Tracker', match: /State Tracker/i },
@@ -71,7 +71,7 @@ export function setSettingsOverlayAppearance(mode) {
 }
 
 /**
- * Appearance toggle pinned to the top of the General tab.
+ * Appearance toggle pinned to the top of the General & Visuals tab.
  * @param {HTMLElement} tabsHost
  */
 function installAppearanceToggle(tabsHost) {

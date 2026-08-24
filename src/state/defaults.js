@@ -17,6 +17,7 @@ import { DEFAULT_MAP_EVOLUTION_SYSTEM_PROMPT } from '../../map-evolution-prompt.
 import { DEFAULT_MAP_EVOLUTION_COMPRESS_SYSTEM_PROMPT } from '../../map-evolution-compress-prompt.js';
 import { DEFAULT_WORLD_PROGRESSION_SYSTEM_PROMPT } from '../../world-progression-prompt.js';
 import { MAIN_SYSPROMPT_BACKUP_KEY } from './main-sysprompt-backup.js';
+import { DEFAULT_MAP_THEME } from './map-themes.js';
 import {
     DEFAULT_ROUTER_AUTO_PASS_RESTRICTION,
     DEFAULT_ROUTER_COMBAT_PROFILE_GUIDANCE_AGENT,
@@ -1326,6 +1327,12 @@ Include the entity name/title itself (without timestamps like "[Day 1]") as a ke
         mapUpdaterEnabled: true,
 
         dungeonMapRevealAll: false,
+
+        mapTheme: { ...DEFAULT_MAP_THEME },
+
+        savedMapThemePresets: {},
+
+        activeMapThemePresetId: 'factory:ember',
 
         mapUpdaterRunEvery: 1,
 

@@ -13,7 +13,7 @@ const LIVE_TRAP_STATES = new Set(['ARMED', 'ACTIVE', 'ALERT', 'IDLE']);
 const STRESSED_STATES = new Set(['FLEEING', 'DAMAGED', 'ALERT']);
 
 const KIND_ART = {
-    CREATURE: new URL('./src/ui/SVG/creature.svg', import.meta.url).href,
+    CREATURE: new URL('./src/ui/SVG/man-person.svg', import.meta.url).href,
     GROUP: new URL('./src/ui/SVG/group.svg', import.meta.url).href,
     TRAP: new URL('./src/ui/SVG/trap.svg', import.meta.url).href,
     HAZARD: new URL('./src/ui/SVG/hazard-sign.svg', import.meta.url).href,
@@ -138,6 +138,7 @@ function overlayForMood(mood) {
 
 function renderOneIcon(icon, x, y, size) {
     const href = escapeXml(KIND_ART[icon.kind] || KIND_ART.OTHER);
+    const maskStyle = `-webkit-mask-image:url('${href}');mask-image:url('${href}');-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;-webkit-mask-position:center;mask-position:center;-webkit-mask-size:contain;mask-size:contain;`;
     const scale = size / 12;
     const knowledgeClass = `rt-dungeon-graph-icon-${String(icon.knowledge || 'known').toLowerCase()}`;
     const classes = [
@@ -149,7 +150,7 @@ function renderOneIcon(icon, x, y, size) {
     const count = Number.isInteger(icon.count) ? String(icon.count) : '';
     return `<g class="${classes}" data-icon="${escapeXml(icon.token)}" data-asset-name="${escapeXml(icon.name)}" data-asset-kind="${escapeXml(icon.kind)}" data-asset-state="${escapeXml(icon.state)}" data-asset-knowledge="${escapeXml(icon.knowledge)}" data-asset-detail="${escapeXml(icon.detail || '')}"${count ? ` data-asset-count="${escapeXml(count)}"` : ''} transform="translate(${x},${y}) scale(${scale})" stroke="none">
         <rect class="rt-dungeon-graph-icon-hit" x="0" y="0" width="12" height="12" fill="transparent" pointer-events="all"></rect>
-        <image class="rt-dungeon-graph-icon-art" href="${href}" width="12" height="12" preserveAspectRatio="xMidYMid meet" pointer-events="none"></image>
+        <rect class="rt-dungeon-graph-icon-art" x="0" y="0" width="12" height="12" fill="currentColor" style="${maskStyle}" pointer-events="none"></rect>
         ${overlayForMood(icon.mood)}
     </g>`;
 }

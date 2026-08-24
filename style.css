@@ -6398,6 +6398,45 @@ textarea.rt-cr-input {
     opacity: 0.82;
 }
 
+.rt-connection-apply-all {
+    margin-top: 10px;
+    padding: 10px;
+    border: 1px solid rgba(100, 180, 255, 0.22);
+    border-radius: 7px;
+    background: rgba(100, 180, 255, 0.06);
+}
+
+.rt-connection-apply-all > b {
+    display: block;
+    font-size: 0.88em;
+    margin-bottom: 4px;
+}
+
+.rt-connection-apply-all-help {
+    font-size: 0.72em;
+    line-height: 1.4;
+    opacity: 0.7;
+    margin-bottom: 8px;
+}
+
+.rt-connection-apply-all-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.rt-connection-apply-all-row .text_pole {
+    flex: 1;
+    min-width: 0;
+    font-size: 0.82em;
+}
+
+.rt-connection-apply-all-row .menu_button {
+    flex-shrink: 0;
+    white-space: nowrap;
+    font-size: 0.82em;
+}
+
 .rt-connection-drawer-slot:empty {
     display: none;
 }
@@ -8372,7 +8411,7 @@ textarea.rt-cr-input {
     justify-content: space-between;
     gap: 8px;
     padding: 8px 10px;
-    border: 1px solid rgba(255, 170, 0, 0.28);
+    border: 1px solid var(--rt-map-frame-soft, rgba(255, 170, 0, 0.35));
     border-radius: 6px;
     background: rgba(0, 0, 0, 0.45);
     font-size: 0.8em;
@@ -8384,9 +8423,9 @@ textarea.rt-cr-input {
 .rt-dungeon-graph-scroll {
     overflow: auto;
     max-height: 220px;
-    border: 1px solid rgba(255, 170, 0, 0.28);
+    border: 1px solid var(--rt-map-frame, #ffaa00);
     border-radius: 8px;
-    background: #0c0c0c;
+    background: var(--rt-map-background, #0c0c0c);
     padding: 4px;
     cursor: grab;
     user-select: none;
@@ -8417,53 +8456,53 @@ textarea.rt-cr-input {
     -webkit-user-select: none;
 }
 .rt-dungeon-graph-edge {
-    stroke: rgba(255, 170, 0, 0.48);
+    stroke: var(--rt-map-route, rgba(255, 170, 0, 0.48));
     stroke-width: 1.6;
 }
 .rt-dungeon-graph-edge-locked,
 .rt-dungeon-graph-edge-closed {
     stroke-dasharray: 5 4;
-    stroke: rgba(255, 170, 0, 0.72);
+    stroke: var(--rt-map-route-locked, rgba(255, 170, 0, 0.72));
 }
 .rt-dungeon-graph-edge-blocked,
 .rt-dungeon-graph-edge-destroyed {
     stroke-dasharray: 2 3;
-    stroke: rgba(234, 67, 53, 0.55);
+    stroke: var(--rt-map-route-blocked, rgba(234, 67, 53, 0.55));
 }
 .rt-dungeon-graph-node rect,
 .rt-dungeon-graph-node circle {
-    fill: #161616;
-    stroke: rgba(255, 170, 0, 0.55);
+    fill: var(--rt-map-node, #161616);
+    stroke: var(--rt-map-accent-medium, rgba(255, 170, 0, 0.55));
     stroke-width: 1.2;
 }
 .rt-dungeon-graph-node text {
-    fill: #f0f0f0;
+    fill: var(--rt-map-text, #f0f0f0);
     pointer-events: none;
 }
 .rt-dungeon-graph-node-discovered rect {
-    fill: #101010;
-    stroke: rgba(255, 170, 0, 0.28);
+    fill: var(--rt-map-node-discovered, #101010);
+    stroke: var(--rt-map-accent-soft, rgba(255, 170, 0, 0.28));
 }
 .rt-dungeon-graph-node-discovered text {
-    fill: #c8c8c8;
+    fill: var(--rt-map-text-muted, #c8c8c8);
     opacity: 0.78;
 }
 .rt-dungeon-graph-node-fog circle {
-    fill: #0a0a0a;
-    stroke: rgba(255, 170, 0, 0.18);
+    fill: var(--rt-map-node-fog, #0a0a0a);
+    stroke: var(--rt-map-accent-faint, rgba(255, 170, 0, 0.18));
     stroke-dasharray: 2 2;
 }
 .rt-dungeon-graph-node-fog text {
-    fill: rgba(255, 170, 0, 0.45);
+    fill: var(--rt-map-accent-medium, rgba(255, 170, 0, 0.45));
     font-size: 10px;
 }
 .rt-dungeon-graph-node-current rect {
-    fill: #0e0e0e;
-    stroke: #ffaa00;
+    fill: var(--rt-map-node-discovered, #0e0e0e);
+    stroke: var(--rt-map-accent, #ffaa00);
     stroke-width: 2.2;
 }
 .rt-dungeon-graph-node-current text {
-    fill: #ffaa00;
+    fill: var(--rt-map-accent, #ffaa00);
     font-weight: 700;
 }
 .rt-dungeon-graph-node-revealed {
@@ -8474,27 +8513,30 @@ textarea.rt-cr-input {
 }
 .rt-dungeon-graph-icon {
     pointer-events: auto;
-    color: #ffaa00;
+    color: var(--rt-map-accent, #ffaa00);
     opacity: 1;
-    filter: drop-shadow(0 0 0.55px rgba(255, 170, 0, 0.7));
+    filter: drop-shadow(0 0 0.55px var(--rt-map-accent-strong, rgba(255, 170, 0, 0.7)));
 }
-.rt-dungeon-graph-icon-art {
+.rt-dungeon-graph-node .rt-dungeon-graph-icon-art {
+    fill: currentColor;
+    stroke: none;
     pointer-events: none;
 }
-.rt-dungeon-graph-icon-hit {
+.rt-dungeon-graph-node .rt-dungeon-graph-icon-hit {
     fill: transparent;
+    stroke: none;
     pointer-events: all;
 }
-.rt-dungeon-graph-icon-creature { color: #ff8c4a; }
-.rt-dungeon-graph-icon-group { color: #e56b32; }
-.rt-dungeon-graph-icon-trap { color: #ff5a2a; }
-.rt-dungeon-graph-icon-hazard { color: #ffc53d; }
-.rt-dungeon-graph-icon-alarm { color: #ffaa00; }
-.rt-dungeon-graph-icon-barrier { color: #e8d5b0; }
-.rt-dungeon-graph-icon-object { color: #d4a574; }
-.rt-dungeon-graph-icon-loot { color: #ffcc4a; }
-.rt-dungeon-graph-icon-effect { color: #ff9a5c; }
-.rt-dungeon-graph-icon-other { color: #c8925a; }
+.rt-dungeon-graph-icon-creature { color: var(--rt-map-creature, #ffffff); }
+.rt-dungeon-graph-icon-group { color: var(--rt-map-group, #ffffff); }
+.rt-dungeon-graph-icon-trap { color: var(--rt-map-trap, #ff5a2a); }
+.rt-dungeon-graph-icon-hazard { color: var(--rt-map-hazard, #ffc53d); }
+.rt-dungeon-graph-icon-alarm { color: var(--rt-map-alarm, #ffaa00); }
+.rt-dungeon-graph-icon-barrier { color: var(--rt-map-barrier, #e8d5b0); }
+.rt-dungeon-graph-icon-object { color: var(--rt-map-object, #d4a574); }
+.rt-dungeon-graph-icon-loot { color: var(--rt-map-loot, #ffcc4a); }
+.rt-dungeon-graph-icon-effect { color: var(--rt-map-effect, #ff9a5c); }
+.rt-dungeon-graph-icon-other { color: var(--rt-map-other, #c8925a); }
 .rt-dungeon-graph-icon-deactivated,
 .rt-dungeon-graph-icon-spent {
     opacity: 0.82;
@@ -8504,7 +8546,7 @@ textarea.rt-cr-input {
     opacity: 0.7;
 }
 .rt-dungeon-graph-icon-stressed {
-    color: #ff8c4a;
+    color: var(--rt-map-creature, #ffffff);
 }
 .rt-dungeon-graph-icon-suspected {
     opacity: 0.88;
@@ -8523,11 +8565,11 @@ textarea.rt-cr-input {
     min-width: 148px;
     max-width: 260px;
     padding: 7px 8px 8px;
-    border: 1px solid rgba(255, 170, 0, 0.45);
+    border: 1px solid var(--rt-map-accent-medium, rgba(255, 170, 0, 0.45));
     border-radius: 8px;
-    background: rgba(12, 12, 12, 0.96);
+    background: var(--rt-map-background-tooltip, rgba(12, 12, 12, 0.96));
     box-shadow: 0 10px 24px rgba(0, 0, 0, 0.55);
-    color: var(--rt-text, #e8e8e8);
+    color: var(--rt-map-text, var(--rt-text, #e8e8e8));
     font-size: 12px;
     line-height: 1.35;
 }
@@ -8540,16 +8582,16 @@ dialog .rt-dungeon-graph-asset-tip,
     align-items: center;
     flex-wrap: wrap;
     gap: 5px;
-    color: #ffaa00;
+    color: var(--rt-map-accent, #ffaa00);
     font-size: 12px;
 }
 .rt-dungeon-graph-asset-tip-head strong {
     font-weight: 650;
-    color: var(--rt-text, #e8e8e8);
+    color: var(--rt-map-text, var(--rt-text, #e8e8e8));
 }
 .rt-dungeon-graph-asset-tip-detail {
     margin-top: 5px;
-    color: var(--rt-text, #e8e8e8);
+    color: var(--rt-map-text, var(--rt-text, #e8e8e8));
     font-size: 11px;
     line-height: 1.4;
     opacity: 0.88;
@@ -8561,13 +8603,86 @@ dialog .rt-dungeon-graph-asset-tip,
     top: 100%;
     transform: translateX(-50%);
     border: 6px solid transparent;
-    border-top-color: rgba(255, 170, 0, 0.45);
+    border-top-color: var(--rt-map-accent-medium, rgba(255, 170, 0, 0.45));
 }
 .rt-dungeon-graph-asset-tip-below::after {
     top: auto;
     bottom: 100%;
     border-top-color: transparent;
-    border-bottom-color: rgba(255, 170, 0, 0.45);
+    border-bottom-color: var(--rt-map-accent-medium, rgba(255, 170, 0, 0.45));
+}
+
+.rt-map-theme-preset-row {
+    display: grid;
+    grid-template-columns: minmax(140px, 1fr) auto auto auto;
+    gap: 6px;
+    align-items: center;
+}
+.rt-map-theme-preset-row .menu_button {
+    white-space: nowrap;
+}
+#rpg_map_theme_reset {
+    white-space: nowrap;
+}
+.rt-map-theme-colors {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 8px;
+    margin-top: 8px;
+}
+.rt-map-theme-group-title {
+    grid-column: 1 / -1;
+    margin-top: 5px;
+    padding-bottom: 3px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    font-size: 0.72em;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    opacity: 0.62;
+}
+.rt-map-theme-color {
+    display: grid;
+    grid-template-columns: 30px minmax(0, 1fr);
+    grid-template-areas: "picker label" "picker hex";
+    column-gap: 7px;
+    align-items: center;
+    min-width: 0;
+}
+.rt-map-theme-color > span {
+    grid-area: label;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.78em;
+    opacity: 0.82;
+}
+.rt-map-theme-color input[type="color"] {
+    grid-area: picker;
+    width: 30px;
+    height: 34px;
+    padding: 1px;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 5px;
+    background: transparent;
+    cursor: pointer;
+}
+.rt-map-theme-color input[type="text"] {
+    grid-area: hex;
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    padding: 2px 5px;
+    font-family: monospace;
+    font-size: 0.72em;
+}
+@media (max-width: 560px) {
+    .rt-map-theme-preset-row {
+        grid-template-columns: 1fr auto auto;
+    }
+    .rt-map-theme-preset-row select {
+        grid-column: 1 / -1;
+    }
 }
 .rt-dungeon-map-detached-panel {
     display: flex;
@@ -9831,6 +9946,12 @@ dialog .rt-dungeon-graph-asset-tip,
     position: absolute;
     inset: 0;
     background: rgba(0, 0, 0, 0.5);
+    transition: background-color 160ms ease;
+}
+
+/* Show the live map at its real brightness while its colors are being edited. */
+.rt-settings-overlay.rt-so-open:has(.rt-so-tab-btn[data-tab="maparchitect"].rt-so-tab-active):has(#rpg_map_themes_drawer.open) .rt-so-dim {
+    background: transparent;
 }
 
 .rt-settings-overlay .rt-so-panel {

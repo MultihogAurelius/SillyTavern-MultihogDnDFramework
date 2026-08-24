@@ -27,7 +27,13 @@ describe('settings overlay', () => {
         expect(overlaySource).toContain('centered panel rather than a literal fullscreen');
     });
 
-    it('locks Dark/Light settings chrome with a General-tab toggle', () => {
+    it('removes backdrop dimming only for an open Map Themes preview', () => {
+        expect(style).toContain('.rt-so-tab-btn[data-tab="maparchitect"].rt-so-tab-active');
+        expect(style).toContain(':has(#rpg_map_themes_drawer.open) .rt-so-dim');
+        expect(style).toContain('background: transparent;');
+    });
+
+    it('locks Dark/Light settings chrome with a General & Visuals tab toggle', () => {
         expect(overlaySource).toContain('installAppearanceToggle');
         expect(overlaySource).toContain('settingsOverlayAppearance');
         expect(overlaySource).toContain('rt-so-mode-dark');
@@ -58,6 +64,7 @@ describe('settings overlay', () => {
         expect(mapIdx).toBeGreaterThan(agentIdx);
         expect(worldIdx).toBeGreaterThan(mapIdx);
 
+        expect(overlaySource).toContain("label: 'General & Visuals'");
         expect(overlaySource).toContain("label: 'Persistent Maps'");
         expect(overlaySource).toContain('match: /Persistent Maps/i');
         expect(indexSource).toContain('initSettingsOverlay(settingsHtml');

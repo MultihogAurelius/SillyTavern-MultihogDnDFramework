@@ -75,6 +75,8 @@ describe('General & Visuals settings', () => {
         expect(indexSource).toContain('I recommend using a somewhat better model here such as Sonnet 5 or above for more robust and complex systems. Your mileage varies a lot here. Experiment.');
         expect(indexSource).toContain('A lightweight model should do fine.');
         expect(indexSource).toContain("chevron.className = 'inline-drawer-icon fa-solid fa-circle-chevron-down rt-central-connection-chevron'");
+        expect(settingsMarkup).toContain('id="rpg_connection_apply_all_box"');
+        expect(settingsMarkup).toContain('Apply Connection Setup to All');
 
         const style = readFileSync(new URL('../style.css', import.meta.url), 'utf8');
         expect(style).toContain('.rpg-tracker-settings .rt-central-connection-header');
@@ -101,8 +103,16 @@ describe('General & Visuals settings', () => {
         const portraitsMarkup = settingsMarkup.slice(portraitsStart, developerStart);
 
         expect(portraitsMarkup).toContain('<b>Portraits LLM Connection</b>');
+        expect(portraitsMarkup).toContain('<b>Portrait and Location Image Styles</b>');
         expect(portraitsMarkup).toContain('<b>Portrait Prompt Templates</b>');
+        expect(portraitsMarkup).toContain('id="rpg_portrait_prompt_presets_container"');
+        expect(portraitsMarkup).toContain('id="rpg_portrait_prompt_preset_save_btn"');
         expect(portraitsMarkup).toContain('id="rpg_tracker_purge_all_portraits"');
+        expect(portraitsMarkup.indexOf('Portrait and Location Image Styles'))
+            .toBeLessThan(portraitsMarkup.indexOf('<b>Portrait Prompt Templates</b>'));
+        expect(portraitsMarkup).not.toContain('<b>Portrait Prompt Presets</b>');
+        expect(portraitsMarkup).toContain('load it into the <b>Portrait Prompt Templates</b> below');
+        expect(portraitsMarkup).toContain('Save Setup to Library');
     });
 
     it('mirrors every Adventure Companion option and gives it a dedicated connection', () => {
@@ -142,6 +152,22 @@ describe('General & Visuals settings', () => {
         expect(worldStart).toBeGreaterThan(mapStart);
         expect(settingsMarkup.indexOf('<b>Map Architect</b>')).toBeGreaterThan(mapStart);
         expect(settingsMarkup.indexOf('<b>Architect Prompt</b>')).toBeLessThan(0);
+    });
+
+    it('places editable map themes at the bottom of Persistent Maps', () => {
+        const mapStart = settingsMarkup.indexOf('<b>Persistent Maps</b>');
+        const evolutionStart = settingsMarkup.indexOf('<b>Map Evolution</b>', mapStart);
+        const themesStart = settingsMarkup.indexOf('<b>Map Themes</b>', mapStart);
+        const worldStart = settingsMarkup.indexOf('<b>World Progression</b>');
+        const mapMarkup = settingsMarkup.slice(mapStart, worldStart);
+
+        expect(themesStart).toBeGreaterThan(evolutionStart);
+        expect(themesStart).toBeLessThan(worldStart);
+        expect(mapMarkup).toContain('id="rpg_map_theme_preset"');
+        expect(mapMarkup).toContain('id="rpg_map_theme_load"');
+        expect(mapMarkup).toContain('id="rpg_map_theme_save"');
+        expect(mapMarkup).toContain('id="rpg_map_theme_delete"');
+        expect(mapMarkup).toContain('id="rpg_map_theme_colors"');
     });
 
     it('places Adventure Companion directly below World Progression', () => {

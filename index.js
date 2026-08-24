@@ -29,6 +29,11 @@ import { openDisplayGroupsManager } from './display-groups.js';
 import { handleCategorySettings, openCustomFieldEditor, openPromptEditor, refreshOrderList, exportModules, importModulesFromJson, openNpcSectionEditor, openPcSectionEditor } from './ui-editors.js';
 import { openGameSystemWizard, openManageGameSystems, openSystemPromptControlRoom, syncAllNarratorTogglesForUnlockState, extractTopLevelSections, normalizeSectionOrder, getSectionRowDescriptor, transformBaseSectionContent, isBlankSectionContent, isSectionUnlocked, isEffectiveSectionEnabled } from './game-systems.js';
 import { isCyoaEnabled, isLorebookAgentRuntimeActive, setLocationMappingEnabled, LOCATION_MAPPING_SECTION_TAG } from './src/state/section-enabled.js';
+import {
+    AGENT_CONNECTION_SETUPS,
+    applyConnectionSetupToAll,
+    findAgentConnectionSetup,
+} from './src/state/connection-setups.js';
 import { applyMapArchitectOpenerToUi, normalizeMapArchitectOpener, syncMapArchitectOpenerNestedVisibility } from './map-architect-opener.js';
 import { openManageGameCartridges, promptAndSaveCurrentAsCartridge } from './game-cartridges.js';
 import {
@@ -81,6 +86,15 @@ import { DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT } from './map-architect-prompt.js';
 import { DEFAULT_MAP_UPDATER_SYSTEM_PROMPT } from './map-updater-prompt.js';
 import { DEFAULT_MAP_EVOLUTION_SYSTEM_PROMPT } from './map-evolution-prompt.js';
 import { DEFAULT_MAP_EVOLUTION_COMPRESS_SYSTEM_PROMPT } from './map-evolution-compress-prompt.js';
+import {
+    DEFAULT_MAP_THEME,
+    FACTORY_MAP_THEME_PRESETS,
+    MAP_THEME_FIELDS,
+    applyMapThemeToRoot,
+    normalizeMapTheme,
+    normalizeSavedMapThemePresets,
+    resolveMapThemePreset,
+} from './src/state/map-themes.js';
 
 export { RENDERING_TAGS_LIBRARY };
 export { bindRenderedCardEvents };
@@ -404,6 +418,102 @@ function applyMapRuntimeConnectionSettingsToUi(settings) {
     $('#rpg_map_runtime_profile_group').toggle(s.mapRuntimeConnectionSource === 'profile');
     $('#rpg_map_runtime_ollama_group').toggle(s.mapRuntimeConnectionSource === 'ollama');
     $('#rpg_map_runtime_openai_group').toggle(s.mapRuntimeConnectionSource === 'openai');
+}
+
+/**
+ * Push one agent connection setup from settings into its DOM controls.
+ * @param {import('./src/state/connection-setups.js').AgentConnectionSetupDef} def
+ * @param {Record<string, any>} settings
+ */
+function applyAgentConnectionSetupToUi(def, settings) {
+    if (!def?.ui || !settings) return;
+    const sourceVal = String(settings[def.settingsKeys.connectionSource] || 'default');
+    const profileVal = String(settings[def.settingsKeys.connectionProfileId] || '');
+    const presetVal = String(settings[def.settingsKeys.completionPresetId] || '');
+    const ollamaUrl = String(settings[def.settingsKeys.ollamaUrl] || 'http://localhost:11434');
+    const ollamaModel = String(settings[def.settingsKeys.ollamaModel] || '');
+    const openaiUrl = String(settings[def.settingsKeys.openaiUrl] || '');
+    const openaiKey = String(settings[def.settingsKeys.openaiKey] || '');
+    const openaiModel = String(settings[def.settingsKeys.openaiModel] || '');
+
+    const ensureSelectValue = (selector, value) => {
+        const el = $(selector);
+        if (!el.length || !value) {
+            el.val(value);
+            return;
+        }
+        if (!el.find(`option[value="${CSS.escape(value)}"]`).length) {
+            el.append($('<option></option>').val(value).text(value));
+        }
+        el.val(value);
+    };
+
+    $(def.ui.source).val(sourceVal);
+    ensureSelectValue(def.ui.profile, profileVal);
+    ensureSelectValue(def.ui.preset, presetVal);
+    $(def.ui.ollamaUrl).val(ollamaUrl);
+    ensureSelectValue(def.ui.ollamaModel, ollamaModel);
+    $(def.ui.openaiUrl).val(openaiUrl);
+    $(def.ui.openaiKey).val(openaiKey);
+    ensureSelectValue(def.ui.openaiModel, openaiModel);
+    $(def.ui.openaiManual).val(openaiModel);
+
+    const setGroupVisible = (selector, visible, useFlex) => {
+        const el = document.querySelector(selector);
+        if (el instanceof HTMLElement) {
+            el.style.display = visible ? (useFlex ? 'flex' : '') : 'none';
+            return;
+        }
+        $(selector).toggle(!!visible);
+    };
+    setGroupVisible(def.ui.profileGroup, sourceVal === 'profile', false);
+    setGroupVisible(def.ui.ollamaGroup, sourceVal === 'ollama', true);
+    setGroupVisible(def.ui.openaiGroup, sourceVal === 'openai', true);
+}
+
+/** Refresh every agent connection drawer from live settings. */
+function syncAllAgentConnectionSetupsToUi(settings) {
+    const s = settings || getSettings();
+    for (const def of AGENT_CONNECTION_SETUPS) {
+        applyAgentConnectionSetupToUi(def, s);
+    }
+}
+
+function populateConnectionApplyAllSourceSelect() {
+    const select = /** @type {HTMLSelectElement|null} */ (document.getElementById('rpg_connection_apply_all_source'));
+    if (!select) return;
+    const previous = select.value || 'state_tracker';
+    select.innerHTML = '';
+    for (const def of AGENT_CONNECTION_SETUPS) {
+        const option = document.createElement('option');
+        option.value = def.key;
+        option.textContent = def.label;
+        select.appendChild(option);
+    }
+    select.value = findAgentConnectionSetup(previous) ? previous : 'state_tracker';
+}
+
+function bindConnectionApplyAllControls() {
+    populateConnectionApplyAllSourceSelect();
+    const btn = document.getElementById('rpg_connection_apply_all_btn');
+    if (!btn || btn.dataset.rtBound === '1') return;
+    btn.dataset.rtBound = '1';
+    btn.addEventListener('click', () => {
+        const select = /** @type {HTMLSelectElement|null} */ (document.getElementById('rpg_connection_apply_all_source'));
+        const sourceKey = String(select?.value || 'state_tracker');
+        const settings = getSettings();
+        const result = applyConnectionSetupToAll(settings, sourceKey);
+        if (!result) {
+            toastr['error']('Could not apply that connection setup.', 'Connections & Models');
+            return;
+        }
+        saveSettings();
+        syncAllAgentConnectionSetupsToUi(settings);
+        toastr['success'](
+            `Applied ${result.sourceLabel} connection to ${result.appliedCount} other features.`,
+            'Connections & Models',
+        );
+    });
 }
 
 
@@ -936,6 +1046,248 @@ export function saveSettings(force = false, delay = 0) {
 
     if (_saveSettingsTimer) clearTimeout(_saveSettingsTimer);
     _saveSettingsTimer = setTimeout(() => { void doSave(false); }, delay);
+}
+
+let _mapThemePreviewTimer = null;
+let _mapThemeSaveTimer = null;
+let _pendingMapThemeColors = {};
+const MAP_THEME_PREVIEW_DELAY_MS = 90;
+const MAP_THEME_SAVE_DELAY_MS = 240;
+
+function applyMapThemePreviewNow(theme) {
+    if (_mapThemePreviewTimer) clearTimeout(_mapThemePreviewTimer);
+    _mapThemePreviewTimer = null;
+    _pendingMapThemeColors = {};
+    applyMapThemeToRoot(theme);
+}
+
+function flushPendingMapThemeColors(immediateSave = false) {
+    if (_mapThemePreviewTimer) clearTimeout(_mapThemePreviewTimer);
+    _mapThemePreviewTimer = null;
+    const edits = _pendingMapThemeColors;
+    _pendingMapThemeColors = {};
+    if (!Object.keys(edits).length) return;
+
+    const settings = getSettings();
+    settings.mapTheme = normalizeMapTheme({ ...settings.mapTheme, ...edits });
+    settings.activeMapThemePresetId = '';
+    applyMapThemeToRoot(settings.mapTheme);
+    for (const key of Object.keys(edits)) {
+        document.querySelectorAll(`#rpg_map_theme_colors [data-map-theme-key="${key}"]`).forEach((input) => {
+            input.value = settings.mapTheme[key];
+        });
+    }
+    const select = document.getElementById('rpg_map_theme_preset');
+    if (select) select.value = '';
+    const deleteButton = document.getElementById('rpg_map_theme_delete');
+    if (deleteButton) deleteButton.disabled = true;
+    scheduleMapThemeSave(immediateSave);
+}
+
+function queueMapThemeColor(key, value, immediate = false) {
+    _pendingMapThemeColors[key] = value;
+    if (_mapThemePreviewTimer) clearTimeout(_mapThemePreviewTimer);
+    _mapThemePreviewTimer = null;
+    if (immediate) {
+        flushPendingMapThemeColors(true);
+        return;
+    }
+    _mapThemePreviewTimer = setTimeout(() => {
+        flushPendingMapThemeColors(false);
+    }, MAP_THEME_PREVIEW_DELAY_MS);
+}
+
+function scheduleMapThemeSave(immediate = false) {
+    if (_mapThemeSaveTimer) clearTimeout(_mapThemeSaveTimer);
+    _mapThemeSaveTimer = null;
+    if (immediate) {
+        saveSettings();
+        return;
+    }
+    _mapThemeSaveTimer = setTimeout(() => {
+        _mapThemeSaveTimer = null;
+        saveSettings();
+    }, MAP_THEME_SAVE_DELAY_MS);
+}
+
+function renderMapThemeColorControls() {
+    const container = document.getElementById('rpg_map_theme_colors');
+    if (!container || container.childElementCount) return;
+    let currentGroup = '';
+    for (const field of MAP_THEME_FIELDS) {
+        if (field.group !== currentGroup) {
+            currentGroup = field.group;
+            const heading = document.createElement('div');
+            heading.className = 'rt-map-theme-group-title';
+            heading.textContent = currentGroup;
+            container.appendChild(heading);
+        }
+        const label = document.createElement('label');
+        label.className = 'rt-map-theme-color';
+        label.title = `Choose the ${field.label.toLowerCase()} color`;
+
+        const picker = document.createElement('input');
+        picker.type = 'color';
+        picker.dataset.mapThemeKey = field.key;
+        picker.setAttribute('aria-label', `${field.label} color picker`);
+
+        const name = document.createElement('span');
+        name.textContent = field.label;
+
+        const hex = document.createElement('input');
+        hex.type = 'text';
+        hex.className = 'text_pole';
+        hex.maxLength = 7;
+        hex.spellcheck = false;
+        hex.dataset.mapThemeKey = field.key;
+        hex.dataset.mapThemeHex = 'true';
+        hex.setAttribute('aria-label', `${field.label} hex color`);
+
+        label.append(picker, name, hex);
+        container.appendChild(label);
+    }
+}
+
+function syncMapThemePresetSelect(settings) {
+    const select = document.getElementById('rpg_map_theme_preset');
+    if (!select) return;
+    const previous = String(settings.activeMapThemePresetId || '');
+    select.replaceChildren();
+
+    const custom = document.createElement('option');
+    custom.value = '';
+    custom.textContent = 'Custom (unsaved)';
+    select.appendChild(custom);
+
+    const factoryGroup = document.createElement('optgroup');
+    factoryGroup.label = 'Factory themes';
+    for (const preset of FACTORY_MAP_THEME_PRESETS) {
+        const option = document.createElement('option');
+        option.value = preset.id;
+        option.textContent = preset.name;
+        factoryGroup.appendChild(option);
+    }
+    select.appendChild(factoryGroup);
+
+    const savedEntries = Object.entries(settings.savedMapThemePresets || {});
+    if (savedEntries.length) {
+        const savedGroup = document.createElement('optgroup');
+        savedGroup.label = 'Your presets';
+        for (const [name] of savedEntries.sort(([a], [b]) => a.localeCompare(b))) {
+            const option = document.createElement('option');
+            option.value = `user:${name}`;
+            option.textContent = name;
+            savedGroup.appendChild(option);
+        }
+        select.appendChild(savedGroup);
+    }
+    select.value = [...select.options].some(option => option.value === previous) ? previous : '';
+    const deleteButton = document.getElementById('rpg_map_theme_delete');
+    if (deleteButton) deleteButton.disabled = !select.value.startsWith('user:');
+}
+
+function syncMapThemeUi(settings = getSettings()) {
+    settings.mapTheme = normalizeMapTheme(settings.mapTheme);
+    settings.savedMapThemePresets = normalizeSavedMapThemePresets(settings.savedMapThemePresets);
+    applyMapThemePreviewNow(settings.mapTheme);
+    renderMapThemeColorControls();
+    for (const { key } of MAP_THEME_FIELDS) {
+        document.querySelectorAll(`#rpg_map_theme_colors [data-map-theme-key="${key}"]`).forEach((input) => {
+            input.value = settings.mapTheme[key];
+        });
+    }
+    syncMapThemePresetSelect(settings);
+}
+
+function applySelectedMapTheme(settings, theme, activeId = '') {
+    settings.mapTheme = normalizeMapTheme(theme);
+    settings.activeMapThemePresetId = activeId;
+    syncMapThemeUi(settings);
+    scheduleMapThemeSave(true);
+}
+
+function bindMapThemeControls() {
+    const $colors = $('#rpg_map_theme_colors');
+    $colors.off('.rpgMapTheme');
+    $colors.on('input.rpgMapTheme change.rpgMapTheme', 'input[data-map-theme-key]', function (event) {
+        const key = String(this.dataset.mapThemeKey || '');
+        const raw = String(this.value || '').trim();
+        const valid = /^#[0-9a-f]{6}$/i.test(raw);
+        if (!valid) {
+            if (event.type === 'change') {
+                const settings = getSettings();
+                this.value = settings.mapTheme[key] || DEFAULT_MAP_THEME[key];
+            }
+            return;
+        }
+        // Keep the high-frequency native picker event nearly work-free. The
+        // complete settings/UI/map update runs only after movement settles.
+        queueMapThemeColor(key, raw, event.type === 'change');
+    });
+
+    $('#rpg_map_theme_preset').off('.rpgMapTheme').on('change.rpgMapTheme', function () {
+        $('#rpg_map_theme_delete').prop('disabled', !String(this.value || '').startsWith('user:'));
+    });
+    $('#rpg_map_theme_load').off('.rpgMapTheme').on('click.rpgMapTheme', function () {
+        const settings = getSettings();
+        const id = String($('#rpg_map_theme_preset').val() || '');
+        const theme = resolveMapThemePreset(id, settings.savedMapThemePresets);
+        if (!theme) {
+            toastr['warning']('Choose a saved or factory theme first.', 'Map Themes');
+            return;
+        }
+        applySelectedMapTheme(settings, theme, id);
+        const name = id.startsWith('user:') ? id.slice(5) : FACTORY_MAP_THEME_PRESETS.find(preset => preset.id === id)?.name;
+        toastr['success'](`Loaded ${name || 'map theme'}.`, 'Map Themes');
+    });
+    $('#rpg_map_theme_save').off('.rpgMapTheme').on('click.rpgMapTheme', async function () {
+        const settings = getSettings();
+        const { Popup, POPUP_RESULT } = SillyTavern.getContext();
+        const requested = Popup?.show?.input
+            ? await Popup.show.input('Save Map Theme', 'Name this map theme preset:', 'My Map Theme')
+            : prompt('Name this map theme preset:', 'My Map Theme');
+        const name = String(requested || '').trim().slice(0, 80);
+        if (!name) return;
+        if (['__proto__', 'constructor', 'prototype'].includes(name)) {
+            toastr['warning']('Please choose another preset name.', 'Map Themes');
+            return;
+        }
+        const existingName = Object.keys(settings.savedMapThemePresets || {})
+            .find(savedName => savedName.toLowerCase() === name.toLowerCase());
+        if (existingName) {
+            const replace = Popup?.show?.confirm
+                ? await Popup.show.confirm('Replace Map Theme?', `Replace the saved map theme "${escapeHtml(existingName)}"?`)
+                : confirm(`Replace the saved map theme "${existingName}"?`);
+            if (Popup?.show?.confirm ? replace !== (POPUP_RESULT?.AFFIRMATIVE ?? 1) : !replace) return;
+        }
+        if (existingName && existingName !== name) delete settings.savedMapThemePresets[existingName];
+        settings.savedMapThemePresets[name] = normalizeMapTheme(settings.mapTheme);
+        settings.activeMapThemePresetId = `user:${name}`;
+        syncMapThemeUi(settings);
+        scheduleMapThemeSave(true);
+        toastr['success'](`Saved ${name}.`, 'Map Themes');
+    });
+    $('#rpg_map_theme_delete').off('.rpgMapTheme').on('click.rpgMapTheme', async function () {
+        const settings = getSettings();
+        const id = String($('#rpg_map_theme_preset').val() || '');
+        if (!id.startsWith('user:')) return;
+        const name = id.slice(5);
+        const { Popup, POPUP_RESULT } = SillyTavern.getContext();
+        const approved = Popup?.show?.confirm
+            ? await Popup.show.confirm('Delete Map Theme?', `Delete the saved map theme "${escapeHtml(name)}"?`)
+            : confirm(`Delete the saved map theme "${name}"?`);
+        if (Popup?.show?.confirm ? approved !== (POPUP_RESULT?.AFFIRMATIVE ?? 1) : !approved) return;
+        delete settings.savedMapThemePresets[name];
+        if (settings.activeMapThemePresetId === id) settings.activeMapThemePresetId = '';
+        syncMapThemeUi(settings);
+        scheduleMapThemeSave(true);
+        toastr['info'](`Deleted ${name}.`, 'Map Themes');
+    });
+    $('#rpg_map_theme_reset').off('.rpgMapTheme').on('click.rpgMapTheme', function () {
+        const settings = getSettings();
+        applySelectedMapTheme(settings, DEFAULT_MAP_THEME, 'factory:ember');
+        toastr['success']('Map colors reset to Ember.', 'Map Themes');
+    });
 }
 
 /** When NPC portraits are disabled, turn off NPC auto-generation and sync dependent UI. */
@@ -3176,6 +3528,7 @@ function loadProfile(name) {
     applyMapEvolutionTickSettingsToUi(s);
     $('#rpg_map_evolution_system_prompt').val(s.mapEvolutionSystemPrompt || DEFAULT_MAP_EVOLUTION_SYSTEM_PROMPT);
     $('#rpg_map_evolution_compress_prompt').val(s.mapEvolutionCompressSystemPrompt || DEFAULT_MAP_EVOLUTION_COMPRESS_SYSTEM_PROMPT);
+    syncMapThemeUi(s);
 
     // Sync world progression connection settings UI
     $('#rpg_world_connection_source').val(s.worldConnectionSource || 'default');
@@ -5478,6 +5831,7 @@ function organizeConnectionSettingsUI() {
 
     {
         const earlySettings = getSettings();
+        applyMapThemeToRoot(earlySettings.mapTheme);
         // Heal displayGroups / prompt-ack before the Prompt Defaults dialog or UI bind.
         // Disk settings.json saves (~12MB) are often cancelled when reloading after code edits;
         // this sync localStorage WAL restores the last intentional change.
@@ -5514,6 +5868,7 @@ function organizeConnectionSettingsUI() {
         initSettingsOverlay(settingsHtml, { folderName: FOLDER_NAME });
 
         organizeConnectionSettingsUI();
+        bindConnectionApplyAllControls();
 
         // Bind drawer toggles ONLY for our own content to avoid global conflicts.
         // IMPORTANT: expand each comma-root before appending `.inline-drawer-toggle`.
@@ -5550,6 +5905,8 @@ function organizeConnectionSettingsUI() {
         });
 
         const settings = getSettings();
+        syncMapThemeUi(settings);
+        bindMapThemeControls();
         bindCharacterCreationConnectionSettings(getSettingsOverlayRoot() || document.querySelector('.rpg-tracker-settings'));
         bindAdventureCompanionSettingsDrawer();
         await bindFeatureConnectionSettings({
@@ -11728,6 +12085,7 @@ RULES:
             applyMapEvolutionTickSettingsToUi(s);
             $('#rpg_map_evolution_system_prompt').val(s.mapEvolutionSystemPrompt || DEFAULT_MAP_EVOLUTION_SYSTEM_PROMPT);
             $('#rpg_map_evolution_compress_prompt').val(s.mapEvolutionCompressSystemPrompt || DEFAULT_MAP_EVOLUTION_COMPRESS_SYSTEM_PROMPT);
+            syncMapThemeUi(s);
 
             // Inventory/Core Prompt
             $('#rpg_tracker_inventory_worth_mode').val(s.inventoryWorthMode || 'hover');

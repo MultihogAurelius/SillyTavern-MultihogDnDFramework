@@ -2,11 +2,16 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
-## [2026.8.39] - 2026-08-24
+## [2026.8.40] - 2026-08-24
+
+### Added
+- **Persistent Map themes**: The bottom of Persistent Maps now provides live color controls for the map canvas, areas, routes, and every asset type. Includes Ember, Blueprint, Verdant, and Parchment factory themes plus named user presets that can be saved, loaded, and deleted without changing map JSON.
 
 ### Changed
 - **Single master power button**: Removed the Lorebook Agent header ⏻. The main panel ⏻ (and Enable Multihog Framework in settings) now powers the whole extension off — stops State Tracker / CYOA / pacing / Lorebook Agent / map injection, restores the backed-up Main prompt, and aborts in-flight agent runs. The Lorebook Agent settings checkbox remains as a preference used only while the framework is on.
 - **Agent header title**: Renamed to "Lorebook Agent & Maps" (header and attached mode tab).
+- **Portrait and Location Image Styles**: Moved art-style / saved setup picker out of the Portrait Prompt Templates drawer and placed it above the templates, with copy explaining that styles load into the templates below and that edits can be saved as presets.
+- **Connections Apply to All**: Connections & Models now has a footer box to copy one feature's connection setup onto every Multihog agent connection (Combat API Override excluded).
 
 ## [2026.8.37] - 2026-08-24
 

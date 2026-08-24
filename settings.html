@@ -391,6 +391,17 @@
                                 </div>
                             </div>
 
+                            <div id="rpg_portrait_prompt_presets_container" style="margin-top: 8px; margin-bottom: 8px; padding: 8px 6px; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; background: rgba(0,0,0,0.12);">
+                                <b style="font-size: 0.85em;">Portrait and Location Image Styles</b>
+                                <div style="font-size: 0.72em; opacity: 0.6; line-height: 1.4; margin: 4px 0 8px;">
+                                    Click a style to load it into the <b>Portrait Prompt Templates</b> below (NPC/PC, Character/Party/Combat, and Location Scene). You can edit those templates afterward, then use <b>Save Setup to Library</b> to keep your own preset.
+                                </div>
+                                <div id="rpg_portrait_prompt_presets_list" class="flex-container flexFlowColumn gap-1" style="max-height: 220px; overflow-y: auto; padding-right: 4px;"></div>
+                                <div class="flex-container gap-1" style="margin-top: 8px;">
+                                    <button id="rpg_portrait_prompt_preset_save_btn" class="menu_button interactable" style="flex: 1; font-size: 11px;"><i class="fa-solid fa-bookmark"></i> Save Setup to Library</button>
+                                </div>
+                            </div>
+
                             <div class="inline-drawer" style="margin-top: 4px; margin-bottom: 2px;">
                                 <div class="inline-drawer-toggle inline-drawer-header" style="font-size: 0.82em; padding: 3px 6px;">
                                     <b>Portrait Prompt Templates</b>
@@ -400,7 +411,7 @@
                                     <div class="flex-container flexFlowColumn gap-1">
                                         <div style="font-size: 0.72em; opacity: 0.55; line-height: 1.35; margin-bottom: 2px;">
                                             These are the system prompts sent to the LLM to write an image-generation prompt. The NPC/PC prompt receives the full lorebook entry verbatim — including any custom <code>[CORE]</code> field you've added (e.g. an "Image Tags" section via the NPC Section Editor), so you can instruct it to prioritize that field by name. Tokens: <code>{{name}}</code> is replaced with the entity's name, <code>{{wordtarget}}</code> is replaced with the word target set below.
-                                            <br>Use <b>Factory Art Styles</b> below to swap the art-style guidance across all three prompts, or <b>Save Setup</b> to keep your own presets. <b>Fantasy (Default)</b> matches the historical Multihog prompts and is what Reset restores.
+                                            <br>Use <b>Portrait and Location Image Styles</b> above to swap art-style guidance across all three prompts. Edit the templates here, then save your own preset from that styles section. <b>Fantasy (Default)</b> matches the historical Multihog prompts and is what Reset restores.
                                         </div>
 
                                         <div style="display:flex; align-items:center; gap:8px; margin-bottom: 4px;">
@@ -431,15 +442,6 @@
                                             </button>
                                         </div>
                                         <textarea id="rpg_portrait_location_system_prompt" class="text_pole" rows="8" style="width:100%; font-size:0.78em; font-family:monospace; resize:vertical; background:rgba(0,0,0,0.3); color:var(--SmartThemeBodyColor); border:1px solid rgba(255,255,255,0.1); border-radius:4px; padding:6px; box-sizing:border-box;" placeholder="System prompt used for location/scene image prompt generation…"></textarea>
-
-                                        <div class="flex-container gap-1" style="margin-top: 6px;">
-                                            <button id="rpg_portrait_prompt_preset_save_btn" class="menu_button interactable" style="flex: 1; font-size: 11px;"><i class="fa-solid fa-bookmark"></i> Save Setup to Library</button>
-                                        </div>
-                                        <div id="rpg_portrait_prompt_presets_container" style="margin-top: 8px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 8px;">
-                                            <b style="font-size: 0.85em; opacity: 0.8;">Portrait Prompt Presets</b>
-                                            <div style="font-size: 0.7em; opacity: 0.5; margin: 2px 0 4px;">Click a style or saved setup to load it into the templates above.</div>
-                                            <div id="rpg_portrait_prompt_presets_list" class="flex-container flexFlowColumn gap-1" style="max-height: 220px; overflow-y: auto; padding-right: 4px;"></div>
-                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -562,6 +564,19 @@
                     <div id="rpg_connection_slot_map_runtime" class="rt-connection-drawer-slot"></div>
                     <div id="rpg_connection_slot_world_progression" class="rt-connection-drawer-slot"></div>
                     <div id="rpg_connection_slot_portraits" class="rt-connection-drawer-slot"></div>
+
+                    <div class="rt-connection-apply-all" id="rpg_connection_apply_all_box">
+                        <b>Apply Connection Setup to All</b>
+                        <div class="rt-connection-apply-all-help">
+                            Choose one feature's connection setup, then apply it to every Multihog connection below (State Tracker, Lorebook Agent, Character Creation, maps, portraits, and the rest). Combat API Override is left alone.
+                        </div>
+                        <div class="rt-connection-apply-all-row">
+                            <select id="rpg_connection_apply_all_source" class="text_pole" aria-label="Connection setup to copy"></select>
+                            <button type="button" id="rpg_connection_apply_all_btn" class="menu_button interactable">
+                                <i class="fa-solid fa-clone"></i> Apply to All
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -1596,6 +1611,31 @@
                                         <button id="rpg_map_evolution_reset_compress_prompt" class="menu_button interactable" style="font-size:0.75em; padding:2px 8px;" title="Reset to the shipped history-compression prompt"><i class="fa-solid fa-arrow-rotate-left"></i> Reset</button>
                                     </div>
                                     <textarea id="rpg_map_evolution_compress_prompt" class="text_pole" rows="6" style="width:100%; font-size:0.78em; font-family:monospace; resize:vertical; box-sizing:border-box;" placeholder="Dedicated Map Evolution history-compression system prompt"></textarea>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="inline-drawer" id="rpg_map_themes_drawer">
+                            <div class="inline-drawer-toggle inline-drawer-header">
+                                <b>Map Themes</b>
+                                <div class="inline-drawer-icon fa-solid fa-circle-down down"></div>
+                            </div>
+                            <div class="inline-drawer-content">
+                                <div class="flex-container flexFlowColumn gap-1">
+                                    <div style="font-size:0.8em; opacity:0.72; line-height:1.4;">
+                                        Customize the graph colors used by every persistent map. Changes appear immediately and never alter map or campaign data.
+                                    </div>
+                                    <label for="rpg_map_theme_preset">Preset</label>
+                                    <div class="rt-map-theme-preset-row">
+                                        <select id="rpg_map_theme_preset" class="text_pole" aria-label="Map theme preset"></select>
+                                        <button type="button" id="rpg_map_theme_load" class="menu_button interactable"><i class="fa-solid fa-folder-open"></i> Load</button>
+                                        <button type="button" id="rpg_map_theme_save" class="menu_button interactable"><i class="fa-solid fa-floppy-disk"></i> Save as</button>
+                                        <button type="button" id="rpg_map_theme_delete" class="menu_button interactable" title="Delete the selected saved preset"><i class="fa-solid fa-trash-can"></i></button>
+                                    </div>
+                                    <div id="rpg_map_theme_colors" class="rt-map-theme-colors" aria-label="Map theme colors"></div>
+                                    <div class="flex-container gap-1" style="justify-content:flex-end; margin-top:4px;">
+                                        <button type="button" id="rpg_map_theme_reset" class="menu_button interactable"><i class="fa-solid fa-arrow-rotate-left"></i> Reset to Ember</button>
+                                    </div>
                                 </div>
                             </div>
                         </div>

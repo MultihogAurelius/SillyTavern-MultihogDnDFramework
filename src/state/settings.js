@@ -24,6 +24,7 @@ import { LOREBOOK_RUNTIME_FRAGMENT_KEYS } from './lorebook-runtime-fragments.js'
 import { DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT } from '../../map-architect-prompt.js';
 import { DEFAULT_MAP_UPDATER_SYSTEM_PROMPT } from '../../map-updater-prompt.js';
 import { DEFAULT_MAP_EVOLUTION_SYSTEM_PROMPT } from '../../map-evolution-prompt.js';
+import { normalizeMapTheme, normalizeSavedMapThemePresets } from './map-themes.js';
 
 // Re-entrancy guard: some migration blocks below call buildNpcInstruction()/
 // buildLocInstruction()/buildFacInstruction(), which themselves call
@@ -1124,6 +1125,9 @@ function getSettingsInternal(extensionSettings) {
         s.mapEvolutionThreadsBySite = {};
     }
     s.dungeonMapRevealAll = !!s.dungeonMapRevealAll;
+    s.mapTheme = normalizeMapTheme(s.mapTheme);
+    s.savedMapThemePresets = normalizeSavedMapThemePresets(s.savedMapThemePresets);
+    s.activeMapThemePresetId = typeof s.activeMapThemePresetId === 'string' ? s.activeMapThemePresetId : '';
     if (!s.mapEvolutionWorldReportApplications || typeof s.mapEvolutionWorldReportApplications !== 'object') {
         s.mapEvolutionWorldReportApplications = {};
     }
@@ -1389,6 +1393,9 @@ export const CHAT_STATE_GLOBAL_UI_KEYS = [
     'mapUpdaterRunEvery',
     'mapUpdaterMaxTokens',
     'mapUpdaterSystemPrompt',
+    'mapTheme',
+    'savedMapThemePresets',
+    'activeMapThemePresetId',
     'mapEvolutionEnabled',
     'mapEvolutionIntervalHours',
     'mapEvolutionOnSiteIntervalHours',
