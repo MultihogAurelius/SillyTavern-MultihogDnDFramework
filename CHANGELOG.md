@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.46] - 2026-08-25
+
+### Added
+- **Optional map background textures**: Map Themes can now place an uploaded image or HTTP(S) image behind every persistent-map graph. A live Canvas-color overlay controls readability, and custom theme presets retain both the texture and overlay strength.
+
 ## [2026.8.45] - 2026-08-25
 
 ### Fixed

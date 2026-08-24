@@ -8425,7 +8425,13 @@ textarea.rt-cr-input {
     max-height: 220px;
     border: 1px solid var(--rt-map-frame, #ffaa00);
     border-radius: 8px;
-    background: var(--rt-map-background, #0c0c0c);
+    background-color: var(--rt-map-background, #0c0c0c);
+    background-image:
+        linear-gradient(var(--rt-map-background-overlay, rgba(12, 12, 12, 0.55)), var(--rt-map-background-overlay, rgba(12, 12, 12, 0.55))),
+        var(--rt-map-background-image, none);
+    background-position: center;
+    background-size: cover;
+    background-repeat: no-repeat;
     padding: 4px;
     cursor: grab;
     user-select: none;
@@ -8652,6 +8658,36 @@ dialog .rt-dungeon-graph-asset-tip,
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
     gap: 8px;
     margin-top: 8px;
+}
+.rt-map-theme-image-block {
+    margin-top: 10px;
+    padding: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.03);
+}
+.rt-map-theme-image-row {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+}
+.rt-map-theme-image-preview {
+    width: 96px;
+    height: 64px;
+    flex-shrink: 0;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 6px;
+    background-position: center;
+    background-size: cover;
+    background-repeat: no-repeat;
+}
+.rt-map-theme-image-controls {
+    display: flex;
+    flex: 1;
+    min-width: 160px;
+    flex-direction: column;
+    gap: 5px;
 }
 .rt-map-theme-group-title {
     grid-column: 1 / -1;

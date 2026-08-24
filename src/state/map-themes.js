@@ -50,6 +50,8 @@ export const DEFAULT_MAP_THEME = Object.freeze({
     loot: '#ffcc4a',
     effect: '#ff9a5c',
     other: '#c8925a',
+    backgroundImage: '',
+    backgroundImageStrength: 55,
 });
 
 function makeTheme(overrides) {
@@ -102,6 +104,17 @@ export const FACTORY_MAP_THEME_PRESETS = Object.freeze([
 ]);
 
 const HEX_COLOR = /^#[0-9a-f]{6}$/i;
+const REMOTE_IMAGE = /^https?:\/\//i;
+
+function normalizeMapThemeImage(value) {
+    const source = String(value || '').trim();
+    return source.startsWith('data:image/') || REMOTE_IMAGE.test(source) ? source : '';
+}
+
+function normalizeMapThemeImageStrength(value) {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? Math.max(0, Math.min(100, Math.round(numeric))) : 55;
+}
 
 export function normalizeMapTheme(value) {
     const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
@@ -110,6 +123,8 @@ export function normalizeMapTheme(value) {
         const candidate = String(source[key] || '').trim();
         normalized[key] = HEX_COLOR.test(candidate) ? candidate.toLowerCase() : DEFAULT_MAP_THEME[key];
     }
+    normalized.backgroundImage = normalizeMapThemeImage(source.backgroundImage);
+    normalized.backgroundImageStrength = normalizeMapThemeImageStrength(source.backgroundImageStrength);
     return normalized;
 }
 
@@ -147,6 +162,8 @@ export function applyMapThemeToRoot(theme, root = globalThis.document?.documentE
     const t = normalizeMapTheme(theme);
     const vars = {
         '--rt-map-background': t.background,
+        '--rt-map-background-image': t.backgroundImage ? `url(${JSON.stringify(t.backgroundImage)})` : 'none',
+        '--rt-map-background-overlay': hexToRgba(t.background, t.backgroundImageStrength / 100),
         '--rt-map-textbox': t.textbox,
         '--rt-map-frame': t.frame,
         '--rt-map-frame-soft': hexToRgba(t.frame, 0.35),

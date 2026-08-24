@@ -1188,6 +1188,33 @@ function syncMapThemePresetSelect(settings) {
     if (deleteButton) deleteButton.disabled = !select.value.startsWith('user:');
 }
 
+function syncMapThemeImageUi(settings) {
+    const theme = normalizeMapTheme(settings.mapTheme);
+    const preview = document.getElementById('rpg_map_theme_bg_preview');
+    const urlInput = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_map_theme_bg_url'));
+    const overlayInput = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_map_theme_bg_overlay'));
+    const overlayValue = document.getElementById('rpg_map_theme_bg_overlay_val');
+    const strength = theme.backgroundImageStrength;
+    if (preview) {
+        const alpha = Math.round(strength * 2.55).toString(16).padStart(2, '0');
+        preview.style.backgroundColor = theme.background;
+        preview.style.backgroundImage = theme.backgroundImage
+            ? `linear-gradient(${theme.background}${alpha}, ${theme.background}${alpha}), url(${JSON.stringify(theme.backgroundImage)})`
+            : 'none';
+    }
+    if (urlInput) urlInput.value = /^https?:\/\//i.test(theme.backgroundImage) ? theme.backgroundImage : '';
+    if (overlayInput) overlayInput.value = String(strength);
+    if (overlayValue) overlayValue.textContent = `${strength}%`;
+}
+
+function markMapThemeCustom(settings) {
+    settings.activeMapThemePresetId = '';
+    const select = document.getElementById('rpg_map_theme_preset');
+    if (select) select.value = '';
+    const deleteButton = document.getElementById('rpg_map_theme_delete');
+    if (deleteButton) deleteButton.disabled = true;
+}
+
 function syncMapThemeUi(settings = getSettings()) {
     settings.mapTheme = normalizeMapTheme(settings.mapTheme);
     settings.savedMapThemePresets = normalizeSavedMapThemePresets(settings.savedMapThemePresets);
@@ -1198,6 +1225,7 @@ function syncMapThemeUi(settings = getSettings()) {
             input.value = settings.mapTheme[key];
         });
     }
+    syncMapThemeImageUi(settings);
     syncMapThemePresetSelect(settings);
 }
 
@@ -1288,7 +1316,62 @@ function bindMapThemeControls() {
     $('#rpg_map_theme_reset').off('.rpgMapTheme').on('click.rpgMapTheme', function () {
         const settings = getSettings();
         applySelectedMapTheme(settings, DEFAULT_MAP_THEME, 'factory:ember');
-        toastr['success']('Map colors reset to Ember.', 'Map Themes');
+        toastr['success']('Map theme reset to Ember.', 'Map Themes');
+    });
+
+    const persistBackgroundImage = async (source) => {
+        const settings = getSettings();
+        let stored = String(source || '').trim();
+        if (stored.startsWith('data:image/')) {
+            try {
+                stored = await scalePanelBackgroundImage(stored);
+            } catch (err) {
+                console.error(err);
+                toastr['warning']('Could not process that image.', 'Map Themes');
+                return false;
+            }
+        } else if (stored && !/^https?:\/\//i.test(stored)) {
+            toastr['warning']('Use an http(s) image URL or upload a file.', 'Map Themes');
+            return false;
+        }
+        settings.mapTheme = normalizeMapTheme({ ...settings.mapTheme, backgroundImage: stored });
+        markMapThemeCustom(settings);
+        applyMapThemeToRoot(settings.mapTheme);
+        syncMapThemeImageUi(settings);
+        scheduleMapThemeSave(true);
+        return true;
+    };
+
+    $('#rpg_map_theme_bg_upload').off('.rpgMapTheme').on('click.rpgMapTheme', function () {
+        document.getElementById('rpg_map_theme_bg_file')?.click();
+    });
+    $('#rpg_map_theme_bg_file').off('.rpgMapTheme').on('change.rpgMapTheme', async function () {
+        const file = this.files?.[0];
+        this.value = '';
+        if (!file) return;
+        try {
+            if (await persistBackgroundImage(String(await fileToDataUrl(file)))) {
+                toastr['success']('Map background image set.', 'Map Themes');
+            }
+        } catch (err) {
+            console.error(err);
+            toastr['warning']('Could not read that file.', 'Map Themes');
+        }
+    });
+    $('#rpg_map_theme_bg_url').off('.rpgMapTheme').on('change.rpgMapTheme', async function () {
+        await persistBackgroundImage(this.value);
+    });
+    $('#rpg_map_theme_bg_clear').off('.rpgMapTheme').on('click.rpgMapTheme', async function () {
+        await persistBackgroundImage('');
+    });
+    $('#rpg_map_theme_bg_overlay').off('.rpgMapTheme').on('input.rpgMapTheme change.rpgMapTheme', function (event) {
+        const settings = getSettings();
+        const strength = Math.max(0, Math.min(100, parseInt(this.value, 10) || 0));
+        settings.mapTheme = normalizeMapTheme({ ...settings.mapTheme, backgroundImageStrength: strength });
+        markMapThemeCustom(settings);
+        applyMapThemeToRoot(settings.mapTheme);
+        syncMapThemeImageUi(settings);
+        if (event.type === 'change') scheduleMapThemeSave(true);
     });
 }
 

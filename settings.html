@@ -1638,7 +1638,7 @@
                             <div class="inline-drawer-content">
                                 <div class="flex-container flexFlowColumn gap-1">
                                     <div style="font-size:0.8em; opacity:0.72; line-height:1.4;">
-                                        Customize the graph colors used by every persistent map. Changes appear immediately and never alter map or campaign data.
+                                        Customize the appearance used by every persistent map. Changes appear immediately and never alter map or campaign data.
                                     </div>
                                     <label for="rpg_map_theme_preset">Preset</label>
                                     <div class="rt-map-theme-preset-row">
@@ -1648,6 +1648,28 @@
                                         <button type="button" id="rpg_map_theme_delete" class="menu_button interactable" title="Delete the selected saved preset"><i class="fa-solid fa-trash-can"></i></button>
                                     </div>
                                     <div id="rpg_map_theme_colors" class="rt-map-theme-colors" aria-label="Map theme colors"></div>
+                                    <div class="rt-map-theme-image-block">
+                                        <div style="display:flex; align-items:center; gap:6px; margin-bottom:7px;">
+                                            <b style="font-size:0.85em;">Canvas background image <span style="font-weight:normal; opacity:0.58;">(optional)</span></b>
+                                            <i class="fa-solid fa-circle-question interactable" title="Optional texture or artwork behind the map graph. The Canvas color overlays it to keep nodes and routes readable. Saved custom presets include the image."></i>
+                                        </div>
+                                        <div class="rt-map-theme-image-row">
+                                            <div id="rpg_map_theme_bg_preview" class="rt-map-theme-image-preview" title="Map background preview"></div>
+                                            <div class="rt-map-theme-image-controls">
+                                                <div class="flex-container gap-1">
+                                                    <button type="button" id="rpg_map_theme_bg_upload" class="menu_button interactable"><i class="fa-solid fa-upload"></i> Upload</button>
+                                                    <button type="button" id="rpg_map_theme_bg_clear" class="menu_button interactable">Clear</button>
+                                                </div>
+                                                <input id="rpg_map_theme_bg_file" type="file" accept="image/*" style="display:none;" />
+                                                <input id="rpg_map_theme_bg_url" type="text" class="text_pole" placeholder="Or paste image URL…" aria-label="Map background image URL" />
+                                            </div>
+                                        </div>
+                                        <div class="flex-container alignitemscenter" style="width:100%; margin-top:8px;">
+                                            <span style="font-size:0.82em;">Canvas color overlay</span>
+                                            <span id="rpg_map_theme_bg_overlay_val" style="margin-left:auto; font-weight:bold; opacity:0.8;">55%</span>
+                                        </div>
+                                        <input id="rpg_map_theme_bg_overlay" type="range" class="text_pole" style="width:100%; cursor:pointer;" min="0" max="100" value="55" title="Higher values make the Canvas color more opaque over the image" />
+                                    </div>
                                     <div class="flex-container gap-1" style="justify-content:flex-end; margin-top:4px;">
                                         <button type="button" id="rpg_map_theme_reset" class="menu_button interactable"><i class="fa-solid fa-arrow-rotate-left"></i> Reset to Ember</button>
                                     </div>

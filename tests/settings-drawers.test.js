@@ -170,6 +170,10 @@ describe('General & Visuals settings', () => {
         expect(mapMarkup).toContain('id="rpg_map_theme_save"');
         expect(mapMarkup).toContain('id="rpg_map_theme_delete"');
         expect(mapMarkup).toContain('id="rpg_map_theme_colors"');
+        expect(mapMarkup).toContain('id="rpg_map_theme_bg_upload"');
+        expect(mapMarkup).toContain('id="rpg_map_theme_bg_clear"');
+        expect(mapMarkup).toContain('id="rpg_map_theme_bg_url"');
+        expect(mapMarkup).toContain('id="rpg_map_theme_bg_overlay"');
     });
 
     it('places Adventure Companion directly below World Progression', () => {
