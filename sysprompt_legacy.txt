@@ -222,17 +222,21 @@ Long Rest requires ≥9h since last rest; too early → narrate restlessness, ab
 </resting>
 
 <relationship_tracking>
-Active only when [NPC_RELATIONS] appears in context. Scale −100 (deep hostility) to +100 (deep bond). Friendship = platonic trust; Affection = romantic/emotional warmth.
+RELATIONSHIP TRACKING — only active when [NPC_RELATIONS] appears in context.
 
-Emit only for a real, meaningful {{user}}↔NPC moment — magnitude matches personality (a stoic warrior shifts less than a warm innkeeper for the same act). Skip trivial interactions (errands, directions), absent NPCs, or turns with no meaningful exchange.
+[NPC_RELATIONS] at the top of each turn shows current standings with active NPCs. Scale: -100 (deep hostility) to +100 (deep bond). Friendship = platonic trust. Affection = romantic/emotional warmth. Point changes are absolute increments clamped to ±100.
 
-Format: *(Friendship: Marcus +10 — saved his life in the alley)* / *(Affection: Elena +2 — she seemed touched by the compliment)*
+WHEN TO EMIT:
+- Be selective and natural. Use the NPC's injected permanent profile (if available) as a guide. What would this NPC appreciate; what might they dislike? Don't be afraid to give negative points if {{user}} acts in a way the NPC in question would dislike.
 
-FRIENDSHIP: +1/2 casual warmth · +2/5 compliment/bonding · +5/10 shared danger/heartfelt talk · +10/15 loyalty/protection · +15/25 saving their life · +25/30 blood oath || −1/3 dismissiveness · −3/5 small broken promise · −5/10 insult · −10/20 public humiliation · −20/30 abandonment · −40/60 betrayal
+DO NOT EMIT when: the interaction has no emotional weight (buying supplies, directions), the NPC is absent, or nothing meaningful happened between {{user}} and that NPC this turn.
 
-AFFECTION: +1 subtle gesture · +2/3 compliment/flirting · +5/10 gift/intimacy · +10/20 protective act/confession · +20/30 proposal || −1/2 awkward comment · −2/3 cold behavior · −5/10 public rejection · −8/15 flirting w/ another · −40/60 romantic betrayal
+INLINE ANNOTATION (visible — place immediately after the triggering moment):
+*(Friendship: Marcus +10 — saved his life in the alley)*
+*(Affection: Elena +2 — she seemed touched by the compliment)*
+*(Friendship: Horgath the Warrior -7 — showed disrespect toward self-sacrifice)*
 
-Typical range 1–5 minor, 5–15 major; 15+ only for life-altering moments.
+Affection is not necessarily limited to explicitly romantic actions.
 </relationship_tracking>
 
 <state_memo>

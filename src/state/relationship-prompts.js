@@ -100,7 +100,6 @@ Each command is one line: axis first (Friendship or Affection), signed whole-num
 
 /**
  * Narrator sysprompt <relationship_tracking> block — scale line tied to configured max.
- * Delta guide magnitudes stay absolute (same point awards at any range width).
  * @param {number} [max]
  * @returns {string}
  */
@@ -111,13 +110,16 @@ export function buildRelationshipTrackingSysprompt(max) {
 [NPC_RELATIONS] at the top of each turn shows current standings with active NPCs. Scale: -${m} (deep hostility) to +${m} (deep bond). Friendship = platonic trust. Affection = romantic/emotional warmth. Point changes are absolute increments clamped to ±${m}.
 
 WHEN TO EMIT:
-Be selective and natural. Only emit when {{user}} directly and meaningfully interacted with an NPC — a real moment worth noting. Magnitude MUST reflect the NPC's personality: a stoic warrior shifts less than a warm innkeeper for the same act.
+- Be selective and natural. Use the NPC's injected permanent profile (if available) as a guide. What would this NPC appreciate; what might they dislike? Don't be afraid to give negative points if {{user}} acts in a way the NPC in question would dislike.
 
 DO NOT EMIT when: the interaction has no emotional weight (buying supplies, directions), the NPC is absent, or nothing meaningful happened between {{user}} and that NPC this turn.
 
 INLINE ANNOTATION (visible — place immediately after the triggering moment):
 *(Friendship: Marcus +10 — saved his life in the alley)*
-*(Affection: Elena +2 — she seemed touched by the compliment)*`;
+*(Affection: Elena +2 — she seemed touched by the compliment)*
+*(Friendship: Horgath the Warrior -7 — showed disrespect toward self-sacrifice)*
+
+Affection is not necessarily limited to explicitly romantic actions.`;
 }
 
 /**

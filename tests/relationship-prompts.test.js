@@ -1,8 +1,22 @@
 import { describe, expect, it } from 'vitest';
 import {
+    buildRelationshipTrackingSysprompt,
     buildStateTrackerRelationshipCommandInstruction,
     shouldProcessRegexRelationshipUpdates,
 } from '../src/state/relationship-prompts.js';
+
+describe('narrator relationship_tracking sysprompt', () => {
+    it('interpolates the configured scale instead of a hardcoded ±200', () => {
+        const prompt = buildRelationshipTrackingSysprompt(80);
+        expect(prompt).toContain('Scale: -80 (deep hostility) to +80 (deep bond)');
+        expect(prompt).toContain('clamped to ±80');
+        expect(prompt).not.toContain('-200');
+        expect(prompt).not.toContain('+200');
+        expect(prompt).toContain("Use the NPC's injected permanent profile");
+        expect(prompt).toContain('*(Friendship: Horgath the Warrior -7 — showed disrespect toward self-sacrifice)*');
+        expect(prompt).toContain('Affection is not necessarily limited to explicitly romantic actions.');
+    });
+});
 
 describe('State Tracker relationship instruction', () => {
     it('uses the built-in instruction when no custom instruction is configured', () => {

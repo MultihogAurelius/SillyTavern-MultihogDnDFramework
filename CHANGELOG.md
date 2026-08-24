@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.44] - 2026-08-25
+
+### Changed
+- **Relationship tracking prompt**: Narrator `<relationship_tracking>` now guides emit/withhold from the NPC's injected permanent profile, allows negative points, and notes Affection is not limited to explicitly romantic actions. Scale still follows the chat's configured relationship max.
+
 ## [2026.8.43] - 2026-08-25
 
 ### Added
