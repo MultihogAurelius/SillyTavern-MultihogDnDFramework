@@ -340,7 +340,7 @@ export function renderImmersionViewHtml(scene) {
 
     return `<div class="rt-immersion-root">
         ${locationImagesEnabled ? `
-        <div class="rt-immersion-hero-wrap${isLocationGenerating ? ' rt-immersion-hero-generating' : ''}" ${locDataAttrs} role="button" tabindex="0" title="${isLocationGenerating ? 'Generating scene art…' : (locationImage ? 'View location' : 'Set location image')}">
+        <div class="rt-immersion-hero-wrap${isLocationGenerating ? ' rt-immersion-hero-generating' : ''}" ${locDataAttrs} role="button" tabindex="0" title="${isLocationGenerating ? 'Generating scene art…' : (locationImage ? 'Manage location image' : 'Set location image')}">
             ${heroInner}
             ${generatingOverlay}
             <div class="rt-immersion-hero-overlay">

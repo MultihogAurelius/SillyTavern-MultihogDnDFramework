@@ -6512,7 +6512,8 @@ textarea.rt-cr-input {
     opacity: 0.58;
 }
 
-.rt-connection-shortcut-button {
+.rt-connection-shortcut-button,
+.rt-settings-shortcut-button {
     flex: 0 0 auto;
     width: auto !important;
     padding: 3px 8px !important;

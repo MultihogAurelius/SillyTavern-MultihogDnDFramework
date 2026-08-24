@@ -5798,6 +5798,13 @@ function openConnectionsModelsSettings(targetKey = '') {
     setTimeout(() => (targetDrawer || connectionsDrawer)?.scrollIntoView?.({ behavior: 'smooth', block: 'center' }), 80);
 }
 
+function openMapThemesSettings() {
+    openSettingsOverlay('maparchitect');
+    const drawer = document.getElementById('rpg_map_themes_drawer');
+    setSettingsDrawerOpen(drawer);
+    setTimeout(() => drawer?.scrollIntoView?.({ behavior: 'smooth', block: 'center' }), 80);
+}
+
 function organizeConnectionSettingsUI() {
     const settingsRoot = getSettingsOverlayRoot() || document.querySelector('.rpg-tracker-settings');
     if (!settingsRoot) return;
@@ -5991,6 +5998,11 @@ function organizeConnectionSettingsUI() {
             e.preventDefault();
             e.stopPropagation();
             openConnectionsModelsSettings(String($(this).data('connectionTarget') || ''));
+        });
+        $(document).on('click.rpgTrackerSettingsDrawers', '#rpg_open_map_themes', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            openMapThemesSettings();
         });
         $('#rpg_tracker_open_settings').off('click').on('click', function (e) {
             e.preventDefault();

@@ -2,6 +2,12 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.47] - 2026-08-25
+
+### Changed
+- **Direct Visuals/Map image editing**: Clicking the active location artwork now opens its image-generation and management window immediately instead of opening Location details first.
+- **Map Themes shortcut**: General & Visuals → UI Appearance now links directly to the canonical Map Themes drawer under Persistent Maps.
+
 ## [2026.8.46] - 2026-08-25
 
 ### Added

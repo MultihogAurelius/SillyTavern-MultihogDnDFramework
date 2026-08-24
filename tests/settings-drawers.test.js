@@ -34,6 +34,15 @@ describe('General & Visuals settings', () => {
         expect(settingsMarkup).toContain('<b>Portraits and Location Images</b>');
     });
 
+    it('links General & Visuals to the canonical Map Themes controls', () => {
+        const generalStart = settingsMarkup.indexOf('<b>General & Visuals</b>');
+        const connectionsStart = settingsMarkup.indexOf('<b>Connections &amp; Models</b>');
+        const generalMarkup = settingsMarkup.slice(generalStart, connectionsStart);
+        expect(generalMarkup).toContain('<b>Map Appearance</b>');
+        expect(generalMarkup).toContain('id="rpg_open_map_themes"');
+        expect(generalMarkup).toContain('managed under Persistent Maps');
+    });
+
     it('places Connections & Models immediately after General & Visuals', () => {
         const general = settingsMarkup.indexOf('<b>General & Visuals</b>');
         const connections = settingsMarkup.indexOf('<b>Connections &amp; Models</b>');

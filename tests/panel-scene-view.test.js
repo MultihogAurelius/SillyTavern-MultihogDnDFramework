@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { createSceneViewController } from '../src/ui/panel/panel-scene-view.js';
 import { captureDungeonMapViewport, restoreDungeonMapViewport } from '../src/ui/panel/dungeon-map-panel.js';
 import { runtimeState } from '../src/app/runtime-state.js';
@@ -41,6 +42,15 @@ function mountController(settings, extra = {}) {
 }
 
 describe('Scene View controller', () => {
+    it('opens location image controls directly from the Visuals/Map hero image', () => {
+        const source = readFileSync(new URL('../src/ui/panel/panel-scene-view.js', import.meta.url), 'utf8');
+        const heroStart = source.indexOf("const hero = root.querySelector('.rt-immersion-hero-wrap')");
+        const npcStart = source.indexOf("root.querySelectorAll('.rt-immersion-npc-tile')", heroStart);
+        const heroHandler = source.slice(heroStart, npcStart);
+        expect(heroHandler).toContain('await showLocationImageSettingsMenu(');
+        expect(heroHandler).not.toContain('_rpgAgentOpenLocationDetail');
+    });
+
     it('restores a map graph viewport after the refresh replaces its scroll container', () => {
         const original = { scrollLeft: 284, scrollTop: 96 };
         const replacement = { scrollLeft: 0, scrollTop: 0 };

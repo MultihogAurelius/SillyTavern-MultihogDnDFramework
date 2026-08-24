@@ -70,6 +70,9 @@ describe('settings overlay', () => {
         expect(indexSource).toContain('initSettingsOverlay(settingsHtml');
         expect(indexSource).toContain("settings-stub");
         expect(indexSource).toContain("openSettingsOverlay('connections')");
+        expect(indexSource).toContain("openSettingsOverlay('maparchitect')");
+        expect(indexSource).toContain("document.getElementById('rpg_map_themes_drawer')");
+        expect(indexSource).toContain("'#rpg_open_map_themes'");
         expect(indexSource).toContain('#rpg_tracker_open_settings');
     });
 

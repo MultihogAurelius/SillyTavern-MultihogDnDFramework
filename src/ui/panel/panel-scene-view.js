@@ -51,12 +51,11 @@ export function createSceneViewController({
                     const raw = hero.getAttribute('data-loc-raw');
                     if (path) {
                         const item = await loadLocationEntryByPath(path);
-                        const opener = globalThis._rpgAgentOpenLocationDetail;
-                        if (item && typeof opener === 'function') {
-                            await opener(item, path);
-                        } else {
-                            await showLocationImageSettingsMenu(path, () => runtimeState.refreshImmersionView(), item?.content || '');
-                        }
+                        await showLocationImageSettingsMenu(
+                            path,
+                            () => runtimeState.refreshImmersionView(),
+                            item?.content || '',
+                        );
                     } else if (raw) {
                         toastr.info(`No lore match for "${raw}". Add a Locations entry or check the name.`, 'Visuals/Map');
                     }
