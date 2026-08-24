@@ -14,6 +14,9 @@ describe('panel markup', () => {
             },
         });
 
+        expect(markup).toContain('id="rpg-tracker-enable-btn"');
+        expect(markup).toContain('Disable Multihog Framework');
+        expect(markup).not.toContain('id="rt-agent-router-enable-btn"');
         expect(markup).toContain('id="rpg-tracker-memo"');
         expect(markup).toContain('id="rt-bottom-xp-bar"');
         expect(markup).toContain('Saved memo');

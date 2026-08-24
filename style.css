@@ -4272,7 +4272,6 @@
     /* On mobile, collapse action buttons into the overflow menu.
        Raw View stays in the header. */
     #rpg-tracker-enable-btn,
-    #rt-agent-router-enable-btn,
     #rpg-tracker-update-btn,
     #rpg-tracker-pause-btn,
     #rpg-tracker-portraits-menu-btn {

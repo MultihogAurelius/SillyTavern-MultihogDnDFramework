@@ -7,7 +7,7 @@ const panel = readFileSync(new URL('../src/ui/panel/panel-builder.js', import.me
 
 describe('NPC card / lore activation after a newly created entry', () => {
     it('injects agent-owned lore even when native keyword activation is on', () => {
-        const nativeGate = hooks.indexOf('if (settings.routerEnabled && !settings.routerNativeKeywordActivation && content)');
+        const nativeGate = hooks.indexOf('if (isLorebookAgentRuntimeActive(settings) && !settings.routerNativeKeywordActivation && content)');
         const agentOwned = hooks.indexOf('## ACTIVE LORE (AGENT)');
         expect(nativeGate).toBeGreaterThanOrEqual(0);
         expect(agentOwned).toBeGreaterThan(nativeGate);
@@ -25,7 +25,7 @@ describe('NPC card / lore activation after a newly created entry', () => {
         expect(agent).toBeGreaterThan(start);
         const between = hooks.slice(start, agent);
         expect(between).not.toMatch(/if \(content\) \{[\s\S]*const agentOwned/);
-        expect(between).toContain('if (settings.routerEnabled && !skipInjection)');
+        expect(between).toContain('if (isLorebookAgentRuntimeActive(settings) && !skipInjection)');
     });
 
     it('records the NPCs book on campaignBooks and persists settings after Add NPC', () => {

@@ -788,9 +788,9 @@
                 <div class="inline-drawer-content">
                     <label class="checkbox_label" style="margin-bottom: 8px;">
                         <input id="rpg_tracker_enabled" type="checkbox" />
-                        <span>Enable State Tracker</span>
+                        <span>Enable Multihog Framework</span>
                         <i class="fa-solid fa-circle-question interactable"
-                            title="When enabled (and Custom Sysprompt Mode is off), the framework system prompt is written to Quick Prompt Main. Your previous Main prompt is backed up first (browser-local, kept even if you disable the tracker or the extension) and restored when you click the ⏻ button on the tracker panel (or uncheck this box)."></i>
+                            title="Master power for the whole extension (same as the ⏻ button on the panel). When on (and Custom Sysprompt Mode is off), the framework system prompt is written to Quick Prompt Main — your previous Main is backed up first and restored when you power off. Powering off also stops all Multihog injection (State Tracker, CYOA, pacing, Lorebook Agent, maps) and aborts in-flight agent runs. The separate Lorebook Agent checkbox below is only a preference used while this is on."></i>
                     </label>
 
                     <label class="checkbox_label" style="margin-bottom: 8px;" title="Forces the State Model to output the COMPLETE, verified state for every enabled module on every pass, instead of only the changed sections. Trades tokens/latency for reliability — recommended for weaker/local models that struggle to keep delta-tracked state consistent. While enabled, the Core Prompt and User Prompt Suffix (further below) are temporarily replaced by built-in Full Review versions; your custom edits are preserved and restored when you turn this off.">
@@ -1015,6 +1015,8 @@
                         <label class="checkbox_label">
                             <input id="rpg_tracker_router_enabled" type="checkbox" />
                             <span>Enable Lorebook Agent</span>
+                            <i class="fa-solid fa-circle-question interactable"
+                                title="Preference used only while Multihog Framework is powered on. The panel ⏻ (or Enable Multihog Framework above) stops Lorebook Agent injection and auto-passes without clearing this checkbox."></i>
                         </label>
 
                         <div style="margin-bottom: 8px; font-size: 10px; opacity: 0.65; line-height: 1.4; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">

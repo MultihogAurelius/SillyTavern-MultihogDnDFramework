@@ -8,7 +8,7 @@ import { getSettings } from './state-manager.js';
 import { cleanToolCallMessage, memoForGmContext } from './memo-processor.js';
 import { runtimeState } from './src/app/runtime-state.js';
 import { isRouterRunning, runRouterPass, sendDirectPrompt } from './src/app/runtime-bridge.js';
-import { isLocationMappingEnabled, isEffectiveSectionEnabled } from './src/state/section-enabled.js';
+import { isCyoaEnabled, isLorebookAgentRuntimeActive, isLocationMappingEnabled } from './src/state/section-enabled.js';
 import { formatDungeonMapForPlayer, stripDungeonMapSection } from './dungeon-reality.js';
 import { clampFloatingPanelToViewport, isMobileLayout, makeDraggable, makeResizableBL, makeResizableBR, resolveViewportClampedGeometry } from './ui-geometry.js';
 
@@ -874,7 +874,7 @@ export function getCurrentCyoaChoices(root = document) {
  */
 function buildActForUserContext() {
     const settings = getSettings();
-    const cyoaActive = isEffectiveSectionEnabled('CYOA_mode', settings);
+    const cyoaActive = isCyoaEnabled(settings);
     if (!cyoaActive) {
         return `## ACT FOR USER MODE
 CYOA is inactive. If the player clearly asks you to take their turn, call act_for_user with action_text containing the concise player message to submit. Include brief, organic commentary reacting to your move without repeating it or inventing the outcome.`;
@@ -1049,7 +1049,7 @@ async function executeCompanionAction(action) {
     try {
         if (action.name === 'act_for_user') {
             const settings = getSettings();
-            const cyoaActive = isEffectiveSectionEnabled('CYOA_mode', settings);
+            const cyoaActive = isCyoaEnabled(settings);
             const actionText = String(action.action_text || '').trim();
             // A free-form player message deliberately remains available in
             // CYOA mode. When present, it takes precedence over a choice.
@@ -1193,7 +1193,7 @@ async function executeCompanionAction(action) {
         }
 
         const settings = getSettings();
-        if (!settings.routerEnabled) {
+        if (!isLorebookAgentRuntimeActive(settings)) {
             return {
                 action: 'Lorebook Agent',
                 success: false,

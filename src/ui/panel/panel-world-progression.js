@@ -213,7 +213,7 @@ export function wireAgentWorldProgression({
             worldPurgeBtn.addEventListener('click', () => { void confirmAndPurgeWorldHistory(); });
         }
 
-        // ── Agent enable button (header ⏻) ──
+        // ── Agent World Progression Toggle ──
 
     return { updateStatus: updateAgentWorldStatus };
 }

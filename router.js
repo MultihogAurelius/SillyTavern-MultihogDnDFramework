@@ -4,7 +4,7 @@ import { getRequestHeaders } from '../../../../script.js';
 import { extractCurrentTimeStr, cleanMessageContent, parseInWorldTime, formatInWorldTime, findNthUserMessageStartIdx, formatAgentChatLogFromIndex, sanitizeLorebookRecordContent, parseJsonWithColorRepair } from './memo-processor.js';
 import { recordSchedulerEvent } from './swipe-scheduler-debug.js';
 import { saveSettings } from './src/app/runtime-bridge.js';
-import { isLocationMappingEnabled } from './src/state/section-enabled.js';
+import { isLorebookAgentRuntimeActive, isLocationMappingEnabled } from './src/state/section-enabled.js';
 import { buildSkeletonLorebookSourceContext } from './src/features/world-progression/skeleton-lorebooks.js';
 import { buildNpcRelationshipInstruction } from './src/state/relationship-prompts.js';
 import {
@@ -1413,7 +1413,7 @@ export async function applyActiveDungeonMapCommit(transaction, expectedContext, 
 export async function runRouterPass(narrativeOutput, manualPrompt = null, customLookback = null, isManual = false, newlyTriggeredIds = [], overrideChatLog = null) {
     const settings = getSettings();
     const dungeonRealityEnabled = isLocationMappingEnabled(settings);
-    if (!settings.routerEnabled || _routerRunning) return;
+    if (!isLorebookAgentRuntimeActive(settings) || _routerRunning) return;
     // routerPaused blocks auto-runs only; manual UI runs always go through
     if (settings.routerPaused && !isManual) return;
 
@@ -4172,7 +4172,7 @@ export async function scanAssistantOutputForKeywords(narrativeText, opts = {}) {
     if (!narrativeText) return [];
     const sweepEnabled = opts.sweepEnabled !== false; // default true
     const settings = getSettings();
-    if (!settings.routerEnabled) return [];
+    if (!isLorebookAgentRuntimeActive(settings)) return [];
 
     const ctx = SillyTavern.getContext();
     const prefix = getLivePrefix();
@@ -4529,7 +4529,7 @@ function narrativeMentionsNpcName(narrativeText, npcLabel, opts = {}) {
  */
 export async function disableManagedEntries() {
     const settings = getSettings();
-    if (!settings.routerEnabled) return;
+    if (!isLorebookAgentRuntimeActive(settings)) return;
     // In native keyword mode, entries are left enabled for ST's keyword scanner to manage.
     if (settings.routerNativeKeywordActivation) return;
     const ctx = SillyTavern.getContext();

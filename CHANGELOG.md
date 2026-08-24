@@ -2,6 +2,17 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.39] - 2026-08-24
+
+### Changed
+- **Single master power button**: Removed the Lorebook Agent header ⏻. The main panel ⏻ (and Enable Multihog Framework in settings) now powers the whole extension off — stops State Tracker / CYOA / pacing / Lorebook Agent / map injection, restores the backed-up Main prompt, and aborts in-flight agent runs. The Lorebook Agent settings checkbox remains as a preference used only while the framework is on.
+- **Agent header title**: Renamed to "Lorebook Agent & Maps" (header and attached mode tab).
+
+## [2026.8.37] - 2026-08-24
+
+### Fixed
+- **CYOA respects State Tracker power**: Powering off the State Tracker (`settings.enabled`) now stops `<CYOA_mode>` injection and CYOA choice-button binding. Leftover CYOA/pacing tags are stripped from the outgoing prompt copy when powered down (same pattern as Persistent Maps). Narrative pacing tags also follow the master toggle.
+
 ## [2026.8.36] - 2026-08-24
 
 ### Fixed

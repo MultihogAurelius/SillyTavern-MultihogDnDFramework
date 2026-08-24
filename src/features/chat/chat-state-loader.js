@@ -2,6 +2,7 @@ import { runtimeState } from '../../app/runtime-state.js';
 import { applyChatSetup, resetChatSetupToStock } from '../../state/chat-setup.js';
 import { ensureDungeonMapHistory } from '../../state/dungeon-map-history.js';
 import { summarizeMapEvolutionSchedule } from '../../../map-evolution-lib.js';
+import { isLorebookAgentRuntimeActive } from '../../state/section-enabled.js';
 
 /** Restores one chat-linked tracker snapshot and synchronizes dependent UI. */
 export function createChatStateLoader({
@@ -330,7 +331,7 @@ export function createChatStateLoader({
 
     // Patch any managed entries that don't yet have disable:true so ST's
     // native keyword scanner cannot inject them on user-message send.
-    if (s.routerEnabled) {
+    if (isLorebookAgentRuntimeActive(s)) {
         scheduleDeferred(() => {
             disableManagedEntries().catch(e => console.warn('[RPG Tracker] disableManagedEntries on chat change failed:', e));
         });

@@ -19,7 +19,7 @@ export function buildPanelMarkup({ settings, agentPanelCollapsedClass }) {
                     <button type="button" class="rpg-tracker-icon-btn" id="rpg-tracker-settings-btn" title="Open Settings"><i class="fa-solid fa-wrench" aria-hidden="true"></i></button>
                     <button class="rpg-tracker-icon-btn rt-tutorial-help-btn" id="rpg-tracker-help-btn" title="CHAT">CHAT</button>
                     <button class="rpg-tracker-icon-btn" id="rpg-tracker-view-btn" title="Toggle rendered view">⊞</button>
-                    <button class="rpg-tracker-icon-btn" id="rpg-tracker-enable-btn" title="${settings.enabled ? 'Disable State Tracker' : 'Enable State Tracker'}" style="${settings.enabled ? '' : 'opacity:0.4;'}" >⏻</button>
+                    <button class="rpg-tracker-icon-btn" id="rpg-tracker-enable-btn" title="${settings.enabled ? 'Disable Multihog Framework' : 'Enable Multihog Framework'}" style="${settings.enabled ? '' : 'opacity:0.4;'}" >⏻</button>
                     <button class="rpg-tracker-icon-btn" id="rpg-tracker-update-btn" title="Update State Now">🔄</button>
                     <button class="rpg-tracker-icon-btn" id="rpg-tracker-pause-btn" title="Pause Tracker">⏸</button>
                     <button class="rpg-tracker-icon-btn" id="rpg-tracker-portraits-menu-btn" title="AI Portrait Actions">🖼️</button>
@@ -30,7 +30,7 @@ export function buildPanelMarkup({ settings, agentPanelCollapsedClass }) {
                 </div>
                 <div class="rt-header-face rt-header-face-inactive" id="rt-header-face-agent">
                     <div class="rpg-tracker-header-left">
-                        <i class="fa-solid fa-robot"></i> <span>Lorebook Agent: Autonomous Librarian</span>
+                        <i class="fa-solid fa-robot"></i> <span>Lorebook Agent &amp; Maps</span>
                     </div>
                     <div class="rpg-tracker-header-center" id="rt-agent-pause-banner" style="color:#ffa500; font-size:0.7em; font-weight:bold; letter-spacing:0.04em;">${settings.routerPaused ? 'AGENT PAUSED' : ''}</div>
                     <div class="rpg-tracker-header-right">
@@ -64,7 +64,6 @@ export function buildPanelMarkup({ settings, agentPanelCollapsedClass }) {
                                  </div>
                              </div>
                          </div>
-                        <button class="rpg-tracker-icon-btn" id="rt-agent-router-enable-btn" title="${settings.routerEnabled ? 'Disable Lorebook Agent' : 'Enable Lorebook Agent'}" style="${settings.routerEnabled ? '' : 'opacity:0.35;'}">⏻</button>
                         <button class="rpg-tracker-icon-btn" id="rt-agent-router-pause-btn" title="${settings.routerPaused ? 'Resume Agent (auto-runs paused)' : 'Pause Agent (skip auto-runs)'}" style="${settings.routerPaused ? 'color:#ffa500;' : ''}">${settings.routerPaused ? '▶' : '⏸'}</button>
                         <button class="rpg-tracker-icon-btn" id="rt-agent-router-detach" title="Detach Lorebook Agent">⧉</button>
                         <button class="rpg-tracker-icon-btn" id="rt-agent-router-collapse-btn" title="Collapse Panel"><i class="fa-solid ${settings.agentCollapsed ? 'fa-chevron-down' : 'fa-chevron-up'}"></i></button>
@@ -80,7 +79,7 @@ export function buildPanelMarkup({ settings, agentPanelCollapsedClass }) {
                     </div>
                     <div class="rt-agent-view-mode-switch rt-panel-mode-switch" id="rt-panel-mode-switch" role="tablist" aria-label="Panel content mode">
                         <button type="button" id="rt-panel-mode-tracker" class="rt-agent-view-mode-btn rt-agent-view-mode-btn-active" role="tab" aria-selected="true">State Tracker</button>
-                        <button type="button" id="rt-panel-mode-agent" class="rt-agent-view-mode-btn" role="tab" aria-selected="false">Lorebook Agent</button>
+                        <button type="button" id="rt-panel-mode-agent" class="rt-agent-view-mode-btn" role="tab" aria-selected="false">Lorebook Agent &amp; Maps</button>
                     </div>
                 </div>
                 <div class="rt-panel-mode-pane" id="rt-panel-tracker-pane">

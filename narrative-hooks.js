@@ -26,7 +26,7 @@ import { saveSettings } from './src/app/runtime-bridge.js';
 import { runtimeState } from './src/app/runtime-state.js';
 import { isPercentFormula, resolveDiceCompare } from './src/state/dice-compare.js';
 import { buildCyoaModeBlock, STATE_MEMO_INJECT_PREAMBLE } from './constants.js';
-import { isEffectiveSectionEnabled, isLocationMappingEnabled } from './src/state/section-enabled.js';
+import { isCyoaEnabled, isLorebookAgentRuntimeActive, isLocationMappingEnabled } from './src/state/section-enabled.js';
 import { buildNarrativeModeTags, hasInjectableNarrativePacing } from './src/state/narrative-pacing.js';
 import {
     buildDungeonRealityInjection,
@@ -125,6 +125,24 @@ function prepareUserMessagesForContextInject(chat, currentUserIdx) {
             const cleaned = stripCyoaAndPacingInjections(raw);
             if (cleaned !== raw) setChatMessageText(m, cleaned);
         }
+    }
+}
+
+/**
+ * Remove leftover CYOA / narrative-pacing tags from the outgoing prompt copy
+ * when the State Tracker master toggle is off (do not mutate persisted chat).
+ * @param {object[]} chat
+ */
+function stripLeftoverCyoaAndPacingFromPrompt(chat) {
+    if (!Array.isArray(chat)) return;
+    for (const m of chat) {
+        if (!m) continue;
+        const role = String(m.role || '').toLowerCase();
+        const isUser = m.is_user || role === 'user' || role === 'human' || role === 'player';
+        if (!isUser) continue;
+        const raw = extractTextContent(m);
+        const cleaned = stripCyoaAndPacingInjections(raw);
+        if (cleaned !== raw) setChatMessageText(m, cleaned);
     }
 }
 
@@ -751,7 +769,7 @@ export function registerDiceSlashCommand() {
                 return 'Scene save requested.';
             }
 
-            if (!settings.routerEnabled) {
+            if (!isLorebookAgentRuntimeActive(settings)) {
                 return 'Lorebook Agent is disabled.';
             }
             if (isRouterRunning()) {
@@ -1088,6 +1106,12 @@ export function installInterceptor() {
             stripDungeonRealityBlocksFromPrompt(chat);
         }
 
+        // Master power off: strip any leftover CYOA / pacing from the prompt
+        // copy so prior injections cannot keep firing while powered down.
+        if (!settings.enabled && Array.isArray(chat)) {
+            stripLeftoverCyoaAndPacingFromPrompt(chat);
+        }
+
         if (dungeonEnabled && dungeonChatId && Array.isArray(_rbChat)) {
             // A swipe/regeneration rejects the latest selected narrator message,
             // so read existing attachments but do not persist a map from it.
@@ -1159,9 +1183,9 @@ export function installInterceptor() {
             console.log("Chat Length:", Array.isArray(chat) ? chat.length : 'N/A');
         }
 
-        const routerActive = !!settings.routerEnabled;
-        const cyoaActive = isEffectiveSectionEnabled('CYOA_mode', settings);
-        const pacingInject = hasInjectableNarrativePacing(settings.narrativePacing);
+        const routerActive = isLorebookAgentRuntimeActive(settings);
+        const cyoaActive = isCyoaEnabled(settings);
+        const pacingInject = !!settings.enabled && hasInjectableNarrativePacing(settings.narrativePacing);
         if (!settings.enabled && !routerActive && !cyoaActive && !pacingInject && !dungeonEnabled) {
             if (settings.debugMode) console.groupEnd();
             return;
@@ -1259,7 +1283,7 @@ export function installInterceptor() {
         }
 
         // Core user-message injection every turn: PC / relations / pacing / CYOA / RNG / memo / quests.
-        // CYOA / pacing tags can inject even when the State Tracker master toggle is off.
+        // CYOA / pacing follow the State Tracker master toggle (same as Persistent Maps).
         if (!skipInjection && (settings.enabled || cyoaActive || pacingInject)) {
             if (settings.enabled) {
                 // [PLAYER_CHARACTER] — always injected at the top of the core block
@@ -1356,7 +1380,7 @@ export function installInterceptor() {
         // otherwise [NPC_RELATIONS] can list an NPC whose card never appears (ST
         // native WI only injects when the book is selected and keys match).
         let triggered = [];
-        if (settings.routerEnabled && !settings.routerNativeKeywordActivation && content) {
+        if (isLorebookAgentRuntimeActive(settings) && !settings.routerNativeKeywordActivation && content) {
             const t0 = performance.now().toFixed(1);
             console.group(`[RPG|INTERCEPT] rpgTrackerInterceptor keyword pre-scan @ ${t0}ms`);
             console.log('skipInjection (Path 1 active):', skipInjection);
@@ -1372,7 +1396,7 @@ export function installInterceptor() {
             console.groupEnd();
         }
 
-        if (settings.routerEnabled && !skipInjection) {
+        if (isLorebookAgentRuntimeActive(settings) && !skipInjection) {
             if (!settings.routerNativeKeywordActivation) {
                 if (triggered.length > 0) {
                     try {
@@ -2747,7 +2771,7 @@ export async function onGenerationEnded() {
     }
 
     const isStateRunning = typeof globalThis._rpgStateModelRunning === 'function' && globalThis._rpgStateModelRunning();
-    const routerActive = !!settings.routerEnabled;
+    const routerActive = isLorebookAgentRuntimeActive(settings);
     if ((!settings.enabled && !routerActive) || isStateRunning) {
         recordSchedulerEvent('generation_ended_aborted', {
             reason: (!settings.enabled && !routerActive) ? 'disabled' : 'state_running',
@@ -2848,7 +2872,7 @@ export async function onGenerationEnded() {
     // Must run before the state model pass and on EVERY generation, regardless of throttle,
     // so entries are never one turn behind the narrator even when the agent is skipped.
     // Skipped when routerNativeKeywordActivation is enabled (native ST system handles keywords).
-    if (settings.routerEnabled && !settings.routerNativeKeywordActivation) {
+    if (isLorebookAgentRuntimeActive(settings) && !settings.routerNativeKeywordActivation) {
         const thisGenTriggered = await scanAssistantOutputForKeywords(combinedNarrative);
         if (thisGenTriggered.length > 0) {
             // Accumulate across throttled turns — deduplicate so IDs are not repeated.
@@ -3073,7 +3097,7 @@ export async function onGenerationEnded() {
  */
 async function maybeRunWorldProgression() {
     const settings = getSettings();
-    if (!settings.worldProgressionEnabled || !settings.routerEnabled) return;
+    if (!settings.worldProgressionEnabled || !isLorebookAgentRuntimeActive(settings)) return;
     if (!settings.currentMemo) return;
 
     // Extract time string from the [TIME] block

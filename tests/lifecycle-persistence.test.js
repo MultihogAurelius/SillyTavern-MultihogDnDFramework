@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 
 const indexSource = readFileSync(new URL('../index.js', import.meta.url), 'utf8');
 const snapshotStart = indexSource.indexOf('const snapshotPendingStateForNavigation =');
-const snapshotEnd = indexSource.indexOf('// Always run activation when routerEnabled', snapshotStart);
+const snapshotEnd = indexSource.indexOf('// Always run activation when Lorebook Agent is live', snapshotStart);
 const lifecycleSource = indexSource.slice(snapshotStart, snapshotEnd);
 
 describe('navigation persistence safety', () => {

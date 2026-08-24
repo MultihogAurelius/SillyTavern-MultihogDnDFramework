@@ -54,7 +54,7 @@ describe('Full Review State Mode', () => {
         expect(indexSource).toMatch(/import\s*\{[^}]*FULL_REVIEW_USER_PROMPT_SUFFIX[^}]*\}\s*from\s*'\.\/state-manager\.js'/);
     });
 
-    it('settings.html places Full Review Mode and Connection Settings just below Enable State Tracker', () => {
+    it('settings.html places Full Review Mode and Connection Settings just below Enable Multihog Framework', () => {
         const enableAt = settingsHtml.indexOf('id="rpg_tracker_enabled"');
         const fullReviewAt = settingsHtml.indexOf('id="rpg_tracker_full_review_mode"');
         const connectionAt = settingsHtml.indexOf('id="rpg_tracker_connection_source"');

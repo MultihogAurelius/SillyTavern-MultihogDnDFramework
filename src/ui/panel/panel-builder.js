@@ -22,7 +22,7 @@ import { NEW_NPC_NAMING_RULE } from '../../state/defaults.js';
 import { openSettingsOverlay } from '../settings-overlay.js';
 import { extractDungeonMapSection, parseDungeonMapDocument, stripDungeonMapSection, defaultMapSiteThreat } from '../../../dungeon-reality.js';
 import { clearMemoAndMapHistory, getDungeonMapHistoryEntry } from '../../state/dungeon-map-history.js';
-import { isLocationMappingEnabled } from '../../state/section-enabled.js';
+import { isLorebookAgentRuntimeActive, isLocationMappingEnabled } from '../../state/section-enabled.js';
 import { openDungeonMapReadablePopup } from './dungeon-map-panel.js';
 import { buildAddLibraryNpcToPartyPrompt, buildApplyLibraryCardAsPcPrompt, extractLibraryIdentityContent, findLibraryNpcByName, getNpcLibrary, sanitizeNpcLibraryRecords } from '../../../npc-library-lib.js';
 
@@ -961,27 +961,23 @@ export function createPanel(dependencies) {
             });
         }
 
-        /** Applies/removes is-agent-disabled on the agent panel to match routerEnabled. */
+        /** Dims the agent panel when the framework power is off or LA preference is off. */
         function updateAgentPanelDisabled() {
             const s = getSettings();
-            if (s.routerEnabled) {
+            const agentLive = isLorebookAgentRuntimeActive(s);
+            if (agentLive) {
                 agentPanel.classList.remove('is-agent-disabled');
             } else {
                 agentPanel.classList.add('is-agent-disabled');
             }
-            // Keep settings sidebar toggle in sync
+            // Keep settings sidebar preference toggle in sync (does not clear on master power-off)
             const sidebarCheck = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_tracker_router_enabled'));
             if (sidebarCheck) sidebarCheck.checked = !!s.routerEnabled;
-            // Keep header ⏻ button in sync
-            const agentEnableBtn = /** @type {HTMLElement|null} */ (queryAgentUi('#rt-agent-router-enable-btn'));
-            if (agentEnableBtn) {
-                agentEnableBtn.style.opacity = s.routerEnabled ? '' : '0.35';
-                agentEnableBtn.title = s.routerEnabled ? 'Disable Lorebook Agent' : 'Enable Lorebook Agent';
-            }
         }
 
         // Apply on open
         updateAgentPanelDisabled();
+        runtimeState.updateAgentPanelDisabledRef = updateAgentPanelDisabled;
         updateAgentMapEvolutionStatus();
         updateAgentWorldStatus();
 
@@ -1083,17 +1079,6 @@ export function createPanel(dependencies) {
         }
 
         // ── Agent World Progression Toggle ──
-        const agentEnableBtn = queryAgentUi('#rt-agent-router-enable-btn');
-        if (agentEnableBtn) {
-            agentEnableBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const s = getSettings();
-                s.routerEnabled = !s.routerEnabled;
-                saveSettings();
-                updateAgentPanelDisabled();
-            });
-        }
-
         const basicCheck = agentPanel.querySelector('#rt-agent-router-basic');
         if (basicCheck) {
             basicCheck.addEventListener('change', (e) => {
@@ -6857,7 +6842,7 @@ ${namingRule}`;
             // Refresh dynamic labels
             const s = getSettings();
             const enableLabel = overflowMenu.querySelector('#rt-ov-enable-label');
-            if (enableLabel) enableLabel.textContent = s.enabled ? 'Disable Tracker' : 'Enable Tracker';
+            if (enableLabel) enableLabel.textContent = s.enabled ? 'Disable Framework' : 'Enable Framework';
             const pauseLabel = overflowMenu.querySelector('#rt-ov-pause-label');
             if (pauseLabel) pauseLabel.textContent = s.trackerPaused ? 'Resume Tracker' : 'Pause Tracker';
             overflowMenu.style.display = 'flex';

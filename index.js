@@ -28,7 +28,7 @@ import { bindAdventureCompanion, bindAdventureCompanionSettingsDrawer, openAdven
 import { openDisplayGroupsManager } from './display-groups.js';
 import { handleCategorySettings, openCustomFieldEditor, openPromptEditor, refreshOrderList, exportModules, importModulesFromJson, openNpcSectionEditor, openPcSectionEditor } from './ui-editors.js';
 import { openGameSystemWizard, openManageGameSystems, openSystemPromptControlRoom, syncAllNarratorTogglesForUnlockState, extractTopLevelSections, normalizeSectionOrder, getSectionRowDescriptor, transformBaseSectionContent, isBlankSectionContent, isSectionUnlocked, isEffectiveSectionEnabled } from './game-systems.js';
-import { setLocationMappingEnabled, LOCATION_MAPPING_SECTION_TAG } from './src/state/section-enabled.js';
+import { isCyoaEnabled, isLorebookAgentRuntimeActive, setLocationMappingEnabled, LOCATION_MAPPING_SECTION_TAG } from './src/state/section-enabled.js';
 import { applyMapArchitectOpenerToUi, normalizeMapArchitectOpener, syncMapArchitectOpenerNestedVisibility } from './map-architect-opener.js';
 import { openManageGameCartridges, promptAndSaveCurrentAsCartridge } from './game-cartridges.js';
 import {
@@ -662,7 +662,7 @@ async function syncCampaignPrefixAndWorldsForChat(newChatId, source) {
         renderLoreActivationDebugPanel();
         return;
     }
-    if (!s2.routerEnabled) {
+    if (!isLorebookAgentRuntimeActive(s2)) {
         _loreActivationDebugLast = {
             ts: new Date().toISOString(),
             source,
@@ -1828,7 +1828,7 @@ async function refreshExtensionPrompt() {
     if (typeof setExtensionPrompt !== 'function') return;
 
     const s = getSettings();
-    if (!s.routerEnabled || (!s.activeRouterKeys?.length && !s.activeWorldKeys?.length)) {
+    if (!isLorebookAgentRuntimeActive(s) || (!s.activeRouterKeys?.length && !s.activeWorldKeys?.length)) {
         setExtensionPrompt('rpg_tracker_lore', '', 0, 0); // Clear if disabled
         return;
     }
@@ -2077,7 +2077,7 @@ function onChatChanged(newChatId) {
                 scheduleAgentManifestRefresh(true);
             })();
         }
-    } else if (s.routerEnabled && resolvedId) {
+    } else if (isLorebookAgentRuntimeActive(s) && resolvedId) {
         // No linked stack yet for the arriving chat.
         // Capture the departing chat's book list NOW (before any async gap).
         const _oldBooksDeferred = s.chatStates?.[oldChatId]?.campaignBooks || [];
@@ -2325,11 +2325,22 @@ function updatePanelStatus() {
     // Keep in-panel power button in sync
     if (enableBtn) {
         enableBtn.style.opacity = settings.enabled ? '' : '0.35';
-        enableBtn.title = settings.enabled ? 'Disable State Tracker' : 'Enable State Tracker';
+        enableBtn.title = settings.enabled ? 'Disable Multihog Framework' : 'Enable Multihog Framework';
     }
     // Keep settings sidebar checkbox in sync
     const sidebarEnableCheck = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_tracker_enabled'));
     if (sidebarEnableCheck) sidebarEnableCheck.checked = !!settings.enabled;
+
+    // Master power also dims Lorebook Agent; preference checkbox stays as stored.
+    if (typeof runtimeState.updateAgentPanelDisabledRef === 'function') {
+        runtimeState.updateAgentPanelDisabledRef();
+    } else {
+        const ap = document.getElementById('rpg-tracker-agent');
+        if (ap) {
+            if (isLorebookAgentRuntimeActive(settings)) ap.classList.remove('is-agent-disabled');
+            else ap.classList.add('is-agent-disabled');
+        }
+    }
 
     if (!settings.enabled) {
         // Fully disabled — transparent panel, no banner
@@ -4902,6 +4913,9 @@ async function handleTrackerEnabledChange(settings, enabled) {
     } else {
         restoreTrackedMainSysprompt(settings);
         void resetCombatProfileOverride(settings);
+        try { stopRouterPass(); } catch (_) { /* ignore */ }
+        try { stopMapUpdaterPass(); } catch (_) { /* ignore */ }
+        try { stopMapEvolutionPass(); } catch (_) { /* ignore */ }
     }
 }
 
@@ -7008,6 +7022,9 @@ function organizeConnectionSettingsUI() {
         // ─── Event Hooks ───
         const shouldStripOldCyoaChoices = () => {
             const fresh = getSettings();
+            // Strip superseded choice lists whenever CYOA Mode is configured on,
+            // even if the master power toggle is off — leftover choices in history
+            // should not keep steering the model after power-down.
             return isEffectiveSectionEnabled('CYOA_mode', fresh)
                 && fresh.cyoaConfig?.stripOldChoicesFromPrompt !== false;
         };
@@ -7185,9 +7202,9 @@ function organizeConnectionSettingsUI() {
         document.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'hidden') snapshotPendingStateForNavigation('visibilityhidden');
         });
-        // Always run activation when routerEnabled — regardless of chatLinkEnabled —
+        // Always run activation when Lorebook Agent is live — regardless of chatLinkEnabled —
         // so the correct lorebook stack is live from the very first message.
-        if (settings.routerEnabled && bootChatId) {
+        if (isLorebookAgentRuntimeActive(settings) && bootChatId) {
             _sessionBootstrapChatId = bootChatId;
             const bootBooks = settings.chatStates?.[bootChatId]?.campaignBooks;
             if (bootBooks?.length && typeof ctx.executeSlashCommandsWithOptions === 'function') {
@@ -7218,7 +7235,7 @@ function organizeConnectionSettingsUI() {
         // Ensure managed lorebook entries have disable:true so ST's native keyword
         // scanner never injects them. Deferred so F5 startup stays responsive.
         const s = getSettings();
-        if (s.routerEnabled) {
+        if (isLorebookAgentRuntimeActive(s)) {
             scheduleDeferred(() => {
                 disableManagedEntries().catch(e => console.warn('[RPG Tracker] disableManagedEntries on init failed:', e));
             });
@@ -9228,7 +9245,7 @@ RULES:
         function cyoaBindChoiceButtons({ allowFlatten = true } = {}) {
             const s = getSettings();
             if (!s.cyoaConfig?.useButtonTags) return;
-            if (!isEffectiveSectionEnabled('CYOA_mode', s)) return;
+            if (!isCyoaEnabled(s)) return;
             // Welcome screen (no chat) + welcome_prompt/welcome system messages host ST
             // drawer chrome — never flatten/bind those as CYOA choices.
             if (isSillyTavernWelcomeScreen()) {
@@ -10123,14 +10140,14 @@ RULES:
         $('#rpg_tracker_router_enabled').prop('checked', settings.routerEnabled).on('change', function () {
             settings.routerEnabled = !!$(this).prop('checked');
             saveSettings();
-            // Sync in-panel enable checkbox
-            const inPanelCheck = /** @type {HTMLInputElement|null} */ (document.getElementById('rt-agent-router-enable'));
-            if (inPanelCheck) inPanelCheck.checked = settings.routerEnabled;
-            // Apply disabled state to agent panel
-            const ap = document.getElementById('rpg-tracker-agent');
-            if (ap) {
-                if (settings.routerEnabled) ap.classList.remove('is-agent-disabled');
-                else ap.classList.add('is-agent-disabled');
+            if (typeof runtimeState.updateAgentPanelDisabledRef === 'function') {
+                runtimeState.updateAgentPanelDisabledRef();
+            } else {
+                const ap = document.getElementById('rpg-tracker-agent');
+                if (ap) {
+                    if (isLorebookAgentRuntimeActive(settings)) ap.classList.remove('is-agent-disabled');
+                    else ap.classList.add('is-agent-disabled');
+                }
             }
         });
 
@@ -11730,12 +11747,14 @@ RULES:
 
             // Router Agent
             $('#rpg_tracker_router_enabled').prop('checked', !!s.routerEnabled);
-            const inPanelCheck = (document.getElementById('rt-agent-router-enable'));
-            if (inPanelCheck) inPanelCheck.checked = !!s.routerEnabled;
-            const ap = document.getElementById('rpg-tracker-agent');
-            if (ap) {
-                if (s.routerEnabled) ap.classList.remove('is-agent-disabled');
-                else ap.classList.add('is-agent-disabled');
+            if (typeof runtimeState.updateAgentPanelDisabledRef === 'function') {
+                runtimeState.updateAgentPanelDisabledRef();
+            } else {
+                const ap = document.getElementById('rpg-tracker-agent');
+                if (ap) {
+                    if (isLorebookAgentRuntimeActive(s)) ap.classList.remove('is-agent-disabled');
+                    else ap.classList.add('is-agent-disabled');
+                }
             }
             $('#rpg_tracker_router_basic_mode').prop('checked', !!s.routerBasicMode);
             $('#rt-agent-router-basic').prop('checked', !!s.routerBasicMode);

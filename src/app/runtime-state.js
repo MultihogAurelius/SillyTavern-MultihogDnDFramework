@@ -19,6 +19,7 @@ export const runtimeState = {
     hasActiveDungeonMap: false,
     refreshNpcManifest: async () => {},
     updateAgentWorldStatusRef: null,
+    updateAgentPanelDisabledRef: null,
     updateWorldProgressionLastFiredDisplayRef: null,
     updateMapEvolutionScheduleDisplayRef: null,
     refreshTrackerViewRef: null,
