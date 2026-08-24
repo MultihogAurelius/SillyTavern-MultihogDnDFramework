@@ -2,6 +2,12 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.41] - 2026-08-24
+
+### Added
+- **Blue & White map theme**: Added the user-designed Blue & White palette as a factory preset.
+- **Independent textbox color**: Map asset textboxes now have their own theme color instead of inheriting the canvas, keeping popup text readable on light canvases.
+
 ## [2026.8.40] - 2026-08-24
 
 ### Added

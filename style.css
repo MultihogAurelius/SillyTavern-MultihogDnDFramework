@@ -8567,7 +8567,7 @@ textarea.rt-cr-input {
     padding: 7px 8px 8px;
     border: 1px solid var(--rt-map-accent-medium, rgba(255, 170, 0, 0.45));
     border-radius: 8px;
-    background: var(--rt-map-background-tooltip, rgba(12, 12, 12, 0.96));
+    background: var(--rt-map-textbox, #0c0c0c);
     box-shadow: 0 10px 24px rgba(0, 0, 0, 0.55);
     color: var(--rt-map-text, var(--rt-text, #e8e8e8));
     font-size: 12px;

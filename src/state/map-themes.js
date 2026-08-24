@@ -4,6 +4,7 @@
 
 export const MAP_THEME_FIELDS = Object.freeze([
     { key: 'background', label: 'Canvas', group: 'Map' },
+    { key: 'textbox', label: 'Textbox background', group: 'Map' },
     { key: 'frame', label: 'Frame', group: 'Map' },
     { key: 'node', label: 'Unvisited area', group: 'Areas' },
     { key: 'nodeDiscovered', label: 'Visited area', group: 'Areas' },
@@ -28,6 +29,7 @@ export const MAP_THEME_FIELDS = Object.freeze([
 
 export const DEFAULT_MAP_THEME = Object.freeze({
     background: '#0c0c0c',
+    textbox: '#0c0c0c',
     frame: '#ffaa00',
     node: '#161616',
     nodeDiscovered: '#101010',
@@ -60,7 +62,7 @@ export const FACTORY_MAP_THEME_PRESETS = Object.freeze([
         id: 'factory:blueprint',
         name: 'Blueprint',
         theme: makeTheme({
-            background: '#071520', frame: '#5cc8ff', node: '#102d42', nodeDiscovered: '#0b2233', nodeFog: '#061019',
+            background: '#071520', textbox: '#071520', frame: '#5cc8ff', node: '#102d42', nodeDiscovered: '#0b2233', nodeFog: '#061019',
             text: '#e7f7ff', textMuted: '#9bc9dc', accent: '#63d4ff', route: '#4eb8e8', routeLocked: '#a7dff5',
             routeBlocked: '#ff6b6b', creature: '#ffffff', group: '#ffffff', trap: '#ff667a', hazard: '#ffd166',
             alarm: '#ffb347', barrier: '#b8d8e8', object: '#80c7e8', loot: '#ffe08a', effect: '#9cafff', other: '#89aec2',
@@ -70,7 +72,7 @@ export const FACTORY_MAP_THEME_PRESETS = Object.freeze([
         id: 'factory:verdant',
         name: 'Verdant',
         theme: makeTheme({
-            background: '#08120d', frame: '#66c27f', node: '#14251a', nodeDiscovered: '#0f1d14', nodeFog: '#060d09',
+            background: '#08120d', textbox: '#08120d', frame: '#66c27f', node: '#14251a', nodeDiscovered: '#0f1d14', nodeFog: '#060d09',
             text: '#e8f5e9', textMuted: '#a9c9af', accent: '#7ee09a', route: '#61b879', routeLocked: '#c3d6a4',
             routeBlocked: '#e85d5d', creature: '#ffffff', group: '#ffffff', trap: '#e65b4f', hazard: '#eacb64',
             alarm: '#f0a84f', barrier: '#d5d0ad', object: '#b89b72', loot: '#f2d06b', effect: '#83c5be', other: '#91a889',
@@ -80,10 +82,21 @@ export const FACTORY_MAP_THEME_PRESETS = Object.freeze([
         id: 'factory:parchment',
         name: 'Parchment',
         theme: makeTheme({
-            background: '#241b12', frame: '#c99b52', node: '#3a2a1b', nodeDiscovered: '#2e2117', nodeFog: '#1b140e',
+            background: '#241b12', textbox: '#241b12', frame: '#c99b52', node: '#3a2a1b', nodeDiscovered: '#2e2117', nodeFog: '#1b140e',
             text: '#f4e5c1', textMuted: '#cbb991', accent: '#f0bd61', route: '#bf8b46', routeLocked: '#e0c58b',
             routeBlocked: '#c65345', creature: '#ffffff', group: '#ffffff', trap: '#cf5941', hazard: '#e1b84f',
             alarm: '#d98d3e', barrier: '#d8c7a0', object: '#b89469', loot: '#e6c35c', effect: '#c78f67', other: '#ad8c67',
+        }),
+    }),
+    Object.freeze({
+        id: 'factory:blue-white',
+        name: 'Blue & White',
+        theme: makeTheme({
+            background: '#f7f7f7', textbox: '#071520', frame: '#228abf', node: '#102d42',
+            nodeDiscovered: '#0b2233', nodeFog: '#061019', text: '#e7f7ff', textMuted: '#9bc9dc',
+            accent: '#63d4ff', route: '#4eb8e8', routeLocked: '#a7dff5', routeBlocked: '#ff6b6b',
+            creature: '#ffffff', group: '#ffffff', trap: '#fcfcfc', hazard: '#ffffff', alarm: '#f7f7f7',
+            barrier: '#f7f7f7', object: '#e5e9eb', loot: '#ffffff', effect: '#ffffff', other: '#f7f7f7',
         }),
     }),
 ]);
@@ -134,7 +147,7 @@ export function applyMapThemeToRoot(theme, root = globalThis.document?.documentE
     const t = normalizeMapTheme(theme);
     const vars = {
         '--rt-map-background': t.background,
-        '--rt-map-background-tooltip': hexToRgba(t.background, 0.96),
+        '--rt-map-textbox': t.textbox,
         '--rt-map-frame': t.frame,
         '--rt-map-frame-soft': hexToRgba(t.frame, 0.35),
         '--rt-map-node': t.node,

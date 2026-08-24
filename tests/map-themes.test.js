@@ -26,13 +26,16 @@ describe('map themes', () => {
         expect(Object.keys(DEFAULT_MAP_THEME)).toEqual(keys);
         expect(DEFAULT_MAP_THEME.creature).toBe('#ffffff');
         expect(DEFAULT_MAP_THEME.group).toBe('#ffffff');
-        expect(FACTORY_MAP_THEME_PRESETS.length).toBeGreaterThanOrEqual(3);
+        expect(FACTORY_MAP_THEME_PRESETS.length).toBeGreaterThanOrEqual(5);
         for (const preset of FACTORY_MAP_THEME_PRESETS) {
             expect(Object.keys(preset.theme)).toEqual(keys);
             expect(preset.theme.creature).toBe('#ffffff');
             expect(preset.theme.group).toBe('#ffffff');
             Object.values(preset.theme).forEach(color => expect(color).toMatch(/^#[0-9a-f]{6}$/i));
         }
+        const blueWhite = FACTORY_MAP_THEME_PRESETS.find(preset => preset.id === 'factory:blue-white');
+        expect(blueWhite?.theme.background).toBe('#f7f7f7');
+        expect(blueWhite?.theme.textbox).toBe('#071520');
     });
 
     it('normalizes colors without retaining unknown theme fields', () => {
@@ -67,6 +70,7 @@ describe('map themes', () => {
         expect(setProperty).toHaveBeenCalledWith('--rt-map-accent', '#123456');
         expect(setProperty).toHaveBeenCalledWith('--rt-map-accent-soft', 'rgba(18, 52, 86, 0.28)');
         expect(setProperty).toHaveBeenCalledWith('--rt-map-background', DEFAULT_MAP_THEME.background);
+        expect(setProperty).toHaveBeenCalledWith('--rt-map-textbox', DEFAULT_MAP_THEME.textbox);
         expect(setProperty).toHaveBeenCalledWith('--rt-map-frame', DEFAULT_MAP_THEME.frame);
         expect(setProperty).toHaveBeenCalledWith('--rt-map-frame-soft', 'rgba(255, 170, 0, 0.35)');
     });
@@ -79,5 +83,6 @@ describe('map themes', () => {
         expect(style).toContain('color: var(--rt-map-group, #ffffff);');
         expect(style).toContain('color: var(--rt-map-loot, #ffcc4a);');
         expect(style).toContain('border: 1px solid var(--rt-map-frame, #ffaa00);');
+        expect(style).toContain('background: var(--rt-map-textbox, #0c0c0c);');
     });
 });
