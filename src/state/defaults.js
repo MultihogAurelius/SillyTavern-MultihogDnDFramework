@@ -573,6 +573,10 @@ You may be asked to use Markers: ((PLS)), ((B)), ((XB)), ((BDG)), ((HGT)). These
         openaiMaxTokens: 0,
 
         chatLinkEnabled: true,
+        // Identity of the chat whose linked story state is currently projected
+        // into the top-level settings fields. This is persistence provenance,
+        // not a user-facing preference.
+        chatStateProjectionOwner: '',
 
         /** Also bind Control Room sections and State Tracker module configuration to each chat. */
         chatSetupLinkEnabled: true,

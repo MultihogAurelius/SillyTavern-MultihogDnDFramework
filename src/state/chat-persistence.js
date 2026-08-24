@@ -59,6 +59,42 @@ function chatStateSubstanceScore(state) {
 }
 
 /**
+ * Identify which chat owns the live top-level Chat Link projection.
+ *
+ * New saves carry an explicit owner. For older settings, infer the owner from
+ * the synchronized memo timestamp/content first, then from the campaign prefix.
+ * The inference must be unique: an ambiguous live projection is never assigned
+ * to a different chat merely because that chat happens to open first.
+ */
+export function resolveLiveChatStateOwner(settings) {
+    if (!settings || typeof settings !== 'object') return '';
+    const explicit = String(settings.chatStateProjectionOwner || '').trim();
+    if (explicit) return explicit;
+
+    const states = Object.entries(settings.chatStates || {})
+        .filter(([, state]) => state && typeof state === 'object');
+    if (!states.length) return '';
+
+    const liveStamp = Number(settings.memoPersistedAt) || 0;
+    const liveMemo = String(settings.currentMemo || '');
+    if (liveStamp > 0) {
+        const exact = states.filter(([, state]) =>
+            (Number(state.memoPersistedAt) || 0) === liveStamp
+            && String(state.currentMemo || '') === liveMemo);
+        if (exact.length === 1) return exact[0][0];
+    }
+
+    const livePrefix = String(settings.routerCampaignPrefix || '').trim();
+    if (livePrefix) {
+        const prefixMatches = states.filter(([, state]) =>
+            String(state.routerCampaignPrefix || '').trim() === livePrefix);
+        if (prefixMatches.length === 1) return prefixMatches[0][0];
+    }
+
+    return '';
+}
+
+/**
  * Decide whether boot should seed the active partition from the already-visible
  * top-level state instead of projecting a missing/empty/older partition over it.
  * SillyTavern can run queued whole-settings saves immediately after activation,
@@ -67,9 +103,13 @@ function chatStateSubstanceScore(state) {
 export function shouldPreserveLiveChatStateOnBoot(settings, chatId) {
     if (!settings || !chatId) return false;
     const saved = settings.chatStates?.[chatId];
-    if (!saved) return true;
-
     const liveScore = chatStateSubstanceScore(settings);
+    const owner = resolveLiveChatStateOwner(settings);
+
+    // A known projection owned by another chat must never leak into this one.
+    if (owner && owner !== chatId) return false;
+    if (!saved) return liveScore > 0;
+
     const savedScore = chatStateSubstanceScore(saved);
     if (liveScore > 0 && savedScore === 0) return true;
 
@@ -442,6 +482,10 @@ export function saveChatState(chatId, opts = {}) {
     // is newer than a browser-local recovery snapshot.
     const memoPersistedAt = Date.now();
     s.memoPersistedAt = memoPersistedAt;
+    // The top-level story fields are a projection, not global state. Persisting
+    // their owner makes a late first CHAT_CHANGED deterministic and prevents a
+    // richer snapshot from one campaign being copied into another.
+    s.chatStateProjectionOwner = chatId;
     // Preserve fields that are written outside the normal save cycle (e.g. campaignBooks)
     const existing = s.chatStates[chatId] || {};
     s.chatStates[chatId] = {

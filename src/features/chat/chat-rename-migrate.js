@@ -274,6 +274,10 @@ export async function onChatRenamedMigrate(detail, deps) {
     if (runtimeState.currentChatId === oldId) {
         runtimeState.currentChatId = newId;
     }
+    if (migratedPartition && s.chatStateProjectionOwner === oldId) {
+        s.chatStateProjectionOwner = newId;
+        settingsChanged = true;
+    }
 
     // If we are on the renamed chat, ensure live state matches the migrated partition.
     const activeId = ctx.getCurrentChatId?.() || ctx.chatId || runtimeState.currentChatId;

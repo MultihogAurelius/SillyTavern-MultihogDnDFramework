@@ -170,6 +170,7 @@ describe('onChatRenamedMigrate', () => {
                 playerCharacter: { name: 'Ada' },
             },
         };
+        s.chatStateProjectionOwner = 'Old Chat';
         runtimeState.currentChatId = 'Old Chat';
 
         await onChatRenamedMigrate(
@@ -180,6 +181,7 @@ describe('onChatRenamedMigrate', () => {
         expect(s.routerCampaignPrefixOverride).toBe('Old_Chat');
         expect(s.routerCampaignPrefixOverrideAnchorChatId).toBe('Renamed Chat');
         expect(s.routerCampaignPrefix).toBe('Old_Chat');
+        expect(s.chatStateProjectionOwner).toBe('Renamed Chat');
         expect(s.chatStates['Renamed Chat']?.campaignBooks).toEqual([
             'Old_Chat_NPCs',
             'Old_Chat_Locations',

@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 
 const indexSource = readFileSync(new URL('../index.js', import.meta.url), 'utf8');
 const chatPersistenceSource = readFileSync(new URL('../src/state/chat-persistence.js', import.meta.url), 'utf8');
+const chatLoaderSource = readFileSync(new URL('../src/features/chat/chat-state-loader.js', import.meta.url), 'utf8');
 
 describe('startup settings persistence gate', () => {
     it('coalesces saves until the active chat projection is stable', () => {
@@ -17,17 +18,20 @@ describe('startup settings persistence gate', () => {
         expect(indexSource.slice(gateCheck, doSaveStart)).toContain('_startupSavePendingForce');
     });
 
-    it('releases persistence only from the core settings-loaded lifecycle', () => {
+    it('releases persistence only after both core settings and a real chat projection are ready', () => {
         const bootLoad = indexSource.indexOf('const restoredBootChat = preserveLiveBootState');
         const portraitMigration = indexSource.indexOf('await runPortraitMigrationIfNeeded()', bootLoad);
         const settingsReadyHook = indexSource.indexOf('eventSource.once(event_types.SETTINGS_LOADED', portraitMigration);
         const gateOpen = indexSource.indexOf('void openSettingsPersistenceGate()', portraitMigration);
+        const releaseGuard = indexSource.indexOf('if (!_startupCoreSettingsReady || !_startupChatProjectionReady) return', portraitMigration);
 
         expect(bootLoad).toBeGreaterThan(-1);
         expect(portraitMigration).toBeGreaterThan(bootLoad);
         expect(settingsReadyHook).toBeGreaterThan(portraitMigration);
         expect(gateOpen).toBeGreaterThan(portraitMigration);
         expect(gateOpen).toBeLessThan(settingsReadyHook);
+        expect(releaseGuard).toBeGreaterThan(portraitMigration);
+        expect(releaseGuard).toBeLessThan(gateOpen);
     });
 
     it('defers the prompt-default startup action until after the gate opens', () => {
@@ -60,5 +64,29 @@ describe('startup settings persistence gate', () => {
         expect(body).toContain('shouldPreserveLiveChatStateOnBoot(settings, bootChatId)');
         expect(body).toContain("saveChatState(bootChatId, { skipDiskWrite: true })");
         expect(body).not.toContain('resetUnseenChatState(settings)');
+    });
+
+    it('treats a late first CHAT_CHANGED as deferred boot before mutating live state', () => {
+        const handlerStart = indexSource.indexOf('function onChatChanged(newChatId)');
+        const handlerEnd = indexSource.indexOf('\n}', indexSource.indexOf('void syncCombatProfile', handlerStart));
+        const body = indexSource.slice(handlerStart, handlerEnd);
+        const deferredGuard = body.indexOf('const isDeferredBootAttachment');
+        const preserve = body.indexOf('shouldPreserveLiveChatStateOnBoot(s, resolvedId)', deferredGuard);
+        const snapshot = body.indexOf("saveChatState(resolvedId, { skipDiskWrite: true })", preserve);
+        const firstMutation = body.indexOf('resetRouterTick(true)');
+        const projectionReady = body.indexOf('markStartupChatProjectionReady(resolvedId)', firstMutation);
+        const save = body.indexOf('saveSettings();', projectionReady);
+
+        expect(deferredGuard).toBeGreaterThan(-1);
+        expect(preserve).toBeGreaterThan(deferredGuard);
+        expect(snapshot).toBeGreaterThan(preserve);
+        expect(snapshot).toBeLessThan(firstMutation);
+        expect(projectionReady).toBeGreaterThan(firstMutation);
+        expect(save).toBeGreaterThan(projectionReady);
+    });
+
+    it('records projection ownership on every save and successful load', () => {
+        expect(chatPersistenceSource).toContain('s.chatStateProjectionOwner = chatId;');
+        expect(chatLoaderSource).toContain('s.chatStateProjectionOwner = chatId;');
     });
 });

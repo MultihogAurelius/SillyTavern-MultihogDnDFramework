@@ -36,6 +36,10 @@ export function createChatStateLoader({
     const saved = s.chatStates?.[chatId];
     if (!saved) return false;
 
+    // Every successful projection records its owner before any later extension
+    // can ask SillyTavern to save the shared extensionSettings object.
+    s.chatStateProjectionOwner = chatId;
+
     if (s.chatSetupLinkEnabled) {
         if (!applyChatSetup(s, saved.setup)) resetChatSetupToStock(s);
     }

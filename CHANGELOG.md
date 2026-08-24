@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.36] - 2026-08-24
+
+### Fixed
+- **Reload-proof Chat Link startup**: persistence now remains closed until both SillyTavern settings and a real chat projection are ready. When `APP_READY` precedes the first `CHAT_CHANGED`, Multihog preserves newer live state before any reset, stamps the owning chat on every projection, and refuses to copy one campaign's live state into another. This closes the late-chat startup ordering that could resurrect an older chat partition after updating another extension or reloading SillyTavern.
+
 ## [2026.8.35] - 2026-08-24
 
 ### Changed

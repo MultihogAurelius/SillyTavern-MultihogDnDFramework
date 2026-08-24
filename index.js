@@ -770,6 +770,17 @@ let _coreSaveSettingsFn = null;
 let _settingsPersistenceGateOpen = false;
 let _startupSavePending = false;
 let _startupSavePendingForce = false;
+/** Core settings and a real chat projection must both be stable before writes resume. */
+let _startupCoreSettingsReady = false;
+let _startupChatProjectionReady = false;
+let _attemptStartupPersistenceRelease = () => {};
+
+/** Mark the first real chat projection complete, including late post-APP_READY attachment. */
+function markStartupChatProjectionReady(chatId) {
+    if (!chatId) return;
+    _startupChatProjectionReady = true;
+    _attemptStartupPersistenceRelease();
+}
 
 /** Open persistence after Chat Link bootstrap and flush one coalesced save. */
 async function openSettingsPersistenceGate() {
@@ -1956,10 +1967,23 @@ function onChatChanged(newChatId) {
     // Same-chat refresh (bare emit, F5, Copilot apply, etc.): keep live tracker state.
     if (!emitHadId || oldChatId === resolvedId) {
         runtimeState.currentChatId = resolvedId;
+        markStartupChatProjectionReady(resolvedId);
         if (migratedPortraitScope) void saveSettings(true);
         void ensureLocalMemoRecovery(resolvedId);
         updateChatLinkUI();
         return;
+    }
+
+    // SillyTavern commonly reaches APP_READY before it exposes the restored chat
+    // id. In that ordering the boot guard above could not run. Preserve the live
+    // projection now, before resetRouterTick or any other switch logic mutates it.
+    // Owner-aware validation prevents state from a different campaign leaking in.
+    const isDeferredBootAttachment = !_startupChatProjectionReady && !oldChatId;
+    if (isDeferredBootAttachment
+        && s.chatLinkEnabled
+        && shouldPreserveLiveChatStateOnBoot(s, resolvedId)) {
+        saveChatState(resolvedId, { skipDiskWrite: true });
+        console.warn('[RPG Tracker] Preserved live tracker state during deferred boot chat attachment:', resolvedId);
     }
 
     // A later CHAT_RENAMED may prove this switch was a rename. Only the exact
@@ -2015,6 +2039,7 @@ function onChatChanged(newChatId) {
         if (typeof globalThis._rpgLoadAdventureCompanionForChat === 'function') {
             globalThis._rpgLoadAdventureCompanionForChat(resolvedId);
         }
+        markStartupChatProjectionReady(resolvedId);
         updateChatLinkUI();
         return;
     }
@@ -2124,6 +2149,7 @@ function onChatChanged(newChatId) {
             globalThis._rpgLoadAdventureCompanionForChat(resolvedId);
         }
         refreshRenderedView();
+        markStartupChatProjectionReady(resolvedId);
         updateChatLinkUI();
         return;
     }
@@ -2146,6 +2172,10 @@ function onChatChanged(newChatId) {
             // writes its own empty Adventure Companion / recovery shells there.
             const preexistingLocalMapKeys = [COMPANION_BY_CHAT_KEY, MEMO_RECOVERY_KEY]
                 .filter((key) => localChatMapHasEntry(key, resolvedId));
+            // Establish ownership before exposing the deliberate empty projection.
+            // Any other extension saving in this synchronous turn now persists an
+            // identified new-chat state, never an ownerless transient snapshot.
+            s.chatStateProjectionOwner = resolvedId;
             resetUnseenChatState(s);
             runtimeState.pendingUnseenChatReset = {
                 oldId: oldChatId,
@@ -2163,6 +2193,7 @@ function onChatChanged(newChatId) {
     // Persist only after the arriving partition has been projected. Saving the
     // departing partition above used to call ST directly while top-level state
     // still belonged to the old chat, creating a destructive startup/switch race.
+    markStartupChatProjectionReady(resolvedId);
     saveSettings();
 
     scheduleAgentManifestRefresh();
@@ -7060,6 +7091,7 @@ function organizeConnectionSettingsUI() {
             // loadChatState can reintroduce tombstoned tags from a stale partition — strip again.
             applyDeletedCustomTagTombstones();
         }
+        if (bootChatId) markStartupChatProjectionReady(bootChatId);
         // Compare the just-loaded (disk) memo against this browser's last-seen live copy
         // BEFORE any boot-time save can mirror the (possibly stale) disk memo over the
         // recovery evidence. Runs regardless of chatLinkEnabled — the top-level currentMemo
@@ -7090,7 +7122,8 @@ function organizeConnectionSettingsUI() {
         // settings ready. Before that, core saveSettings() turns every early call
         // into a delayed global retry that can outlive extension bootstrap.
         let startupPersistenceReleaseScheduled = false;
-        const scheduleStartupPersistenceRelease = () => {
+        _attemptStartupPersistenceRelease = () => {
+            if (!_startupCoreSettingsReady || !_startupChatProjectionReady) return;
             if (startupPersistenceReleaseScheduled) return;
             startupPersistenceReleaseScheduled = true;
             setTimeout(() => {
@@ -7103,9 +7136,14 @@ function organizeConnectionSettingsUI() {
                 });
             }, 0);
         };
-        eventSource.once(event_types.SETTINGS_LOADED, scheduleStartupPersistenceRelease);
+        const markCoreSettingsReady = () => {
+            _startupCoreSettingsReady = true;
+            _attemptStartupPersistenceRelease();
+        };
+        eventSource.once(event_types.SETTINGS_LOADED, markCoreSettingsReady);
         // APP_READY auto-fires for extensions activated after normal startup.
-        if (event_types.APP_READY) eventSource.once(event_types.APP_READY, scheduleStartupPersistenceRelease);
+        if (event_types.APP_READY) eventSource.once(event_types.APP_READY, markCoreSettingsReady);
+        _attemptStartupPersistenceRelease();
 
         // ─── Navigation snapshot safety net ───
         // Never write SillyTavern's whole settings blob from lifecycle events. A hidden or

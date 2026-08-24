@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach } from 'vitest';
-import { getSettings, hydrateWorldProgressionFromChatState, saveChatState, shouldPreserveLiveChatStateOnBoot, snapshotStockPromptsForProfile } from '../state-manager.js';
+import { getSettings, hydrateWorldProgressionFromChatState, resolveLiveChatStateOwner, saveChatState, shouldPreserveLiveChatStateOnBoot, snapshotStockPromptsForProfile } from '../state-manager.js';
 import { testExtensionSettings } from './setup.js';
 
 describe('saveChatState', () => {
@@ -58,6 +58,53 @@ describe('saveChatState', () => {
         expect(shouldPreserveLiveChatStateOnBoot(s, 'active-chat')).toBe(true);
     });
 
+    it('never preserves a live projection owned by another chat', () => {
+        const s = getSettings();
+        s.chatStateProjectionOwner = 'other-chat';
+        s.currentMemo = 'Other campaign state';
+        s.memoPersistedAt = 500;
+        s.chatStates = {
+            'active-chat': {
+                currentMemo: 'Correct active campaign state',
+                memoPersistedAt: 100,
+            },
+        };
+
+        expect(shouldPreserveLiveChatStateOnBoot(s, 'active-chat')).toBe(false);
+    });
+
+    it('infers the legacy live owner from an exact snapshot or unique campaign prefix', () => {
+        const s = getSettings();
+        s.chatStateProjectionOwner = '';
+        s.currentMemo = 'Live alpha';
+        s.memoPersistedAt = 300;
+        s.routerCampaignPrefix = 'Alpha';
+        s.chatStates = {
+            alpha: { currentMemo: 'Live alpha', memoPersistedAt: 300, routerCampaignPrefix: 'Alpha' },
+            beta: { currentMemo: 'Saved beta', memoPersistedAt: 200, routerCampaignPrefix: 'Beta' },
+        };
+
+        expect(resolveLiveChatStateOwner(s)).toBe('alpha');
+
+        s.memoPersistedAt = 999;
+        s.currentMemo = 'Newer unsnapshotted alpha';
+        expect(resolveLiveChatStateOwner(s)).toBe('alpha');
+    });
+
+    it('refuses to guess a legacy owner when identity evidence is ambiguous', () => {
+        const s = getSettings();
+        s.chatStateProjectionOwner = '';
+        s.currentMemo = 'Live state';
+        s.memoPersistedAt = 300;
+        s.routerCampaignPrefix = 'Shared';
+        s.chatStates = {
+            alpha: { currentMemo: 'Different', memoPersistedAt: 100, routerCampaignPrefix: 'Shared' },
+            beta: { currentMemo: 'Different', memoPersistedAt: 200, routerCampaignPrefix: 'Shared' },
+        };
+
+        expect(resolveLiveChatStateOwner(s)).toBe('');
+    });
+
     it('snapshots stock prompts via snapshotStockPromptsForProfile without throwing', () => {
         const s = getSettings();
         s.chatLinkEnabled = true;
@@ -69,6 +116,7 @@ describe('saveChatState', () => {
         expect(() => saveChatState('vitest-chat', { skipDiskWrite: true })).not.toThrow();
 
         const part = getSettings().chatStates['vitest-chat'];
+        expect(getSettings().chatStateProjectionOwner).toBe('vitest-chat');
         expect(part.currentMemo).toBe('test-memo');
         expect(part.combatDefeatedUi).toEqual(s.combatDefeatedUi);
         expect(part.combatDefeatedUi).not.toBe(s.combatDefeatedUi);
