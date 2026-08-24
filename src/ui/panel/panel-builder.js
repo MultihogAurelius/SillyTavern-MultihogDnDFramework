@@ -669,6 +669,7 @@ export function createPanel(dependencies) {
         navigateSnapshot,
         normalizeLocationPath,
         openNpcSectionEditor,
+        openPcSectionEditor,
         parseInWorldTime,
         reapplyRouterPass,
         refreshAgentManifestNow,
@@ -2159,7 +2160,7 @@ export function createPanel(dependencies) {
                             <span style="font-weight:bold; font-size:11px; flex:1; color:var(--rt-text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(displayName)}</span>
                             <span style="font-size:9px; opacity:0.45; color:var(--rt-text-muted); flex-shrink:0;">${activeCount}/${items.length} (${totalTokens}t)</span>
                             ${isNpcBook ? '<button type="button" class="rt-npc-manager-btn" title="NPC/PC Manager — library, add to story, import/export"><i class="fa-solid fa-users-gear"></i> NPC/PC Manager</button>' : ''}
-                            ${isNpcBook ? '<button class="rt-npc-settings-btn" title="NPC Settings" style="background:none;border:none;cursor:pointer;font-size:11px;opacity:0.5;padding:0;margin:0;width:14px;height:14px;display:inline-flex;align-items:center;justify-content:center;color:var(--rt-text-muted);flex-shrink:0;line-height:1;" onclick="event.stopPropagation()">⚙️</button>' : ''}
+                            ${isNpcBook ? '<button class="rt-npc-settings-btn" title="NPC and PC Card Settings" style="background:none;border:none;cursor:pointer;font-size:11px;opacity:0.5;padding:0;margin:0;width:14px;height:14px;display:inline-flex;align-items:center;justify-content:center;color:var(--rt-text-muted);flex-shrink:0;line-height:1;" onclick="event.stopPropagation()">⚙️</button>' : ''}
                             ${isLocBook ? '<button type="button" class="rt-loc-maps-guide-btn" title="Learn how Persistent Maps work"><i class="fa-solid fa-circle-info"></i> Maps Guide</button>' : ''}
                             ${isLocBook && dungeonRealityEnabled ? '<button type="button" class="rt-loc-add-mapped-btn" title="Create a new location root and generate its private map"><i class="fa-solid fa-plus"></i> Add Mapped Location</button>' : ''}
                             ${isLocBook ? '<button class="rt-loc-settings-btn" title="Location Settings" style="background:none;border:none;cursor:pointer;font-size:11px;opacity:0.5;padding:0;margin:0;width:14px;height:14px;display:inline-flex;align-items:center;justify-content:center;color:var(--rt-text-muted);flex-shrink:0;line-height:1;" onclick="event.stopPropagation()">⚙️</button>' : ''}
@@ -2194,7 +2195,7 @@ export function createPanel(dependencies) {
                                         const curS = getSettings();
 
                                         const popupHtml = `<div style="padding:16px;width:320px;text-align:left;font-family:var(--rt-font, system-ui, sans-serif);">
-                                    <div style="font-size:16px;font-weight:bold;color:#d4a940;margin-bottom:16px;">⚙️ NPC Settings</div>
+                                    <div style="font-size:16px;font-weight:bold;color:#d4a940;margin-bottom:16px;">⚙️ NPC and PC Card Settings</div>
 
                                     <div style="margin-bottom:6px;display:flex;align-items:center;gap:10px;">
                                         <label style="font-size:12px;color:rgba(255,255,255,0.7);flex:1;">Show NPC Portraits</label>
@@ -2274,8 +2275,11 @@ export function createPanel(dependencies) {
                                     </div>
                                     <div style="font-size:10px;color:rgba(255,255,255,0.35);margin-bottom:10px;">Omits the &lt;CORE LENGTH TARGETS&gt; section from the NPC prompt.</div>
                                     
-                                    <button id="rt-btn-edit-npc-sections-inline" style="width:100%;background:rgba(180, 100, 255, 0.15);border:1px solid rgba(180, 100, 255, 0.4);color:white;border-radius:6px;padding:8px 10px;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:10px;transition:background 0.2s;">
+                                    <button id="rt-btn-edit-npc-sections-inline" style="width:100%;background:rgba(180, 100, 255, 0.15);border:1px solid rgba(180, 100, 255, 0.4);color:white;border-radius:6px;padding:8px 10px;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:6px;transition:background 0.2s;">
                                         <i class="fa-solid fa-puzzle-piece"></i> Edit NPC Sections
+                                    </button>
+                                    <button id="rt-btn-edit-pc-sections-inline" style="width:100%;background:rgba(180, 100, 255, 0.15);border:1px solid rgba(180, 100, 255, 0.4);color:white;border-radius:6px;padding:8px 10px;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:10px;transition:background 0.2s;" title="Customize the persona sections for Player Characters (e.g. Appearance, Personality, Strengths).">
+                                        <i class="fa-solid fa-user"></i> Edit PC Sections
                                     </button>
                                 </div>`;
 
@@ -2356,6 +2360,12 @@ export function createPanel(dependencies) {
                                                     openNpcSectionEditor();
                                                 });
                                             }
+                                            const editPcBtn = document.getElementById('rt-btn-edit-pc-sections-inline');
+                                            if (editPcBtn) {
+                                                editPcBtn.addEventListener('click', () => {
+                                                    openPcSectionEditor();
+                                                });
+                                            }
                                         }, 0);
 
                                         const result = await ctx.callGenericPopup(popupHtml, ctx.POPUP_TYPE?.CONFIRM ?? 3, '', {
@@ -2396,7 +2406,7 @@ export function createPanel(dependencies) {
                                             }
 
                                             saveSettings();
-                                            toastr['success']('NPC settings saved.', 'NPC Settings');
+                                            toastr['success']('NPC and PC card settings saved.', 'NPC and PC Card Settings');
                                             if (typeof globalThis._rpgRenderAgentModules === 'function') {
                                                 globalThis._rpgRenderAgentModules();
                                             }

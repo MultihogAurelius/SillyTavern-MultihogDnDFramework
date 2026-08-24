@@ -242,7 +242,9 @@ function persistMapEvolutionSelectedRootsFromUi() {
     });
     const settings = getSettings();
     settings.mapEvolutionSelectedRoots = roots;
-    saveSettings();
+    // This discrete campaign choice must reach disk before an immediate F5 can
+    // cancel SillyTavern's normal debounced settings write.
+    void saveSettings(true);
     return roots;
 }
 
@@ -253,7 +255,7 @@ function persistMapEvolutionIntervalOverrideFromUi(siteRoot, rawValue) {
         siteRoot,
         String(rawValue || '').trim(),
     );
-    saveSettings();
+    void saveSettings(true);
     if (settings.chatLinkEnabled && runtimeState.currentChatId) saveChatState(runtimeState.currentChatId);
     updateMapEvolutionScheduleDisplay();
 }
@@ -4866,6 +4868,7 @@ function createPanel() {
         navigateSnapshot,
         normalizeLocationPath,
         openNpcSectionEditor,
+        openPcSectionEditor,
         parseInWorldTime,
         reapplyRouterPass,
         refreshAgentManifestNow,
@@ -9002,7 +9005,7 @@ RULES:
             openNpcSectionEditor();
         });
 
-        $('#rpg_tracker_btn_edit_pc_sections').on('click', function () {
+        $('#rpg_tracker_btn_edit_pc_sections, #rpg_tracker_btn_edit_pc_sections_agent').on('click', function () {
             openPcSectionEditor();
         });
 
@@ -10895,7 +10898,7 @@ RULES:
             saveSettings();
         });
 
-        // NPC Settings Bindings — delegated so toggles stay live if settings HTML is re-injected.
+        // NPC and PC Card Settings bindings — delegated so toggles stay live if settings HTML is re-injected.
         $(document).off('change.rpgPortraitDisplay', '#rpg_tracker_npc_portraits, #rpg_tracker_location_images');
         $(document).on('change.rpgPortraitDisplay', '#rpg_tracker_npc_portraits', async function () {
             const s = getSettings();

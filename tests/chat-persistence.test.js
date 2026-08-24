@@ -226,6 +226,23 @@ describe('saveChatState', () => {
         });
     });
 
+    it('keeps Map Evolution tick targeting in the chat partition across reloads', () => {
+        const s = getSettings();
+        s.mapEvolutionTickScope = 'selected';
+        s.mapEvolutionTickCount = 3;
+        s.mapEvolutionTickRandomize = false;
+        s.mapEvolutionSelectedRoots = ['Ember Mine', 'Morrowfen'];
+
+        saveChatState('map-evolution-targets-chat', { skipDiskWrite: true });
+
+        expect(s.chatStates['map-evolution-targets-chat']).toMatchObject({
+            mapEvolutionTickScope: 'selected',
+            mapEvolutionTickCount: 3,
+            mapEvolutionTickRandomize: false,
+            mapEvolutionSelectedRoots: ['Ember Mine', 'Morrowfen'],
+        });
+    });
+
     it('rehydrates World Progression and Map Evolution watermarks from the active chat partition', () => {
         const s = getSettings();
         s.chatLinkEnabled = true;

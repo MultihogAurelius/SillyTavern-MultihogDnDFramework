@@ -1404,10 +1404,8 @@ export const CHAT_STATE_GLOBAL_UI_KEYS = [
     'mapEvolutionCompressThreshold',
     'mapEvolutionNarratorCommitTokens',
     'mapEvolutionCompressSystemPrompt',
-    'mapEvolutionTickScope',
-    'mapEvolutionTickCount',
-    'mapEvolutionTickRandomize',
-    'mapEvolutionSelectedRoots',
+    // Tick targeting is operational campaign state: mapped roots differ by chat.
+    // Keep these fields in chatStates so reload restores the active campaign's choices.
     'mapEvolutionSystemPrompt',
     'worldConnectionSource',
     'worldConnectionProfileId',

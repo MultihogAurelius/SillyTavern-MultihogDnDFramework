@@ -74,5 +74,9 @@ describe('stripChatStateGlobalUiPrefs', () => {
         expect(CHAT_STATE_GLOBAL_UI_KEYS).toContain('mapTheme');
         expect(CHAT_STATE_GLOBAL_UI_KEYS).toContain('savedMapThemePresets');
         expect(CHAT_STATE_GLOBAL_UI_KEYS).toContain('activeMapThemePresetId');
+        expect(CHAT_STATE_GLOBAL_UI_KEYS).not.toContain('mapEvolutionTickScope');
+        expect(CHAT_STATE_GLOBAL_UI_KEYS).not.toContain('mapEvolutionTickCount');
+        expect(CHAT_STATE_GLOBAL_UI_KEYS).not.toContain('mapEvolutionTickRandomize');
+        expect(CHAT_STATE_GLOBAL_UI_KEYS).not.toContain('mapEvolutionSelectedRoots');
     });
 });
