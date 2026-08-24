@@ -207,7 +207,7 @@
                     <div class="inline-drawer">
                         <div class="inline-drawer-toggle inline-drawer-header">
                             <i class="fa-solid fa-image" style="margin-right: 6px; opacity: 0.65;"></i>
-                            <b>Portraits</b>
+                            <b>Portraits and Location Images</b>
                             <div class="inline-drawer-icon fa-solid fa-circle-chevron-down"></div>
                         </div>
                         <div class="inline-drawer-content">
@@ -262,6 +262,20 @@
                                 <i class="fa-solid fa-circle-question interactable"
                                     title="Suppress progress and success notifications from portrait and location AI auto-generation. Errors and warnings still appear."></i>
                             </label>
+
+                            <label class="checkbox_label" style="padding-left: 4px;">
+                                <input id="rpg_tracker_portrait_use_story_lookback" type="checkbox" />
+                                <span>Use Story Lookback When Generating Portraits</span>
+                                <i class="fa-solid fa-circle-question interactable"
+                                    title="When enabled, portrait prompts include recent chat messages plus broader story context. When disabled, prompts are built only from the NPC or PC card itself (State Memo block and/or character card description, or the NPC lorebook entry). Location images always include recent story context and are not affected by this toggle."></i>
+                            </label>
+                            <div id="rpg_tracker_portrait_story_lookback_row" style="padding-left: 4px; transition: opacity 0.2s; opacity: 0.35; pointer-events: none;">
+                                <label style="font-size: 0.82em; opacity: 0.75; display: block; margin-bottom: 3px;">Story lookback messages
+                                    <i class="fa-solid fa-circle-question interactable"
+                                        title="Number of recent SillyTavern chat messages to include when generating portrait prompts."></i>
+                                </label>
+                                <input id="rpg_tracker_portrait_story_lookback" type="text" inputmode="numeric" pattern="[0-9]*" min="0" max="100" class="text_pole" value="5" style="font-size: 0.85em; max-width: 72px;" />
+                            </div>
 
                             <small style="display: block; padding-left: 4px; font-size: 0.78em; opacity: 0.6; margin-top: 2px;">Auto-generate for:</small>
                             <label class="checkbox_label" style="padding-left: 4px;">

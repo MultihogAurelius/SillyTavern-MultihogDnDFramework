@@ -28,10 +28,10 @@ describe('General & Visuals settings', () => {
             .toBe((settingsMarkup.match(/<\/div>/g) || []).length);
     });
 
-    it('organizes settings into Core & Branching, UI Appearance, and Portraits drawers', () => {
+    it('organizes settings into Core & Branching, UI Appearance, and Portraits and Location Images drawers', () => {
         expect(settingsMarkup).toContain('<b>Core &amp; Branching</b>');
         expect(settingsMarkup).toContain('<b>UI Appearance</b>');
-        expect(settingsMarkup).toContain('<b>Portraits</b>');
+        expect(settingsMarkup).toContain('<b>Portraits and Location Images</b>');
     });
 
     it('places Connections & Models immediately after General & Visuals', () => {
@@ -97,8 +97,8 @@ describe('General & Visuals settings', () => {
         expect(style).toContain('right: 14px;');
     });
 
-    it('keeps portrait-specific drawers and the emergency purge within Portraits', () => {
-        const portraitsStart = settingsMarkup.indexOf('<b>Portraits</b>');
+    it('keeps portrait-specific drawers and the emergency purge within Portraits and Location Images', () => {
+        const portraitsStart = settingsMarkup.indexOf('<b>Portraits and Location Images</b>');
         const developerStart = settingsMarkup.indexOf('Developer &amp; Reset');
         const portraitsMarkup = settingsMarkup.slice(portraitsStart, developerStart);
 
@@ -108,6 +108,8 @@ describe('General & Visuals settings', () => {
         expect(portraitsMarkup).toContain('id="rpg_portrait_prompt_presets_container"');
         expect(portraitsMarkup).toContain('id="rpg_portrait_prompt_preset_save_btn"');
         expect(portraitsMarkup).toContain('id="rpg_tracker_purge_all_portraits"');
+        expect(portraitsMarkup).toContain('id="rpg_tracker_portrait_use_story_lookback"');
+        expect(portraitsMarkup).toContain('id="rpg_tracker_portrait_story_lookback"');
         expect(portraitsMarkup.indexOf('Portrait and Location Image Styles'))
             .toBeLessThan(portraitsMarkup.indexOf('<b>Portrait Prompt Templates</b>'));
         expect(portraitsMarkup).not.toContain('<b>Portrait Prompt Presets</b>');

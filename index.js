@@ -3340,6 +3340,8 @@ function loadProfile(name) {
     s.portraitGeneratorSource = p.portraitGeneratorSource ?? "native";
     s.portraitSkipPromptDialog = p.portraitSkipPromptDialog ?? false;
     s.hideImageGenToasts = p.hideImageGenToasts ?? false;
+    s.portraitUseStoryLookback = p.portraitUseStoryLookback ?? false;
+    s.portraitStoryLookback = Math.max(0, Math.min(100, Number(p.portraitStoryLookback) || 5));
     s.portraitAutoGenerateParty = p.portraitAutoGenerateParty ?? false;
     s.portraitAutoGeneratePlayer = p.portraitAutoGeneratePlayer ?? false;
     s.portraitAutoGenerateEnemies = p.portraitAutoGenerateEnemies ?? false;
@@ -3480,6 +3482,12 @@ function loadProfile(name) {
     $('#rpg_tracker_pollinations_group').toggle((s.portraitGeneratorSource || 'native') === 'pollinations');
     $('#rpg_tracker_portrait_skip_prompt').prop('checked', !!s.portraitSkipPromptDialog);
     $('#rpg_tracker_hide_image_gen_toasts').prop('checked', !!s.hideImageGenToasts);
+    $('#rpg_tracker_portrait_use_story_lookback').prop('checked', !!s.portraitUseStoryLookback);
+    $('#rpg_tracker_portrait_story_lookback').val(s.portraitStoryLookback ?? 5);
+    $('#rpg_tracker_portrait_story_lookback_row').css({
+        opacity: s.portraitUseStoryLookback ? '1' : '0.35',
+        'pointer-events': s.portraitUseStoryLookback ? 'auto' : 'none',
+    });
     $('#rpg_tracker_portrait_auto_party').prop('checked', !!s.portraitAutoGenerateParty);
     $('#rpg_tracker_portrait_auto_player').prop('checked', !!s.portraitAutoGeneratePlayer);
     $('#rpg_tracker_portrait_auto_enemies').prop('checked', !!s.portraitAutoGenerateEnemies);
@@ -3809,7 +3817,7 @@ async function showLorebookAgentDocumentation() {
                             <p style="margin-top:4px;">When <b>Show Location Images</b> is enabled or the party is inside a mapped site, the panel header switches between <b>Campaign Records</b> and <b>Visuals/Map</b>. Otherwise only the standard Campaign Records tree is shown.</p>
 
                             <h4 style="margin-bottom: 5px;">🗺️ Location Images &amp; Visuals/Map</h4>
-                            <p>Location scene art is <b>opt-in</b> and <b>off by default</b>. Enable it from <b>Extension Settings → Portraits → Location Images &amp; Visualization</b>.</p>
+                            <p>Location scene art is <b>opt-in</b> and <b>off by default</b>. Enable it from <b>Extension Settings → Portraits and Location Images → Location Images &amp; Visualization</b>.</p>
                             <ul style="padding-left: 20px; margin-top: 0;">
                                 <li><b>Show Location Images</b> — Master toggle. When on, the Locations book gains hierarchical scene art: thumbnails on the location tree, wide 16:9 images in detail view, drag-and-drop upload, and the <b>Campaign Records / Visuals/Map</b> switch in this panel. Also turns on automatically if you enable Real-Time Visualization Mode or Auto-Generate Locations.</li>
                                 <li><b>Auto-Generate Locations</b> — Background scene art for new location lorebook entries that do not already have an image. Mutually exclusive with Real-Time Visualization Mode.</li>
@@ -7095,6 +7103,25 @@ function organizeConnectionSettingsUI() {
 
         $('#rpg_tracker_hide_image_gen_toasts').prop('checked', !!settings.hideImageGenToasts).on('change', function () {
             settings.hideImageGenToasts = !!$(this).prop('checked');
+            saveSettings();
+        });
+
+        const portraitStoryLookbackRow = $('#rpg_tracker_portrait_story_lookback_row');
+        const applyPortraitStoryLookbackUI = (enabled) => {
+            portraitStoryLookbackRow.css({
+                opacity: enabled ? '1' : '0.35',
+                'pointer-events': enabled ? 'auto' : 'none',
+            });
+        };
+        $('#rpg_tracker_portrait_use_story_lookback').prop('checked', !!settings.portraitUseStoryLookback).on('change', function () {
+            settings.portraitUseStoryLookback = !!$(this).prop('checked');
+            applyPortraitStoryLookbackUI(settings.portraitUseStoryLookback);
+            saveSettings();
+        });
+        applyPortraitStoryLookbackUI(!!settings.portraitUseStoryLookback);
+        $('#rpg_tracker_portrait_story_lookback').val(settings.portraitStoryLookback ?? 5).on('input', function () {
+            settings.portraitStoryLookback = Math.max(0, Math.min(100, parseInt(String($(this).val() || ''), 10) || 0));
+            $(this).val(settings.portraitStoryLookback);
             saveSettings();
         });
 
@@ -12029,6 +12056,12 @@ RULES:
             $('#rpg_tracker_pollinations_group').toggle((s.portraitGeneratorSource || 'native') === 'pollinations');
             $('#rpg_tracker_portrait_skip_prompt').prop('checked', !!s.portraitSkipPromptDialog);
     $('#rpg_tracker_hide_image_gen_toasts').prop('checked', !!s.hideImageGenToasts);
+            $('#rpg_tracker_portrait_use_story_lookback').prop('checked', !!s.portraitUseStoryLookback);
+            $('#rpg_tracker_portrait_story_lookback').val(s.portraitStoryLookback ?? 5);
+            $('#rpg_tracker_portrait_story_lookback_row').css({
+                opacity: s.portraitUseStoryLookback ? '1' : '0.35',
+                'pointer-events': s.portraitUseStoryLookback ? 'auto' : 'none',
+            });
             $('#rpg_tracker_portrait_auto_party').prop('checked', !!s.portraitAutoGenerateParty);
             $('#rpg_tracker_portrait_auto_player').prop('checked', !!s.portraitAutoGeneratePlayer);
             $('#rpg_tracker_portrait_auto_enemies').prop('checked', !!s.portraitAutoGenerateEnemies);

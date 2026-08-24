@@ -1345,6 +1345,8 @@ export const CHAT_STATE_GLOBAL_UI_KEYS = [
     'portraitGeneratorSource',
     'portraitSkipPromptDialog',
     'hideImageGenToasts',
+    'portraitUseStoryLookback',
+    'portraitStoryLookback',
     'portraitAutoGenerateParty',
     'portraitAutoGeneratePlayer',
     'portraitAutoGenerateEnemies',

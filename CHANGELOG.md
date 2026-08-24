@@ -2,6 +2,17 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.43] - 2026-08-25
+
+### Added
+- **Portrait story lookback toggle**: Portraits and Location Images settings can now generate character/NPC portraits from the card alone. Off by default; when enabled, the previous chat lookback (default 5 messages) is included. Location images still always use recent story context.
+
+### Changed
+- **Settings drawer title**: Renamed Portraits to Portraits and Location Images.
+
+### Fixed
+- **Map node asset overflow**: Crowded dungeon-map nodes now show one fewer icon so the +N badge stays inside the border, and hovering +N lists the hidden assets.
+
 ## [2026.8.42] - 2026-08-25
 
 ### Added

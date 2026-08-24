@@ -17,6 +17,7 @@ import {
     lookupCustomPortraitSrc,
     snapshotPortraitMapsForChat,
 } from './portrait-storage.js';
+import { buildPortraitStoryContext, portraitStoryLookbackCount } from './src/state/portrait-story-lookback.js';
 
 /**
  * Portrait/location AI generation toast — info/success can be hidden via settings.
@@ -373,8 +374,6 @@ export const POLLINATIONS_IMAGE_MODELS = [
     { id: 'grok-imagine-pro',      label: 'Grok Imagine Pro',           tier: 'Premium' },
 ];
 
-// ── AI Portrait Prompt Generation ──────────────────────────────────────────────
-
 /** Connection overlay for portrait / location image prompt LLM calls. */
 export function getPortraitConnectionSettings(baseSettings) {
     const s = baseSettings || getSettings();
@@ -400,6 +399,7 @@ export function getPortraitConnectionSettings(baseSettings) {
 export async function generatePortraitPrompt(entityName) {
     const s = getSettings();
     const ctx = SillyTavern.getContext();
+    const useStoryLookback = !!s.portraitUseStoryLookback;
 
     // 1. Entity name
     let contextParts = [`Character Name: ${entityName}`];
@@ -411,22 +411,13 @@ export async function generatePortraitPrompt(entityName) {
         for (const tag of relevantTags) {
             const block = blocks[tag];
             if (!block) continue;
-            // Check if the entity name appears in this block
             if (block.toUpperCase().includes(entityName.toUpperCase())) {
                 contextParts.push(`[${tag}] block (from State Memo):\n${block.trim()}`);
             }
         }
     }
 
-    // 3. Persona — always included, LLM decides if relevant
-    try {
-        const persona = ctx.substituteParams?.('{{persona}}') || '';
-        if (persona.trim()) {
-            contextParts.push(`User Persona:\n${persona.trim()}`);
-        }
-    } catch { /* substituteParams may not exist */ }
-
-    // 4. Character card description
+    // 3. Character card description
     try {
         const charId = ctx.characterId;
         const charData = ctx.characters?.[charId];
@@ -435,97 +426,94 @@ export async function generatePortraitPrompt(entityName) {
         }
     } catch { /* ignore */ }
 
-    // 5. Active lorebook entries — scan for keyword matches with entityName
-    try {
-        const worldInfo = ctx.chat_metadata?.world_info;
-        if (worldInfo) {
-            // Try to get entries from context
-            const entries = typeof ctx.getWorldInfoEntries === 'function'
-                ? await ctx.getWorldInfoEntries()
-                : null;
-            if (entries && Array.isArray(entries)) {
-                const matchingEntries = entries.filter(entry => {
-                    const keys = entry.key || [];
-                    const keysArr = Array.isArray(keys) ? keys : [keys];
-                    return keysArr.some(k => k && (
-                        entityName.toLowerCase().includes(k.toLowerCase()) ||
-                        k.toLowerCase().includes(entityName.toLowerCase())
-                    ));
-                });
-                if (matchingEntries.length > 0) {
-                    const loreText = matchingEntries.map(e =>
-                        `[Lorebook: ${e.comment || e.key?.[0] || 'Entry'}]\n${(e.content || '').substring(0, 800)}`
-                    ).join('\n\n');
-                    contextParts.push(`Matching Lorebook Entries:\n${loreText}`);
+    if (useStoryLookback) {
+        // Persona — always included when using story context, LLM decides if relevant
+        try {
+            const persona = ctx.substituteParams?.('{{persona}}') || '';
+            if (persona.trim()) {
+                contextParts.push(`User Persona:\n${persona.trim()}`);
+            }
+        } catch { /* substituteParams may not exist */ }
+
+        // Active lorebook entries — scan for keyword matches with entityName
+        try {
+            const worldInfo = ctx.chat_metadata?.world_info;
+            if (worldInfo) {
+                const entries = typeof ctx.getWorldInfoEntries === 'function'
+                    ? await ctx.getWorldInfoEntries()
+                    : null;
+                if (entries && Array.isArray(entries)) {
+                    const matchingEntries = entries.filter(entry => {
+                        const keys = entry.key || [];
+                        const keysArr = Array.isArray(keys) ? keys : [keys];
+                        return keysArr.some(k => k && (
+                            entityName.toLowerCase().includes(k.toLowerCase()) ||
+                            k.toLowerCase().includes(entityName.toLowerCase())
+                        ));
+                    });
+                    if (matchingEntries.length > 0) {
+                        const loreText = matchingEntries.map(e =>
+                            `[Lorebook: ${e.comment || e.key?.[0] || 'Entry'}]\n${(e.content || '').substring(0, 800)}`
+                        ).join('\n\n');
+                        contextParts.push(`Matching Lorebook Entries:\n${loreText}`);
+                    }
                 }
             }
-        }
-    } catch { /* lorebook access may vary */ }
+        } catch { /* lorebook access may vary */ }
 
-    // Also check active router keys for lorebook context
-    try {
-        if (s.activeRouterKeys?.length > 0) {
-            const manifest = typeof getLorebookManifest === 'function' ? await getLorebookManifest(true) : null;
-            if (manifest) {
-                const matchingActive = manifest.filter(entry => {
-                    const keys = entry.keys || [];
-                    return keys.some(k => k && (
-                        entityName.toLowerCase().includes(k.toLowerCase()) ||
-                        k.toLowerCase().includes(entityName.toLowerCase())
-                    ));
-                });
-                if (matchingActive.length > 0) {
-                    const activeText = matchingActive.map(e =>
-                        `[Active Lore: ${e.label || e.category || 'Entry'}]\n${(e.content || '').substring(0, 800)}`
-                    ).join('\n\n');
-                    contextParts.push(`Active Lorebook Context:\n${activeText}`);
+        try {
+            if (s.activeRouterKeys?.length > 0) {
+                const manifest = typeof getLorebookManifest === 'function' ? await getLorebookManifest(true) : null;
+                if (manifest) {
+                    const matchingActive = manifest.filter(entry => {
+                        const keys = entry.keys || [];
+                        return keys.some(k => k && (
+                            entityName.toLowerCase().includes(k.toLowerCase()) ||
+                            k.toLowerCase().includes(entityName.toLowerCase())
+                        ));
+                    });
+                    if (matchingActive.length > 0) {
+                        const activeText = matchingActive.map(e =>
+                            `[Active Lore: ${e.label || e.category || 'Entry'}]\n${(e.content || '').substring(0, 800)}`
+                        ).join('\n\n');
+                        contextParts.push(`Active Lorebook Context:\n${activeText}`);
+                    }
                 }
             }
-        }
-    } catch { /* lorebook manifest may not be available */ }
+        } catch { /* lorebook manifest may not be available */ }
 
-    // 6. Full Lorebook Agent context — ALL active keys with keywords and content
-    try {
-        if (s.activeRouterKeys?.length > 0) {
-            const agentBooks = {};
-            for (const k of s.activeRouterKeys) {
-                const [bookName] = k.split('::');
-                if (!agentBooks[bookName]) agentBooks[bookName] = await ctx.loadWorldInfo(bookName);
-            }
-            const agentEntries = [];
-            for (const k of s.activeRouterKeys) {
-                const [bookName, uid] = k.split('::');
-                const entry = agentBooks[bookName]?.entries?.[uid];
-                if (entry && entry.content) {
-                    const keywords = (entry.key || []).filter(Boolean).join(', ');
-                    const label = entry.comment || entry.key?.[0] || uid;
-                    agentEntries.push(`[Agent Entry: "${label}" | Keywords: ${keywords || 'none'}]\n${(entry.content || '').substring(0, 600)}`);
+        try {
+            if (s.activeRouterKeys?.length > 0) {
+                const agentBooks = {};
+                for (const k of s.activeRouterKeys) {
+                    const [bookName] = k.split('::');
+                    if (!agentBooks[bookName]) agentBooks[bookName] = await ctx.loadWorldInfo(bookName);
+                }
+                const agentEntries = [];
+                for (const k of s.activeRouterKeys) {
+                    const [bookName, uid] = k.split('::');
+                    const entry = agentBooks[bookName]?.entries?.[uid];
+                    if (entry && entry.content) {
+                        const keywords = (entry.key || []).filter(Boolean).join(', ');
+                        const label = entry.comment || entry.key?.[0] || uid;
+                        agentEntries.push(`[Agent Entry: "${label}" | Keywords: ${keywords || 'none'}]\n${(entry.content || '').substring(0, 600)}`);
+                    }
+                }
+                if (agentEntries.length > 0) {
+                    contextParts.push(`Current Lorebook Agent (All Active Entries):\n${agentEntries.join('\n\n')}`);
                 }
             }
-            if (agentEntries.length > 0) {
-                contextParts.push(`Current Lorebook Agent (All Active Entries):\n${agentEntries.join('\n\n')}`);
-            }
-        }
-    } catch { /* lorebook agent entries may not be loadable */ }
+        } catch { /* lorebook agent entries may not be loadable */ }
 
-    // 7. Current game state (memo) — full state for rich context
-    try {
-        if (s.currentMemo) {
-            contextParts.push(`Current Game State:\n${memoForGmContext(s.currentMemo).substring(0, 2000)}`);
-        }
-    } catch { /* ignore */ }
-
-    // 8. Last 5 messages from chat
-    try {
-        if (ctx.chat && Array.isArray(ctx.chat)) {
-            const filteredMsgs = ctx.chat.filter(m => !m.is_system && m.mes && m.mes.trim());
-            const lastMsgs = filteredMsgs.slice(-5);
-            if (lastMsgs.length > 0) {
-                const msgText = lastMsgs.map(m => `${m.name || (m.is_user ? 'User' : 'Character')}: ${m.mes}`).join('\n\n');
-                contextParts.push(`Recent Chat Context (Last 5 Messages):\n${msgText.substring(0, 12000)}`);
+        try {
+            if (s.currentMemo) {
+                contextParts.push(`Current Game State:\n${memoForGmContext(s.currentMemo).substring(0, 2000)}`);
             }
-        }
-    } catch { /* ignore */ }
+        } catch { /* ignore */ }
+
+        const storyContext = buildPortraitStoryContext(ctx, portraitStoryLookbackCount(s));
+        if (storyContext) contextParts.push(storyContext);
+    }
 
     const systemPrompt = (s.portraitCharacterSystemPrompt || '')
         .replace(/\{\{name\}\}/g, entityName)
@@ -548,42 +536,36 @@ export async function generatePortraitPrompt(entityName) {
 export async function generateNpcPortraitPrompt(entityName, npcContent) {
     const s = getSettings();
     const ctx = SillyTavern.getContext();
+    const useStoryLookback = !!s.portraitUseStoryLookback;
 
     let contextParts = [`NPC Name: ${entityName}`];
 
-    // 1. NPC lorebook entry content (primary source)
     if (npcContent && npcContent.trim()) {
         contextParts.push(`NPC Lorebook Entry:\n${npcContent.trim()}`);
     }
 
-    // 2. Persona — for art style context
-    try {
-        const persona = ctx.substituteParams?.('{{persona}}') || '';
-        if (persona.trim()) {
-            contextParts.push(`User Persona (for art style context):\n${persona.trim()}`);
-        }
-    } catch { /* substituteParams may not exist */ }
-
-    // 3. Character card description — for setting/world context
-    try {
-        const charId = ctx.characterId;
-        const charData = ctx.characters?.[charId];
-        if (charData?.description) {
-            contextParts.push(`Narrator Card Description (for world context):\n${charData.description.substring(0, 1500)}`);
-        }
-    } catch { /* ignore */ }
-
-    // 4. Last 3 chat messages for scene context
-    try {
-        if (ctx.chat && Array.isArray(ctx.chat)) {
-            const filteredMsgs = ctx.chat.filter(m => !m.is_system && m.mes && m.mes.trim());
-            const lastMsgs = filteredMsgs.slice(-3);
-            if (lastMsgs.length > 0) {
-                const msgText = lastMsgs.map(m => `${m.name || (m.is_user ? 'User' : 'Character')}: ${m.mes}`).join('\n\n');
-                contextParts.push(`Recent Scene Context:\n${msgText.substring(0, 4000)}`);
+    if (useStoryLookback) {
+        try {
+            const persona = ctx.substituteParams?.('{{persona}}') || '';
+            if (persona.trim()) {
+                contextParts.push(`User Persona (for art style context):\n${persona.trim()}`);
             }
-        }
-    } catch { /* ignore */ }
+        } catch { /* substituteParams may not exist */ }
+
+        try {
+            const charId = ctx.characterId;
+            const charData = ctx.characters?.[charId];
+            if (charData?.description) {
+                contextParts.push(`Narrator Card Description (for world context):\n${charData.description.substring(0, 1500)}`);
+            }
+        } catch { /* ignore */ }
+
+        const storyContext = buildPortraitStoryContext(ctx, portraitStoryLookbackCount(s), {
+            maxChars: 4000,
+            label: 'Recent Scene Context',
+        });
+        if (storyContext) contextParts.push(storyContext);
+    }
 
     const systemPrompt = (s.portraitNpcSystemPrompt || '')
         .replace(/\{\{name\}\}/g, entityName)
@@ -1866,6 +1848,8 @@ async function loadPresentCharactersForLocationPrompt(settings, ctx) {
 /**
  * Generates an image prompt for a location lorebook entry.
  * Parent locations in the hierarchy are included as visual continuity guides, not substitutes.
+ * Always includes recent narrator/story context — location scene art cannot be
+ * generated from a location card alone, so this path is not gated by portraitUseStoryLookback.
  * @param {string} locationPath
  * @param {string} locContent
  * @returns {Promise<string>}

@@ -224,6 +224,14 @@ export function buildDefaultSettings() {
 
         hideImageGenToasts: false,
 
+        /** When true, portrait prompts include recent chat story context; when false, only NPC/PC card data. */
+
+        portraitUseStoryLookback: false,
+
+        /** Recent chat messages to include when portraitUseStoryLookback is on (character path previously used 5). */
+
+        portraitStoryLookback: 5,
+
         portraitAutoGenerateParty: false,
 
         portraitAutoGeneratePlayer: false,
