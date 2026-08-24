@@ -85,6 +85,9 @@ describe('onboarding Player Card and ST persona options', () => {
         expect(html).toContain('Persistent Maps section of the settings');
         expect(html).toContain('Multihog D&amp;D Framework auto-applies its own system prompt.');
         expect(html).toContain('General &amp; Visuals -> Core -> Restore backup to Main.');
+        expect(html).toContain('A summarizer is <b>mandatory</b> for this extension to compress the context.');
+        expect(html).toContain('href="https://github.com/Lodactio/Extension-Summaryception"');
+        expect(html).toContain('hides verbatim messages');
     });
 
     it('lists Function Calling first in the Setup Guide', () => {

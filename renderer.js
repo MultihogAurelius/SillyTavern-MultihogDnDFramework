@@ -2345,6 +2345,7 @@ function formatValueToCurrency(totalCp, detectedCurrency) {
 
                 <div class="rt-onboarding-prompt-backup-note" role="note" style="font-size:12px;line-height:1.4;padding:8px 10px;border-left:3px solid var(--rt-accent);background:rgba(120,80,220,0.1);border-radius:4px;">
                     <b>NOTE:</b> Multihog D&amp;D Framework auto-applies its own system prompt. If you want to restore your old prompt, go to the extension settings: General &amp; Visuals -> Core -> Restore backup to Main.
+                    <div style="margin-top:8px;">A summarizer is <b>mandatory</b> for this extension to compress the context. I recommend <a href="https://github.com/Lodactio/Extension-Summaryception" target="_blank" rel="noopener noreferrer">Summaryception</a>, which creates a summary and auto-ghosts/hides messages. You only need to have the narrator see the last 10 messages or so verbatim; the rest can be hidden away as memory is handled by Lorebook Agent (part of Multihog) and Summaryception.</div>
                 </div>
 
                 <div class="rt-onboarding-how-it-works">
@@ -2381,7 +2382,7 @@ function formatValueToCurrency(totalCp, detectedCurrency) {
                         <li>Use one of the character creation options above to roll a new character. You can either use the Character Creator option to clearly specify your character, use Other Ways to Begin for a more rough description, or use Instant Action to get started quicker.</li>
                     </ol>
                     <div style="margin-top: 8px;">
-                        🪙 <b>Token Optimization:</b> To reduce token costs, especially when in tool use mode, consider using a summarizer such as the <b>Summaryception</b> extension. Summarization combined with <b>Lorebook Agent</b> will guarantee the AI stays on track and keep token costs low.
+                        🪙 <b>Token Optimization:</b> A summarizer that <b>hides verbatim messages</b> is essential — without it, tool-use and long chats will balloon token cost. Use something like <a href="https://github.com/Lodactio/Extension-Summaryception" target="_blank" rel="noopener noreferrer"><b>Summaryception</b></a> that auto-ghosts/hides older messages so the narrator only sees the last ~10 turns verbatim. Combined with <b>Lorebook Agent</b>, memory stays in lore and summaries instead of raw chat, which keeps the AI on track and the cost down.
                     </div>
                     <div style="margin-top: 12px;">
                         🤖 <b>What Model to Use?</b><br><br>

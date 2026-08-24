@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.48] - 2026-08-25
+
+### Changed
+- **Onboarding summarizer guidance**: The How It Works note now states that a summarizer is mandatory and recommends Summaryception. Token Optimization stresses a summarizer that hides verbatim messages so the narrator only sees recent turns.
+
 ## [2026.8.47] - 2026-08-25
 
 ### Changed
