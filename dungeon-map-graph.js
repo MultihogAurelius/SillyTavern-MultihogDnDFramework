@@ -393,11 +393,15 @@ export function renderDungeonMapReadableHtml(mapDocument, { revealAll = true } =
         return visibleIds.has(resolveAssetEffectiveArea(map, asset)?.id);
     });
     const renderTag = (value, className = '') => `<span class="rt-dungeon-map-tag ${className}">${escapeHtml(value)}</span>`;
-    const renderAsset = (asset) => {
+    const renderAsset = (asset, ancestors = new Set()) => {
+        const id = String(asset?.id || '').trim();
+        if (id && ancestors.has(id)) return '';
+        const nested = new Set(ancestors);
+        if (id) nested.add(id);
         const metadata = [];
         if (asset.behavior) metadata.push(`<b>Behavior:</b> ${escapeHtml(asset.behavior)}`);
         if (asset.route?.length) {
-            metadata.push(`<b>Route:</b> ${asset.route.map(id => escapeHtml(areaDisplayName(id, revealAll, visibleIds, areasById))).join(' &rarr; ')}`);
+            metadata.push(`<b>Route:</b> ${asset.route.map(routeId => escapeHtml(areaDisplayName(routeId, revealAll, visibleIds, areasById))).join(' &rarr; ')}`);
         }
         if (asset.faction) metadata.push(`<b>Faction:</b> ${escapeHtml(asset.faction)}`);
         if (Number.isInteger(asset.count)) metadata.push(`<b>Count:</b> ${escapeHtml(String(asset.count))}`);
@@ -410,12 +414,18 @@ export function renderDungeonMapReadableHtml(mapDocument, { revealAll = true } =
         if (asset.last_location) {
             metadata.push(`<b>Last location:</b> ${escapeHtml(areaDisplayName(asset.last_location, revealAll, visibleIds, areasById))}`);
         }
-        const children = visibleAssets.filter(candidate => candidate.location === asset.id);
+        const children = id
+            ? visibleAssets.filter((candidate) => {
+                const childId = String(candidate?.id || '').trim();
+                if (!childId || nested.has(childId)) return false;
+                return String(candidate.location || '').trim() === id;
+            })
+            : [];
         return `<div class="rt-dungeon-map-asset">
                     <div class="rt-dungeon-map-asset-head"><i class="fa-solid fa-diamond"></i><strong>${escapeHtml(asset.name)}</strong>${renderTag(asset.kind)}${renderTag(asset.state, 'rt-dungeon-map-state')}${renderTag(asset.knowledge, 'rt-dungeon-map-knowledge')}</div>
                     ${asset.detail ? `<div class="rt-dungeon-map-asset-detail">${escapeHtml(asset.detail)}</div>` : ''}
                     ${metadata.length ? `<div class="rt-dungeon-map-asset-meta">${metadata.join('<span class="rt-dungeon-map-meta-sep">&bull;</span>')}</div>` : ''}
-                    ${children.length ? `<div class="rt-dungeon-map-assets rt-dungeon-map-contained">${children.map(renderAsset).join('')}</div>` : ''}
+                    ${children.length ? `<div class="rt-dungeon-map-assets rt-dungeon-map-contained">${children.map(child => renderAsset(child, nested)).join('')}</div>` : ''}
                 </div>`;
     };
     const renderArea = (area) => {
@@ -436,10 +446,16 @@ export function renderDungeonMapReadableHtml(mapDocument, { revealAll = true } =
                     <div class="rt-dungeon-map-section-label">Geometry &amp; prose</div>
                     ${geometry}
                     ${connections}
-                    ${areaAssets.length ? `<div class="rt-dungeon-map-assets"><span class="rt-dungeon-map-section-label">Assets (${areaAssets.length})</span>${areaAssets.map(renderAsset).join('')}</div>` : ''}
+                    ${areaAssets.length ? `<div class="rt-dungeon-map-assets"><span class="rt-dungeon-map-section-label">Assets (${areaAssets.length})</span>${areaAssets.map(asset => renderAsset(asset)).join('')}</div>` : ''}
                 </section>`;
     };
-    const unplaced = visibleAssets.filter(asset => (!asset.location || (!areasById.has(asset.location) && !assets.some(parent => parent.id === asset.location))));
+    const unplaced = visibleAssets.filter((asset) => {
+        const loc = String(asset.location || '').trim();
+        const id = String(asset.id || '').trim();
+        if (!loc) return true;
+        if (areasById.has(loc)) return false;
+        return !assets.some(parent => String(parent.id || '').trim() === loc && String(parent.id || '').trim() !== id);
+    });
     if (!visibleAreas.length && !unplaced.length) {
         return '<div class="rt-dungeon-map-empty">No revealed rooms yet.</div>';
     }
@@ -448,5 +464,5 @@ export function renderDungeonMapReadableHtml(mapDocument, { revealAll = true } =
                     <span>${renderTag(`${visibleAssets.length} assets`)}</span>
                 </div>
                 <div class="rt-dungeon-map-area-list">${visibleAreas.map(renderArea).join('')}</div>
-                ${unplaced.length ? `<section class="rt-dungeon-map-area rt-dungeon-map-unplaced"><div class="rt-dungeon-map-area-head"><i class="fa-solid fa-box-archive"></i><strong>Removed / unplaced assets</strong></div>${unplaced.map(renderAsset).join('')}</section>` : ''}`;
+                ${unplaced.length ? `<section class="rt-dungeon-map-area rt-dungeon-map-unplaced"><div class="rt-dungeon-map-area-head"><i class="fa-solid fa-box-archive"></i><strong>Removed / unplaced assets</strong></div>${unplaced.map(asset => renderAsset(asset)).join('')}</section>` : ''}`;
 }

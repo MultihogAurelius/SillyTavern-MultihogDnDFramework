@@ -532,4 +532,25 @@ describe('dungeon map graph', () => {
         expect(graph.nodes[0].icons.map(icon => icon.kind)).toEqual(['CREATURE', 'BUILDING', 'LOOT']);
         expect(graph.currentInteriorName).toBe('Residential House');
     });
+
+    it('does not recurse forever when asset containment loops', () => {
+        const map = {
+            version: 3, site: 'Loop Site', kind: 'DUNGEON',
+            areas: [{ id: 'hall', name: 'Hall', knowledge: 'VISITED', geometry: [], connections: [] }],
+            assets: [
+                { kind: 'OBJECT', name: 'Nameless A', location: 'hall', state: 'ACTIVE', knowledge: 'KNOWN', detail: '', origin: 'INITIAL_MAP' },
+                { kind: 'OBJECT', name: 'Nameless B', location: 'hall', state: 'ACTIVE', knowledge: 'KNOWN', detail: '', origin: 'INITIAL_MAP' },
+                { id: 'hall', kind: 'GROUP', name: 'Hall Pack', location: 'hall', state: 'ACTIVE', knowledge: 'KNOWN', detail: '', origin: 'INITIAL_MAP' },
+                { id: 'alpha', kind: 'CREATURE', name: 'Alpha', location: 'hall', state: 'ACTIVE', knowledge: 'KNOWN', detail: '', origin: 'INITIAL_MAP' },
+                { id: 'beta', kind: 'CREATURE', name: 'Beta', location: 'alpha', state: 'ACTIVE', knowledge: 'KNOWN', detail: '', origin: 'INITIAL_MAP' },
+            ],
+        };
+        const html = renderDungeonMapReadableHtml(map, { revealAll: true });
+        expect(html).toContain('Nameless A');
+        expect(html).toContain('Nameless B');
+        expect(html).toContain('Hall Pack');
+        expect(html).toContain('Alpha');
+        expect(html).toContain('Beta');
+        expect(html.indexOf('Beta')).toBeGreaterThan(html.indexOf('Alpha'));
+    });
 });

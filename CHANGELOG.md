@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.51] - 2026-08-25
+
+### Fixed
+- **Map Details stack overflow**: Asset inspector nesting no longer recurses forever when containment loops, duplicate/empty ids, or an asset id matching its room.
+
 ## [2026.8.50] - 2026-08-25
 
 ### Changed
