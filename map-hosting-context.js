@@ -51,7 +51,7 @@ function buildHostCellPrompt(hostDocument, hostArea) {
         const target = areasById.get(connection.to);
         return `${target?.name || connection.to} (${connection.state})${connection.detail ? ` — ${connection.detail}` : ''}`;
     });
-    const assets = (hostDocument.assets || []).filter(asset => asset.location === hostArea.id && asset.state !== 'REMOVED');
+    const assets = (hostDocument.assets || []).filter(asset => asset.location === hostArea.id && asset.state !== 'REMOVED' && asset.state !== 'LEFT');
     return `PARENT MAP CELL (LOCKED CONTEXT)\nParent map: ${hostDocument.site} (${hostDocument.kind})\nTarget cell: ${hostArea.name} [${hostArea.id}]\nCell knowledge: ${hostArea.knowledge}\nGeometry:\n${(hostArea.geometry || []).map(line => `- ${line}`).join('\n') || '- none'}\nParent routes:\n${routes.map(line => `- ${line}`).join('\n') || '- none'}\nExisting parent-cell assets:\n${assets.map(asset => `- ${asset.id}: ${asset.kind} "${asset.name}" (${asset.state}, ${asset.knowledge})${asset.detail ? ` — ${asset.detail}` : ''}`).join('\n') || '- none'}\nThe target cell remains on the parent map and receives the child gateway. The child map begins at its requested entrance. Do not duplicate parent-cell occupants or props inside the child unless the map-generation prompt or recent story explicitly establishes that they crossed the gateway.`;
 }
 
@@ -97,7 +97,7 @@ export function resolveHostedCreationContext(current, currentLocation, args) {
         throw attachmentFailure(`"${active.siteRoot}" is already map level ${chain.length}. Nested maps are limited to ${MAX_HOSTED_MAP_DEPTH} mapped levels.`);
     }
     const exactAssetMatches = (hostDocument.assets || []).filter(asset =>
-        asset.state !== 'REMOVED' && dungeonLabelIdentitiesMatch(asset.name, args.site));
+        asset.state !== 'REMOVED' && asset.state !== 'LEFT' && dungeonLabelIdentitiesMatch(asset.name, args.site));
     if (exactAssetMatches.length > 1) {
         throw attachmentFailure(`Parent map "${active.siteRoot}" contains more than one active asset named "${args.site}".`);
     }

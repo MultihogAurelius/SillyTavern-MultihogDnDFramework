@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.54] - 2026-08-26
+
+### Changed
+- **Map Evolution departures**: Living occupants who leave a site now use `LEFT` (`LEAVING` is accepted and stored as `LEFT`) instead of `FLEEING` or `REMOVE_ASSET`. The record stays so cause, actor, detail, and threads survive; they no longer occupy the room. `FLEEING` is panic still on the map. `REMOVE_ASSET` remains for clutter or identities that should be forgotten. Untouched shipped Evolution/Updater prompts migrate.
+
 ## [2026.8.53] - 2026-08-25
 
 ### Changed

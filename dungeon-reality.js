@@ -56,7 +56,7 @@ const ASSET_KIND_ALIASES = {
     INTERIOR: 'BUILDING',
 };
 const ASSET_STATES = [
-    'ACTIVE', 'ALERT', 'IDLE', 'DORMANT', 'FLEEING', 'CAPTURED',
+    'ACTIVE', 'ALERT', 'IDLE', 'DORMANT', 'FLEEING', 'LEFT', 'CAPTURED',
     'DEAD', 'DESTROYED', 'DISABLED', 'DEACTIVATED', 'ARMED', 'TRIGGERED',
     'LOCKED', 'UNLOCKED', 'OPEN', 'CLOSED', 'BLOCKED', 'CLEARED',
     'INTACT', 'DAMAGED', 'TAKEN', 'AVAILABLE', 'EXHAUSTED', 'EXPIRED',
@@ -66,7 +66,10 @@ const ASSET_STATE_ALIASES = {
     DISARMED: 'DEACTIVATED',
     INACTIVE: 'DEACTIVATED',
     PACIFIED: 'DEACTIVATED',
+    LEAVING: 'LEFT',
 };
+/** Still on the map as identity/history, but not occupying a room. */
+const OFF_OCCUPANCY_STATES = ['LEFT', 'REMOVED'];
 const CONNECTION_STATES = ['OPEN', 'CLOSED', 'LOCKED', 'BLOCKED', 'DESTROYED', 'UNKNOWN'];
 const MAP_EVIDENCE = ['CONFIRMED', 'IMPLIED', 'AUTONOMOUS', 'EVOLVED'];
 const MAP_OPERATIONS = ['ADD_AREA', 'SET_AREA', 'ADD_ASSET', 'MOVE_ASSET', 'SET_ASSET', 'REMOVE_ASSET', 'SET_CONNECTION'];
@@ -103,6 +106,11 @@ export function coerceAssetState(value) {
 
 export function isPlayCanonLockedState(state) {
     return PLAY_CANON_LOCKED_STATES.includes(coerceAssetState(state));
+}
+
+/** True when the record should not count as current room occupancy. LEFT keeps cause/actor. */
+export function assetOccupiesMap(asset) {
+    return !OFF_OCCUPANCY_STATES.includes(coerceAssetState(asset?.state));
 }
 
 function normalizeThreadStatus(value) {
@@ -804,7 +812,7 @@ export function validateDungeonMapArchitecture(raw, { site = '', entrance = '', 
         }
         const assetState = coerceAssetState(asset.state);
         if (!ASSET_STATES.includes(assetState)) errors.push(architectureError('INVALID_ASSET_STATE', `${path}.state`, asset.state, `Use one of: ${ASSET_STATES.join(', ')}.`));
-        const noneSafeThreatStates = ['DORMANT', 'DESTROYED', 'DISABLED', 'DEACTIVATED', 'CLEARED', 'EXPIRED', 'DISMISSED', 'REMOVED'];
+        const noneSafeThreatStates = ['DORMANT', 'DESTROYED', 'DISABLED', 'DEACTIVATED', 'CLEARED', 'EXPIRED', 'DISMISSED', 'REMOVED', 'LEFT'];
         if (effectiveThreat === 'NONE' && ['TRAP', 'HAZARD', 'ALARM'].includes(asset.kind) && !noneSafeThreatStates.includes(assetState)) {
             errors.push(architectureError('NONE_THREAT_ACTIVE_DANGER', path, asset, 'Threat NONE cannot contain an active trap, hazard, or alarm. Remove it, use a safely inactive state, or request LOW or higher when real danger exists.'));
         }
@@ -1047,7 +1055,7 @@ export function formatDungeonMapForNarrator(documentOrContent, siteFallback = ''
     const assetsByArea = new Map(document.areas.map(area => [area.id, []]));
     const unplacedAssets = [];
     for (const asset of document.assets) {
-        const bucket = asset.location ? assetsByArea.get(asset.location) : null;
+        const bucket = assetOccupiesMap(asset) && asset.location ? assetsByArea.get(asset.location) : null;
         if (bucket) bucket.push(asset);
         else unplacedAssets.push(asset);
     }
@@ -1080,7 +1088,7 @@ export function formatDungeonMapForNarrator(documentOrContent, siteFallback = ''
     }
     const unplacedRoots = unplacedAssets.filter(asset => !isContainedByOtherAsset(document.assets, asset));
     if (unplacedRoots.length) {
-        lines.push('', 'Removed / unplaced assets:');
+        lines.push('', 'Removed / departed / unplaced assets:');
         for (const asset of unplacedRoots) {
             lines.push(...formatMapAssetTree(document, asset, areasById));
         }
@@ -1152,7 +1160,7 @@ export function formatDungeonMapForPlayer(documentOrContent, currentLocation = '
         }
         for (const fact of area.geometry) lines.push(`- ${fact}`);
         const assets = document.assets.filter(asset =>
-            asset.location === area.id && isPlayerVisibleAsset(asset));
+            asset.location === area.id && assetOccupiesMap(asset) && isPlayerVisibleAsset(asset));
         if (assets.length) {
             lines.push('Known occupants / objects:');
             for (const asset of assets) lines.push(...formatMapAssetTree(document, asset, areasById, { visible: isPlayerVisibleAsset }));
@@ -1498,7 +1506,7 @@ export function resolveBuildingIntentPopulationTarget(document, currentLocation 
     const siteTokens = new Set(normalizeDungeonLabel(map.site).split(' ').filter(Boolean));
     const pending = map.assets.filter(asset =>
         asset.kind === 'BUILDING'
-        && asset.state !== 'REMOVED'
+        && assetOccupiesMap(asset)
         && asset.notEntered !== false
         && resolveAssetEffectiveArea(map, asset));
     const scored = pending.map((building) => {
@@ -2158,7 +2166,7 @@ export function applyDungeonMapTransaction(document, transaction, options = {}) 
                 continue;
             }
             if (op === 'MOVE_ASSET') {
-                if (['DEAD', 'DESTROYED', 'REMOVED', 'EXPIRED', 'DISMISSED'].includes(asset.state)) {
+                if (['DEAD', 'DESTROYED', 'REMOVED', 'EXPIRED', 'DISMISSED', 'LEFT'].includes(asset.state)) {
                     errors.push(mapError('ASSET_CANNOT_MOVE', `${path}.asset_id`, asset.id, `Asset state is ${asset.state}; change its state only if the narrative explicitly re-establishes mobility.`));
                     continue;
                 }
@@ -2227,6 +2235,7 @@ export function applyDungeonMapTransaction(document, transaction, options = {}) 
                         errors.push(mapError('PLAY_CANON_LOCKED', `${path}.state`, state, `Asset state is ${asset.state}. Map Evolution cannot revive play-established outcomes; add a new distinct entity instead.`));
                         continue;
                     }
+                    if (state === 'LEFT' && asset.location) asset.last_location = asset.location;
                     asset.state = state;
                 }
             }
@@ -2529,7 +2538,7 @@ export function formatDungeonMapForEvolution(document, currentLocation = '') {
 
 function formatLivingOccupantsForEvolution(document) {
     const map = normalizeDungeonMapDocument(document, document?.site);
-    const inert = new Set([...PLAY_CANON_LOCKED_STATES, 'CAPTURED']);
+    const inert = new Set([...PLAY_CANON_LOCKED_STATES, 'CAPTURED', 'LEFT']);
     const living = (map.assets || []).filter(asset =>
         (asset.kind === 'CREATURE' || asset.kind === 'GROUP') && !inert.has(asset.state),
     );

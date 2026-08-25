@@ -271,7 +271,7 @@ Departed mapped site: ${loaded.context.siteRoot}
 Previous footer location: ${previousLocation || loaded.context.siteRoot}
 Current footer location: ${loaded.currentLocation || 'Unknown'}
 
-The latest story moved the player away from this mapped site. Review its CREATURE assets for characters whom RECENT STORY establishes also left the site, including an NPC who departed alongside the player or joined [PARTY], and REMOVE_ASSET those exact records. Do not speculate and do not purge residents merely because the player left. Do not add or move assets on the destination map; this pass owns only cleanup of the departed site.`;
+The latest story moved the player away from this mapped site. Review its CREATURE assets for characters whom RECENT STORY establishes also left the site. If they joined [PARTY], REMOVE_ASSET those exact records. If they departed without joining [PARTY], SET_ASSET state LEFT with cause and destination in detail — keep the record so later Evolution can continue that thread. Do not speculate and do not purge residents merely because the player left. Do not add or move assets on the destination map; this pass owns only cleanup of the departed site.`;
     }
     if (inspectorPass) {
         const footer = loaded.currentLocation || 'Unknown';

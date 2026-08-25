@@ -17,6 +17,7 @@ OPERATIONS
 - When the instruction creates or materially changes an asset, include a concise detail string. SET_ASSET detail when the instruction revises substantive facts about an existing asset.
 - Existing people are CREATURE; unnamed bands are GROUP. Never add the player or a supplied [PARTY] member as an asset.
 - DEAD or DESTROYED requires actor. Respect the PLAYER BUBBLE freeze when the party is on-site.
+- A living departure from this site is SET_ASSET state LEFT (keep cause/detail). Do not REMOVE_ASSET a departure unless the instruction explicitly asks to purge that identity.
 - Operations apply in array order. Do not change anything the instruction did not ask to change.
 
 EXAMPLES

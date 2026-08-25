@@ -354,6 +354,16 @@ describe('dungeon map graph', () => {
         expect(mapAssetIconToken({ kind: 'CREATURE', state: 'DEAD' })).toBe('CREATURE_DEAD');
     });
 
+    it('does not place LEFT or FLEEING-vs-LEFT occupancy icons for departed records', () => {
+        const assets = [
+            { id: 'odran', kind: 'CREATURE', name: 'Odran', location: 'ossuary', state: 'LEFT', knowledge: 'KNOWN' },
+            { id: 'runner', kind: 'CREATURE', name: 'Runner', location: 'ossuary', state: 'FLEEING', knowledge: 'KNOWN' },
+        ];
+        const icons = collectAreaAssetIcons(assets, 'ossuary', { playerFacing: true });
+        expect(icons.map(icon => icon.name)).toEqual(['Runner']);
+        expect(icons.map(icon => icon.state)).toEqual(['FLEEING']);
+    });
+
     it('renders known asset icons under room labels and hides unrevealed ones', () => {
         const map = {
             version: 3,

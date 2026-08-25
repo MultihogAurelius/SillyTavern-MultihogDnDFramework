@@ -304,9 +304,11 @@ describe('Map Updater', () => {
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('short footer names still match longer BUILDING assets');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('external combat tracker (not shown to you.)');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('gateways may exist on SETTLEMENT, DUNGEON, or INTERIOR maps');
-        expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('REMOVE vs DESTROYED (both valid');
+        expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('REMOVE vs DESTROYED vs LEFT (choose by lasting occupancy and identity)');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('Default for kills and destroyed things');
-        expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('REMOVE_ASSET is additional, not a substitute for DESTROYED');
+        expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('REMOVE_ASSET is additional, not a substitute for DESTROYED or LEFT');
+        expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('SET_ASSET state LEFT when a living CREATURE/GROUP departed');
+        expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).not.toContain('NPC left the site permanently');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('"op":"REMOVE_ASSET"');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('"area_id":"shrine-quarter"');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('Never write {"type":"ADD_ASSET","asset":{...}}');
@@ -338,6 +340,7 @@ describe('Map Updater', () => {
         expect(updater).toContain('shouldForceBuildingPopulationPass');
         expect(updater).toContain('PARTY_MEMBER_NOT_AN_ASSET');
         expect(updater).toContain('SITE EXIT CLEANUP (MANDATORY REVIEW)');
+        expect(updater).toContain('SET_ASSET state LEFT with cause');
         expect(updater).toContain("trigger === 'site_exit'");
         expect(updater).toContain('deferWatermark');
         expect(updater).toContain('mapRuntimeConnectionSource');
@@ -355,7 +358,7 @@ describe('Map Updater', () => {
         expect(updater).toContain('directPass || inspectorPass');
         expect(updater).toContain('DIRECT INSTRUCTION (AUTHORITATIVE SCOPE)');
         expect(updater).toContain('Do not derive extra maintenance work from it');
-        expect(updater).toContain("directPass\n                ? []");
+        expect(updater).toMatch(/directPass\s*\?\s*\[\]/);
         expect(updater).toContain('formatLocationSection(loaded, { inspectorPass, exitPass, previousLocation })');
         expect(updater).toContain('export async function onMapUpdaterUserMessage(messageId)');
         expect(updater).toContain('resolveBuildingIntentPopulationTarget');

@@ -292,7 +292,7 @@ export async function openMapEvolutionTestingGround({ siteRoot = '' } = {}) {
                 <summary>Kill / change entity</summary>
                 <div class="rt-map-evo-debug-form-grid">
                     <select data-debug="set-asset">${optionList(assets)}</select>
-                    <select data-debug="set-state">${optionList(['DESTROYED', 'DEAD', 'DEACTIVATED', 'DAMAGED', 'FLEEING', 'ACTIVE', 'ALERT'], 'DESTROYED')}</select>
+                    <select data-debug="set-state">${optionList(['DESTROYED', 'DEAD', 'DEACTIVATED', 'DAMAGED', 'FLEEING', 'LEFT', 'ACTIVE', 'ALERT'], 'DESTROYED')}</select>
                     <input type="number" data-debug="set-count" class="text_pole" min="1" max="99" placeholder="Count (attrition)">
                     <input type="text" data-debug="set-actor" class="text_pole" placeholder='Actor: party, asset id, or "salt-road-delvers"'>
                     <input type="text" data-debug="set-cause" class="text_pole" placeholder="Cause, e.g. Killed by the party">

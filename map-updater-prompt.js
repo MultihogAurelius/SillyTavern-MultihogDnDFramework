@@ -16,7 +16,7 @@ OUTPUT CONTRACT
 - chronicles are optional. Omit them for hidden/off-screen changes.
 
 DURABLE vs TRANSIENT
-Durable map facts: remaining occupancy via asset.count, DESTROYED/DEAD/FLED/CAPTURED/TAKEN, MOVE_ASSET between areas, sprung/disarmed traps, opened/blocked routes, lasting damage/cleansing, newly entered interiors, newly established occupants, and newly observed landmarks (existing UNREVEALED/SUSPECTED assets the narration clearly identifies become KNOWN).
+Durable map facts: remaining occupancy via asset.count, DESTROYED/DEAD/FLEEING/LEFT/CAPTURED/TAKEN, MOVE_ASSET between areas, sprung/disarmed traps, opened/blocked routes, lasting damage/cleansing, newly entered interiors, newly established occupants, and newly observed landmarks (existing UNREVEALED/SUSPECTED assets the narration clearly identifies become KNOWN).
 Never write transient combat into asset.detail or chronicles: current targeting, advancing toward someone, mid-round poses, HP, or temporary conditions (frightened, held, prone). Those belong to the external combat tracker (not shown to you.) If only poses/status changed this round, output {"noop":true}.
 asset.detail is a lasting occupancy note, never a play-by-play. Remaining member numbers belong in count, not only in prose.
 
@@ -33,9 +33,10 @@ OPERATIONS
 - Existing but newly encountered entity: SET_ASSET or MOVE_ASSET, not ADD_ASSET.
 - Genuinely new narrator-established entity: ADD_ASSET. The extension generates its ID. People are CREATURE or GROUP, never kind NPC.
 
-REMOVE vs DESTROYED (both valid — choose by lasting occupancy)
+REMOVE vs DESTROYED vs LEFT (choose by lasting occupancy and identity)
 - Default for kills and destroyed things: SET_ASSET state DESTROYED or DEAD when remains, wreckage, or killed occupancy still mark the room. Smoldering corpses, broken traps with parts left, slain enemies on the floor — keep them on the map as DESTROYED with actor and a lasting detail. This is the normal outcome of combat kills and destruction.
-- REMOVE_ASSET is additional, not a substitute for DESTROYED. Delete the record only when narration establishes nothing map-worthy remains: body disintegrated or was hauled away and gone, mistaken/retracted asset, NPC left the site permanently, summon dismissed into nothing. If the party killed something and the prose does not say the remains vanished or were cleared, use DESTROYED — not REMOVE_ASSET.
+- SET_ASSET state LEFT when a living CREATURE/GROUP departed this site (a visit that ended, going home, moving on). Keep the record so cause, actor, detail, and threads survive. Name the destination in detail. FLEEING is panic still on this map. Do not REMOVE_ASSET a departure.
+- REMOVE_ASSET is additional, not a substitute for DESTROYED or LEFT. Delete the record only when narration establishes nothing map-worthy remains: body disintegrated or was hauled away and gone, mistaken/retracted asset, summon dismissed into nothing. If the party killed something and the prose does not say the remains vanished or were cleared, use DESTROYED — not REMOVE_ASSET.
 - REMOVE_ASSET on an existing DESTROYED corpse is valid when narration later clears those remains from the room.
 - SET_ASSET state TAKEN when portable loot left with the party but identity should still be tracked. REMOVE_ASSET when it should disappear from the map entirely.
 
@@ -86,9 +87,12 @@ Settlement building + contained occupant on first entry (flat fields, op not typ
 Existing occupancy change (remains stay in room):
 {"operation_id":"day1-1602-ghoul-destroyed","operations":[{"op":"SET_ASSET","evidence":"CONFIRMED","asset_id":"crypt-ghoul","state":"DESTROYED","knowledge":"KNOWN","detail":"Smoldering remains on the landing.","cause":"Killed by the party on the cellar landing.","actor":"party"}],"chronicles":[{"area_id":"cellar-landing","text":"The crypt ghoul was destroyed."}]}
 
-Remove from map entirely (no lasting occupancy, mistake, or left the site):
+Remove from map entirely (no lasting occupancy, or correcting a mistake — not a living departure):
 {"operation_id":"day2-1210-clutter-removed","operations":[{"op":"REMOVE_ASSET","evidence":"CONFIRMED","asset_id":"diner-tipped-chair","cause":"Mistaken ambient clutter; not a map-worthy asset."}]}
 {"operation_id":"day1-1705-ghoul-removed","operations":[{"op":"REMOVE_ASSET","evidence":"CONFIRMED","asset_id":"crypt-ghoul","cause":"The party scattered the remains; nothing remains on the landing.","actor":"party"}],"chronicles":[{"area_id":"cellar-landing","text":"The ghoul remains were cleared from the landing."}]}
+
+Living departure from the site (keep the record; do not REMOVE_ASSET):
+{"operation_id":"day2-1400-odran-left","operations":[{"op":"SET_ASSET","evidence":"CONFIRMED","asset_id":"odran","state":"LEFT","knowledge":"KNOWN","detail":"Returned to the Hall of the Ember-Ancestors.","cause":"Finished checking the chapel and left the site.","actor":"odran"}]}
 
 Pack encounter (one GROUP with count, not many singleton CREATUREs):
 {"operation_id":"day1-1540-watch-patrol","operations":[{"op":"ADD_ASSET","evidence":"CONFIRMED","name":"Night Watch Patrol","kind":"GROUP","location":"plank-market","state":"ACTIVE","knowledge":"KNOWN","count":5,"detail":"Five lantern-bearing watchmen walking the market boards.","cause":"The party encountered this patrol in the market."}]}
@@ -104,4 +108,4 @@ Elapsed asset boundary (clear duration after applying it):
 
 Never write {"type":"ADD_ASSET","asset":{...}} or chronicles[{"area":"..."}].
 
-Before answering, silently verify: valid JSON; exact existing IDs unless ADD_*; new contents use ADD_ASSET not SET_ASSET; durable facts only; no ambient clutter assets; every operation has cause; kills default to DESTROYED/DEAD when remains stay (with actor); REMOVE_ASSET only when purging with no lasting occupancy or correcting a mistake; packs are one GROUP with count; ordinary settlement structures are BUILDING and props are OBJECT; exterior-relative footer phrases (behind/outside/near/…) never become new BUILDING assets; short footer names still match longer BUILDING assets when the party is clearly inside; clearly observed UNREVEALED landmarks become KNOWN without clearing notEntered; no inferred promotion; no player or [PARTY] names as assets; every existing CREATURE matching [PARTY] was removed; every met/passed absolute duration was applied once and cleared; future, unknown, or legacy relative durations were not guessed; noop when nothing lasting changed.`;
+Before answering, silently verify: valid JSON; exact existing IDs unless ADD_*; new contents use ADD_ASSET not SET_ASSET; durable facts only; no ambient clutter assets; every operation has cause; kills default to DESTROYED/DEAD when remains stay (with actor); living departures use LEFT not REMOVE_ASSET; REMOVE_ASSET only when purging with no lasting occupancy or correcting a mistake; packs are one GROUP with count; ordinary settlement structures are BUILDING and props are OBJECT; exterior-relative footer phrases (behind/outside/near/…) never become new BUILDING assets; short footer names still match longer BUILDING assets when the party is clearly inside; clearly observed UNREVEALED landmarks become KNOWN without clearing notEntered; no inferred promotion; no player or [PARTY] names as assets; every existing CREATURE matching [PARTY] was removed; every met/passed absolute duration was applied once and cleared; future, unknown, or legacy relative durations were not guessed; noop when nothing lasting changed.`;

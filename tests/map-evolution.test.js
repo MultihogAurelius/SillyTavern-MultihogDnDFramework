@@ -118,6 +118,10 @@ describe('Map Evolution', () => {
         expect(DEFAULT_MAP_EVOLUTION_SYSTEM_PROMPT).toContain('TIME MECHANICS');
         expect(DEFAULT_MAP_EVOLUTION_SYSTEM_PROMPT).toContain('set duration to ""');
         expect(DEFAULT_MAP_EVOLUTION_SYSTEM_PROMPT).toContain('leave it for Map Updater');
+        expect(DEFAULT_MAP_EVOLUTION_SYSTEM_PROMPT).toContain('SET_ASSET state LEFT');
+        expect(DEFAULT_MAP_EVOLUTION_SYSTEM_PROMPT).toContain('Never REMOVE_ASSET a departure');
+        expect(DEFAULT_MAP_EVOLUTION_SYSTEM_PROMPT).toContain('evo-day2-1500-odran-left');
+        expect(DEFAULT_MAP_EVOLUTION_SYSTEM_PROMPT).not.toContain('Leaving this site: SET_ASSET state FLEEING or REMOVE_ASSET');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('Every operation MUST include cause');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('ONE GROUP with count');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('"count":5');
@@ -130,14 +134,17 @@ describe('Map Evolution', () => {
     it('summarizes a sequential digest without dumping operations JSON', () => {
         const line = summarizeEvolutionDigest('Forgotten Tomb', {
             operations: [
-                { op: 'SET_ASSET', asset_id: 'odran', state: 'FLEEING', cause: 'Fled after the ossuary pack was destroyed.', actor: 'party' },
-                { op: 'REMOVE_ASSET', asset_id: 'odran', cause: 'Left for the Hall of the Ember-Ancestors.' },
+                { op: 'SET_ASSET', asset_id: 'odran', state: 'LEFT', cause: 'Came to inspect the ossuary, then left.', actor: 'odran' },
+                { op: 'SET_ASSET', asset_id: 'ash-wight', state: 'FLEEING', cause: 'Fled after the ossuary pack was destroyed.', actor: 'party' },
+                { op: 'REMOVE_ASSET', asset_id: 'clutter-chair', cause: 'Mistaken ambient clutter.' },
             ],
         });
         expect(line).not.toContain('Forgotten Tomb:');
-        expect(line).toContain('odran FLEEING');
+        expect(line).toContain('odran LEFT');
+        expect(line).toContain('by odran');
+        expect(line).toContain('ash-wight FLEEING');
         expect(line).toContain('by party');
-        expect(line).toContain('odran removed from map');
+        expect(line).toContain('clutter-chair removed from map');
         expect(line).not.toContain('"op"');
 
         const many = summarizeEvolutionDigest('Hall', {

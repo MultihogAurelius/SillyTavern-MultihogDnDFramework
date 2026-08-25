@@ -160,6 +160,23 @@ describe('getSettings fresh install', () => {
         expect(customized.mapEvolutionOnSiteIntervalMinutes).toBe(0);
     });
 
+    it('migrates shipped Map Evolution leave guidance without deleting customized cadences', () => {
+        for (const key of Object.keys(testExtensionSettings)) delete testExtensionSettings[key];
+        testExtensionSettings.rpg_tracker = {
+            settingsVersion: '2026.8.49.1',
+            mapEvolutionSystemPrompt: 'Keep this wrapper.\n- Leaving this site: SET_ASSET state FLEEING or REMOVE_ASSET, with detail naming the destination in prose. You cannot MOVE_ASSET to another map.\nEnd.',
+            mapUpdaterSystemPrompt: 'REMOVE vs DESTROYED (both valid — choose by lasting occupancy)\n- Default.\n- REMOVE_ASSET is additional, not a substitute for DESTROYED. Delete the record only when narration establishes nothing map-worthy remains: body disintegrated or was hauled away and gone, mistaken/retracted asset, NPC left the site permanently, summon dismissed into nothing.',
+        };
+        const migrated = getSettings();
+        expect(migrated.mapEvolutionSystemPrompt).toContain('SET_ASSET state LEFT');
+        expect(migrated.mapEvolutionSystemPrompt).toContain('Never REMOVE_ASSET a departure');
+        expect(migrated.mapEvolutionSystemPrompt).not.toContain('Leaving this site: SET_ASSET state FLEEING or REMOVE_ASSET');
+        expect(migrated.mapEvolutionSystemPrompt).toContain('Keep this wrapper.');
+        expect(migrated.mapUpdaterSystemPrompt).toContain('SET_ASSET state LEFT when a living CREATURE/GROUP departed');
+        expect(migrated.mapUpdaterSystemPrompt).not.toContain('NPC left the site permanently');
+        expect(migrated.settingsVersion).toBe(FACTORY_SETTINGS_VERSION);
+    });
+
     it('includes implicit spell-slot and resource accounting in the State Tracker core prompt', () => {
         for (const key of Object.keys(testExtensionSettings)) {
             delete testExtensionSettings[key];

@@ -34,7 +34,7 @@ const ASSET_SCHEMA = Object.freeze({
         state: {
             type: 'string',
             enum: [
-                'ACTIVE', 'ALERT', 'IDLE', 'DORMANT', 'FLEEING', 'CAPTURED',
+                'ACTIVE', 'ALERT', 'IDLE', 'DORMANT', 'FLEEING', 'LEFT', 'LEAVING', 'CAPTURED',
                 'DEAD', 'DESTROYED', 'DISABLED', 'DEACTIVATED', 'DISARMED', 'ARMED', 'TRIGGERED',
                 'LOCKED', 'UNLOCKED', 'OPEN', 'CLOSED', 'BLOCKED', 'CLEARED',
                 'INTACT', 'DAMAGED', 'TAKEN', 'AVAILABLE', 'EXHAUSTED', 'EXPIRED',

@@ -1042,6 +1042,43 @@ function getSettingsInternal(extensionSettings) {
         s.settingsVersion = '2026.8.49.1';
     }
 
+    // 2026.8.54: departed living identities use LEFT so cause/actor/threads survive.
+    // Surgical replace of the old FLEEING-or-REMOVE leave guidance; custom prompts
+    // that never contained those sentences are left alone.
+    if (isOlderThan(s.settingsVersion, '2026.8.54')) {
+        const oldEvoLeave = '- Leaving this site: SET_ASSET state FLEEING or REMOVE_ASSET, with detail naming the destination in prose. You cannot MOVE_ASSET to another map.';
+        const newEvoLeave = [
+            '- Departing this site: SET_ASSET state LEFT (LEAVING is accepted and stored as LEFT). Keep the record so cause, actor, detail, and threads survive. Name the destination in detail. FLEEING is panic still on this map. Once they have actually left, use LEFT — not FLEEING, and not REMOVE_ASSET. You cannot MOVE_ASSET to another map.',
+            '- A later return to THIS site: SET_ASSET the existing LEFT record back to ACTIVE. Arriving from another site as someone this map has never recorded (see PRIOR EVOLUTION digest): ADD_ASSET here.',
+            '- REMOVE_ASSET deletes the record and its causal history. Use it only for mistaken clutter or when nothing of that identity should be remembered. Never REMOVE_ASSET a departure, visit, or flight that later ticks should continue.',
+        ].join('\n');
+        if (typeof s.mapEvolutionSystemPrompt === 'string' && s.mapEvolutionSystemPrompt.includes(oldEvoLeave)) {
+            s.mapEvolutionSystemPrompt = s.mapEvolutionSystemPrompt.replace(oldEvoLeave, newEvoLeave);
+        }
+        const oldEvoExample = 'Realize a reported departure:\n{"operation_id":"evo-day2-0800-odran-fled","operations":[{"op":"SET_ASSET","evidence":"EVOLVED","asset_id":"odran","state":"FLEEING","knowledge":"KNOWN","detail":"Departed for the Hall of the Ember-Ancestors.","cause":"Fled after the ossuary pack was destroyed by the party.","actor":"party"}]}';
+        const newEvoExample = [
+            'Calm departure / finished visit (keep the record; do not REMOVE_ASSET):',
+            '{"operation_id":"evo-day2-1500-odran-left","operations":[{"op":"SET_ASSET","evidence":"EVOLVED","asset_id":"odran","state":"LEFT","knowledge":"KNOWN","detail":"Returned to the Hall of the Ember-Ancestors after checking the ossuary.","cause":"Came to inspect the emptied ossuary, then left for home.","actor":"odran","thread_status":"resolved"}]}',
+            '',
+            'Panic still on this map (running/hiding; they have not left the site yet):',
+            '{"operation_id":"evo-day2-0800-odran-fled","operations":[{"op":"SET_ASSET","evidence":"EVOLVED","asset_id":"odran","state":"FLEEING","knowledge":"KNOWN","detail":"Bolting toward the ossuary threshold.","cause":"Fled after the ossuary pack was destroyed by the party.","actor":"party"}]}',
+        ].join('\n');
+        if (typeof s.mapEvolutionSystemPrompt === 'string' && s.mapEvolutionSystemPrompt.includes(oldEvoExample)) {
+            s.mapEvolutionSystemPrompt = s.mapEvolutionSystemPrompt.replace(oldEvoExample, newEvoExample);
+        }
+        if (typeof s.mapUpdaterSystemPrompt === 'string' && s.mapUpdaterSystemPrompt.includes('NPC left the site permanently')) {
+            s.mapUpdaterSystemPrompt = s.mapUpdaterSystemPrompt
+                .replace('REMOVE vs DESTROYED (both valid — choose by lasting occupancy)', 'REMOVE vs DESTROYED vs LEFT (choose by lasting occupancy and identity)')
+                .replace('DESTROYED/DEAD/FLED/CAPTURED/TAKEN', 'DESTROYED/DEAD/FLEEING/LEFT/CAPTURED/TAKEN')
+                .replace('mistaken/retracted asset, NPC left the site permanently, summon dismissed into nothing', 'mistaken/retracted asset, summon dismissed into nothing')
+                .replace(
+                    '- REMOVE_ASSET is additional, not a substitute for DESTROYED.',
+                    '- SET_ASSET state LEFT when a living CREATURE/GROUP departed this site (a visit that ended, going home, moving on). Keep the record so cause, actor, detail, and threads survive. Name the destination in detail. FLEEING is panic still on this map. Do not REMOVE_ASSET a departure.\n- REMOVE_ASSET is additional, not a substitute for DESTROYED or LEFT.',
+                );
+        }
+        s.settingsVersion = '2026.8.54';
+    }
+
     // Stamp factory version even when a release has no field rewrites
     // (8.28.0 mapped-site index is prompt/injection only).
     if (isOlderThan(s.settingsVersion, FACTORY_SETTINGS_VERSION)) {

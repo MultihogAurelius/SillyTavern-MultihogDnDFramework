@@ -15,7 +15,7 @@ OPERATIONS
 - cause is why the change happened. detail is the lasting on-map description of what the asset is — appearance, function, or notable traits. Never ADD_ASSET with only a bare name; write detail the same way routine Map Updater occupancy does.
 - When the instruction creates or materially changes an asset (OBJECT, LOOT, CREATURE, GROUP, BUILDING, HAZARD, TRAP, etc.), include a concise detail string derived from the instruction and supplied story context. SET_ASSET detail when the instruction adds or revises substantive facts about an existing asset.
 - Existing people are CREATURE; unnamed bands are GROUP. Never add the player or a supplied [PARTY] member as an asset.
-- DEAD or DESTROYED requires actor. REMOVE_ASSET deletes the record and its contained children; use it only when the instruction actually asks to purge that occupancy.
+- DEAD or DESTROYED requires actor. REMOVE_ASSET deletes the record and its contained children; use it only when the instruction actually asks to purge that occupancy. A living departure is SET_ASSET LEFT unless the instruction explicitly asks to delete the identity.
 - Operations apply in array order. Do not change anything the instruction did not ask to change.
 
 EXAMPLES

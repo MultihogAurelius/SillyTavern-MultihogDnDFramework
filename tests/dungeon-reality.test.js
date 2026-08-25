@@ -37,6 +37,7 @@ import {
     serializeDungeonMapDocument,
     coerceAssetState,
     isPlayCanonLockedState,
+    assetOccupiesMap,
     parseDungeonDeltaBlock,
     reconcileDungeonMapAreaKnowledge,
     reconcileAssetAreaKnowledge,
@@ -1269,6 +1270,7 @@ Area: Ossuary Behind Rotten Tapestry
                 { id: 'flood-passage-vermin', kind: 'GROUP', name: 'Giant Marsh Rats', location: 'ossuary', state: 'ACTIVE', knowledge: 'UNREVEALED', count: 4, origin: 'INITIAL_MAP' },
                 { id: 'upper-crypt-skeletal-guardians', kind: 'GROUP', name: 'Skeletal Crypt Guardians', location: 'gallery', state: 'ACTIVE', knowledge: 'UNREVEALED', count: 8, origin: 'INITIAL_MAP' },
                 { id: 'crypt-ghoul', kind: 'CREATURE', name: 'Crypt Ghoul', location: 'ossuary', state: 'DESTROYED', knowledge: 'KNOWN', origin: 'INITIAL_MAP' },
+                { id: 'odran', kind: 'CREATURE', name: 'Odran', location: 'ossuary', state: 'LEFT', knowledge: 'KNOWN', detail: 'Returned home.', origin: 'MAP_EVOLUTION', cause: 'Finished checking the ossuary.' },
                 { id: 'bandit-hideout-supplies', kind: 'OBJECT', name: 'Bandit Hideout Supplies', location: 'ossuary', state: 'ACTIVE', knowledge: 'UNREVEALED', origin: 'MAP_EVOLUTION' },
             ],
         });
@@ -1281,6 +1283,7 @@ Area: Ossuary Behind Rotten Tapestry
         expect(snapshot).toContain('flood-passage-vermin | GROUP | Giant Marsh Rats | loc=ossuary | ACTIVE | count=4 | same-room=outer-bandit-crew');
         expect(snapshot).toContain('upper-crypt-skeletal-guardians | GROUP | Skeletal Crypt Guardians | loc=gallery | ACTIVE | count=8');
         expect(snapshot).not.toMatch(/## LIVING OCCUPANTS[\s\S]*crypt-ghoul/);
+        expect(snapshot).not.toMatch(/## LIVING OCCUPANTS[\s\S]*odran/);
         expect(snapshot).not.toMatch(/## LIVING OCCUPANTS[\s\S]*bandit-hideout-supplies/);
         expect(snapshot).not.toContain('same-room=upper-crypt-skeletal-guardians');
     });
@@ -2171,6 +2174,63 @@ The last guard falls and a loose stone reveals a niche.
         expect(removed.ok).toBe(true);
         expect(removed.document.assets).toHaveLength(0);
         expect(formatDungeonMapForNarrator(removed.document)).not.toContain('Tipped Chair');
+    });
+
+    it('SET_ASSET LEFT keeps the departed record and cause instead of deleting identity', () => {
+        const map = normalizeDungeonMapDocument({
+            version: 3, site: 'Abbey Undercroft', kind: 'DUNGEON',
+            areas: [
+                { id: 'ossuary', name: 'Ossuary', knowledge: 'VISITED', geometry: [], connections: [{ to: 'nave', state: 'OPEN', detail: '' }] },
+                { id: 'nave', name: 'Nave', knowledge: 'VISITED', geometry: [], connections: [{ to: 'ossuary', state: 'OPEN', detail: '' }] },
+            ],
+            assets: [
+                { id: 'odran', kind: 'CREATURE', name: 'Odran', location: 'ossuary', state: 'ACTIVE', knowledge: 'KNOWN', detail: 'Checking the emptied ossuary.', origin: 'MAP_EVOLUTION' },
+            ],
+        });
+        const left = applyDungeonMapTransaction(map, {
+            operation_id: 'evo-odran-left',
+            operations: [{
+                op: 'SET_ASSET', evidence: 'EVOLVED', asset_id: 'odran', state: 'LEAVING',
+                detail: 'Returned to the Hall of the Ember-Ancestors.',
+                cause: 'Came to inspect the emptied ossuary, then left for home.',
+                actor: 'odran',
+                thread_status: 'resolved',
+            }],
+        });
+        expect(left.ok).toBe(true);
+        const departed = left.document.assets.find(asset => asset.id === 'odran');
+        expect(departed).toMatchObject({
+            state: 'LEFT',
+            location: 'ossuary',
+            last_location: 'ossuary',
+            cause: 'Came to inspect the emptied ossuary, then left for home.',
+            actor: 'odran',
+            detail: 'Returned to the Hall of the Ember-Ancestors.',
+        });
+        expect(coerceAssetState('LEAVING')).toBe('LEFT');
+        expect(assetOccupiesMap(departed)).toBe(false);
+        expect(isPlayCanonLockedState('LEFT')).toBe(false);
+        expect(formatDungeonMapForNarrator(left.document)).toContain('Removed / departed / unplaced assets:');
+        expect(formatDungeonMapForNarrator(left.document)).toContain('Odran');
+        expect(formatDungeonMapForNarrator(left.document)).not.toContain('Area: Ossuary [VISITED]\nAssets:');
+        expect(formatDungeonMapForPlayer(left.document)).not.toContain('Odran');
+        expect(formatDungeonMapForEvolution(left.document)).toContain('odran | CREATURE | Odran');
+        expect(formatDungeonMapForEvolution(left.document)).not.toMatch(/## LIVING OCCUPANTS[\s\S]*odran/);
+
+        const cannotMove = applyDungeonMapTransaction(left.document, {
+            operation_id: 'evo-odran-move',
+            operations: [{ op: 'MOVE_ASSET', evidence: 'EVOLVED', asset_id: 'odran', to: 'nave', cause: 'Tried to walk while gone.' }],
+        });
+        expect(cannotMove.ok).toBe(false);
+        expect(cannotMove.errors[0]).toMatchObject({ code: 'ASSET_CANNOT_MOVE' });
+
+        const returned = applyDungeonMapTransaction(left.document, {
+            operation_id: 'evo-odran-return',
+            operations: [{ op: 'SET_ASSET', evidence: 'EVOLVED', asset_id: 'odran', state: 'ACTIVE', cause: 'Came back to resume the vigil.', actor: 'odran' }],
+        });
+        expect(returned.ok).toBe(true);
+        expect(returned.document.assets.find(asset => asset.id === 'odran')).toMatchObject({ state: 'ACTIVE', location: 'ossuary' });
+        expect(assetOccupiesMap(returned.document.assets.find(asset => asset.id === 'odran'))).toBe(true);
     });
 
     it('detects pending BUILDING entry and requires Evolution population to clear it atomically', () => {

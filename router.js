@@ -632,7 +632,7 @@ function promoteHostedPeerAsset(hostDocument, site, expectedKind, areaId, briefD
     }
     const area = (hostDocument.areas || []).find(item => item.id === areaId);
     if (!area) throw new Error(`Could not resolve the host map cell for "${site}".`);
-    const matches = (hostDocument.assets || []).filter(asset => dungeonLabelIdentitiesMatch(asset.name, site) && asset.state !== 'REMOVED');
+    const matches = (hostDocument.assets || []).filter(asset => dungeonLabelIdentitiesMatch(asset.name, site) && asset.state !== 'REMOVED' && asset.state !== 'LEFT');
     if (matches.length > 1) throw new Error(`Host map contains more than one active asset named "${site}".`);
     let asset = matches[0] || null;
     if (asset) {

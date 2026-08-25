@@ -113,7 +113,8 @@ function isPlayerVisibleAsset(asset) {
 
 function isPlacedAsset(asset) {
     if (!asset?.location) return false;
-    return String(asset.state || '').toUpperCase() !== 'REMOVED';
+    const status = String(asset.state || '').toUpperCase();
+    return status !== 'REMOVED' && status !== 'LEFT' && status !== 'LEAVING';
 }
 
 /**

@@ -55,8 +55,9 @@ OPERATIONS
 - ADD_ASSET uses location (the destination area or legal container ID). BUILDING contains CREATURE/GROUP/OBJECT/LOOT/HAZARD/TRAP; CREATURE/GROUP may carry OBJECT/LOOT.
 - MOVE_ASSET uses to (required) and from (optional, the asset's current direct area/container). Never location — that field is rejected on MOVE_ASSET. Moving a container carries its descendants.
 - SET_AREA geometry_append is an array of strings, never a bare string.
-- Leaving this site: SET_ASSET state FLEEING or REMOVE_ASSET, with detail naming the destination in prose. You cannot MOVE_ASSET to another map.
-- Arriving from another site (see PRIOR EVOLUTION digest): ADD_ASSET here.
+- Departing this site: SET_ASSET state LEFT (LEAVING is accepted and stored as LEFT). Keep the record so cause, actor, detail, and threads survive. Name the destination in detail. FLEEING is panic still on this map. Once they have actually left, use LEFT — not FLEEING, and not REMOVE_ASSET. You cannot MOVE_ASSET to another map.
+- A later return to THIS site: SET_ASSET the existing LEFT record back to ACTIVE. Arriving from another site as someone this map has never recorded (see PRIOR EVOLUTION digest): ADD_ASSET here.
+- REMOVE_ASSET deletes the record and its causal history. Use it only for mistaken clutter or when nothing of that identity should be remembered. Never REMOVE_ASSET a departure, visit, or flight that later ticks should continue.
 
 EXAMPLES
 The one-operation objects below are field syntax. Do not treat a single operation as the default when hours have passed and several living occupants exist.
@@ -64,8 +65,11 @@ The one-operation objects below are field syntax. Do not treat a single operatio
 No change:
 {"noop":true}
 
-Realize a reported departure:
-{"operation_id":"evo-day2-0800-odran-fled","operations":[{"op":"SET_ASSET","evidence":"EVOLVED","asset_id":"odran","state":"FLEEING","knowledge":"KNOWN","detail":"Departed for the Hall of the Ember-Ancestors.","cause":"Fled after the ossuary pack was destroyed by the party.","actor":"party"}]}
+Calm departure / finished visit (keep the record; do not REMOVE_ASSET):
+{"operation_id":"evo-day2-1500-odran-left","operations":[{"op":"SET_ASSET","evidence":"EVOLVED","asset_id":"odran","state":"LEFT","knowledge":"KNOWN","detail":"Returned to the Hall of the Ember-Ancestors after checking the ossuary.","cause":"Came to inspect the emptied ossuary, then left for home.","actor":"odran","thread_status":"resolved"}]}
+
+Panic still on this map (running/hiding; they have not left the site yet):
+{"operation_id":"evo-day2-0800-odran-fled","operations":[{"op":"SET_ASSET","evidence":"EVOLVED","asset_id":"odran","state":"FLEEING","knowledge":"KNOWN","detail":"Bolting toward the ossuary threshold.","cause":"Fled after the ossuary pack was destroyed by the party.","actor":"party"}]}
 
 Move an existing occupant along an OPEN route (to/from, not location):
 {"operation_id":"evo-day3-scavengers-forge","operations":[{"op":"MOVE_ASSET","evidence":"EVOLVED","asset_id":"ember-scavengers","from":"the-ashen-ossuary","to":"the-forge-of-dormant-embers","detail":"Picked the ossuary clean and moved into the forge.","cause":"Moved into the forge after picking the ossuary clean.","actor":"ember-scavengers","thread_status":"transformed"}]}
@@ -93,4 +97,4 @@ Hours elapsed with several living groups — several operations in ONE transacti
 
 Never write MOVE_ASSET with "location". Never write SET_AREA geometry_append as a string.
 
-Before answering, silently verify: valid JSON; evidence EVOLVED; exact existing IDs unless ADD_ASSET; every operation has cause; DEAD/DESTROYED has actor; packs are one GROUP with count not many singleton CREATUREs; MOVE_ASSET uses to/from not location; SET_AREA geometry_append is an array; player bubble untouched; every met/passed absolute duration outside the player bubble was applied once and cleared; future, unknown, or legacy relative durations were not guessed; no revivals; magnitude matches the latest interval and accumulated backlog; hours plus several living groups did not collapse into one patrol commute; idle occupants were allowed to stay; same-room groups were not assumed to be enemies; mundane in-place activity and archetype-fitting projects were allowed; return-to-baseline or restored duty was thread_status resolved, not a new open thread; open threads were not ignored; frequent short intervals have not been treated as independent resets; prefer real change over noop when cumulative time supports it; that change still makes logical and narrative sense for this site.`;
+Before answering, silently verify: valid JSON; evidence EVOLVED; exact existing IDs unless ADD_ASSET; every operation has cause; DEAD/DESTROYED has actor; packs are one GROUP with count not many singleton CREATUREs; MOVE_ASSET uses to/from not location; SET_AREA geometry_append is an array; player bubble untouched; every met/passed absolute duration outside the player bubble was applied once and cleared; future, unknown, or legacy relative durations were not guessed; no revivals; magnitude matches the latest interval and accumulated backlog; hours plus several living groups did not collapse into one patrol commute; idle occupants were allowed to stay; same-room groups were not assumed to be enemies; mundane in-place activity and archetype-fitting projects were allowed; return-to-baseline or restored duty was thread_status resolved, not a new open thread; open threads were not ignored; frequent short intervals have not been treated as independent resets; departures used LEFT (not REMOVE_ASSET, not FLEEING-off-site); FLEEING only for on-site panic; prefer real change over noop when cumulative time supports it; that change still makes logical and narrative sense for this site.`;
