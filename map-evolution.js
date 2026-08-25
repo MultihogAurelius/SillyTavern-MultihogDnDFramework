@@ -358,7 +358,15 @@ function formatDirectInstructionBlock(directInstruction) {
     return `\n## DIRECT INSTRUCTION (THIS PASS ONLY)\nFollow this user instruction for this evolution pass. It does not override JSON output rules or the durable-only contract.\n${text}\n`;
 }
 
-function initialUserPrompt({ site, trigger, worldReports, digest, bubble, currentLocation, partyIsHere, timeWindow, backlog, threads, directInstruction = '' }) {
+function evolutionDetailPolicy(partyIsHere, onSitePreset) {
+    if (!partyIsHere || onSitePreset === 'standard') return '';
+    return `## LEVEL OF DETAIL — CURRENT MAP (TACTICAL AND FELT)
+The party is inside this map. Outside the frozen player area, make this site feel actively alive at close range. Prefer one or two meaningful, causal developments the party could discover soon: patrol or creature movement, a spreading alarm, pursuit, reinforcement, faction reaction, a newly guarded or breached route, a worsening or subsiding hazard, relocation, or another short-term project. Be bolder and more encounter-rich than an off-site pass while scaling everything to the actual elapsed time.
+
+Do not manufacture arbitrary catastrophe, mutate the frozen area, narrate events the party directly witnessed, or contradict the immediate scene. Map Updater owns observed/current-area events. Your job is durable state just beyond the player bubble whose consequences can become noticeable during continued exploration. Noop remains valid when nothing has a plausible cause, but do not default to quiet merely because the party is nearby.`;
+}
+
+function initialUserPrompt({ site, trigger, worldReports, digest, bubble, currentLocation, partyIsHere, onSitePreset = 'dynamic', timeWindow, backlog, threads, directInstruction = '' }) {
     const kind = normalizeMapSiteKind(site.document?.kind);
     const bubbleLine = bubble.area
         ? `${bubble.area.id} (${bubble.area.name})${bubble.combatActive ? ' — combat is active' : ''}`
@@ -366,6 +374,7 @@ function initialUserPrompt({ site, trigger, worldReports, digest, bubble, curren
     const reportBlock = formatWorldReportPressures(worldReports);
     const digestBlock = String(digest || '').trim() || '(None yet this period.)';
     const instruction = String(directInstruction || '').trim();
+    const detailPolicy = evolutionDetailPolicy(partyIsHere, onSitePreset);
     if (instruction) {
         return `${triggerHeadline(trigger)}
 Exact site root: ${site.siteRoot}
@@ -393,8 +402,7 @@ Last Evolved for this site: ${timeWindow.lastEvolved}
 Current in-world time: ${timeWindow.currentTime}
 Elapsed since Last Evolved: ${timeWindow.elapsed}
 Scale both the amount and the breadth of change to this elapsed duration. Minutes: one local reaction can be enough. Hours with several living CREATURE/GROUP assets: several operations in this one transaction when several occupants would plausibly stir; staying put is valid. Do not use a single asset's patrol commute as the entire result. A manual or site-exit trigger does not imply that a full interval has passed. If elapsed time is unknown, do not invent a long unattended period.
-
-## ACCUMULATED EVOLUTION BACKLOG (THIS SITE)
+${detailPolicy ? `\n${detailPolicy}\n` : '\n'}## ACCUMULATED EVOLUTION BACKLOG (THIS SITE)
 ${formatEvolutionBacklog(backlog, site.siteRoot)}
 
 Judge the latest interval together with this trajectory. A short latest interval limits what happened during that interval, but it does not erase accumulated quiet time or prior developments. Do not choose noop solely because the latest interval is short. Let repeated quiet checkpoints build enough opportunity for a meaningful change, and let prior commits continue, complicate, culminate, resolve, or reverse rather than mechanically repeating them.
@@ -425,7 +433,7 @@ ${digestBlock}
 Output only the required JSON object. Include report_outcomes when World Report pressures are supplied: [{"report_id":"exact supplied id","status":"materialized|already_realized_by_play|considered"}]. Prefer durable change when in-world time has passed, but only if it makes logical and narrative sense for this site. Hours plus several living occupants may yield several operations when several would stir; idle occupants may stay. Use {"noop":true} only when this site would not plausibly stir.`;
 }
 
-function correctionPrompt({ site, trigger, worldReports, digest, bubble, currentLocation, partyIsHere, timeWindow, backlog, threads, priorOutput, errors, attempt, directInstruction = '' }) {
+function correctionPrompt({ site, trigger, worldReports, digest, bubble, currentLocation, partyIsHere, onSitePreset = 'dynamic', timeWindow, backlog, threads, priorOutput, errors, attempt, directInstruction = '' }) {
     return `CORRECTION PASS ${attempt}
 Your previous map evolution was rejected. Return a complete corrected JSON object, not a patch. Reuse the same operation_id unless the error says to mint a new one.
 
@@ -439,7 +447,7 @@ Field reminder: Every operation needs cause. DEAD/DESTROYED also needs actor ("p
 PREVIOUS OUTPUT
 ${priorOutput}
 
-${initialUserPrompt({ site, trigger, worldReports, digest, bubble, currentLocation, partyIsHere, timeWindow, backlog, threads, directInstruction })}`;
+${initialUserPrompt({ site, trigger, worldReports, digest, bubble, currentLocation, partyIsHere, onSitePreset, timeWindow, backlog, threads, directInstruction })}`;
 }
 
 function swipeSnapshotKey(ctx, message, swipeId = message?.swipe_id ?? 0) {
@@ -558,7 +566,9 @@ AUTHORITATIVE CAUSAL THREAD CONTRACT
 - Do not invent a killer when actor is unknown.
 - Third-party killing is allowed when it makes logical and narrative sense.`;
     let prompt = initialUserPrompt({
-        site, trigger, worldReports, digest, bubble, currentLocation, partyIsHere, timeWindow, backlog, threads, directInstruction: instruction,
+        site, trigger, worldReports, digest, bubble, currentLocation, partyIsHere,
+        onSitePreset: settings.mapEvolutionOnSitePreset === 'standard' ? 'standard' : 'dynamic',
+        timeWindow, backlog, threads, directInstruction: instruction,
     });
     let lastIssues = [];
     let lastOutput = '';
@@ -582,7 +592,9 @@ AUTHORITATIVE CAUSAL THREAD CONTRACT
             lastIssues = [{ code: 'INVALID_JSON', path: '$', hint: parsed.error || 'No JSON object was found.' }];
             if (attempt < MAX_CORRECTION_ATTEMPTS) {
                 prompt = correctionPrompt({
-                    site, trigger, worldReports, digest, bubble, currentLocation, partyIsHere, timeWindow, backlog, threads,
+                    site, trigger, worldReports, digest, bubble, currentLocation, partyIsHere,
+                    onSitePreset: settings.mapEvolutionOnSitePreset === 'standard' ? 'standard' : 'dynamic',
+                    timeWindow, backlog, threads,
                     priorOutput: output, errors: lastIssues, attempt: attempt + 1, directInstruction: instruction,
                 });
                 continue;
@@ -611,7 +623,9 @@ AUTHORITATIVE CAUSAL THREAD CONTRACT
             lastIssues = validation.errors || [];
             if (attempt < MAX_CORRECTION_ATTEMPTS) {
                 prompt = correctionPrompt({
-                    site, trigger, worldReports, digest, bubble, currentLocation, partyIsHere, timeWindow, backlog, threads,
+                    site, trigger, worldReports, digest, bubble, currentLocation, partyIsHere,
+                    onSitePreset: settings.mapEvolutionOnSitePreset === 'standard' ? 'standard' : 'dynamic',
+                    timeWindow, backlog, threads,
                     priorOutput: output, errors: lastIssues, attempt: attempt + 1, directInstruction: instruction,
                 });
                 continue;
@@ -629,7 +643,9 @@ AUTHORITATIVE CAUSAL THREAD CONTRACT
             lastIssues = mapResult.errors || [{ code: mapResult.code || 'MAP_COMMIT_FAILED', path: 'map', hint: 'Persistence rejected the transaction.' }];
             if (attempt < MAX_CORRECTION_ATTEMPTS && mapResult.retryable !== false) {
                 prompt = correctionPrompt({
-                    site, trigger, worldReports, digest, bubble, currentLocation, partyIsHere, timeWindow, backlog, threads,
+                    site, trigger, worldReports, digest, bubble, currentLocation, partyIsHere,
+                    onSitePreset: settings.mapEvolutionOnSitePreset === 'standard' ? 'standard' : 'dynamic',
+                    timeWindow, backlog, threads,
                     priorOutput: output, errors: lastIssues, attempt: attempt + 1, directInstruction: instruction,
                 });
                 continue;

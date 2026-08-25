@@ -65,7 +65,8 @@ describe('panel markup', () => {
                 agentMapEvolutionOpen: true,
                 mapEvolutionEnabled: true,
                 mapEvolutionIntervalHours: 6,
-                mapEvolutionOnSiteIntervalHours: 2,
+                mapEvolutionOnSiteIntervalHours: 1,
+                mapEvolutionOnSiteIntervalMinutes: 30,
                 mapEvolutionTickScope: 'count',
                 mapEvolutionTickCount: 2,
                 mapEvolutionTickRandomize: false,
@@ -77,7 +78,8 @@ describe('panel markup', () => {
         });
 
         expect(markup).toContain('id="rt-agent-map-evo-interval" value="6"');
-        expect(markup).toContain('id="rt-agent-map-evo-onsite-interval" value="2"');
+        expect(markup).toContain('id="rt-agent-map-evo-onsite-interval" value="1"');
+        expect(markup).toContain('id="rt-agent-map-evo-onsite-minutes" value="30"');
         expect(markup).toContain('id="rt-agent-map-evo-tick-count" value="2"');
         expect(markup).toContain('option value="count" selected');
         expect(markup).toContain('id="rt-agent-map-evo-n-row" style="display:flex;');

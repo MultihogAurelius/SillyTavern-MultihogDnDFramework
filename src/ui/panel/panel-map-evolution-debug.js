@@ -260,7 +260,7 @@ export async function openMapEvolutionTestingGround({ siteRoot = '' } = {}) {
             <div class="rt-map-evo-debug-row">
                 <input type="text" data-debug="set-time" class="text_pole" placeholder="Set time, e.g. Day 3, 08:00" value="${escapeHtml(currentCampaignTimeLabel())}">
                 <button type="button" class="menu_button" data-debug-action="set-time">Set time</button>
-                <input type="number" data-debug="hours" class="text_pole" min="1" max="168" value="${escapeHtml(String(settings.mapEvolutionIntervalHours ?? 8))}" title="Hours to advance">
+                <input type="number" data-debug="hours" class="text_pole" min="1" max="168" value="${escapeHtml(String(settings.mapEvolutionIntervalHours ?? 12))}" title="Hours to advance">
                 <button type="button" class="menu_button" data-debug-action="advance-hours">Advance hours</button>
                 <button type="button" class="menu_button" data-debug-action="advance-day">+1 day</button>
             </div>
@@ -339,7 +339,7 @@ export async function openMapEvolutionTestingGround({ siteRoot = '' } = {}) {
             if (result.ok) await reload();
         });
         popup.querySelector('[data-debug-action="advance-hours"]')?.addEventListener('click', async () => {
-            const hours = Number(popup.querySelector('[data-debug="hours"]')?.value) || 8;
+            const hours = Number(popup.querySelector('[data-debug="hours"]')?.value) || 12;
             const result = advanceCampaignTime(hours * 60);
             setStatus(result.ok ? `Advanced to ${result.timeLabel}.` : result.error);
             if (result.ok) await reload();
@@ -360,7 +360,7 @@ export async function openMapEvolutionTestingGround({ siteRoot = '' } = {}) {
         });
         popup.querySelector('[data-debug-action="simulate"]')?.addEventListener('click', async () => {
             const ticks = Number(popup.querySelector('[data-debug="ticks"]')?.value) || 3;
-            const hours = Number(popup.querySelector('[data-debug="hours"]')?.value) || Number(getSettings().mapEvolutionIntervalHours) || 8;
+            const hours = Number(popup.querySelector('[data-debug="hours"]')?.value) || Number(getSettings().mapEvolutionIntervalHours) || 12;
             setStatus(`Simulating ${ticks} tick(s) at ${hours}h…`);
             const result = await debugSimulateTicks({
                 siteRoot: sandbox.siteRoot,

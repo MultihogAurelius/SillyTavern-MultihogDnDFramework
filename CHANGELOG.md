@@ -2,6 +2,15 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.50] - 2026-08-25
+
+### Changed
+- **Map Evolution cadence**: Background maps now default to 12 hours. The current map defaults to 1 hour, with optional minutes, and a High Dynamism vs Standard detail preset. Untouched 8h/8h installs migrate; custom cadences are kept.
+
+### Fixed
+- **Map Details hover lag**: Asset hover cards stay on the document body as a popover instead of living inside the modal, so hovering no longer recosts the compact Visuals/Map until reload.
+- **Map Details overlay and tooltip scrollbars**: Restored the inspector backdrop and sized popover tooltips to the card so they no longer cover the menu or show a scrollbar.
+
 ## [2026.8.49] - 2026-08-25
 
 ### Fixed

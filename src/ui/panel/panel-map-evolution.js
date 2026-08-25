@@ -78,11 +78,15 @@ export function wireAgentMapEvolution({
 
         const intervalInp = /** @type {HTMLInputElement|null} */ (agentPanel.querySelector('#rt-agent-map-evo-interval'));
         if (intervalInp && document.activeElement !== intervalInp) {
-            intervalInp.value = String(s.mapEvolutionIntervalHours ?? 8);
+            intervalInp.value = String(s.mapEvolutionIntervalHours ?? 12);
         }
         const onSiteInp = /** @type {HTMLInputElement|null} */ (agentPanel.querySelector('#rt-agent-map-evo-onsite-interval'));
         if (onSiteInp && document.activeElement !== onSiteInp) {
-            onSiteInp.value = String(s.mapEvolutionOnSiteIntervalHours ?? 8);
+            onSiteInp.value = String(s.mapEvolutionOnSiteIntervalHours ?? 1);
+        }
+        const onSiteMinutesInp = /** @type {HTMLInputElement|null} */ (agentPanel.querySelector('#rt-agent-map-evo-onsite-minutes'));
+        if (onSiteMinutesInp && document.activeElement !== onSiteMinutesInp) {
+            onSiteMinutesInp.value = String(s.mapEvolutionOnSiteIntervalMinutes ?? 0);
         }
         const scopeSel = /** @type {HTMLSelectElement|null} */ (agentPanel.querySelector('#rt-agent-map-evo-tick-scope'));
         if (scopeSel && document.activeElement !== scopeSel) {
@@ -104,7 +108,7 @@ export function wireAgentMapEvolution({
     if (intervalInp) {
         intervalInp.addEventListener('change', () => {
             const s = getSettings();
-            s.mapEvolutionIntervalHours = Math.max(1, Math.min(168, parseInt(intervalInp.value, 10) || 8));
+            s.mapEvolutionIntervalHours = Math.max(1, Math.min(168, parseInt(intervalInp.value, 10) || 12));
             intervalInp.value = String(s.mapEvolutionIntervalHours);
             saveSettings();
             $('#rpg_map_evolution_interval_hours').val(s.mapEvolutionIntervalHours);
@@ -121,12 +125,27 @@ export function wireAgentMapEvolution({
         onSiteInp.addEventListener('change', () => {
             const s = getSettings();
             const parsed = parseInt(onSiteInp.value, 10);
-            s.mapEvolutionOnSiteIntervalHours = parsed === 0
-                ? 0
-                : Math.max(1, Math.min(168, Number.isFinite(parsed) ? parsed : 12));
+            s.mapEvolutionOnSiteIntervalHours = Math.max(0, Math.min(168, Number.isFinite(parsed) ? parsed : 1));
             onSiteInp.value = String(s.mapEvolutionOnSiteIntervalHours);
             saveSettings();
             $('#rpg_map_evolution_onsite_interval_hours').val(s.mapEvolutionOnSiteIntervalHours);
+            if (typeof runtimeState.updateMapEvolutionScheduleDisplayRef === 'function') {
+                runtimeState.updateMapEvolutionScheduleDisplayRef();
+            } else {
+                updateAgentMapEvolutionStatus();
+            }
+        });
+    }
+
+    const onSiteMinutesInp = /** @type {HTMLInputElement|null} */ (agentPanel.querySelector('#rt-agent-map-evo-onsite-minutes'));
+    if (onSiteMinutesInp) {
+        onSiteMinutesInp.addEventListener('change', () => {
+            const s = getSettings();
+            const parsed = parseInt(onSiteMinutesInp.value, 10);
+            s.mapEvolutionOnSiteIntervalMinutes = Math.max(0, Math.min(59, Number.isFinite(parsed) ? parsed : 0));
+            onSiteMinutesInp.value = String(s.mapEvolutionOnSiteIntervalMinutes);
+            saveSettings();
+            $('#rpg_map_evolution_onsite_interval_minutes').val(s.mapEvolutionOnSiteIntervalMinutes);
             if (typeof runtimeState.updateMapEvolutionScheduleDisplayRef === 'function') {
                 runtimeState.updateMapEvolutionScheduleDisplayRef();
             } else {

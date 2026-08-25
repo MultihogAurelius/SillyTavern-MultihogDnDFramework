@@ -446,9 +446,9 @@ describe('dungeon map graph', () => {
         expect(playerSvg).toContain('data-asset-state="ARMED"');
         expect(playerSvg).toContain('rt-dungeon-graph-icon-trap');
         expect(playerSvg).toContain('rt-dungeon-graph-icon-art');
-        expect(playerSvg).toContain('SVG/trap.svg');
         expect(playerSvg).toContain('fill="currentColor"');
-        expect(playerSvg).toContain('mask-image:url(');
+        expect(playerSvg).not.toContain('mask-image:url(');
+        expect(playerSvg).not.toContain('style="');
         expect(playerSvg).not.toMatch(/rt-dungeon-graph-node[^>]*>\s*<title>/);
         expect(playerSvg).not.toMatch(/rt-dungeon-graph-icon[\s\S]*?<title>/);
         expect(playerSvg).not.toContain('data-icon="CREATURE_LIVE"');
@@ -465,7 +465,7 @@ describe('dungeon map graph', () => {
         const gmGraph = buildDungeonMapGraph(map, { playerFacing: false });
         const gmSvg = renderDungeonMapGraphSvg(gmGraph, { compact: false });
         expect(gmSvg).toContain('data-icon="CREATURE_LIVE"');
-        expect(gmSvg).toContain('SVG/man-person.svg');
+        expect(gmSvg).toContain('rt-dungeon-graph-icon-creature');
         expect(gmSvg).toContain('rt-dungeon-graph-icon-unrevealed');
     });
 

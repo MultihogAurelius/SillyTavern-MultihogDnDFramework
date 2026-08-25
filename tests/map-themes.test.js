@@ -112,12 +112,15 @@ describe('map themes', () => {
         const style = readFileSync(new URL('../style.css', import.meta.url), 'utf8');
         expect(style).toContain('.rt-dungeon-graph-node .rt-dungeon-graph-icon-art');
         expect(style).toContain('fill: currentColor;');
+        expect(style).toContain('pointer-events: none !important;');
         expect(style).toContain('color: var(--rt-map-creature, #ffffff);');
         expect(style).toContain('color: var(--rt-map-group, #ffffff);');
         expect(style).toContain('color: var(--rt-map-loot, #ffcc4a);');
         expect(style).toContain('border: 1px solid var(--rt-map-frame, #ffaa00);');
         expect(style).toContain('background: var(--rt-map-textbox, #0c0c0c);');
         expect(style).toContain('var(--rt-map-background-image, none);');
+        expect(style).toContain('.rt-dungeon-graph-asset-tip:popover-open');
+        expect(style).toContain('overflow: visible;');
         expect(style).not.toMatch(/\.rt-dungeon-graph-icon \{[^}]*filter:\s*drop-shadow/);
     });
 });

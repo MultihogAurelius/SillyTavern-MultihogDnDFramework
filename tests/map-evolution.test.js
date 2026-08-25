@@ -199,6 +199,8 @@ describe('Map Evolution', () => {
         expect(siteEvolutionDue(null, 8 * 60, 4)).toEqual({ due: false, baseline: true });
         expect(siteEvolutionDue(8 * 60, 8 * 60 + 3 * 60, 4)).toEqual({ due: false, baseline: false });
         expect(siteEvolutionDue(8 * 60, 8 * 60 + 4 * 60, 4)).toEqual({ due: true, baseline: false });
+        expect(siteEvolutionDue(8 * 60, 8 * 60 + 29, 0.5)).toEqual({ due: false, baseline: false });
+        expect(siteEvolutionDue(8 * 60, 8 * 60 + 30, 0.5)).toEqual({ due: true, baseline: false });
         expect(siteEvolutionDue(8 * 60, 8 * 60 + 48 * 60, 0)).toEqual({ due: false, baseline: false });
         expect(siteEvolutionDue(null, 8 * 60, 0)).toEqual({ due: false, baseline: true });
     });
@@ -769,6 +771,18 @@ describe('Map Evolution', () => {
         expect(getSiteEvolutionIntervalOverride({}, 'Bunker Theta')).toBeNull();
         expect(setSiteEvolutionIntervalOverride({ 'bunker theta': 4 }, 'Bunker Theta', '')).toEqual({});
         expect(setSiteEvolutionIntervalOverride({}, 'Bunker Theta', 0)).toEqual({ 'bunker theta': 0 });
+        expect(resolveSiteEvolutionIntervalHours('Current Site', { currentRoot: 'Current Site' })).toBe(1);
+        expect(resolveSiteEvolutionIntervalHours('Current Site', {
+            currentRoot: 'Current Site',
+            onSiteIntervalHours: 0,
+            onSiteIntervalMinutes: 30,
+        })).toBe(0.5);
+        expect(resolveSiteEvolutionIntervalHours('Current Site', {
+            currentRoot: 'Current Site',
+            onSiteIntervalHours: 0,
+            onSiteIntervalMinutes: 0,
+        })).toBe(0);
+        expect(resolveSiteEvolutionIntervalHours('Other Site', { currentRoot: 'Current Site' })).toBe(12);
     });
 
     it('picks due maps from per-site intervals while leaving others waiting', () => {
@@ -831,6 +845,13 @@ describe('Map Evolution', () => {
         expect(evolution).toContain('Omitted thread_status defaults to open');
         expect(evolution).toContain('directional prose, not explicit deltas');
         expect(evolution).toContain('EVOLUTION TIME WINDOW (AUTHORITATIVE)');
+        expect(evolution).toContain('LEVEL OF DETAIL — CURRENT MAP (TACTICAL AND FELT)');
+        expect(evolution).toContain('one or two meaningful, causal developments the party could discover soon');
+        expect(evolution).toContain('Map Updater owns observed/current-area events');
+        expect(evolution).toContain("if (!partyIsHere || onSitePreset === 'standard') return '';");
+        expect(evolution).toContain("settings.mapEvolutionOnSitePreset === 'standard' ? 'standard' : 'dynamic'");
+        expect(evolution).not.toContain('LEVEL OF DETAIL — OTHER MAP');
+        expect(evolution).not.toContain('Evolve this map at lower resolution');
         expect(evolution).toContain('ACCUMULATED EVOLUTION BACKLOG (THIS SITE)');
         expect(evolution).toContain('Do not choose noop solely because the latest interval is short');
         expect(evolution).toContain('settings.mapEvolutionLastFiredBySite?.[siteKey]');
@@ -873,9 +894,19 @@ describe('Map Evolution', () => {
         expect(settingsMarkup).toContain('id="rpg_map_evolution_enabled"');
         expect(settingsMarkup).toContain('id="rpg_map_evolution_interval_hours"');
         expect(settingsMarkup).toContain('id="rpg_map_evolution_onsite_interval_hours"');
+        expect(settingsMarkup).toContain('id="rpg_map_evolution_onsite_interval_minutes"');
+        expect(settingsMarkup).toContain('id="rpg_map_evolution_onsite_preset"');
+        expect(settingsMarkup).toContain('High Dynamism — tactical and soon discoverable');
+        expect(settingsMarkup).toContain('Standard — same behavior as background maps');
+        expect(defaultsSource).toContain('mapEvolutionIntervalHours: 12');
+        expect(defaultsSource).toContain('mapEvolutionOnSiteIntervalHours: 1');
+        expect(defaultsSource).toContain('mapEvolutionOnSiteIntervalMinutes: 0');
+        expect(defaultsSource).toContain("mapEvolutionOnSitePreset: 'dynamic'");
+        expect(indexSource).toContain("settings.mapEvolutionOnSitePreset = String($(this).val() || '') === 'standard' ? 'standard' : 'dynamic'");
         expect(settingsMarkup).toContain('<b>Per-map interval</b>');
         expect(settingsMarkup).toContain('id="rpg_map_evolution_site_list_header"');
         expect(panelMarkup).toContain('id="rt-agent-map-evo-onsite-interval"');
+        expect(panelMarkup).toContain('id="rt-agent-map-evo-onsite-minutes"');
         expect(evolution).toContain('evolutionIntervalHoursForSettings');
         expect(settingsMarkup).toContain('id="rpg_map_evolution_world_report_lookback"');
         expect(settingsMarkup).toContain('Reports never trigger an immediate map fan-out');

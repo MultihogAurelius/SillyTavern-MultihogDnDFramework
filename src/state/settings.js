@@ -1011,6 +1011,17 @@ function getSettingsInternal(extensionSettings) {
         s.settingsVersion = '2026.8.35';
     }
 
+    // 2026.8.48.1: increase current-map detail/cadence while slowing remote maps.
+    // Migrate only the untouched legacy 8h/8h pair; preserve any customized cadence.
+    if (isOlderThan(s.settingsVersion, '2026.8.48.1')) {
+        if (Number(s.mapEvolutionIntervalHours) === 8 && Number(s.mapEvolutionOnSiteIntervalHours) === 8) {
+            s.mapEvolutionIntervalHours = 12;
+            s.mapEvolutionOnSiteIntervalHours = 1;
+            s.mapEvolutionOnSiteIntervalMinutes = 0;
+        }
+        s.settingsVersion = '2026.8.48.1';
+    }
+
     // Stamp factory version even when a release has no field rewrites
     // (8.28.0 mapped-site index is prompt/injection only).
     if (isOlderThan(s.settingsVersion, FACTORY_SETTINGS_VERSION)) {
@@ -1108,12 +1119,21 @@ function getSettingsInternal(extensionSettings) {
     s.mapEvolutionTickCount = Number.isFinite(tickCount) ? Math.max(0, Math.min(50, Math.floor(tickCount))) : 1;
     s.mapEvolutionTickRandomize = s.mapEvolutionTickRandomize !== false;
     if (!Array.isArray(s.mapEvolutionSelectedRoots)) s.mapEvolutionSelectedRoots = [];
+    s.mapEvolutionIntervalHours = (() => {
+        const hours = Math.floor(Number(s.mapEvolutionIntervalHours));
+        return Number.isFinite(hours) ? Math.max(1, Math.min(168, hours)) : 12;
+    })();
     s.mapEvolutionOnSiteIntervalHours = (() => {
         const hours = Math.floor(Number(s.mapEvolutionOnSiteIntervalHours));
-        if (!Number.isFinite(hours)) return 8;
+        if (!Number.isFinite(hours)) return 1;
         if (hours === 0) return 0;
         return Math.max(1, Math.min(168, hours));
     })();
+    s.mapEvolutionOnSiteIntervalMinutes = (() => {
+        const minutes = Math.floor(Number(s.mapEvolutionOnSiteIntervalMinutes));
+        return Number.isFinite(minutes) ? Math.max(0, Math.min(59, minutes)) : 0;
+    })();
+    s.mapEvolutionOnSitePreset = s.mapEvolutionOnSitePreset === 'standard' ? 'standard' : 'dynamic';
     if (!s.mapEvolutionIntervalHoursBySite || typeof s.mapEvolutionIntervalHoursBySite !== 'object' || Array.isArray(s.mapEvolutionIntervalHoursBySite)) {
         s.mapEvolutionIntervalHoursBySite = {};
     }
@@ -1401,6 +1421,8 @@ export const CHAT_STATE_GLOBAL_UI_KEYS = [
     'mapEvolutionEnabled',
     'mapEvolutionIntervalHours',
     'mapEvolutionOnSiteIntervalHours',
+    'mapEvolutionOnSiteIntervalMinutes',
+    'mapEvolutionOnSitePreset',
     'mapEvolutionMaxTokens',
     'mapEvolutionCompressEnabled',
     'mapEvolutionCompressThreshold',

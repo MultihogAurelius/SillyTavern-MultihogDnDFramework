@@ -341,7 +341,7 @@ async function runSimulateTicks({
     const root = String(siteRoot || '').trim();
     if (!root) return { ok: false, error: 'Pick a mapped site.' };
     const count = Math.max(1, Math.min(20, Math.floor(Number(ticks) || 1)));
-    const hours = Math.max(1, Math.floor(Number(hoursPerTick) || Number(getSettings().mapEvolutionIntervalHours) || 8));
+    const hours = Math.max(1, Math.floor(Number(hoursPerTick) || Number(getSettings().mapEvolutionIntervalHours) || 12));
     const results = [];
     for (let index = 0; index < count; index++) {
         if (evolutionAgentsBusy()) {
@@ -378,7 +378,7 @@ export async function debugSimulateTicks({
     if (!root) return { ok: false, error: 'Pick a mapped site.' };
     if (evolutionAgentsBusy()) return { ok: false, skipped: 'busy', error: 'An agent is already running.' };
     const count = Math.max(1, Math.min(20, Math.floor(Number(ticks) || 1)));
-    const hours = Math.max(1, Math.floor(Number(hoursPerTick) || Number(getSettings().mapEvolutionIntervalHours) || 8));
+    const hours = Math.max(1, Math.floor(Number(hoursPerTick) || Number(getSettings().mapEvolutionIntervalHours) || 12));
     await captureTestingGroundCheckpoint({
         type: 'simulate',
         siteRoot: root,

@@ -310,10 +310,13 @@ export function buildPanelMarkup({ settings, agentPanelCollapsedClass }) {
                         <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:8px;">
                             <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
                                 <span style="font-size:0.769em; opacity:0.7; white-space:nowrap;">Other maps:</span>
-                                <input type="text" inputmode="numeric" pattern="[0-9]*" id="rt-agent-map-evo-interval" value="${settings.mapEvolutionIntervalHours ?? 8}" style="width:50px; background:var(--rt-card-bg); color:var(--rt-text); border:var(--rt-border); border-radius:3px; text-align:center; font-size:0.769em; padding:2px;" title="Interval for mapped sites the party is not in.">
+                                <input type="text" inputmode="numeric" pattern="[0-9]*" id="rt-agent-map-evo-interval" value="${settings.mapEvolutionIntervalHours ?? 12}" style="width:50px; background:var(--rt-card-bg); color:var(--rt-text); border:var(--rt-border); border-radius:3px; text-align:center; font-size:0.769em; padding:2px;" title="Interval for mapped sites the party is not in.">
+                                <span style="font-size:0.769em; opacity:0.5;">h</span>
                                 <span style="font-size:0.769em; opacity:0.7; white-space:nowrap;">Current map:</span>
-                                <input type="text" inputmode="numeric" pattern="[0-9]*" id="rt-agent-map-evo-onsite-interval" value="${settings.mapEvolutionOnSiteIntervalHours ?? 8}" style="width:50px; background:var(--rt-card-bg); color:var(--rt-text); border:var(--rt-border); border-radius:3px; text-align:center; font-size:0.769em; padding:2px;" title="Interval for the mapped site the party is in. 0 skips automatic ticks there. Same Evolution writer.">
-                                <span style="font-size:0.769em; opacity:0.5;">in-world hours</span>
+                                <input type="text" inputmode="numeric" pattern="[0-9]*" id="rt-agent-map-evo-onsite-interval" value="${settings.mapEvolutionOnSiteIntervalHours ?? 1}" style="width:42px; background:var(--rt-card-bg); color:var(--rt-text); border:var(--rt-border); border-radius:3px; text-align:center; font-size:0.769em; padding:2px;" title="Current-map interval hours. Use 0 with a nonzero minutes value for intervals below one hour.">
+                                <span style="font-size:0.769em; opacity:0.5;">h</span>
+                                <input type="text" inputmode="numeric" pattern="[0-9]*" id="rt-agent-map-evo-onsite-minutes" value="${settings.mapEvolutionOnSiteIntervalMinutes ?? 0}" style="width:42px; background:var(--rt-card-bg); color:var(--rt-text); border:var(--rt-border); border-radius:3px; text-align:center; font-size:0.769em; padding:2px;" title="Additional current-map interval minutes (0–59). 0h 0m skips automatic current-map ticks.">
+                                <span style="font-size:0.769em; opacity:0.5;">m in-world</span>
                             </div>
                         </div>
                         <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:8px;">

@@ -1560,12 +1560,26 @@
                                         <label style="flex:1; min-width:140px;">Other maps (in-world hours)
                                             <input id="rpg_map_evolution_interval_hours" type="text" inputmode="numeric" pattern="[0-9]*" min="1" max="168" value="12" class="text_pole" title="How often mapped sites the party is not in may evolve. Per-map hours in the list below override this. Evolution's job does not change — only the timer." />
                                         </label>
-                                        <label style="flex:1; min-width:140px;">Current map (in-world hours)
-                                            <input id="rpg_map_evolution_onsite_interval_hours" type="text" inputmode="numeric" pattern="[0-9]*" min="0" max="168" value="12" class="text_pole" title="How often the mapped site the party is in may evolve. 0 skips automatic ticks for that site only. Per-map hours in the list below override this. Same Evolution writer — not a player-centric mode." />
+                                        <label style="flex:1; min-width:180px;">Current map interval
+                                            <span style="display:flex; align-items:center; gap:5px;">
+                                                <input id="rpg_map_evolution_onsite_interval_hours" type="text" inputmode="numeric" pattern="[0-9]*" min="0" max="168" value="1" class="text_pole" aria-label="Current map interval hours" title="Current-map interval hours. Use 0 hours with a nonzero Minutes value for intervals below one hour." />
+                                                <span style="font-size:0.78em; opacity:0.65;">h</span>
+                                                <input id="rpg_map_evolution_onsite_interval_minutes" type="text" inputmode="numeric" pattern="[0-9]*" min="0" max="59" value="0" class="text_pole" aria-label="Current map interval minutes" title="Additional current-map interval minutes (0–59). 0h 0m skips automatic current-map ticks." />
+                                                <span style="font-size:0.78em; opacity:0.65;">m</span>
+                                            </span>
                                         </label>
                                         <label style="flex:1; min-width:140px;">Max Output Tokens
                                             <input id="rpg_map_evolution_max_tokens" type="text" inputmode="numeric" pattern="[0-9]*" min="1000" max="32000" value="25000" class="text_pole" title="Maximum generation length for one Map Evolution site pass." />
                                         </label>
+                                    </div>
+                                    <label>Current map evolution style
+                                        <select id="rpg_map_evolution_onsite_preset" class="text_pole" title="Changes only the prompt used while the party is inside a mapped site. Background locations always use the original Standard behavior.">
+                                            <option value="dynamic" selected>High Dynamism — tactical and soon discoverable</option>
+                                            <option value="standard">Standard — same behavior as background maps</option>
+                                        </select>
+                                    </label>
+                                    <div style="font-size:0.78em; opacity:0.65; line-height:1.35; margin-top:-4px;">
+                                        <b>High Dynamism</b> encourages one or two causal developments just outside the protected player area. <b>Standard</b> uses the unchanged background-map prompt. The current area itself remains frozen for Map Updater and play.
                                     </div>
                                     <label class="checkbox_label">
                                         <input id="rpg_map_evolution_compress_enabled" type="checkbox" checked />

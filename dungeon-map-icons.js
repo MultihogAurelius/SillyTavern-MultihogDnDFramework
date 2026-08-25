@@ -36,6 +36,25 @@ export const MAP_ICON_GAP = 6;
 export const MAP_ICON_MAX = { compact: 5, expanded: 6 };
 export const MAP_NODE_FONT = { compact: 13, expanded: 15.6 };
 
+const KIND_ART_STYLE_ID = 'rt-dungeon-graph-kind-art';
+
+/**
+ * One shared stylesheet for kind masks instead of per-icon inline mask-image.
+ * Inline masks recost every glyph on hover; a single rule per kind stays cached.
+ */
+export function ensureDungeonMapKindArtStyles() {
+    if (typeof document === 'undefined') return;
+    if (document.getElementById(KIND_ART_STYLE_ID)) return;
+    const style = document.createElement('style');
+    style.id = KIND_ART_STYLE_ID;
+    style.textContent = Object.entries(KIND_ART).map(([kind, href]) => {
+        const cls = kind.toLowerCase();
+        const url = JSON.stringify(href);
+        return `.rt-dungeon-graph-icon-${cls} .rt-dungeon-graph-icon-art{-webkit-mask-image:url(${url});mask-image:url(${url});}`;
+    }).join('');
+    document.head.appendChild(style);
+}
+
 const ICON_STACK = {
     compact: { padTop: 4, gap: 3, padBottom: 3 },
     expanded: { padTop: 5, gap: 3, padBottom: 4 },
@@ -137,8 +156,6 @@ function overlayForMood(mood) {
 }
 
 function renderOneIcon(icon, x, y, size) {
-    const href = escapeXml(KIND_ART[icon.kind] || KIND_ART.OTHER);
-    const maskStyle = `-webkit-mask-image:url('${href}');mask-image:url('${href}');-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;-webkit-mask-position:center;mask-position:center;-webkit-mask-size:contain;mask-size:contain;`;
     const scale = size / 12;
     const knowledgeClass = `rt-dungeon-graph-icon-${String(icon.knowledge || 'known').toLowerCase()}`;
     const classes = [
@@ -150,7 +167,7 @@ function renderOneIcon(icon, x, y, size) {
     const count = Number.isInteger(icon.count) ? String(icon.count) : '';
     return `<g class="${classes}" data-icon="${escapeXml(icon.token)}" data-asset-name="${escapeXml(icon.name)}" data-asset-kind="${escapeXml(icon.kind)}" data-asset-state="${escapeXml(icon.state)}" data-asset-knowledge="${escapeXml(icon.knowledge)}" data-asset-detail="${escapeXml(icon.detail || '')}"${count ? ` data-asset-count="${escapeXml(count)}"` : ''} transform="translate(${x},${y}) scale(${scale})" stroke="none">
         <rect class="rt-dungeon-graph-icon-hit" x="0" y="0" width="12" height="12" fill="transparent" pointer-events="all"></rect>
-        <rect class="rt-dungeon-graph-icon-art" x="0" y="0" width="12" height="12" fill="currentColor" style="${maskStyle}" pointer-events="none"></rect>
+        <rect class="rt-dungeon-graph-icon-art" x="0" y="0" width="12" height="12" fill="currentColor" pointer-events="none"></rect>
         ${overlayForMood(icon.mood)}
     </g>`;
 }

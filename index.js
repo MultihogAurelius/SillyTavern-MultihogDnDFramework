@@ -266,6 +266,14 @@ function syncMapEvolutionTickRows(settings) {
     $('#rpg_map_evolution_interval_selected_hint').toggle(scope === 'selected');
 }
 
+function formatMapEvolutionCadence(hours) {
+    const totalMinutes = Math.max(0, Math.round(Number(hours) * 60));
+    if (!totalMinutes) return 'skip';
+    const wholeHours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    return [wholeHours ? `${wholeHours}h` : '', minutes ? `${minutes}m` : ''].filter(Boolean).join(' ');
+}
+
 async function refreshMapEvolutionSelectedList() {
     const $list = $('#rpg_map_evolution_selected_list');
     if (!$list.length) return;
@@ -301,13 +309,13 @@ async function refreshMapEvolutionSelectedList() {
         const hasOverride = overrideHours != null;
         const inheritText = inherited === 0
             ? (site.current ? 'Automatic: skip (current map)' : 'Automatic: skip (other maps)')
-            : (site.current ? `Automatic: ${inherited}h (current map)` : `Automatic: ${inherited}h (other maps)`);
+            : (site.current ? `Automatic: ${formatMapEvolutionCadence(inherited)} (current map)` : `Automatic: ${formatMapEvolutionCadence(inherited)} (other maps)`);
         const $inherit = $('<div>').css({
             fontSize: '0.75em',
             opacity: hasOverride ? '0.45' : '0.65',
             lineHeight: '1.3',
             marginTop: '2px',
-        }).text(hasOverride ? `Override · was ${inherited === 0 ? 'skip' : `${inherited}h`}` : inheritText);
+        }).text(hasOverride ? `Override · was ${formatMapEvolutionCadence(inherited)}` : inheritText);
         const $hours = $('<input type="text" inputmode="numeric" pattern="[0-9]*" class="text_pole">')
             .attr({
                 'data-site-root': site.siteRoot,
@@ -3476,13 +3484,15 @@ function loadProfile(name) {
     s.mapUpdaterLastSiteRoot = p.mapUpdaterLastSiteRoot || '';
     s.mapUpdaterPendingExitRoot = p.mapUpdaterPendingExitRoot || '';
     s.mapEvolutionEnabled = p.mapEvolutionEnabled !== false;
-    s.mapEvolutionIntervalHours = Math.max(1, Number(p.mapEvolutionIntervalHours) || 8);
+    s.mapEvolutionIntervalHours = Math.max(1, Number(p.mapEvolutionIntervalHours) || 12);
     s.mapEvolutionOnSiteIntervalHours = (() => {
         const hours = Math.floor(Number(p.mapEvolutionOnSiteIntervalHours));
-        if (!Number.isFinite(hours)) return s.mapEvolutionIntervalHours;
+        if (!Number.isFinite(hours)) return 1;
         if (hours === 0) return 0;
         return Math.max(1, Math.min(168, hours));
     })();
+    s.mapEvolutionOnSiteIntervalMinutes = Math.max(0, Math.min(59, Math.floor(Number(p.mapEvolutionOnSiteIntervalMinutes) || 0)));
+    s.mapEvolutionOnSitePreset = p.mapEvolutionOnSitePreset === 'standard' ? 'standard' : 'dynamic';
     s.mapEvolutionIntervalHoursBySite = JSON.parse(JSON.stringify(p.mapEvolutionIntervalHoursBySite || {}));
     s.mapEvolutionMaxTokens = p.mapEvolutionMaxTokens ?? 25000;
     s.mapEvolutionCompressEnabled = p.mapEvolutionCompressEnabled !== false;
@@ -3611,8 +3621,10 @@ function loadProfile(name) {
     $('#rpg_map_updater_max_tokens').val(s.mapUpdaterMaxTokens ?? 25000);
     $('#rpg_map_updater_system_prompt').val(s.mapUpdaterSystemPrompt || DEFAULT_MAP_UPDATER_SYSTEM_PROMPT);
     $('#rpg_map_evolution_enabled').prop('checked', s.mapEvolutionEnabled !== false);
-    $('#rpg_map_evolution_interval_hours').val(s.mapEvolutionIntervalHours ?? 8);
-    $('#rpg_map_evolution_onsite_interval_hours').val(s.mapEvolutionOnSiteIntervalHours ?? 8);
+    $('#rpg_map_evolution_interval_hours').val(s.mapEvolutionIntervalHours ?? 12);
+    $('#rpg_map_evolution_onsite_interval_hours').val(s.mapEvolutionOnSiteIntervalHours ?? 1);
+    $('#rpg_map_evolution_onsite_interval_minutes').val(s.mapEvolutionOnSiteIntervalMinutes ?? 0);
+    $('#rpg_map_evolution_onsite_preset').val(s.mapEvolutionOnSitePreset === 'standard' ? 'standard' : 'dynamic');
     $('#rpg_map_evolution_max_tokens').val(s.mapEvolutionMaxTokens ?? 25000);
     $('#rpg_map_evolution_compress_enabled').prop('checked', s.mapEvolutionCompressEnabled !== false);
     $('#rpg_map_evolution_compress_threshold').val(s.mapEvolutionCompressThreshold ?? 10000);
@@ -6094,24 +6106,36 @@ function organizeConnectionSettingsUI() {
                 runtimeState.updateAgentMapEvolutionStatusRef();
             }
         });
-        $('#rpg_map_evolution_interval_hours').val(settings.mapEvolutionIntervalHours ?? 8).on('change', function () {
-            settings.mapEvolutionIntervalHours = Math.max(1, Math.min(168, parseInt(String($(this).val()), 10) || 8));
+        $('#rpg_map_evolution_interval_hours').val(settings.mapEvolutionIntervalHours ?? 12).on('change', function () {
+            settings.mapEvolutionIntervalHours = Math.max(1, Math.min(168, parseInt(String($(this).val()), 10) || 12));
             $(this).val(settings.mapEvolutionIntervalHours);
             saveSettings();
             updateMapEvolutionScheduleDisplay();
             $('#rt-agent-map-evo-interval').val(settings.mapEvolutionIntervalHours);
             void refreshMapEvolutionSelectedList();
         });
-        $('#rpg_map_evolution_onsite_interval_hours').val(settings.mapEvolutionOnSiteIntervalHours ?? 8).on('change', function () {
+        $('#rpg_map_evolution_onsite_interval_hours').val(settings.mapEvolutionOnSiteIntervalHours ?? 1).on('change', function () {
             const parsed = parseInt(String($(this).val()), 10);
-            settings.mapEvolutionOnSiteIntervalHours = parsed === 0
-                ? 0
-                : Math.max(1, Math.min(168, Number.isFinite(parsed) ? parsed : 12));
+            settings.mapEvolutionOnSiteIntervalHours = Math.max(0, Math.min(168, Number.isFinite(parsed) ? parsed : 1));
             $(this).val(settings.mapEvolutionOnSiteIntervalHours);
             saveSettings();
             updateMapEvolutionScheduleDisplay();
             $('#rt-agent-map-evo-onsite-interval').val(settings.mapEvolutionOnSiteIntervalHours);
             void refreshMapEvolutionSelectedList();
+        });
+        $('#rpg_map_evolution_onsite_interval_minutes').val(settings.mapEvolutionOnSiteIntervalMinutes ?? 0).on('change', function () {
+            const parsed = parseInt(String($(this).val()), 10);
+            settings.mapEvolutionOnSiteIntervalMinutes = Math.max(0, Math.min(59, Number.isFinite(parsed) ? parsed : 0));
+            $(this).val(settings.mapEvolutionOnSiteIntervalMinutes);
+            saveSettings();
+            updateMapEvolutionScheduleDisplay();
+            $('#rt-agent-map-evo-onsite-minutes').val(settings.mapEvolutionOnSiteIntervalMinutes);
+            void refreshMapEvolutionSelectedList();
+        });
+        $('#rpg_map_evolution_onsite_preset').val(settings.mapEvolutionOnSitePreset === 'standard' ? 'standard' : 'dynamic').on('change', function () {
+            settings.mapEvolutionOnSitePreset = String($(this).val() || '') === 'standard' ? 'standard' : 'dynamic';
+            $(this).val(settings.mapEvolutionOnSitePreset);
+            saveSettings();
         });
         $('#rpg_map_evolution_max_tokens').val(settings.mapEvolutionMaxTokens ?? 25000).on('change', function () {
             settings.mapEvolutionMaxTokens = Math.max(1000, Math.min(32000, parseInt(String($(this).val()), 10) || 25000));
@@ -6213,7 +6237,7 @@ function organizeConnectionSettingsUI() {
                 currentMinutes: currentMemoMinutes(),
                 intervalHoursFor: hoursFor,
             });
-            const fallbackHours = Math.max(1, Number(s.mapEvolutionIntervalHours) || 8);
+            const fallbackHours = Math.max(1, Number(s.mapEvolutionIntervalHours) || 12);
             const currentNextMins = schedule.nextMins >= 0
                 ? schedule.nextMins
                 : currentMemoMinutes() >= 0 ? currentMemoMinutes() + fallbackHours * 60 : fallbackHours * 60;
@@ -12207,8 +12231,10 @@ RULES:
             $('#rpg_map_updater_max_tokens').val(s.mapUpdaterMaxTokens ?? 25000);
             $('#rpg_map_updater_system_prompt').val(s.mapUpdaterSystemPrompt || DEFAULT_MAP_UPDATER_SYSTEM_PROMPT);
             $('#rpg_map_evolution_enabled').prop('checked', s.mapEvolutionEnabled !== false);
-            $('#rpg_map_evolution_interval_hours').val(s.mapEvolutionIntervalHours ?? 8);
-            $('#rpg_map_evolution_onsite_interval_hours').val(s.mapEvolutionOnSiteIntervalHours ?? 8);
+            $('#rpg_map_evolution_interval_hours').val(s.mapEvolutionIntervalHours ?? 12);
+            $('#rpg_map_evolution_onsite_interval_hours').val(s.mapEvolutionOnSiteIntervalHours ?? 1);
+            $('#rpg_map_evolution_onsite_interval_minutes').val(s.mapEvolutionOnSiteIntervalMinutes ?? 0);
+            $('#rpg_map_evolution_onsite_preset').val(s.mapEvolutionOnSitePreset === 'standard' ? 'standard' : 'dynamic');
             $('#rpg_map_evolution_max_tokens').val(s.mapEvolutionMaxTokens ?? 25000);
             $('#rpg_map_evolution_compress_enabled').prop('checked', s.mapEvolutionCompressEnabled !== false);
             $('#rpg_map_evolution_compress_threshold').val(s.mapEvolutionCompressThreshold ?? 10000);

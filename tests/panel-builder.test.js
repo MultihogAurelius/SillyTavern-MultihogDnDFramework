@@ -115,7 +115,12 @@ describe('panel builder', () => {
         const source = readFileSync(new URL('../src/ui/panel/dungeon-map-panel.js', import.meta.url), 'utf8');
         expect(source).toContain('bindDungeonMapPan');
         expect(source).toContain('bindDungeonMapAssetPopups');
-        expect(source).toContain("anchor.closest('dialog, .popup')");
+        expect(source).toContain('document.body.appendChild(tip)');
+        expect(source).toContain("tip.setAttribute('popover', 'manual')");
+        expect(source).toContain('onClose: () => hideDungeonMapAssetTip()');
+        expect(source).toContain('ensureDungeonMapKindArtStyles');
+        expect(source).not.toContain("anchor.closest('dialog, .popup')");
+        expect(source).not.toContain('popupContent.dataset.assetTipScroll');
         expect(source).toContain("root.classList.contains('rt-dungeon-graph-scroll')");
         expect(source).toContain('openDungeonMapReadablePopup');
         expect(source).toContain('Reveal All');
