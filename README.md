@@ -166,6 +166,3 @@ Copyright (c) 2026 MultihogAurelius
 This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 
 See [LICENSE](LICENSE) for the full text.
-
-## Got a Question or Ideas?
-Open an issue or discussion on the [GitHub repository](https://github.com/MultihogAurelius/SillyTavern-MultihogDnDFramework), or ask the in-extension Adventure Companion when Tutorial Mode is enabled.
