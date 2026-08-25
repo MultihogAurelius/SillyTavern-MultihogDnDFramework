@@ -777,6 +777,60 @@ Area: Ossuary Behind Rotten Tapestry
         expect(readable).not.toContain('DEADLY');
     });
 
+    it('nests contained assets under their container in narrator prose', () => {
+        const map = {
+            version: 3,
+            site: 'Ashford',
+            kind: 'SETTLEMENT',
+            areas: [{ id: 'north', name: 'North Residential Streets', knowledge: 'VISITED', geometry: [], connections: [] }],
+            assets: [
+                { id: 'house', kind: 'BUILDING', name: 'Residential House', location: 'north', state: 'ACTIVE', knowledge: 'KNOWN', detail: '', origin: 'INITIAL_MAP' },
+                { id: 'caretaker', kind: 'CREATURE', name: 'Caretaker', location: 'house', state: 'ACTIVE', knowledge: 'KNOWN', detail: '', origin: 'INITIAL_MAP' },
+                { id: 'brass-key', kind: 'LOOT', name: 'Brass Key', location: 'caretaker', state: 'AVAILABLE', knowledge: 'SUSPECTED', detail: '', origin: 'INITIAL_MAP' },
+            ],
+        };
+        const readable = formatDungeonMapForNarrator(map);
+        expect(readable).toMatch(/- Residential House \[BUILDING[^\n]*\n\s+- Caretaker \[CREATURE[^\n]*\n\s+- Brass Key \[LOOT/);
+        const snapshot = formatDungeonMapForUpdater(map);
+        expect(snapshot.indexOf('caretaker | CREATURE')).toBeGreaterThan(snapshot.indexOf('house | BUILDING'));
+        expect(snapshot.indexOf('brass-key | LOOT')).toBeGreaterThan(snapshot.indexOf('caretaker | CREATURE'));
+    });
+
+    it('does not recurse forever when narrator map asset containment loops', () => {
+        const map = {
+            version: 3, site: 'Loop Site', kind: 'DUNGEON',
+            areas: [{ id: 'hall', name: 'Hall', knowledge: 'VISITED', geometry: [], connections: [] }],
+            assets: [
+                { kind: 'OBJECT', name: 'Nameless A', location: 'hall', state: 'ACTIVE', knowledge: 'KNOWN', detail: '', origin: 'INITIAL_MAP' },
+                { kind: 'OBJECT', name: 'Nameless B', location: 'hall', state: 'ACTIVE', knowledge: 'KNOWN', detail: '', origin: 'INITIAL_MAP' },
+                { id: 'hall', kind: 'GROUP', name: 'Hall Pack', location: 'hall', state: 'ACTIVE', knowledge: 'KNOWN', detail: '', origin: 'INITIAL_MAP' },
+                { id: 'alpha', kind: 'CREATURE', name: 'Alpha', location: 'hall', state: 'ACTIVE', knowledge: 'KNOWN', detail: '', origin: 'INITIAL_MAP' },
+                { id: 'beta', kind: 'CREATURE', name: 'Beta', location: 'alpha', state: 'ACTIVE', knowledge: 'KNOWN', detail: '', origin: 'INITIAL_MAP' },
+            ],
+        };
+        const readable = formatDungeonMapForNarrator(map);
+        expect(readable).toContain('Nameless A');
+        expect(readable).toContain('Nameless B');
+        expect(readable).toContain('Hall Pack');
+        expect(readable).toContain('Alpha');
+        expect(readable).toContain('Beta');
+        expect((readable.match(/Hall Pack/g) || []).length).toBe(1);
+        expect(readable.indexOf('Beta')).toBeGreaterThan(readable.indexOf('Alpha'));
+
+        const player = formatDungeonMapForPlayer(map, 'Loop Site, Hall');
+        expect(player).toContain('Hall Pack');
+        expect(player).toContain('Nameless A');
+        expect((player.match(/Hall Pack/g) || []).length).toBe(1);
+
+        const snapshot = formatDungeonMapForUpdater(map, 'Loop Site, Hall');
+        expect(snapshot).toContain('Hall Pack');
+        expect(snapshot).toContain('Nameless A');
+        expect(snapshot).toContain('alpha | CREATURE | Alpha');
+        expect(snapshot).toContain('beta | CREATURE | Beta');
+
+        expect(listContainedMapAssets(map, 'hall', { recursive: true }).map(asset => asset.name)).toEqual(['Nameless A', 'Nameless B', 'Alpha', 'Beta']);
+    });
+
     it('uses explicit child chronicles once when establishing current state from a legacy map', () => {
         const root = {
             comment: 'Abbey Undercroft',

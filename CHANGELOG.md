@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.52] - 2026-08-25
+
+### Fixed
+- **Map containment loops in narrator prose**: Narrator, player, and Map Updater snapshots no longer recurse forever when an asset id collides with its room or containment otherwise loops. Map Details already stopped; the hotter LLM-facing trees now use the same cutoff.
+
 ## [2026.8.51] - 2026-08-25
 
 ### Fixed

@@ -952,6 +952,30 @@ export function parseEditableDungeonMapJson(text, siteRoot = '') {
     return { ok: true, errors: [], document };
 }
 
+function mapAssetId(asset) {
+    return String(asset?.id || '').trim();
+}
+
+function listDirectContainedAssets(assets, parentId, ancestors = new Set()) {
+    const id = String(parentId || '').trim();
+    if (!id) return [];
+    return (assets || []).filter((candidate) => {
+        const childId = mapAssetId(candidate);
+        if (!childId || ancestors.has(childId)) return false;
+        return String(candidate.location || '').trim() === id;
+    });
+}
+
+function isContainedByOtherAsset(assets, asset) {
+    const loc = String(asset?.location || '').trim();
+    const id = mapAssetId(asset);
+    if (!loc) return false;
+    return (assets || []).some((parent) => {
+        const parentId = mapAssetId(parent);
+        return parentId && parentId === loc && parentId !== id;
+    });
+}
+
 function formatMapAsset(asset, areasById, depth = 0) {
     const indent = '  '.repeat(depth);
     const tags = [asset.kind, asset.state, asset.knowledge].filter(Boolean).join(' / ');
@@ -975,11 +999,15 @@ function formatMapAsset(asset, areasById, depth = 0) {
     return lines;
 }
 
-function formatMapAssetTree(document, asset, areasById, { visible = () => true, depth = 0 } = {}) {
+function formatMapAssetTree(document, asset, areasById, { visible = () => true, depth = 0, ancestors = new Set() } = {}) {
     if (!visible(asset)) return [];
+    const id = mapAssetId(asset);
+    if (id && ancestors.has(id)) return [];
+    const nested = new Set(ancestors);
+    if (id) nested.add(id);
     const lines = formatMapAsset(asset, areasById, depth);
-    for (const child of document.assets.filter(candidate => candidate.location === asset.id)) {
-        lines.push(...formatMapAssetTree(document, child, areasById, { visible, depth: depth + 1 }));
+    for (const child of listDirectContainedAssets(document.assets, id, nested)) {
+        lines.push(...formatMapAssetTree(document, child, areasById, { visible, depth: depth + 1, ancestors: nested }));
     }
     return lines;
 }
@@ -1050,7 +1078,7 @@ export function formatDungeonMapForNarrator(documentOrContent, siteFallback = ''
             for (const asset of assets) lines.push(...formatMapAssetTree(document, asset, areasById));
         }
     }
-    const unplacedRoots = unplacedAssets.filter(asset => !document.assets.some(parent => parent.id === asset.location));
+    const unplacedRoots = unplacedAssets.filter(asset => !isContainedByOtherAsset(document.assets, asset));
     if (unplacedRoots.length) {
         lines.push('', 'Removed / unplaced assets:');
         for (const asset of unplacedRoots) {
@@ -1846,11 +1874,18 @@ function resolveMapEffectiveArea(document, ref) {
 
 export function listContainedMapAssets(document, containerRef, { recursive = false } = {}) {
     const map = normalizeDungeonMapDocument(document, document?.site);
-    const container = resolveMapAsset(map, containerRef).asset;
-    if (!container) return [];
-    const direct = map.assets.filter(asset => asset.location === container.id);
-    if (!recursive) return direct;
-    return direct.flatMap(asset => [asset, ...listContainedMapAssets(map, asset.id, { recursive: true })]);
+    const walk = (ref, ancestors) => {
+        const container = resolveMapAsset(map, ref).asset;
+        if (!container) return [];
+        const containerId = mapAssetId(container);
+        if (!containerId || ancestors.has(containerId)) return [];
+        const nested = new Set(ancestors);
+        nested.add(containerId);
+        const direct = listDirectContainedAssets(map.assets, containerId, nested);
+        if (!recursive) return direct;
+        return direct.flatMap(asset => [asset, ...walk(asset.id, nested)]);
+    };
+    return walk(containerRef, new Set());
 }
 
 function collectAssetDeletionIds(document, rootId) {
@@ -2413,19 +2448,38 @@ export function formatDungeonMapForUpdater(document, currentLocation = '', optio
     });
     const assetDepth = (asset) => {
         let depth = 0;
-        let parent = map.assets.find(candidate => candidate.id === asset.location);
+        const seen = new Set([mapAssetId(asset)].filter(Boolean));
+        let parent = map.assets.find(candidate => {
+            const parentId = mapAssetId(candidate);
+            return parentId && parentId === String(asset.location || '').trim() && parentId !== mapAssetId(asset);
+        });
         while (parent && depth < 4) {
+            const parentId = mapAssetId(parent);
+            if (parentId && seen.has(parentId)) break;
+            if (parentId) seen.add(parentId);
             depth++;
-            parent = map.assets.find(candidate => candidate.id === parent.location);
+            parent = map.assets.find(candidate => {
+                const candidateId = mapAssetId(candidate);
+                return candidateId && candidateId === String(parent.location || '').trim() && candidateId !== parentId;
+            });
         }
         return depth;
     };
     const orderedAssets = [];
+    const seenAssets = new Set();
     const appendAsset = (asset) => {
+        if (seenAssets.has(asset)) return;
+        seenAssets.add(asset);
         orderedAssets.push(asset);
-        for (const child of map.assets.filter(candidate => candidate.location === asset.id)) appendAsset(child);
+        const id = mapAssetId(asset);
+        if (!id) return;
+        for (const child of map.assets) {
+            if (seenAssets.has(child)) continue;
+            if (String(child.location || '').trim() !== id) continue;
+            appendAsset(child);
+        }
     };
-    for (const asset of map.assets.filter(candidate => !map.assets.some(parent => parent.id === candidate.location))) appendAsset(asset);
+    for (const asset of map.assets.filter(candidate => !isContainedByOtherAsset(map.assets, candidate))) appendAsset(asset);
     const assetLines = orderedAssets.map(asset => {
         const bits = [asset.id, asset.kind, asset.name, `loc=${asset.location}`, asset.state, asset.knowledge];
         if (asset.kind === 'BUILDING') bits.push(`notEntered=${asset.notEntered !== false}`);
