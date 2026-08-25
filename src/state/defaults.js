@@ -294,7 +294,7 @@ export function buildDefaultSettings() {
 
         locationImages: false,
 
-        npcRelationshipBars: true,
+        npcRelationshipBars: false,
         npcRelationshipUpdateMode: 'state_tracker',
         // Optional editable instruction for State Tracker relationship commands.
         // Blank uses the built-in prompt.
@@ -1548,7 +1548,7 @@ You may be asked to use Markers: ((PLS)), ((B)), ((XB)), ((BDG)), ((HGT)). These
 
 /** Latest settings migration version — factory reset skips legacy upgrade paths at or below this. */
 
-export const FACTORY_SETTINGS_VERSION = '2026.8.54';
+export const FACTORY_SETTINGS_VERSION = '2026.8.55';
 
 
 /** Remove extension UI keys from localStorage so a factory reset does not rehydrate stale panel state. */

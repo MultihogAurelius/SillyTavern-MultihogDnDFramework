@@ -6,7 +6,7 @@ const SHARED_NARRATIVE_RULES = `- Simulate realistic time passage; advance the t
 - NPCs only know what they'd realistically know based on established narrative and their archetype; they're not omniscient.
 - NPC tone and behavior is guided by their injected permanent profile (the identity fields above any chronicle lines).`;
 
-const VOICE_LINE = `- Voice: may paraphrase {{user}}'s dialogue/actions consistent with their character, lightly expanding as needed.`;
+const VOICE_LINE = `- Voice: may expand {{user}}'s dialogue/actions consistent with their character.`;
 
 /**
  * Mode-specific pacing tags for Main `<narrative>` and periodic injection.

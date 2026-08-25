@@ -539,7 +539,7 @@ Never auto-resolve or narrate past a pending level-up.
 - NPCs can express opinions about things, and they can even leave over serious value conflicts.
 - NPCs only know what they'd realistically know based on established narrative and their archetype; they're not omniscient.
 - NPC tone and behavior is guided by their injected permanent profile (the identity fields above any chronicle lines).
-- Voice: may paraphrase {{user}}'s dialogue/actions consistent with their character, lightly expanding as needed.
+- Voice: may expand {{user}}'s dialogue/actions consistent with their character.
 </narrative>
 
 <world_progression>
@@ -905,7 +905,7 @@ Never auto-resolve or narrate past a pending level-up.
 - NPCs can express opinions about things, and they can even leave over serious value conflicts.
 - NPCs only know what they'd realistically know based on established narrative and their archetype; they're not omniscient.
 - NPC tone and behavior is guided by their injected permanent profile (the identity fields above any chronicle lines).
-- Voice: may paraphrase {{user}}'s dialogue/actions consistent with their character, lightly expanding as needed.
+- Voice: may expand {{user}}'s dialogue/actions consistent with their character.
 </narrative>
 
 <world_progression>

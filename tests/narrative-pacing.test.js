@@ -34,7 +34,7 @@ describe('Narrator Configuration pacing', () => {
 - NPCs can express opinions about things, and they can even leave over serious value conflicts.
 - NPCs only know what they'd realistically know based on established narrative and their archetype; they're not omniscient.
 - NPC tone and behavior is guided by their injected permanent profile (the identity fields above any chronicle lines).
-- Voice: may paraphrase {{user}}'s dialogue/actions consistent with their character, lightly expanding as needed.
+- Voice: may expand {{user}}'s dialogue/actions consistent with their character.
 <output_length>
 - Keep the output length short/modest; don't let it drift out of control.
 </output_length>
@@ -52,7 +52,7 @@ describe('Narrator Configuration pacing', () => {
     it('keeps Normal free of output-length instructions', () => {
         const result = buildNarrativePacingSection('normal');
 
-        expect(result).toContain('- Voice: may paraphrase');
+        expect(result).toContain('- Voice: may expand');
         expect(result).not.toContain('output length');
         expect(result).not.toContain('<output_length>');
         expect(result).not.toContain('<high_agency_mode_on>');

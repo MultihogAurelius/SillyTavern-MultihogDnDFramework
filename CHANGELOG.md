@@ -2,6 +2,12 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.55] - 2026-08-26
+
+### Changed
+- **Narrative Voice (Normal)**: `<narrative>` Voice line now permits expanding {{user}}'s dialogue/actions consistent with their character (replacing the prior paraphrase/light-expansion wording).
+- **Relationship system**: Factory default is now off (`npcRelationshipBars: false`). Existing installs still on the shipped-on default migrate to off and rebuild the NPC module instruction.
+
 ## [2026.8.54] - 2026-08-26
 
 ### Changed

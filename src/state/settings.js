@@ -1079,6 +1079,22 @@ function getSettingsInternal(extensionSettings) {
         s.settingsVersion = '2026.8.54';
     }
 
+    // 2026.8.55: relationship bars off by factory default; migrate untouched shipped-on default.
+    if (isOlderThan(s.settingsVersion, '2026.8.55')) {
+        if (s.npcRelationshipBars === true) {
+            s.npcRelationshipBars = false;
+            if (s.routerModules?.npc) {
+                s.routerModules.npc.instruction = buildNpcInstruction(
+                    s.npcMajorWords ?? s.npcMajorTokens,
+                    s.npcMinorWords ?? s.npcMinorTokens,
+                    false,
+                    s,
+                );
+            }
+        }
+        s.settingsVersion = '2026.8.55';
+    }
+
     // Stamp factory version even when a release has no field rewrites
     // (8.28.0 mapped-site index is prompt/injection only).
     if (isOlderThan(s.settingsVersion, FACTORY_SETTINGS_VERSION)) {
