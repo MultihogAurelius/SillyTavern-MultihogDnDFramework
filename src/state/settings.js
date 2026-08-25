@@ -1022,6 +1022,26 @@ function getSettingsInternal(extensionSettings) {
         s.settingsVersion = '2026.8.48.1';
     }
 
+    // 2026.8.49.1: stock prompt moved <relationship_tracking> above <homebrew_and_custom_classes>.
+    // Swap those Control Room keys when still in the prior stock relative order.
+    if (isOlderThan(s.settingsVersion, '2026.8.49.1')) {
+        const homebrewKey = 'base:homebrew_and_custom_classes';
+        const relationshipKey = 'base:relationship_tracking';
+        const swapHomebrewRelationshipOrder = (order) => {
+            if (!Array.isArray(order)) return;
+            const hi = order.indexOf(homebrewKey);
+            const ri = order.indexOf(relationshipKey);
+            if (hi === -1 || ri === -1 || ri <= hi) return;
+            order[hi] = relationshipKey;
+            order[ri] = homebrewKey;
+        };
+        swapHomebrewRelationshipOrder(s.syspromptSectionOrder);
+        for (const snapshot of Object.values(s.chatStates || {})) {
+            swapHomebrewRelationshipOrder(snapshot?.setup?.syspromptSectionOrder);
+        }
+        s.settingsVersion = '2026.8.49.1';
+    }
+
     // Stamp factory version even when a release has no field rewrites
     // (8.28.0 mapped-site index is prompt/injection only).
     if (isOlderThan(s.settingsVersion, FACTORY_SETTINGS_VERSION)) {

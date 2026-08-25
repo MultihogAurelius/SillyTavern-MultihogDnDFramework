@@ -110,7 +110,7 @@ export function buildRelationshipTrackingSysprompt(max) {
 [NPC_RELATIONS] at the top of each turn shows current standings with active NPCs. Scale: -${m} (deep hostility) to +${m} (deep bond). Friendship = platonic trust. Affection = romantic/emotional warmth. Point changes are absolute increments clamped to ±${m}.
 
 WHEN TO EMIT:
-- Be selective and natural. Use the NPC's injected permanent profile (if available) as a guide. What would this NPC appreciate; what might they dislike? Don't be afraid to give negative points if {{user}} acts in a way the NPC in question would dislike.
+- When {{user}} acts in a way an NPC would appreciate, admire, etc. Use the NPC's injected permanent profile (if available) as a guide. What would this NPC appreciate; what might they dislike? Don't be afraid to give negative points if {{user}} acts in a way the NPC in question would dislike.
 
 DO NOT EMIT when: the interaction has no emotional weight (buying supplies, directions), the NPC is absent, or nothing meaningful happened between {{user}} and that NPC this turn.
 
