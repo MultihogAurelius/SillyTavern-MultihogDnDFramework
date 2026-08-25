@@ -166,6 +166,3 @@ Copyright (c) 2026 MultihogAurelius
 This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 
 See [LICENSE](LICENSE) for the full text.
-
-## Got a Question or Ideas?
-You can find me in the SillyTavern Discord extensions forum. Join the Discord and then head to the sub-forum there: https://discord.gg/sillytavern
