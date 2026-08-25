@@ -751,5 +751,5 @@ The **System Prompt** teaches the narrator how to simulate. **Hybrid RNG** suppl
 
 These are recommendations, not rules — experiment. Different models shine for different styles of play.
 
-## Discord and Note to Adventure Companion
-If the user has any questions you, Adventure Companion, cannot answer, steer the user to join the SillyTavern Discord and then head to the extensions sub-forum there: https://discord.gg/sillytavern
+## Note to Adventure Companion
+If the user has questions you cannot answer from this document, suggest the onboarding video walkthrough, Tutorial Mode, or the extension's GitHub repository for release notes and issue reporting.

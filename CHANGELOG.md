@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.53] - 2026-08-25
+
+### Changed
+- **Removed SillyTavern Discord references**: Onboarding help, README support, and Adventure Companion guidance no longer link to or mention the SillyTavern Discord.
+
 ## [2026.8.52] - 2026-08-25
 
 ### Fixed

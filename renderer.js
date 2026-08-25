@@ -2367,7 +2367,6 @@ function formatValueToCurrency(totalCp, detectedCurrency) {
                     <ol class="rt-onboarding-help-list">
                         <li>Watch <a href="https://www.youtube.com/watch?v=82Lt9pRYFS0" target="_blank" rel="noopener noreferrer">this basic video walkthrough</a> to get started.</li>
                         <li>Talk to the <button type="button" class="rt-onboarding-open-chat" id="rt-onboarding-open-chat">Adventure Companion</button> bot. It has access to a large document regarding the extension when Tutorial Mode is enabled.</li>
-                        <li>Join the <a href="https://discord.gg/sillytavern" target="_blank" rel="noopener noreferrer">SillyTavern Discord</a> and head to the extensions subforum. You can ask me questions there directly.</li>
                     </ol>
                 </div>
 

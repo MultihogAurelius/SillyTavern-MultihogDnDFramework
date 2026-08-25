@@ -50,7 +50,7 @@ describe('onboarding Player Card and ST persona options', () => {
         );
     });
 
-    it('includes numbered onboarding help with embedded video, Discord, and CHAT links', () => {
+    it('includes numbered onboarding help with embedded video and CHAT links', () => {
         const html = renderMemoAsCards('', null, {});
 
         expect(html).toContain('Need help? Try these:');
@@ -58,9 +58,8 @@ describe('onboarding Player Card and ST persona options', () => {
         expect(html).toContain('href="https://www.youtube.com/watch?v=82Lt9pRYFS0"');
         expect(html).toContain('id="rt-onboarding-open-chat"');
         expect(html).toContain('Adventure Companion');
-        expect(html).toContain('href="https://discord.gg/sillytavern"');
-        expect(html).toContain('SillyTavern Discord');
-        expect(html).toContain('extensions subforum');
+        expect(html).not.toContain('discord.gg');
+        expect(html).not.toContain('SillyTavern Discord');
         expect(html).not.toContain('Hell, head there anyway!');
         expect(html).not.toContain('Need help? Open');
     });
