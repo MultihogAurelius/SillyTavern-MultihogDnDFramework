@@ -57,6 +57,7 @@ import {
     sliceMemoAndMapHistory,
     unshiftMemoAndMapHistory,
 } from './src/state/dungeon-map-history.js';
+import { canCommitPassForChat } from './src/state/pass-affinity.js';
 import { createPanel as buildPanel } from './src/ui/panel/panel-builder.js';
 import { broadcastStateTrackerStep } from './src/ui/panel/agent-terminal.js';
 import { createChatStateLoader } from './src/features/chat/chat-state-loader.js';
@@ -2436,6 +2437,12 @@ function onChatChanged(newChatId) {
     // preserved as potentially real campaign data.
     runtimeState.pendingUnseenChatReset = null;
 
+    // Drop in-flight State Tracker work for the departing chat. A late commit
+    // would write into the arriving chat's projected settings / chatStates partition.
+    if (runtimeState.stateController) {
+        try { runtimeState.stateController.abort(); } catch (_) { /* ignore */ }
+    }
+
     // Flush Adventure Companion under the departing chat BEFORE flipping currentChatId /
     // loading the arriving partition (history is per-chat, including when Chat Link is off).
     if (typeof globalThis._rpgFlushAdventureCompanionForChat === 'function' && oldChatId) {
@@ -2830,6 +2837,9 @@ function updatePanelStatus() {
  */
 async function runStateModelPass(narrativeOutput, isFullContext = false, overrideLookback = null) {
     const settings = getSettings();
+    // Capture before any await: after a chat switch the shared settings object
+    // belongs to a different partition and must not receive this pass's commit.
+    const passChatId = runtimeState.currentChatId;
 
     // Deterministic logic: Auto-fail quests past deadline (if not using frustration)
     checkQuestDeadlines();
@@ -2851,6 +2861,7 @@ async function runStateModelPass(narrativeOutput, isFullContext = false, overrid
         if (runtimeState.stateController) runtimeState.stateController.abort();
         runtimeState.stateController = new AbortController();
         const signal = runtimeState.stateController.signal;
+        let abandonedForChatSwitch = false;
 
         const modulesText = buildModulesInstructionText(settings);
         const coreTemplate = settings.fullReviewStateMode ? FULL_REVIEW_STATE_SYSTEM_PROMPT : settings.systemPromptTemplate;
@@ -2963,6 +2974,9 @@ async function runStateModelPass(narrativeOutput, isFullContext = false, overrid
         // Treats each chunk result as a full "turn": commits to settings, archives history,
         // updates UI, and saves — so the next chunk sees the committed state.
         function commitChunkResult(merged, previousMemoSnapshot, mapSnapshot = null) {
+            if (!canCommitPassForChat(passChatId, runtimeState.currentChatId, { aborted: signal.aborted })) {
+                return null;
+            }
             const delta = computeDelta(previousMemoSnapshot, merged);
 
             // Linear Stone History Logic
@@ -2997,7 +3011,8 @@ async function runStateModelPass(narrativeOutput, isFullContext = false, overrid
             saveSettings();
             // Keep chatStates in sync immediately so a same-session reload (F5) can never
             // resurrect a stale/empty per-chat snapshot over this freshly-committed memo.
-            if (settings.chatLinkEnabled && runtimeState.currentChatId) saveChatState(runtimeState.currentChatId);
+            // Always pin to the originating chat — never the post-switch active id.
+            if (settings.chatLinkEnabled && passChatId) saveChatState(passChatId);
 
             if (/LEVEL_UP=true/i.test(merged)) {
                 handleLevelUp();
@@ -3010,6 +3025,10 @@ async function runStateModelPass(narrativeOutput, isFullContext = false, overrid
 
         for (let i = 0; i < chunks.length; i++) {
             if (signal.aborted) break;
+            if (!canCommitPassForChat(passChatId, runtimeState.currentChatId)) {
+                abandonedForChatSwitch = true;
+                break;
+            }
 
             // Snapshot the memo BEFORE this chunk processes, so delta/history is per-chunk
             const memoBeforeThisChunk = settings.currentMemo.replace(/<\/?memo>/gi, '').trim();
@@ -3048,6 +3067,12 @@ async function runStateModelPass(narrativeOutput, isFullContext = false, overrid
 
             const result = await sendStateRequest(settings, systemPrompt, userPrompt, signal, { stream: true, debugSource: 'Tracker' });
 
+            if (signal.aborted) break;
+            if (!canCommitPassForChat(passChatId, runtimeState.currentChatId)) {
+                abandonedForChatSwitch = true;
+                break;
+            }
+
             if (result && typeof result === 'string') {
                 if (settings.debugMode) console.log(`[RPG Tracker] Raw Result (Chunk ${i + 1}):`, result);
 
@@ -3071,9 +3096,22 @@ async function runStateModelPass(narrativeOutput, isFullContext = false, overrid
 
                 // ── FULL COMMIT: treat this chunk as a completed turn ──
                 const mapSnapshot = await captureActiveDungeonMapHistory();
+                if (signal.aborted) break;
+                if (!canCommitPassForChat(passChatId, runtimeState.currentChatId)) {
+                    abandonedForChatSwitch = true;
+                    break;
+                }
                 lastDelta = commitChunkResult(merged, memoBeforeThisChunk, mapSnapshot);
+                if (lastDelta == null) {
+                    abandonedForChatSwitch = true;
+                    break;
+                }
                 if (relationshipCommands.length) {
                     await applyStateTrackerRelationshipCommands(relationshipCommands);
+                    if (!canCommitPassForChat(passChatId, runtimeState.currentChatId, { aborted: signal.aborted })) {
+                        abandonedForChatSwitch = true;
+                        break;
+                    }
                 }
                 const changed = merged !== memoBeforeThisChunk;
                 broadcastStateTrackerStep(
@@ -3102,7 +3140,9 @@ async function runStateModelPass(narrativeOutput, isFullContext = false, overrid
             }
         }
 
-        if (signal.aborted) {
+        if (abandonedForChatSwitch) {
+            broadcastStateTrackerStep('error', 'Stopped because the active chat changed.');
+        } else if (signal.aborted) {
             broadcastStateTrackerStep('error', 'Stopped by user.');
         } else {
             broadcastStateTrackerStep('finish', isFullContext ? 'State Tracker full audit complete.' : 'State Tracker pass complete.');
@@ -3242,6 +3282,7 @@ export async function sendDirectPrompt(message, options = {}) {
     }
 
     const settings = getSettings();
+    const passChatId = runtimeState.currentChatId;
     const { generateRaw } = SillyTavern.getContext();
     if (!generateRaw) {
         toastr['warning']('Text generation is not available. Connect an API in SillyTavern settings.', 'RPG Tracker');
@@ -3258,6 +3299,15 @@ export async function sendDirectPrompt(message, options = {}) {
         runtimeState.stateController = new AbortController();
         const signal = runtimeState.stateController.signal;
         const worldLore = await buildLorebookContext();
+        if (!canCommitPassForChat(passChatId, runtimeState.currentChatId, { aborted: signal.aborted })) {
+            broadcastStateTrackerStep('error', signal.aborted ? 'Stopped by user.' : 'Stopped because the active chat changed.');
+            return {
+                success: false,
+                status: signal.aborted ? 'cancelled' : 'chat_changed',
+                changed: false,
+                message: signal.aborted ? 'State Tracker command was cancelled.' : 'Active chat changed; State Tracker commit was skipped.',
+            };
+        }
         const worldLoreSection = worldLore ? worldLore + '\n\n' : '';
 
         const modulesText = buildModulesInstructionText(settings);
@@ -3311,6 +3361,16 @@ export async function sendDirectPrompt(message, options = {}) {
         broadcastStateTrackerStep('thought', 'Requesting memo update from State Tracker...');
         const result = await sendStateRequest(options.connectionSettings || settings, systemPrompt, userPrompt, signal, { stream: true, debugSource: 'Tracker' });
 
+        if (!canCommitPassForChat(passChatId, runtimeState.currentChatId, { aborted: signal.aborted })) {
+            broadcastStateTrackerStep('error', signal.aborted ? 'Stopped by user.' : 'Stopped because the active chat changed.');
+            return {
+                success: false,
+                status: signal.aborted ? 'cancelled' : 'chat_changed',
+                changed: false,
+                message: signal.aborted ? 'State Tracker command was cancelled.' : 'Active chat changed; State Tracker commit was skipped.',
+            };
+        }
+
         if (result && typeof result === 'string') {
             let cleanedOutput = result;
             const memoBlocks = [...result.matchAll(/<memo>([\s\S]*?)<\/memo>/gi)];
@@ -3331,6 +3391,15 @@ export async function sendDirectPrompt(message, options = {}) {
                     sliceMemoAndMapHistory(settings, settings.historyIndex);
                 }
                 const mapSnapshot = await captureActiveDungeonMapHistory();
+                if (!canCommitPassForChat(passChatId, runtimeState.currentChatId, { aborted: signal.aborted })) {
+                    broadcastStateTrackerStep('error', signal.aborted ? 'Stopped by user.' : 'Stopped because the active chat changed.');
+                    return {
+                        success: false,
+                        status: signal.aborted ? 'cancelled' : 'chat_changed',
+                        changed: false,
+                        message: signal.aborted ? 'State Tracker command was cancelled.' : 'Active chat changed; State Tracker commit was skipped.',
+                    };
+                }
                 ensureDungeonMapHistory(settings);
                 if (settings.memoHistory[0] !== sanitizedCurrentFull) {
                     const previousMap = settings.historyIndex === 0
@@ -3354,7 +3423,7 @@ export async function sendDirectPrompt(message, options = {}) {
                 syncMemoView();
                 refreshRenderedView();
                 saveSettings();
-                if (settings.chatLinkEnabled && runtimeState.currentChatId) saveChatState(runtimeState.currentChatId);
+                if (settings.chatLinkEnabled && passChatId) saveChatState(passChatId);
                 broadcastStateTrackerStep('result', 'Memo updated from direct instruction.');
                 broadcastStateTrackerStep('finish', 'Direct State Tracker instruction complete.');
                 toastr['success']('Tracker updated.', 'RPG Tracker');
