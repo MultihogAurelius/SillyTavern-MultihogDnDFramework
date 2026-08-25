@@ -72,6 +72,7 @@ function findLocationEntryInBook(book, normPath) {
 /**
  * Present Now NPCs from a name scan of the most recent narrator output only.
  * User messages are skipped so a player turn without NPC names does not clear the list.
+ * CYOA choice/button blocks are ignored so names in unused options do not count.
  * Matches NPC entry labels (first/last name); ignores lorebook key[] keywords.
  * Independent of Lorebook Agent activeRouterKeys (avoids stale characters).
  * @param {object} settings

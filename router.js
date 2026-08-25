@@ -21,7 +21,7 @@ import {
     trimLoreHistoryForRollback,
 } from './src/state/lorebook-history.js';
 import { buildKeyringText, grepLoreInBooks, isSkeletonBookName, resolveBooksToScan } from './src/state/lorebook-keyring.js';
-import { findMostRecentNarratorMessage } from './src/state/present-now.js';
+import { findMostRecentNarratorMessage, stripCyoaChoiceBlocks } from './src/state/present-now.js';
 import {
     applyDungeonMapTransaction,
     attachDungeonMapToLocationEntry,
@@ -4402,7 +4402,9 @@ function getMostRecentNarrativeText(includeHidden = false) {
     const { chat } = SillyTavern.getContext();
     const msg = findMostRecentNarratorMessage(chat, { includeHidden });
     if (!msg) return '';
-    const mes = cleanMessageContent(msg);
+    const raw = String(msg.mes || msg.content || '');
+    const withoutChoices = stripCyoaChoiceBlocks(raw);
+    const mes = cleanMessageContent({ ...msg, mes: withoutChoices, content: withoutChoices });
     if (!mes) return '';
     if (mes.startsWith('[Summary') || mes.startsWith('(Summary') || mes.includes('Summary of past events:')) return '';
     return mes;
@@ -4411,6 +4413,8 @@ function getMostRecentNarrativeText(includeHidden = false) {
 /**
  * Present-Now name scanner — separate from the Lorebook Agent keyword scanner.
  * Scans ONLY the latest single narrator message for NPC names (entry comment/label).
+ * CYOA choice/button blocks are stripped first so hypothetical
+ * names in action options do not count as scene presence.
  * User messages are never scanned: a player turn without explicit NPC names must
  * not clear Present Now. First/last name tokens are enough for established NPCs;
  * NPCs the agent just recorded this pass require a full-name match so loose
@@ -4424,9 +4428,10 @@ function getMostRecentNarrativeText(includeHidden = false) {
  */
 export async function scanRecentOutputForPresentNpcs(narrativeText) {
     const settings = getSettings();
-    const text = (narrativeText != null && narrativeText !== '')
+    const rawText = (narrativeText != null && narrativeText !== '')
         ? String(narrativeText)
         : getMostRecentNarrativeText(!!settings.routerIncludeHidden);
+    const text = stripCyoaChoiceBlocks(rawText);
     if (!text.trim()) return [];
 
     const ctx = SillyTavern.getContext();

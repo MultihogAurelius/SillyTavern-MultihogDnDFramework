@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.49] - 2026-08-25
+
+### Fixed
+- **Present Now ignores CYOA choices**: Names that appear only inside unused CYOA choice/button blocks no longer count as scene presence.
+
 ## [2026.8.48] - 2026-08-25
 
 ### Changed
