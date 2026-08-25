@@ -146,7 +146,7 @@ These are recommendations, not rules — experiment. Different models shine for 
 
 <div align="center">
   <figure>
-    <img width="1918" height="982" alt="Screenshot 2026-06-18 195917" src="https://github.com/user-attachments/assets/9cd3fc04-a8b3-40f7-86fd-64b21adffc0f" />
+    <img width="1918" height="982" alt="Screenshot 2026-06-18 195917" src="https://github.com/user-attachments/assets/d6459f8b-ed3a-4baf-9c84-15db5d590ea7" />
   </figure>
 </div>
 
@@ -156,6 +156,8 @@ These are recommendations, not rules — experiment. Different models shine for 
   <br>
   <em>Visualization Mode</em>
 </p>
+
+
 
 ---
 
