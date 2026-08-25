@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.56] - 2026-08-26
+
+### Changed
+- **XP system**: `<xp_system>` now uses bulleted guidance, clarifies that XP should feel meaningful at the current level, and adds quest payout examples (e.g. major level-6 quest: 5,000–10,000 XP).
+
 ## [2026.8.55] - 2026-08-26
 
 ### Changed

@@ -482,7 +482,12 @@ Travel/time-skips only, not spammed. Pop a number: ≥14 = event occurs. If even
 </random_events>
 
 <xp_system>
-Award XP inline (+[X] XP — [reason]) for real consequences: new info, new threat/pressure/option, obstacle resolved, or quest/objective complete. Scale to stakes (discovery=small, quest=large); check every notable roll/event, defaulting to award when in doubt. Skill check XP scales with DC; combat XP scales with challenge to the character. Do not award XP as a consequence of a failed check.
+- Award XP inline (+[X] XP — [reason]) for real consequences: new info, new threat/pressure/option, obstacle resolved, or quest/objective complete.
+- Scale to stakes (discovery=small, quest=large). Generally, XP should be enough to be felt at that level but not excessive.
+- Check every notable roll/event, defaulting to award when in doubt.
+- Skill check XP scales with DC; combat XP scales with challenge to the character.
+- Do not award XP as a consequence of a failed check.
+- Quests should give significant XP. For example, a major quest at level 6 (23,000 total XP) should give 5000-10,000 XP.
 
 LEVEL THRESHOLDS: 1–0 | 2–300 | 3–900 | 4–2,700 | 5–6,500 | 6–14,000 | 7–23,000 | 8–34,000 | 9–48,000 | 10–64,000, etc. Level cap is 20 per D&D.
 </xp_system>
@@ -848,7 +853,12 @@ Travel/time-skips only, not spammed. Pop a number: ≥14 = event occurs. If even
 </random_events>
 
 <xp_system>
-Award XP inline (+[X] XP — [reason]) for real consequences: new info, new threat/pressure/option, obstacle resolved, or quest/objective complete. Scale to stakes (discovery=small, quest=large); check every notable roll/event, defaulting to award when in doubt. Skill check XP scales with DC; combat XP scales with challenge to the character. Do not award XP as a consequence of a failed check.
+- Award XP inline (+[X] XP — [reason]) for real consequences: new info, new threat/pressure/option, obstacle resolved, or quest/objective complete.
+- Scale to stakes (discovery=small, quest=large). Generally, XP should be enough to be felt at that level but not excessive.
+- Check every notable roll/event, defaulting to award when in doubt.
+- Skill check XP scales with DC; combat XP scales with challenge to the character.
+- Do not award XP as a consequence of a failed check.
+- Quests should give significant XP. For example, a major quest at level 6 (23,000 total XP) should give 5000-10,000 XP.
 
 LEVEL THRESHOLDS: 1–0 | 2–300 | 3–900 | 4–2,700 | 5–6,500 | 6–14,000 | 7–23,000 | 8–34,000 | 9–48,000 | 10–64,000, etc. Level cap is 20 per D&D.
 </xp_system>
