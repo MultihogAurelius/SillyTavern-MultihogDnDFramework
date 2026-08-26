@@ -109,7 +109,9 @@ describe('API setup checklist', () => {
         expect(html).toContain('Last time they cared to look at these defaults was in 2021');
         expect(html).toContain('Imposing an artificial context limit does nothing but destroy your cache hits, which means you pay more.');
         expect(html).toContain('Output length is set to 100,000');
-        expect(html).toContain('This is just as bad as Text Completion being the default/at the top of the menu. The defaults are extremely low, which make the program completely unusable from the get-go. The model will suddenly stop outputting, and the user is confused. This truly is the perfect example of anti-user design and being completely out of touch.');
+        expect(html).toContain('Or worse: an agent is outputting a JSON object and the model hits this pathetic cap, truncating the JSON.');
+        expect(html).toContain('SillyTavern is an outdated anti-user program that ships with 2021 assumptions in 2026.');
+        expect(html).toContain('This truly is the perfect example of anti-user design and being completely out of touch.');
         expect(html).toContain('href="https://github.com/Lodactio/Extension-Summaryception"');
         expect(html).toContain('>summarizer</a>');
         expect(html).toContain('id="rt-api-setup-gm-name"');

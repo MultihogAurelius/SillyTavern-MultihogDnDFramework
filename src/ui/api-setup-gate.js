@@ -43,7 +43,7 @@ const CHECKLIST_ITEMS = [
     {
         id: 'outputLength',
         title: 'Output length is set to 100,000',
-        body: 'This is just as bad as Text Completion being the default/at the top of the menu. The defaults are extremely low, which make the program completely unusable from the get-go. The model will suddenly stop outputting, and the user is confused. This truly is the perfect example of anti-user design and being completely out of touch.',
+        body: 'This is just as bad as Text Completion being the default/at the top of the menu. The defaults are extremely low, which make the program completely unusable from the get-go. The model will suddenly stop outputting, and the user is confused. Or worse: an agent is outputting a JSON object and the model hits this pathetic cap, truncating the JSON. The result is that my extension throws an error and looks broken, when in reality the reason is that SillyTavern is an outdated anti-user program that ships with 2021 assumptions in 2026.\n\nThis truly is the perfect example of anti-user design and being completely out of touch.',
     },
 ];
 
