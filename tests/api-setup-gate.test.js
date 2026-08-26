@@ -88,7 +88,7 @@ describe('API setup checklist', () => {
         expect(RECOMMENDED_OUTPUT_LENGTH).toBe(100000);
     });
 
-    it('keeps Continue enabled and uses the crude setup copy', () => {
+    it('keeps Continue enabled and renders the Anti-Museum Tour copy', () => {
         const html = buildOverlayHtml({
             chatCompletion: false,
             functionCalling: false,
@@ -98,20 +98,20 @@ describe('API setup checklist', () => {
         expect(html).toContain('id="rt-api-setup-continue"');
         expect(html).not.toMatch(/id="rt-api-setup-continue"[^>]*disabled/);
         expect(html).toContain('Anti-Museum Tour');
-        expect(html).toContain('This menu is a result of months of taking &quot;bug reports&quot; from people and discovering 98% of the time the cause was the museum defaults of SillyTavern.');
-        expect(html).toContain('I&apos;ll probably fork this trash eventually and fix all of this, but for now Multihog D&amp;D will still continue as an extension.');
+        expect(html).toContain('People get JSON syntax errors and other stuff, and it turns out it&apos;s because ST makes their maximum output like 2000 out of the box.');
         expect(html).toContain('Chat Completion is enabled');
-        expect(html).toContain('Text Completion is an idiotic legacy API that was relevant before ChatGPT came out. It being offered as the default still in 2026 is an insult and shows how the ST developers don\'t give a fuck about UX and common sense.');
-        expect(html).toContain('You still have to configure your API settings manually. OpenRouter or NanoGPT are recommended.');
+        expect(html).toContain('Text Completion is a legacy API that was relevant before ChatGPT came out. It being offered as the default in 2026 makes absolutely no sense. It functions as a landmine, and I constantly see users step into it.');
+        expect(html).toContain('Even with Chat Completion, however, you still have to configure your API settings manually. OpenRouter or NanoGPT are what I would recommend.');
         expect(html).toContain('Function calling is enabled');
-        expect(html).toContain('This is crucial to use the more effective version of tools in Multihog D&amp;D Instead of the MacGyver makeshit cope tools path (that regardless is available if you absolutely can\'t use tool calling.)');
+        expect(html).toContain('This is crucial to use the more effective version of tools in Multihog D&amp;D, though there is a MacGyver cope path available if you can\'t use tools for whatever reason.');
         expect(html).toContain('Maximum context size is unlimited');
-        expect(html).toContain('Last time they cared to look at these defaults was in 2021');
+        expect(html).toContain('It\'s quite clear the last time the ST devs looked at these was in 2021-2022 because the numbers match that era perfectly.');
+        expect(html).toContain('There is no reason to limit this today, and in fact there are reasons not to.');
         expect(html).toContain('Imposing an artificial context limit does nothing but destroy your cache hits, which means you pay more.');
         expect(html).toContain('Output length is set to 100,000');
-        expect(html).toContain('Or worse: an agent is outputting a JSON object and the model hits this pathetic cap, truncating the JSON.');
-        expect(html).toContain('SillyTavern is an outdated anti-user program that ships with 2021 assumptions in 2026.');
-        expect(html).toContain('This truly is the perfect example of anti-user design and being completely out of touch.');
+        expect(html).toContain('truncating the JSON and giving a schema/syntax error.');
+        expect(html).toContain('Why has it never changed? Who knows, but I know the results are disastrous.');
+        expect(html).toContain('Setup should be correct by default, wrong by user intervention. It\'s the exact opposite here.');
         expect(html).toContain('href="https://github.com/Lodactio/Extension-Summaryception"');
         expect(html).toContain('>summarizer</a>');
         expect(html).toContain('id="rt-api-setup-gm-name"');

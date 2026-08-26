@@ -27,23 +27,23 @@ const CHECKLIST_ITEMS = [
     {
         id: 'chatCompletion',
         title: 'Chat Completion is enabled',
-        body: 'Text Completion is an idiotic legacy API that was relevant before ChatGPT came out. It being offered as the default still in 2026 is an insult and shows how the ST developers don\'t give a fuck about UX and common sense.\n\nYou still have to configure your API settings manually. OpenRouter or NanoGPT are recommended.',
+        body: 'Text Completion is a legacy API that was relevant before ChatGPT came out. It being offered as the default in 2026 makes absolutely no sense. It functions as a landmine, and I constantly see users step into it.\n\nEven with Chat Completion, however, you still have to configure your API settings manually. OpenRouter or NanoGPT are what I would recommend.',
         shot: true,
     },
     {
         id: 'functionCalling',
         title: 'Function calling is enabled',
-        body: 'This is crucial to use the more effective version of tools in Multihog D&D Instead of the MacGyver makeshit cope tools path (that regardless is available if you absolutely can\'t use tool calling.)',
+        body: 'This is crucial to use the more effective version of tools in Multihog D&D, though there is a MacGyver cope path available if you can\'t use tools for whatever reason.',
     },
     {
         id: 'maxContextUnlocked',
         title: 'Maximum context size is unlimited',
-        body: 'This is another stroke of genius from the ST guys. Last time they cared to look at these defaults was in 2021. It feels like entering a museum.\n\nThere is no reason to limit this. You\'re supposed to use a {{summarizer}}, which hides messages, so your context is never larger than 30k or so anyway. Imposing an artificial context limit does nothing but destroy your cache hits, which means you pay more. Context caps are from an era before people figured out how to summarize context.',
+        body: 'It\'s quite clear the last time the ST devs looked at these was in 2021-2022 because the numbers match that era perfectly. It feels like entering a museum.\n\nThere is no reason to limit this today, and in fact there are reasons not to. You\'re supposed to use a {{summarizer}}, which hides messages, so your context is never larger than 30k or so anyway. Imposing an artificial context limit does nothing but destroy your cache hits, which means you pay more. Context caps are from an era before people figured out how to summarize context.',
     },
     {
         id: 'outputLength',
         title: 'Output length is set to 100,000',
-        body: 'This is just as bad as Text Completion being the default/at the top of the menu. The defaults are extremely low, which make the program completely unusable from the get-go. The model will suddenly stop outputting, and the user is confused. Or worse: an agent is outputting a JSON object and the model hits this pathetic cap, truncating the JSON. The result is that my extension throws an error and looks broken, when in reality the reason is that SillyTavern is an outdated anti-user program that ships with 2021 assumptions in 2026.\n\nThis truly is the perfect example of anti-user design and being completely out of touch.',
+        body: 'This is just as bad as Text Completion being the default/at the top of the menu.\n\nThe defaults are extremely low, which make the program completely unusable from the get-go. The model will suddenly stop outputting, and the user is confused. Or worse: an agent is outputting a JSON object and the model hits this pathetic cap, truncating the JSON and giving a schema/syntax error.\n\nThe result is that my extension throws an error and looks broken, when in reality the reason is that SillyTavern is an outdated anti-user program that ships with 2021 assumptions in 2026. This truly is the perfect example of anti-user design and being completely out of touch. Why has it never changed? Who knows, but I know the results are disastrous.\n\nSetup should be correct by default, wrong by user intervention. It\'s the exact opposite here.',
     },
 ];
 
@@ -263,7 +263,7 @@ export function buildOverlayHtml(statuses = getApiSetupStatuses(), options = {})
         <div class="rt-api-setup-card" role="dialog" aria-labelledby="rt-api-setup-title">
             <div class="rt-api-setup-kicker">Anti-Museum Tour</div>
             <h2 id="rt-api-setup-title">SillyTavern API settings to check</h2>
-            <p>This menu is a result of months of taking &quot;bug reports&quot; from people and discovering 98% of the time the cause was the museum defaults of SillyTavern. The fix would be a single commit coded in literally one minute, but ST is dead, so this is what I have to do instead. I&apos;ll probably fork this trash eventually and fix all of this, but for now Multihog D&amp;D will still continue as an extension.</p>
+            <p>This menu is a result of months of taking &quot;bug reports&quot; from people and discovering 98% of the time the cause was the museum defaults of SillyTavern. People get JSON syntax errors and other stuff, and it turns out it&apos;s because ST makes their maximum output like 2000 out of the box.</p>
             <div class="rt-api-setup-list" id="rt-api-setup-list">
                 ${renderChecklist(statuses)}
             </div>
