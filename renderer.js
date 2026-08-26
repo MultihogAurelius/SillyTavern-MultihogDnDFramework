@@ -2387,7 +2387,7 @@ function formatValueToCurrency(totalCp, detectedCurrency) {
                                 <input id="rt-onboarding-gm-name" class="text_pole rt-onboarding-gm-name" type="text" value="Game Master" placeholder="Game Master" maxlength="120" aria-label="Narrator card name">
                                 <button type="button" class="rt-onboarding-open-chat" id="rt-onboarding-create-gm">Create narrator card</button>
                             </div>
-                            <div class="rt-onboarding-gm-note">Multihog doesn&apos;t use the outdated and stupid one-on-one chat format but uses a proper RP format written like a book, that involves multiple characters. The messages are attributed to a narrator, not a single character.</div>
+                            <div class="rt-onboarding-gm-note">Multihog doesn&apos;t use a one-on-one chat format but uses a format written like a book, that seamlessly allows for multiple characters. The messages are attributed to a narrator, not a single character.</div>
                         </li>
                         <li>Use one of the character creation options above to roll a new character. You can either use the Character Creator option to clearly specify your character, use Other Ways to Begin for a more rough description, or use Instant Action to get started quicker.</li>
                     </ol>

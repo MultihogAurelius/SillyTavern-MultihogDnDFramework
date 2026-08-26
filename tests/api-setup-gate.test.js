@@ -117,7 +117,7 @@ describe('API setup checklist', () => {
         expect(html).toContain('id="rt-api-setup-gm-name"');
         expect(html).toContain('value="Game Master"');
         expect(html).toContain('id="rt-api-setup-create-gm"');
-        expect(html).toContain('Multihog doesn&apos;t use the outdated and stupid one-on-one chat format but uses a proper RP format written like a book, that involves multiple characters. The messages are attributed to a narrator, not a single character.');
+        expect(html).toContain('Multihog doesn&apos;t use a one-on-one chat format but uses a format written like a book, that seamlessly allows for multiple characters. The messages are attributed to a narrator, not a single character.');
         expect(html.match(/type="checkbox"/g)?.length).toBe(4);
         expect(html).not.toContain('These live checkmarks reflect your current SillyTavern settings');
     });

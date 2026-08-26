@@ -273,7 +273,7 @@ export function buildOverlayHtml(statuses = getApiSetupStatuses(), options = {})
                     <input id="rt-api-setup-gm-name" class="rt-api-setup-gm-name text_pole" type="text" value="${escapeHtml(narratorCardName)}" placeholder="${escapeHtml(GAME_MASTER_CARD_NAME)}" maxlength="120">
                     <button type="button" class="rt-api-setup-create-gm" id="rt-api-setup-create-gm">Create narrator card</button>
                 </div>
-                <p class="rt-api-setup-gm-note">Multihog doesn&apos;t use the outdated and stupid one-on-one chat format but uses a proper RP format written like a book, that involves multiple characters. The messages are attributed to a narrator, not a single character.</p>
+                <p class="rt-api-setup-gm-note">Multihog doesn&apos;t use a one-on-one chat format but uses a format written like a book, that seamlessly allows for multiple characters. The messages are attributed to a narrator, not a single character.</p>
             </div>
             <div class="rt-api-setup-status ${doneCount === 4 ? 'rt-api-setup-status-ok' : 'rt-api-setup-status-bad'}">
                 ${doneCount} / 4 recommended settings are on. Current API: <b>${escapeHtml(describeMainApi())}</b>.
