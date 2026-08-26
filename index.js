@@ -3107,8 +3107,15 @@ async function runStateModelPass(narrativeOutput, isFullContext = false, overrid
                     break;
                 }
                 if (relationshipCommands.length) {
-                    await applyStateTrackerRelationshipCommands(relationshipCommands);
+                    // Relationship applies await NPC resolution; refuse if the chat
+                    // changed so deltas cannot land in another chatStates partition.
                     if (!canCommitPassForChat(passChatId, runtimeState.currentChatId, { aborted: signal.aborted })) {
+                        abandonedForChatSwitch = true;
+                        break;
+                    }
+                    const relResult = await applyStateTrackerRelationshipCommands(relationshipCommands, { passChatId });
+                    if (!canCommitPassForChat(passChatId, runtimeState.currentChatId, { aborted: signal.aborted })
+                        || relResult?.status === 'chat_changed') {
                         abandonedForChatSwitch = true;
                         break;
                     }

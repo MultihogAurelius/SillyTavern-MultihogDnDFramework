@@ -20,6 +20,7 @@ import { getActiveMapUpdaterSiteRoot, maybeRollbackMapUpdaterForSwipe, runMapUpd
 import { maybeRollbackMapEvolutionForSwipe, maybeRunMapEvolution, stopMapEvolutionPass } from './map-evolution.js';
 import { formatNarratorSiteActivity } from './map-evolution-lib.js';
 import { shiftMemoAndMapHistory } from './src/state/dungeon-map-history.js';
+import { canCommitPassForChat } from './src/state/pass-affinity.js';
 import { logTransaction } from './debug-viewer.js';
 import { recordSchedulerEvent } from './swipe-scheduler-debug.js';
 import { saveSettings } from './src/app/runtime-bridge.js';
@@ -2187,19 +2188,29 @@ async function applyNarrativeRelationshipRegex(lastAiMsg, settings, ctx) {
  * Commands are not stored; only the existing relationship value rollback record is.
  * @param {Array<{type: string, npc: string, field: 'friendship'|'affection', delta: number}>} commands
  */
-export async function applyStateTrackerRelationshipCommands(commands) {
-    if (!Array.isArray(commands) || !commands.length) return;
+export async function applyStateTrackerRelationshipCommands(commands, options = {}) {
+    if (!Array.isArray(commands) || !commands.length) return { applied: false, status: 'empty' };
+
+    const passChatId = options.passChatId ?? runtimeState.currentChatId;
+    if (!canCommitPassForChat(passChatId, runtimeState.currentChatId)) {
+        return { applied: false, status: 'chat_changed' };
+    }
 
     const settings = getSettings();
-    if (!settings.npcRelationshipBars) return;
+    if (!settings.npcRelationshipBars) return { applied: false, status: 'disabled' };
     const ctx = SillyTavern.getContext();
     const lastAiMsg = [...(ctx.chat || [])].reverse().find(message => !message.is_user && !message.is_system);
-    if (!lastAiMsg) return;
+    if (!lastAiMsg) return { applied: false, status: 'no_message' };
 
     const swipeResult = applyRelationshipSwipeRollback(lastAiMsg, settings);
     if (swipeResult.bailEarly) {
-        if (swipeResult.anyChanged) persistRelationshipCommandChanges(ctx, settings);
-        return;
+        if (swipeResult.anyChanged) {
+            if (!canCommitPassForChat(passChatId, runtimeState.currentChatId)) {
+                return { applied: false, status: 'chat_changed' };
+            }
+            persistRelationshipCommandChanges(ctx, settings, passChatId);
+        }
+        return { applied: swipeResult.anyChanged, status: swipeResult.anyChanged ? 'ok' : 'bail' };
     }
 
     const swipeId = lastAiMsg.swipe_id ?? 0;
@@ -2207,7 +2218,15 @@ export async function applyStateTrackerRelationshipCommands(commands) {
     let anyChanged = swipeResult.anyChanged;
 
     for (const command of commands) {
+        if (!canCommitPassForChat(passChatId, runtimeState.currentChatId)) {
+            return { applied: false, status: 'chat_changed' };
+        }
         const resolvedId = command.npc.includes('::') ? command.npc : await fuzzyResolveNpcName(command.npc);
+        // fuzzyResolve awaits the lorebook manifest — a chat switch can project
+        // another partition into the shared settings object during that gap.
+        if (!canCommitPassForChat(passChatId, runtimeState.currentChatId)) {
+            return { applied: false, status: 'chat_changed' };
+        }
         if (!resolvedId) {
             console.warn(`[RPG Tracker] State Tracker relationship command could not resolve NPC "${command.npc}".`);
             continue;
@@ -2233,6 +2252,11 @@ export async function applyStateTrackerRelationshipCommands(commands) {
         });
         if (settings.npcRelationshipLog[resolvedId].length > 50) settings.npcRelationshipLog[resolvedId].length = 50;
 
+        lastAiMsg.extra = lastAiMsg.extra || {};
+        lastAiMsg.extra.rpgRollbackData = lastAiMsg.extra.rpgRollbackData || {};
+        if (!Array.isArray(lastAiMsg.extra.rpgRollbackData[swipeId])) {
+            lastAiMsg.extra.rpgRollbackData[swipeId] = [];
+        }
         lastAiMsg.extra.rpgRollbackData[swipeId].push({
             npcId: resolvedId,
             field: command.field,
@@ -2246,15 +2270,22 @@ export async function applyStateTrackerRelationshipCommands(commands) {
         anyChanged = true;
     }
 
-    if (anyChanged) persistRelationshipCommandChanges(ctx, settings);
+    if (anyChanged) {
+        if (!canCommitPassForChat(passChatId, runtimeState.currentChatId)) {
+            return { applied: false, status: 'chat_changed' };
+        }
+        persistRelationshipCommandChanges(ctx, settings, passChatId);
+    }
+    return { applied: anyChanged, status: anyChanged ? 'ok' : 'noop' };
 }
 
-function persistRelationshipCommandChanges(ctx, settings) {
+function persistRelationshipCommandChanges(ctx, settings, passChatId = null) {
     if (typeof ctx.saveChatDebounced === 'function') ctx.saveChatDebounced();
     void saveSettings();
     refreshRelationshipBarsDOM(settings);
     if (settings.chatLinkEnabled) {
-        const chatId = getActiveChatId();
+        // Prefer the originating pass chat when provided — never the post-switch active id.
+        const chatId = passChatId || getActiveChatId();
         if (chatId) saveChatState(chatId);
     }
 }

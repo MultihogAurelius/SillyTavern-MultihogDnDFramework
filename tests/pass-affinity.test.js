@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { canCommitPassForChat } from '../src/state/pass-affinity.js';
 
 const indexSource = readFileSync(new URL('../index.js', import.meta.url), 'utf8');
+const narrativeSource = readFileSync(new URL('../narrative-hooks.js', import.meta.url), 'utf8');
 
 describe('canCommitPassForChat', () => {
     it('allows commit only while the originating chat is still active', () => {
@@ -44,5 +45,23 @@ describe('State Tracker chat-switch affinity', () => {
         expect(directSlice).toContain('canCommitPassForChat(passChatId, runtimeState.currentChatId');
         expect(directSlice).toContain("status: signal.aborted ? 'cancelled' : 'chat_changed'");
         expect(directSlice).toContain('if (settings.chatLinkEnabled && passChatId) saveChatState(passChatId);');
+    });
+
+    it('guards State Tracker relationship applies against a post-await chat switch', () => {
+        expect(narrativeSource).toContain("import { canCommitPassForChat } from './src/state/pass-affinity.js';");
+        const relIdx = narrativeSource.indexOf('export async function applyStateTrackerRelationshipCommands');
+        expect(relIdx).toBeGreaterThanOrEqual(0);
+        const relSlice = narrativeSource.slice(relIdx, relIdx + 9000);
+        expect(relSlice).toContain('options.passChatId ?? runtimeState.currentChatId');
+        expect(relSlice).toContain("status: 'chat_changed'");
+        expect(relSlice).toContain('persistRelationshipCommandChanges(ctx, settings, passChatId)');
+        expect(relSlice).toMatch(
+            /await fuzzyResolveNpcName\([\s\S]*?canCommitPassForChat\(passChatId, runtimeState\.currentChatId\)/,
+        );
+
+        expect(indexSource).toContain(
+            'await applyStateTrackerRelationshipCommands(relationshipCommands, { passChatId })',
+        );
+        expect(indexSource).toContain("relResult?.status === 'chat_changed'");
     });
 });
