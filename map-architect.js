@@ -6,13 +6,10 @@ import {
     findLatestDungeonLocation,
     formatDungeonMapForNarrator,
     getDungeonMessageText,
-    locationContainsSiteRoot,
-    mapSiteFooterMismatchHint,
     normalizeMapSiteKind,
     normalizeMapSiteThreat,
     defaultMapSiteThreat,
     parseDungeonMapDocument,
-    settlementAbsorptionMatchesCurrentPeer,
     stripCapturedDungeonMapsFromPrompt,
     canonicalizeReciprocalConnectionDetails,
     validateDungeonMapArchitecture,
@@ -389,7 +386,6 @@ async function runMapArchitectOnce(rawArgs) {
     }
     const includeManifest = resolveIncludeManifest(include, current.sites, args.site);
     const currentLocation = findLatestDungeonLocation(ctx.chat || []);
-    const absorbsCurrentPeer = settlementAbsorptionMatchesCurrentPeer(args.kind, currentLocation, includeManifest);
     const hostContext = resolveHostedCreationContext(current, currentLocation, args);
     const entranceKnowledge = hostContext?.explicit ? 'UNREVEALED' : 'VISITED';
     const existing = findExistingArchitectSite(current.sites, args.site, hostContext);
@@ -414,10 +410,6 @@ async function runMapArchitectOnce(rawArgs) {
     }
     if (rawArgs?.requireNew && await locationRootExists(args.site)) {
         throw mapArchitectFailure(`A location named "${args.site}" already exists. Use + MAP on that root instead.`);
-    }
-
-    if (currentLocation && !locationContainsSiteRoot(currentLocation, args.site) && !rawArgs?.allowOffsite && !hostContext && !absorbsCurrentPeer) {
-        throw mapArchitectFailure(mapSiteFooterMismatchHint(args.site, currentLocation));
     }
 
     const lookback = resolveLookback(settings, rawArgs?.lookback);
@@ -518,7 +510,6 @@ async function runMapArchitectOnce(rawArgs) {
         throw mapArchitectFailure('Persistent Maps was disabled while the map was being generated. Nothing was saved.');
     }
     const saved = await persistArchitectDungeonMap(args.site, completedMap, {
-        allowOffsite: !!rawArgs?.allowOffsite,
         requireNew: !!rawArgs?.requireNew,
         locationKeys: rawArgs?.locationKeys,
         locationCore: rawArgs?.locationCore,
@@ -528,7 +519,7 @@ async function runMapArchitectOnce(rawArgs) {
     const status = saved.existing ? 'A concurrent map already existed and was preserved.' : `Map saved to ${saved.entryId}.`;
     const continuation = hostContext?.explicit
         ? 'This was an offsite structural edit. Do not move the player, change the Location footer, or narrate entry into the new map.'
-        : `Continue narration from ${args.entrance}; reveal only what the player can perceive.`;
+        : `Continue narration from ${args.entrance}; reveal only what the player can perceive. Once they enter, copy this exact site name into the Location footer: "${args.site}".`;
     broadcastStep('result', status);
     broadcastStep('finish', `Map Architect finished for ${args.site}.`);
     return `[MAP_ARCHITECT_RESULT — PRIVATE]\n${status}\nTreat this as objective current canon. Do not expose unseen facts.\n\n${formatDungeonMapForNarrator(saved.document)}\n\n${continuation}\n[/MAP_ARCHITECT_RESULT]`;

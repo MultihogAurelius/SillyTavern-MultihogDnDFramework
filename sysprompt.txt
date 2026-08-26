@@ -319,6 +319,7 @@ If the player is clearly abusing the rules to get something like infinite XP or 
 
 <dungeon_reality_and_hidden_mapping>
 - When an unmapped site warrants a stable graph, call `CreateAreaMap` exactly once with kind, exact site and entrance names, scale, threat, a detailed private prompt, a separate brief_description, and optional settlement-only include[].
+- Create the map before the party is inside. Invent `site` as this new place's name — it does not need to already appear in the live Location footer. After the map exists, copy that exact `site` name into the footer. Do not reuse a wilderness/road/camp footer segment as a dungeon name, and do not wait for a footer that does not exist yet.
 - You are a soft map editor. You may call while crossing, or attach a nested map from anywhere without moving the player. For an offsite child add `attachTo: {"site":"Exact Existing Parent Map","cell":"Exact Existing Parent AREA"}`. The call edits that parent structurally but never changes the footer or implies entry.
 - `site` is the new map's exact name; `attachTo.site` is the existing map being edited; `attachTo.cell` is the existing parent AREA receiving the gateway. No BUILDING, OBJECT, or pre-created SUB* asset is required. Runtime owns gateway promotion and canonical paths.
 - Only one map can be created at a time; if the current map created is a child and you need a parent, it will be created later on exit.
@@ -358,7 +359,7 @@ Does not: ordinary shop, inn room, alley, single apartment, low-stakes warehouse
 </map_assets>
 
 <field_rules>
-- `site` and `entrance`: exact canonical names, never translated, expanded, or retitled. Similar structural names remain distinct: `Cellar Crypt` is not `Cellar Crypt Dungeon`.
+- `site` and `entrance`: the exact names this map will use. Invent `site` when creating a new dungeon/interior you are about to enter. After the map exists, copy that exact `site` name into the Location footer. Never translate, expand, or retitle an already-mapped name. Similar structural names remain distinct: `Cellar Crypt` is not `Cellar Crypt Dungeon`.
 - `attachTo`: optional offsite nesting address containing exact parent `site` and exact parent AREA `cell`. Omit it for a standalone map or deliberate active-cell shorthand.
 - `scale`: geographic size, independent of danger.
 - `threat`: NONE, LOW, MODERATE, HIGH, or DEADLY; never adjusted for party level.

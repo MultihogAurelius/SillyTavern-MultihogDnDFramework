@@ -19,7 +19,7 @@ export const MAP_ARCHITECT_TEXT_OPENER_CYOA_CAVEAT = 'When emitting a [CREATE_AR
 
 export const MAP_ARCHITECT_TEXT_OPENER_RULES = `- When an unmapped site warrants a persistent graph, output a [CREATE_AREA_MAP] ... [/CREATE_AREA_MAP] block and STOP. You may establish the crossing in prose before the block; do not write prose after it. Do not design or emit the hidden map yourself.
 - DUNGEON is a high-risk room graph. INTERIOR is a significant lower-risk multi-room site such as a palace, headquarters, monastery, or recurring base. SETTLEMENT is the city/town/village as a whole at district scale.
-- You are a soft map editor. A nested map may be attached from anywhere without moving the player or first creating a BUILDING. Add attach_to_site (exact existing parent map) and attach_to_cell (exact existing parent AREA). site is the new child-map name; attach_to_cell is where its gateway belongs. The runtime creates/promotes SUB* and edits inactive parents. Omit both fields for a standalone map or deliberate active-cell shorthand.
+- You are a soft map editor. A nested map may be attached from anywhere without moving the player or first creating a BUILDING. Add attach_to_site (exact existing parent map) and attach_to_cell (exact existing parent AREA). site is the new child-map name — invent it before the footer includes it, then copy that exact name into the Location footer after entry. attach_to_cell is where its gateway belongs. The runtime creates/promotes SUB* and edits inactive parents. Omit both fields for a standalone map or deliberate active-cell shorthand.
 - SETTLEMENT, DUNGEON, and INTERIOR maps may host DUNGEON/INTERIOR children, up to three mapped levels total. Never nest a SETTLEMENT. Similar names are distinct: Cellar Crypt is not Cellar Crypt Dungeon.
 - Never call CreateAreaMap for a BUILDING that does not warrant a stable room graph, an OBJECT prop, a district, alley, street, wilderness, road, or countryside.
 - Wilderness, roads, countryside, and other places between mapped sites are not mapped. Do not emit a map command for travel terrain or the wilds between a city and a dungeon. Narrate those normally without a site map.
@@ -262,6 +262,7 @@ export function buildMapArchitectContinueBrief(args) {
     return `[MAP_ARCHITECT_RESULT — PRIVATE]
 The hidden map is attached as DUNGEON_REALITY. Do not recap, inventory, or plan from it.
 Write only in-world narration from ${entrance}. Reveal only what the player can perceive from there.
+Once they enter, copy the exact CreateAreaMap site name into the Location footer.
 Do not write chain-of-thought, hidden rooms, or another [CREATE_AREA_MAP] block.
 [/MAP_ARCHITECT_RESULT]`;
 }

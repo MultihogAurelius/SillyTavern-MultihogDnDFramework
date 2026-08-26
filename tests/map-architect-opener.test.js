@@ -234,6 +234,7 @@ premise: Vast empty halls.
         const brief = buildMapArchitectContinueBrief({ entrance: 'Rusty Hatch Cover' });
         expect(brief).toContain('Rusty Hatch Cover');
         expect(brief).toContain('Do not write chain-of-thought');
+        expect(brief).toContain('copy the exact CreateAreaMap site name into the Location footer');
         const message = {
             extra: { reasoning: 'long hidden plan', reasoning_duration: 12, reasoning_type: 'model', reasoning_signature: 'sig' },
             swipe_id: 0,

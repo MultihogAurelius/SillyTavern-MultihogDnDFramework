@@ -108,7 +108,9 @@ Out-of-range attack attempt → note {{user}} couldn't attack due to range; ask 
             expect(source).toContain('optional settlement-only include[]');
             expect(source).toContain('creation-only for SETTLEMENT absorption');
             expect(source).toContain('BUILDING has no map unless explicitly promoted');
-            expect(source).toContain('exact canonical names, never translated, expanded, or retitled');
+            expect(source).toContain('Invent `site` as this new place\'s name');
+            expect(source).toContain('it does not need to already appear in the live Location footer');
+            expect(source).toContain('the exact names this map will use');
             expect(source).toContain('BUILDING keeps its parent map active');
             expect(source).toContain('mapped child becomes active at the deepest complete matching footer path');
             expect(source).toContain('Hosted child reality includes a compact host brief');

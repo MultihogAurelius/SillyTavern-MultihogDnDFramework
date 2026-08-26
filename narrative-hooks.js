@@ -567,7 +567,7 @@ export function registerMapArchitectTool() {
             parameters: {
                 type: 'object',
                 properties: {
-                    site: { type: 'string', description: 'Exact name of the map being created. This is not the parent map or parent cell. Copy it character-for-character; never translate or retitle it.' },
+                    site: { type: 'string', description: 'Name of the map being created. For a new dungeon/interior you are about to enter, invent this name now — it does not need to match the current Location footer. After the map is saved, copy this exact name into the footer. Never translate an already-mapped name.' },
                     entrance: { type: 'string', description: 'Exact first area inside the new map: a gate, threshold, landing, door, square, or docks. Never translate it. Explicit offsite attachment leaves it UNREVEALED; active-location creation marks it VISITED.' },
                     kind: { type: 'string', enum: ['DUNGEON', 'SETTLEMENT', 'INTERIOR'], description: 'DUNGEON = high-risk room-scale site. INTERIOR = significant lower-risk multi-room site. SETTLEMENT = city/town/village district-scale graph.' },
                     scale: { type: 'string', enum: ['SMALL', 'MEDIUM', 'LARGE'], description: 'Geographic size, not danger. DUNGEON: SMALL 4-7 rooms, MEDIUM 7-12, LARGE 12-20. SETTLEMENT: SMALL 4-7 districts, MEDIUM 6-10, LARGE 8-14.' },

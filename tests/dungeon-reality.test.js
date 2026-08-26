@@ -413,6 +413,7 @@ describe('Map Architect validation', () => {
         expect(mapSiteMatchesLiveFooter('шестой уровень', footer)).toBe(true);
         expect(mapSiteMatchesLiveFooter('Ashgate Maintenance Tunnels', 'Kuzne, Ashgate Maintenance Tunnels, Junction Chamber Theta')).toBe(true);
         expect(mapSiteMatchesLiveFooter('Invented Title', '')).toBe(true);
+        expect(mapSiteMatchesLiveFooter('Coldwater Ember-Hall', 'Wilderness, Coldwater Creek — Beaver Ponds Camp')).toBe(false);
         expect(mapSiteFooterMismatchHint('Undermountain Level 6 — The Grinding Halls', footer)).toContain('Never translate');
     });
 

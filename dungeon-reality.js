@@ -1620,7 +1620,8 @@ export function settlementAbsorptionMatchesCurrentPeer(kind, currentLocation, in
 
 /**
  * Map activation keys off footer segments. No live footer yet cannot be checked.
- * A translated/retitled site (English title vs a Russian footer) must not save.
+ * CreateAreaMap may invent a new site name before that name appears in the footer;
+ * activation still requires the later footer to copy the saved site exactly.
  */
 export function mapSiteMatchesLiveFooter(site, currentLocation) {
     const location = String(currentLocation || '').trim();

@@ -37,7 +37,6 @@ import {
     extractFooterLocation,
     findLatestDungeonLocation,
     locationContainsSiteRoot,
-    mapSiteFooterMismatchHint,
     getDungeonMapAttachment,
     listMappedSiteDocuments,
     migrateDungeonMapAttachmentToContent,
@@ -47,7 +46,6 @@ import {
     resolveActiveDungeonSite,
     resolveCurrentMapPlacement,
     serializeDungeonMapDocument,
-    settlementAbsorptionMatchesCurrentPeer,
     stripDungeonMapSection,
     collectDungeonMapHistorySnapshot,
     applyDungeonMapHistorySnapshotToBook,
@@ -686,7 +684,6 @@ function findArchitectMapEntry(entries, canonicalSite, requestedSite, hostContex
  * Existing maps always win: concurrent/repeated tool calls never overwrite canon.
  */
 export async function persistArchitectDungeonMap(siteRoot, mapDocument, {
-    allowOffsite = false,
     requireNew = false,
     locationKeys = null,
     locationCore = '',
@@ -746,12 +743,6 @@ export async function persistArchitectDungeonMap(siteRoot, mapDocument, {
 
     if (requireNew && rootEntry) {
         throw new Error(`A location named "${site}" already exists. Use + MAP on that root instead.`);
-    }
-
-    const currentLocation = findLatestDungeonLocation(ctx.chat || []);
-    const absorbsCurrentPeer = settlementAbsorptionMatchesCurrentPeer(mapDocument.kind, currentLocation, includeManifest);
-    if (!rootEntry && currentLocation && !locationContainsSiteRoot(currentLocation, site) && !allowOffsite && !hostContext && !absorbsCurrentPeer) {
-        throw new Error(mapSiteFooterMismatchHint(site, currentLocation));
     }
 
     if (!rootEntry) {

@@ -184,9 +184,11 @@ describe('Map Architect component', () => {
         expect(hooks).toContain('attachTo.cell');
         expect(hooks).toContain('Nesting is limited to three mapped levels');
         expect(hooks).toContain('buildMappedSitesInjection');
-        expect(architect).toContain('mapSiteFooterMismatchHint');
+        expect(architect).not.toContain('mapSiteFooterMismatchHint');
+        expect(architect).toContain('copy this exact site name into the Location footer');
+        expect(hooks).toContain('does not need to match the current Location footer');
         expect(architect).toContain('Live location footer:');
-        expect(router).toContain('mapSiteFooterMismatchHint(site, currentLocation)');
+        expect(router).not.toContain('mapSiteFooterMismatchHint(site, currentLocation)');
         expect(hooks).toContain("unregisterFunctionTool('CreateDungeonMap')");
         expect(hooks).toContain("enum: ['NONE', 'LOW', 'MODERATE', 'HIGH', 'DEADLY']");
         expect(hooks).toContain("enum: ['DUNGEON', 'SETTLEMENT', 'INTERIOR']");
@@ -219,7 +221,6 @@ describe('Map Architect component', () => {
         expect(hooks).toContain('runtimeState.hasActiveDungeonMap = false');
         expect(architect).toContain('MAX_CORRECTION_ATTEMPTS = 2');
         expect(architect).toContain('persistArchitectDungeonMap');
-        expect(architect).toContain('allowOffsite');
         expect(architect).toContain('requireNew');
         expect(architect).toContain('locationKeys');
         expect(architect).toContain('locationCore');
@@ -274,7 +275,6 @@ describe('Map Architect component', () => {
         const hosting = readFileSync(new URL('../map-hosting.js', import.meta.url), 'utf8');
         const hostingContext = readFileSync(new URL('../map-hosting-context.js', import.meta.url), 'utf8');
         expect(architect).toContain('resolveIncludeManifest(include, current.sites, args.site)');
-        expect(architect).toContain('settlementAbsorptionMatchesCurrentPeer(args.kind, currentLocation, includeManifest)');
         expect(architect).toContain('include must name one existing mapped DUNGEON or INTERIOR exactly');
         expect(architect).toContain('INCLUDED EXISTING PEERS (LOCKED)');
         expect(architect).toContain('Create exactly one asset named');
@@ -296,7 +296,6 @@ describe('Map Architect component', () => {
         expect(persistence).toContain('const hostedSite = buildHostedPeerSitePath(persistedDocument, matchingAssets[0])');
         expect(persistence).toContain('stamped.site = hostedSite');
         expect(persistence.match(/reparentHostedLocationEntries\(/g)).toHaveLength(2);
-        expect(persistence).toContain('settlementAbsorptionMatchesCurrentPeer(mapDocument.kind, currentLocation, includeManifest)');
         expect(persistence.match(/saveWorldInfoSnapshot\(/g)).toHaveLength(1);
         expect(hosting).toContain('is already hosted inside');
         expect(hosting).toContain('Contained in ${hostDocument.site}, ${area.name}.');
@@ -307,7 +306,7 @@ describe('Map Architect component', () => {
     it('migrates only untouched shipped prompts to the new taxonomy defaults', () => {
         const defaults = readFileSync(new URL('../src/state/defaults.js', import.meta.url), 'utf8');
         const settings = readFileSync(new URL('../src/state/settings.js', import.meta.url), 'utf8');
-        expect(defaults).toContain("FACTORY_SETTINGS_VERSION = '2026.8.56'");
+        expect(defaults).toContain("FACTORY_SETTINGS_VERSION = '2026.8.57'");
         expect(settings).toContain('promptSignature');
         expect(settings).toContain("'14870:8b5acf86'");
         expect(settings).toContain("'9025:d21f2f49'");

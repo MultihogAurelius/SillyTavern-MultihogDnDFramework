@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.57] - 2026-08-26
+
+### Changed
+- **CreateAreaMap site names**: A new dungeon/interior may be named before it appears in the Location footer. The old verbatim-footer-segment gate is gone, so the GM can create the map first, then copy that exact `site` name into the footer after entry. Map activation still requires an exact footer match.
+
 ## [2026.8.56] - 2026-08-26
 
 ### Changed
