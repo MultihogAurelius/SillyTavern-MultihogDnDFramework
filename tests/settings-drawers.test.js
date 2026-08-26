@@ -34,6 +34,21 @@ describe('General & Visuals settings', () => {
         expect(settingsMarkup).toContain('<b>Portraits and Location Images</b>');
     });
 
+    it('can reopen the API setup checklist from Core & Branching Help', () => {
+        const generalStart = settingsMarkup.indexOf('<b>General & Visuals</b>');
+        const connectionsStart = settingsMarkup.indexOf('<b>Connections &amp; Models</b>');
+        const generalMarkup = settingsMarkup.slice(generalStart, connectionsStart);
+        expect(generalMarkup).toContain('id="rpg_tracker_api_setup_checklist"');
+        expect(generalMarkup).toContain('Anti-Museum Tour');
+        expect(generalMarkup).toContain('id="rpg_tracker_game_master_name"');
+        expect(generalMarkup).toContain('id="rpg_tracker_create_game_master_card"');
+        const indexSource = readFileSync(new URL('../index.js', import.meta.url), 'utf8');
+        expect(indexSource).toContain('showApiSetupGate');
+        expect(indexSource).toContain("$('#rpg_tracker_api_setup_checklist')");
+        expect(indexSource).toContain('createOrSelectGameMasterCard');
+        expect(indexSource).toContain("$('#rpg_tracker_create_game_master_card')");
+    });
+
     it('links General & Visuals to the canonical Map Themes controls', () => {
         const generalStart = settingsMarkup.indexOf('<b>General & Visuals</b>');
         const connectionsStart = settingsMarkup.indexOf('<b>Connections &amp; Models</b>');

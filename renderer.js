@@ -2378,9 +2378,17 @@ function formatValueToCurrency(totalCp, detectedCurrency) {
                 <div class="rt-onboarding-setup-guide">
                     <b class="rt-onboarding-setup-title">Initial Setup:</b>
                     <ol class="rt-onboarding-setup-list">
+                        <li><b>API must be Chat Completion</b> — SillyTavern lists the outdated Text Completion option first. If that is selected, this extension will not work. Open the left-side API dropdown and choose Chat Completion.</li>
                         <li>Ensure <b>Function Calling</b> is enabled in your Chat Completion preset if you want Hybrid RNG tool rolls and the default Persistent Maps opener (<b>CreateAreaMap</b>). You can skip function calling: set the Map Architect opener to <b>Text command</b> under Narrator Configuration (when Persistent Maps is on), and use Pre-Seeded RNG. You <i>can</i> turn Persistent Maps off in Game Systems / Components.</li>
                         <li>Set up your connections in the extension's connection settings. I recommend a lightweight, relatively fast and cheap model for everything but the main narrator/GM. More on that below.</li>
-                        <li>Create a character card for your "narrator" (e.g. Game Master). Leave the card content empty, as the framework handles all logic via the system/Main ST prompt.</li>
+                        <li>Create a narrator character card. Leave the card content empty, as the framework handles all logic via the system/Main ST prompt.
+                            <div class="rt-onboarding-gm-create">
+                                <label class="rt-onboarding-gm-label" for="rt-onboarding-gm-name">Narrator card name</label>
+                                <input id="rt-onboarding-gm-name" class="text_pole rt-onboarding-gm-name" type="text" value="Game Master" placeholder="Game Master" maxlength="120" aria-label="Narrator card name">
+                                <button type="button" class="rt-onboarding-open-chat" id="rt-onboarding-create-gm">Create narrator card</button>
+                            </div>
+                            <div class="rt-onboarding-gm-note">Multihog doesn&apos;t use the outdated and stupid one-on-one chat format but uses a proper RP format written like a book, that involves multiple characters. The messages are attributed to a narrator, not a single character.</div>
+                        </li>
                         <li>Use one of the character creation options above to roll a new character. You can either use the Character Creator option to clearly specify your character, use Other Ways to Begin for a more rough description, or use Instant Action to get started quicker.</li>
                     </ol>
                     <div style="margin-top: 8px;">

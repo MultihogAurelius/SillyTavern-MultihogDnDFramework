@@ -44,6 +44,14 @@
                         <small style="display: block; margin-top: 10px; margin-bottom: 2px; font-weight: bold; opacity: 0.65; text-transform: uppercase; font-size: 0.7em; letter-spacing: 0.4px;">Help</small>
                         <button id="rpg_tracker_tutorial_help" class="menu_button interactable" style="margin-top: 2px; margin-left: 4px; width: calc(100% - 4px); font-size: 0.9em;"><i class="fa-solid fa-comments"></i> CHAT</button>
                         <div style="font-size: 0.75em; opacity: 0.6; line-height: 1.35; padding: 4px 4px 0 4px;">Opens the in-panel Adventure Companion. Optional Tutorial Mode injects the framework guide. Its model connection is configured under <strong>Connections &amp; Models</strong>; its context options remain in the Adventure Companion section below.</div>
+                        <button id="rpg_tracker_api_setup_checklist" class="menu_button interactable" style="margin-top: 8px; margin-left: 4px; width: calc(100% - 4px); font-size: 0.9em;"><i class="fa-solid fa-list-check"></i> Anti-Museum Tour</button>
+                        <div style="font-size: 0.75em; opacity: 0.6; line-height: 1.35; padding: 4px 4px 0 4px;">Reopens the Chat Completion / function calling / context / output-length checklist. Use this if you dismissed it and need the recommended SillyTavern API settings again.</div>
+                        <div class="flex-container flexFlowColumn gap-1" style="margin-top: 8px; margin-left: 4px; width: calc(100% - 4px);">
+                            <label for="rpg_tracker_game_master_name" style="font-size: 0.78em; opacity: 0.75;">Narrator card name</label>
+                            <input id="rpg_tracker_game_master_name" class="text_pole" type="text" value="Game Master" placeholder="Game Master" maxlength="120" style="width: 100%; box-sizing: border-box; font-size: 0.9em;">
+                            <button id="rpg_tracker_create_game_master_card" class="menu_button interactable" style="width: 100%; font-size: 0.9em;"><i class="fa-solid fa-user-tie"></i> Create narrator card</button>
+                        </div>
+                        <div style="font-size: 0.75em; opacity: 0.6; line-height: 1.35; padding: 4px 4px 0 4px;">Creates an empty narrator character card and selects it. If a card with that name already exists, it is selected instead. Multihog uses book-style RP attributed to a narrator, not one-on-one character chat.</div>
 
                         <!-- MAIN PROMPT BACKUP -->
                         <small style="display: block; margin-top: 10px; margin-bottom: 2px; font-weight: bold; opacity: 0.65; text-transform: uppercase; font-size: 0.7em; letter-spacing: 0.4px;">Main Prompt Backup</small>

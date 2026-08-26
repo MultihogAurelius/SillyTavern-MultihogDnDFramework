@@ -22,6 +22,7 @@ import { migrateAllEmbeddedPortraits, countEmbeddedPortraitDataUrls, purgeAllPor
 import { loadPanelGeometry, loadDeltaHeight, makeDraggable, makeResizableTR, makeResizableBR, makeResizableBL, setupResizeObserver, setupDeltaResize, canResizePanels, jqueryToggleSlide, resolveViewportClampedGeometry, clampFloatingPanelToViewport } from './ui-geometry.js';
 import { applyCustomTheme, openThemeWizard, refreshSavedThemesList, handleRecolor, undoThemeChange } from './theme-manager.js';
 import { showCharacterRollPanel, showPcImportPanel, handleCharacterCreatorGenerate, generatePersonaBio, showPersonaConfirmOverlay, extractCharNameFromMemo, activateSillyTavernPersona } from './character-creator.js';
+import { createOrSelectGameMasterCard, resolveNarratorCardName } from './src/ui/game-master-card.js';
 import { bindCharacterCreationConnectionSettings, getCharacterCreationConnectionSettings } from './character-creation-connection.js';
 import { bindQuickStartEvents } from './quickstart.js';
 import { bindAdventureCompanion, bindAdventureCompanionSettingsDrawer, openAdventureCompanion, closeAdventureCompanion } from './adventure-companion.js';
@@ -76,6 +77,7 @@ import {
     closeSettingsOverlay,
     getSettingsOverlayRoot,
 } from './src/ui/settings-overlay.js';
+import { installApiSetupGate, showApiSetupGate, syncApiSetupGate } from './src/ui/api-setup-gate.js';
 import { restoreEscapedCyoaChoiceMarkup } from './src/ui/panel/cyoa-markup.js';
 import { captureXpGainAnimationState, playXpGainAnimation } from './src/ui/panel/xp-gain-animation.js';
 import { captureBarChangeAnimationState, playBarChangeAnimations } from './src/ui/panel/bar-change-animation.js';
@@ -5976,6 +5978,7 @@ function organizeConnectionSettingsUI() {
         buildOnboardingXpHint,
         buildStartingGearHint,
         createDetachedPanel,
+        createOrSelectGameMasterCard,
         extractCharNameFromMemo,
         fileToDataUrl,
         generatePersonaBio,
@@ -7566,6 +7569,22 @@ function organizeConnectionSettingsUI() {
 
         $('#rpg_tracker_tutorial_help').on('click', function () {
             openAdventureCompanion();
+        });
+
+        $('#rpg_tracker_api_setup_checklist').on('click', function () {
+            closeSettingsOverlay();
+            showApiSetupGate();
+        });
+
+        $('#rpg_tracker_create_game_master_card').on('click', async function () {
+            const btn = /** @type {HTMLButtonElement} */ (this);
+            const name = resolveNarratorCardName($('#rpg_tracker_game_master_name').val());
+            btn.disabled = true;
+            try {
+                await createOrSelectGameMasterCard({ name });
+            } finally {
+                btn.disabled = false;
+            }
         });
 
         $('#rpg_tracker_purge_all_portraits').on('click', async function () {
@@ -12418,6 +12437,7 @@ RULES:
 
     // Add wand button to toggle panel visibility
     addWandButton();
+    installApiSetupGate();
 
     function updateTrackerFontSize(size) {
         const panel = document.getElementById('rpg-tracker-panel');
@@ -12457,6 +12477,7 @@ RULES:
                 const isHidden = panel.style.display === 'none';
                 panel.style.display = isHidden ? 'flex' : 'none';
                 localStorage.setItem('rpg_tracker_visible', isHidden ? 'true' : 'false');
+                if (isHidden) syncApiSetupGate();
             }
         });
 

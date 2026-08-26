@@ -2,6 +2,15 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.58] - 2026-08-26
+
+### Added
+- **Anti-Museum Tour**: First-run SillyTavern API checklist with live status checkmarks for Chat Completion, function calling, unlimited context, and 100k output length. Dismissible anytime; reopen from General & Visuals → Core & Branching → Anti-Museum Tour.
+- **Narrator card creator**: One-click empty narrator card creation with a customizable name (default `Game Master`) from the Anti-Museum Tour, startup Setup Guide, and extension settings.
+
+### Changed
+- **Onboarding setup**: Setup Guide now explains book-style narrator RP (not one-on-one character chat) and adds the named narrator card creator beside the Game Master step.
+
 ## [2026.8.57] - 2026-08-26
 
 ### Changed

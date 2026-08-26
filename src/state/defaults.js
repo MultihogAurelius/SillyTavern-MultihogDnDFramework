@@ -190,6 +190,9 @@ export function buildDefaultSettings() {
 
         agentFontSize: 13,
 
+        /** First-run API checklist. Dismissed overlay does not come back. */
+        apiSetupGateSeen: false,
+
         customSysprompt: false,
 
         /** When true (default), snapshot Quick Prompt Main before the framework overwrites it and restore on tracker disable. */
@@ -1548,7 +1551,7 @@ You may be asked to use Markers: ((PLS)), ((B)), ((XB)), ((BDG)), ((HGT)). These
 
 /** Latest settings migration version — factory reset skips legacy upgrade paths at or below this. */
 
-export const FACTORY_SETTINGS_VERSION = '2026.8.57';
+export const FACTORY_SETTINGS_VERSION = '2026.8.58';
 
 
 /** Remove extension UI keys from localStorage so a factory reset does not rehydrate stale panel state. */
