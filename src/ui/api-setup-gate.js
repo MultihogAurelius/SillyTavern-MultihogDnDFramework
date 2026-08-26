@@ -261,6 +261,7 @@ export function buildOverlayHtml(statuses = getApiSetupStatuses(), options = {})
     const narratorCardName = resolveNarratorCardName(options.narratorCardName);
     return `
         <div class="rt-api-setup-card" role="dialog" aria-labelledby="rt-api-setup-title">
+            <div class="rt-api-setup-scroll">
             <div class="rt-api-setup-kicker">Anti-Museum Tour</div>
             <h2 id="rt-api-setup-title">SillyTavern API settings to check</h2>
             <p>This menu is a result of months of taking &quot;bug reports&quot; from people and discovering 98% of the time the cause was the museum defaults of SillyTavern. People get JSON syntax errors and other stuff, and it turns out it&apos;s because ST makes their maximum output like 2000 out of the box.</p>
@@ -277,6 +278,7 @@ export function buildOverlayHtml(statuses = getApiSetupStatuses(), options = {})
             </div>
             <div class="rt-api-setup-status ${doneCount === 4 ? 'rt-api-setup-status-ok' : 'rt-api-setup-status-bad'}">
                 ${doneCount} / 4 recommended settings are on. Current API: <b>${escapeHtml(describeMainApi())}</b>.
+            </div>
             </div>
             <div class="rt-api-setup-actions">
                 <button type="button" class="rt-api-setup-apply" id="rt-api-setup-apply">Apply recommended settings</button>

@@ -149,7 +149,10 @@ describe('panel builder', () => {
         expect(source).toContain('await reloadInspectorFromLiveMap()');
         expect(source).toContain("siteRoots: [site]");
         expect(source).toContain('runtimeState.loadMappedEvolutionSiteRef(site)');
-        expect(source).toContain('dataset.didPan');
+        expect(source).toContain('mapAssetGlyphFromEventTarget');
+        expect(source).toContain('assetTipPinned');
+        expect(source).toContain("scroll.addEventListener('click'");
+        expect(source).toContain('pinDungeonMapAssetTip');
         expect(source).toContain('rt-dungeon-map-view-row');
         expect(source).toContain('Direct Prompt</button>');
         expect(source).toContain('bindMapUpdaterDirectControls(popupDom');

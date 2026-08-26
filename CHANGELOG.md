@@ -2,6 +2,12 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.59] - 2026-08-26
+
+### Fixed
+- **Anti-Museum Tour on mobile**: The checklist now fills the screen and scrolls inside the panel instead of sitting offscreen or behind a tiny scrollbar.
+- **Map occupancy icons**: Tapping or clicking a room's asset icons no longer opens that node's lore entry. Icons still show the asset tooltip; the room node itself remains the lore opener.
+
 ## [2026.8.58] - 2026-08-26
 
 ### Added

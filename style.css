@@ -2035,24 +2035,46 @@
 
 .rt-api-setup-gate {
     position: fixed;
-    inset: 0;
+    top: 0;
+    left: 0;
     z-index: 10100;
     display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 16px;
+    flex-direction: column;
+    box-sizing: border-box;
+    width: 100vw;
+    width: 100dvw;
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+    padding: 12px;
     background: rgba(0, 0, 0, 0.78);
 }
 
 .rt-api-setup-card {
     width: min(640px, 100%);
-    max-height: 92vh;
-    overflow: auto;
+    margin: 0 auto;
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: 100%;
+    overflow: hidden;
+    box-sizing: border-box;
     background: var(--black80a, #1a1a2e);
     border: 1px solid rgba(120, 80, 220, 0.55);
     border-radius: 10px;
     padding: 18px 18px 14px;
     color: var(--rt-text, #eee);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.rt-api-setup-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
     display: flex;
     flex-direction: column;
     gap: 10px;
@@ -2210,6 +2232,7 @@
 .rt-api-setup-actions {
     display: flex;
     flex-wrap: wrap;
+    flex-shrink: 0;
     gap: 8px;
 }
 
@@ -2240,6 +2263,7 @@
 }
 
 .rt-api-setup-foot {
+    flex-shrink: 0;
     font-size: 0.78em;
     opacity: 0.65;
 }

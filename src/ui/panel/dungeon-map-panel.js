@@ -130,6 +130,11 @@ function bindAreaClicks(root, onAreaClick) {
     if (!root || typeof onAreaClick !== 'function') return;
     root.querySelectorAll('.rt-dungeon-graph-node-revealed[data-area-path]').forEach(node => {
         const activate = (event) => {
+            if (mapAssetGlyphFromEventTarget(event.target)) {
+                event.preventDefault();
+                event.stopPropagation();
+                return;
+            }
             const scroll = node.closest('.rt-dungeon-graph-scroll');
             if (scroll?.dataset.didPan === '1') {
                 event.preventDefault();
@@ -225,7 +230,9 @@ export function bindDungeonMapPan(root) {
 
 const ASSET_TIP_ID = 'rt-dungeon-graph-asset-tip';
 let activeAssetTipAnchor = null;
+let assetTipPinned = false;
 let assetTipResizeBound = false;
+let assetTipDismissBound = false;
 
 /**
  * Always host the hover card on document.body.
@@ -274,6 +281,7 @@ function closeDungeonMapAssetTip(tip) {
 export function hideDungeonMapAssetTip() {
     const tip = document.getElementById(ASSET_TIP_ID);
     activeAssetTipAnchor = null;
+    assetTipPinned = false;
     if (!tip) return;
     if (tip.parentElement && tip.parentElement !== document.body) {
         document.body.appendChild(tip);
@@ -348,8 +356,39 @@ function overflowFromEventTarget(target) {
     return target instanceof Element ? target.closest('.rt-dungeon-graph-icon-overflow') : null;
 }
 
+function mapAssetGlyphFromEventTarget(target) {
+    return iconFromEventTarget(target) || overflowFromEventTarget(target);
+}
+
+function glyphInScroll(scroll, target) {
+    const icon = iconFromEventTarget(target);
+    if (icon && scroll.contains(icon)) return icon;
+    const overflow = overflowFromEventTarget(target);
+    if (overflow && scroll.contains(overflow)) return overflow;
+    return null;
+}
+
+function bindAssetTipOutsideDismiss() {
+    if (assetTipDismissBound || typeof document === 'undefined') return;
+    assetTipDismissBound = true;
+    document.addEventListener('pointerdown', (event) => {
+        if (!assetTipPinned) return;
+        const tip = document.getElementById(ASSET_TIP_ID);
+        if (tip?.contains(event.target)) return;
+        if (mapAssetGlyphFromEventTarget(event.target)) return;
+        hideDungeonMapAssetTip();
+    }, true);
+}
+
+function pinDungeonMapAssetTip(glyph) {
+    assetTipPinned = true;
+    if (glyph.classList.contains('rt-dungeon-graph-icon-overflow')) showDungeonMapOverflowTip(glyph);
+    else showDungeonMapAssetTip(glyph);
+}
+
 export function bindDungeonMapAssetPopups(root) {
     if (!root) return;
+    bindAssetTipOutsideDismiss();
     const scrolls = [];
     if (root instanceof HTMLElement && root.classList.contains('rt-dungeon-graph-scroll')) {
         scrolls.push(root);
@@ -361,16 +400,13 @@ export function bindDungeonMapAssetPopups(root) {
         if (!(scroll instanceof HTMLElement) || scroll.dataset.assetTipBound === '1') continue;
         scroll.dataset.assetTipBound = '1';
         scroll.addEventListener('pointerover', (event) => {
-            const icon = iconFromEventTarget(event.target);
-            const overflow = overflowFromEventTarget(event.target);
-            const next = (icon && scroll.contains(icon)) ? icon
-                : (overflow && scroll.contains(overflow)) ? overflow
-                    : null;
+            const next = glyphInScroll(scroll, event.target);
             if (!next || next === activeAssetTipAnchor) return;
-            if (next === icon) showDungeonMapAssetTip(icon);
-            else showDungeonMapOverflowTip(overflow);
+            if (next.classList.contains('rt-dungeon-graph-icon-overflow')) showDungeonMapOverflowTip(next);
+            else showDungeonMapAssetTip(next);
         });
         scroll.addEventListener('pointerout', (event) => {
+            if (assetTipPinned) return;
             const fromIcon = iconFromEventTarget(event.target);
             const fromOverflow = overflowFromEventTarget(event.target);
             const toIcon = iconFromEventTarget(event.relatedTarget);
@@ -379,6 +415,21 @@ export function bindDungeonMapAssetPopups(root) {
             const leavingOverflow = fromOverflow && fromOverflow !== toOverflow && fromOverflow !== toIcon;
             if (leavingIcon || leavingOverflow) hideDungeonMapAssetTip();
         });
+        scroll.addEventListener('click', (event) => {
+            const next = glyphInScroll(scroll, event.target);
+            if (!next) return;
+            event.preventDefault();
+            event.stopPropagation();
+            if (scroll.dataset.didPan === '1') {
+                hideDungeonMapAssetTip();
+                return;
+            }
+            if (activeAssetTipAnchor === next && assetTipPinned) {
+                hideDungeonMapAssetTip();
+                return;
+            }
+            pinDungeonMapAssetTip(next);
+        }, true);
         scroll.addEventListener('scroll', hideDungeonMapAssetTip, { passive: true });
     }
 }
