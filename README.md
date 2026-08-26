@@ -1,9 +1,3 @@
-The extension now has its own Discord server. I no longer use the SillyTavern Discord.
-
-[![Discord](https://img.shields.io/badge/Discord-Join%20Server-5865F2?style=flat-square&logo=discord&logoColor=white)](https://discord.gg/bgjAeWEc2p)
-
----
-
 ### 📢 New: Persistent maps and autonomous map evolution/activity. The framework now generates persistent maps that are automatically updated and even evolved offscreen. Dungeons are also no longer hallucinated but skill checks actually matter. Explore a dungeon or a town, leave, come back later, and continue. What you come back is likely not the exact same thanks to Map Evolution. The dungeon might've repopulated, enemies might've set up ambushes, started their proto-cultural projects, and so on. Settlements evolve too.
 
 <p align="center">
