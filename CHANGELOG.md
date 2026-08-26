@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.60] - 2026-08-27
+
+### Changed
+- **Anti-Museum Tour**: Tightened setup copy — shorter Chat Completion and output-length guidance, softer intro wording, and trimmed context-limit rant while keeping summarizer/cache-hit advice.
+
 ## [2026.8.59] - 2026-08-26
 
 ### Fixed
