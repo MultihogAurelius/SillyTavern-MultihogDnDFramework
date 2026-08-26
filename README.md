@@ -1,9 +1,9 @@
-### 📢 New: Persistent maps and autonomous map evolution/activity. The framework now generates persistent maps that are automatically updated and even evolved offscreen. Dungeons are also no longer hallucinated but skill checks actually matter. Explore a dungeon or a town, leave, come back later, and continue. What you come back is likely not the exact same thanks to Map Evolution. The dungeon might've repopulated, enemies might've set up ambushes, started their proto-cultural projects, and so on. Settlements evolve too.
+### This extension is feature-complete. There will be no more features, but I will still fix bugs as they are reported.
 
 <p align="center">
   <img src="https://github.com/user-attachments/assets/368d05be-009b-4f0d-b753-5c3cf8ae7dad" width="75%" alt="Combat in progress" />
   <br>
-  <em>Dungeon Area Map</em>
+  <em>Area Map</em>
 </p>
 
 <p align="center">
