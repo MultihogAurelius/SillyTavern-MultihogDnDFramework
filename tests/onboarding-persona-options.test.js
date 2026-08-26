@@ -58,7 +58,6 @@ describe('onboarding Player Card and ST persona options', () => {
         expect(html).toContain('href="https://www.youtube.com/watch?v=82Lt9pRYFS0"');
         expect(html).toContain('id="rt-onboarding-open-chat"');
         expect(html).toContain('Adventure Companion');
-        expect(html).not.toContain('discord.gg');
         expect(html).not.toContain('SillyTavern Discord');
         expect(html).not.toContain('Hell, head there anyway!');
         expect(html).not.toContain('Need help? Open');
@@ -112,5 +111,16 @@ describe('onboarding Player Card and ST persona options', () => {
         expect(html).toContain('Welcome to Multihog D&D Framework!');
         expect(html).toContain('href="https://github.com/MultihogAurelius/SillyTavern-MultihogDnDFramework/releases"');
         expect(html).toContain('Releases section of the GitHub page');
+    });
+
+    it('puts a Discord join badge at the top left of the startup menu', () => {
+        const html = renderMemoAsCards('', null, {});
+        const discordAt = html.indexOf('class="rt-discord-btn"');
+        const bmcAt = html.indexOf('class="rt-bmc-btn"');
+
+        expect(discordAt).toBeGreaterThan(-1);
+        expect(bmcAt).toBeGreaterThan(discordAt);
+        expect(html).toContain('href="https://discord.gg/bgjAeWEc2p"');
+        expect(html).toContain('img.shields.io/badge/Discord-Join%20Server-5865F2');
     });
 });
