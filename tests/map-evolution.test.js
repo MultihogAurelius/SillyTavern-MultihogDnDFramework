@@ -880,7 +880,7 @@ describe('Map Evolution', () => {
         expect(evolution).toContain('holdExitBookkeeping');
         expect(evolution).toContain("exitResult?.skipped === 'busy'");
         expect(evolution).toContain('buildReportOutcomeStamps');
-        expect(evolution).toContain('try { persistMapEvolutionState(); } catch (_) { /* best-effort */ }');
+        expect(evolution).toContain('try { persistMapEvolutionState(passChatId); } catch (_) { /* best-effort */ }');
         expect(evolution).toContain('export async function loadMappedEvolutionSite');
         expect(evolution).toContain("from './map-evolution-lib.js'");
         expect(evolution).not.toContain("from './map-updater.js'");
