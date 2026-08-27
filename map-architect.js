@@ -1,5 +1,5 @@
 /** Dedicated one-shot dungeon/settlement/interior map generation agent. */
-import { getSettings } from './state-manager.js';
+import { getSettings, getActiveChatId, getEffectiveRouterCampaignPrefix } from './state-manager.js';
 import { sendStateRequest } from './llm-client.js';
 import {
     dungeonSiteRootsMatch,
@@ -28,6 +28,8 @@ import {
     MAP_ARCHITECT_TOPOLOGY_JSON_SCHEMA,
 } from './map-architect-schema.js';
 import { extractCurrentTimeStr } from './memo-processor.js';
+import { canCommitPassForChat } from './src/state/pass-affinity.js';
+import { runtimeState } from './src/app/runtime-state.js';
 import { isLocationMappingEnabled } from './src/state/section-enabled.js';
 import { buildMapArchitectReferenceContext } from './map-architect-context.js';
 export { parseMapArchitectResponse } from './map-architect-parser.js';
@@ -376,7 +378,23 @@ async function runMapArchitectOnce(rawArgs) {
     if (!isLocationMappingEnabled(settings)) {
         throw mapArchitectFailure('Persistent Maps is disabled in Components. No map was generated or saved.');
     }
+    // Pin chat + campaign before any LLM await. Topology/assets generation can take
+    // minutes; a mid-flight chat switch would otherwise re-resolve getLivePrefix()
+    // into another campaign's Locations book at persist time.
+    const passChatId = getActiveChatId() || runtimeState.currentChatId || ctx.chatId || null;
+    const passPrefix = getEffectiveRouterCampaignPrefix(passChatId || '');
+    if (!passPrefix) {
+        throw mapArchitectFailure('No campaign prefix is available, so there is no safe Locations lorebook target. Nothing was generated or saved.');
+    }
+    const assertStillOnPassChat = () => {
+        if (!canCommitPassForChat(passChatId, runtimeState.currentChatId || getActiveChatId())) {
+            throw mapArchitectFailure('Active chat changed while the map was being generated. Nothing was saved.');
+        }
+    };
+    const persistOpts = { campaignPrefix: passPrefix, chatId: passChatId };
+
     const current = await syncDungeonMapsToLocationLorebook(ctx.chat || [], { capture: false });
+    assertStillOnPassChat();
     if ((current.errors || []).some(error => /no campaign prefix/i.test(String(error)))) {
         throw mapArchitectFailure('No campaign prefix is available, so there is no safe Locations lorebook target. Nothing was generated or saved.');
     }
@@ -397,8 +415,9 @@ async function runMapArchitectOnce(rawArgs) {
             throw mapArchitectFailure(`A mapped location named "${args.site}" already exists.`);
         }
         if (hostContext) {
+            assertStillOnPassChat();
             const existingDocument = parseDungeonMapDocument(existing.mapChunks[0], existing.siteRoot).document;
-            const saved = await persistArchitectDungeonMap(args.site, existingDocument, { hostContext });
+            const saved = await persistArchitectDungeonMap(args.site, existingDocument, { hostContext, ...persistOpts });
             const continuation = hostContext.explicit
                 ? 'This was an offsite structural edit. Keep the current player location and narration unchanged.'
                 : 'Keep unseen facts private and continue narration from the player-observable entrance.';
@@ -412,15 +431,18 @@ async function runMapArchitectOnce(rawArgs) {
         throw mapArchitectFailure(`A location named "${args.site}" already exists. Use + MAP on that root instead.`);
     }
 
+    assertStillOnPassChat();
     const lookback = resolveLookback(settings, rawArgs?.lookback);
     const context = recentStoryContext(ctx, lookback, current);
     const referenceContext = await buildMapArchitectReferenceContext(ctx, rawArgs);
+    assertStillOnPassChat();
     const currentTime = currentTimeFrom(settings);
     let topologyPrompt = topologyUserPrompt(args, context, referenceContext, currentLocation, hostContext, entranceKnowledge);
     let topology = null;
     let topologyIssues = [];
 
     for (let attempt = 0; attempt <= MAX_CORRECTION_ATTEMPTS; attempt++) {
+        assertStillOnPassChat();
         if (attempt > 0) broadcastStep('thought', `Topology correction pass ${attempt} for ${args.site}...`);
         else broadcastStep('thought', `Building ${args.kind.toLowerCase()} topology for ${args.site}...`);
         const output = await sendStateRequest(
@@ -430,6 +452,7 @@ async function runMapArchitectOnce(rawArgs) {
             null,
             { jsonSchema: MAP_ARCHITECT_TOPOLOGY_JSON_SCHEMA, stream: true, debugSource: 'Map Architect: Topology' },
         );
+        assertStillOnPassChat();
         const parsed = parseMapArchitectResponse(output);
         if (parsed.value?.areas) canonicalizeReciprocalConnectionDetails(parsed.value.areas);
         const envelope = envelopeErrors(parsed.value, ['version', 'site', 'kind', 'threat', 'areas'], 'areas', 'Topology');
@@ -471,6 +494,7 @@ async function runMapArchitectOnce(rawArgs) {
     let placementIssues = [];
 
     for (let attempt = 0; attempt <= MAX_CORRECTION_ATTEMPTS; attempt++) {
+        assertStillOnPassChat();
         if (attempt > 0) broadcastStep('thought', `Content correction pass ${attempt} for ${args.site}...`);
         else broadcastStep('thought', `Populating ${topology.areas.length} locked areas for ${args.site}...`);
         const output = await sendStateRequest(
@@ -480,6 +504,7 @@ async function runMapArchitectOnce(rawArgs) {
             null,
             { jsonSchema: MAP_ARCHITECT_ASSETS_JSON_SCHEMA, stream: true, debugSource: 'Map Architect: Assets' },
         );
+        assertStillOnPassChat();
         const parsed = parseMapArchitectResponse(output);
         const envelope = envelopeErrors(parsed.value, ['assets'], 'assets', 'Content placement');
         const candidate = parsed.value && !envelope.length
@@ -509,12 +534,14 @@ async function runMapArchitectOnce(rawArgs) {
     if (!isLocationMappingEnabled(getSettings())) {
         throw mapArchitectFailure('Persistent Maps was disabled while the map was being generated. Nothing was saved.');
     }
+    assertStillOnPassChat();
     const saved = await persistArchitectDungeonMap(args.site, completedMap, {
         requireNew: !!rawArgs?.requireNew,
         locationKeys: rawArgs?.locationKeys,
         locationCore: rawArgs?.locationCore,
         includeManifest,
         hostContext,
+        ...persistOpts,
     });
     const status = saved.existing ? 'A concurrent map already existed and was preserved.' : `Map saved to ${saved.entryId}.`;
     const continuation = hostContext?.explicit
