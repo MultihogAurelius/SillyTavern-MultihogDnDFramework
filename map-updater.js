@@ -4,6 +4,7 @@ import {
     persistMapUpdaterLastRunTimestamp,
     persistMapUpdaterLastRunWatermark,
     persistMapEvolutionState,
+    getActiveChatId,
 } from './state-manager.js';
 import { sendStateRequest } from './llm-client.js';
 import {
@@ -22,6 +23,8 @@ import {
     resolveBuildingPopulationTarget,
 } from './dungeon-reality.js';
 import { isLocationMappingEnabled } from './src/state/section-enabled.js';
+import { canCommitPassForChat } from './src/state/pass-affinity.js';
+import { runtimeState } from './src/app/runtime-state.js';
 import { parseMapArchitectResponse } from './map-architect-parser.js';
 import { DEFAULT_MAP_UPDATER_SYSTEM_PROMPT } from './map-updater-prompt.js';
 import { selectMapUpdaterSystemPrompt } from './map-updater-direct-prompt.js';
@@ -387,9 +390,9 @@ ${formatDirectInstructionBlock(directInstruction)}
 Output only the corrected JSON object.`;
 }
 
-function finishMapUpdater(ctx, snapshot, { applied = false, stampSwipe = true } = {}) {
-    persistMapUpdaterLastRunWatermark(ctx.chat?.length || 0);
-    persistMapUpdaterLastRunTimestamp();
+function finishMapUpdater(ctx, snapshot, { applied = false, stampSwipe = true, passChatId = null } = {}) {
+    persistMapUpdaterLastRunWatermark(ctx.chat?.length || 0, passChatId);
+    persistMapUpdaterLastRunTimestamp(Date.now(), passChatId);
     if (applied && stampSwipe) stampTriggerMessage(ctx, snapshot);
 }
 
@@ -424,6 +427,12 @@ export async function runMapUpdaterPass({ isManual = false, lookback = null, bui
     if (_mapUpdaterRunning || _mapUpdaterStarting || isRouterRunning() || isMapEvolutionRunning()) return { skipped: 'busy' };
 
     const ctx = SillyTavern.getContext();
+    const passChatId = getActiveChatId() || runtimeState.currentChatId || ctx.chatId || null;
+    const canCommit = () => canCommitPassForChat(
+        passChatId,
+        runtimeState.currentChatId || getActiveChatId(),
+        { aborted: !!_mapUpdaterController?.signal?.aborted },
+    );
     const requestedSite = String(siteRoot || '').trim();
     const instruction = String(directInstruction || '').trim();
     const directPass = !!instruction;
@@ -434,6 +443,7 @@ export async function runMapUpdaterPass({ isManual = false, lookback = null, bui
         let inspectorPass = false;
         if (requestedSite) {
             const siteLoaded = await loadDungeonMapContextForSite(requestedSite);
+            if (!canCommit()) return { skipped: 'chat_changed' };
             if (!siteLoaded?.context) return { skipped: 'no_such_map' };
             loaded = {
                 context: siteLoaded.context,
@@ -443,6 +453,7 @@ export async function runMapUpdaterPass({ isManual = false, lookback = null, bui
             inspectorPass = !siteLoaded.isActiveSite && !exitPass;
         } else {
             const activeLoaded = await loadActiveDungeonMapContext();
+            if (!canCommit()) return { skipped: 'chat_changed' };
             if (!activeLoaded?.context) return { skipped: 'no_active_map' };
             loaded = activeLoaded;
         }
@@ -497,6 +508,7 @@ export async function runMapUpdaterPass({ isManual = false, lookback = null, bui
             if (attempt > 0) broadcastStep('thought', `Correction pass ${attempt}...`);
             else broadcastStep('thought', 'Requesting occupancy update...');
             const output = await sendStateRequest(requestSettings(settings), systemPrompt, prompt, signal);
+            if (!canCommit()) return { skipped: 'chat_changed' };
             const parsed = parseMapArchitectResponse(output);
             if (!parsed.value) {
                 lastIssues = [{ code: 'INVALID_JSON', path: '$', hint: parsed.error || 'No JSON object was found.' }];
@@ -536,7 +548,7 @@ export async function runMapUpdaterPass({ isManual = false, lookback = null, bui
                     }
                     break;
                 }
-                if (!deferWatermark) finishMapUpdater(ctx, snapshot, { applied: false });
+                if (!deferWatermark) finishMapUpdater(ctx, snapshot, { applied: false, passChatId });
                 if (settings.debugMode) console.log('[RPG Tracker] Map Updater: noop.');
                 broadcastStep('finish', 'Noop — no durable map fact changed.');
                 return { ok: true, noop: true };
@@ -559,10 +571,12 @@ export async function runMapUpdaterPass({ isManual = false, lookback = null, bui
                 }
                 break;
             }
+            if (!canCommit()) return { skipped: 'chat_changed' };
             broadcastStep('result', summarizeMapUpdaterOperations(parsed.value) || 'Transaction accepted.');
             const mapResult = requestedSite
                 ? await applyDungeonMapCommit(parsed.value, loaded.context, loaded.books, currentTime, { requireActive: false })
                 : await applyActiveDungeonMapCommit(parsed.value, loaded.context, loaded.books, currentTime);
+            if (!canCommit()) return { skipped: 'chat_changed' };
             if (!mapResult.ok) {
                 lastIssues = mapResult.errors || [{ code: mapResult.code || 'MAP_COMMIT_FAILED', path: 'map', hint: 'Persistence rejected the transaction.' }];
                 if (attempt < MAX_CORRECTION_ATTEMPTS && mapResult.retryable !== false) {
@@ -573,7 +587,7 @@ export async function runMapUpdaterPass({ isManual = false, lookback = null, bui
             }
             const shouldStampSwipe = stampSwipe && populationTarget?.phase !== 'intent';
             if (!deferWatermark) {
-                finishMapUpdater(ctx, snapshot, { applied: true, stampSwipe: shouldStampSwipe });
+                finishMapUpdater(ctx, snapshot, { applied: true, stampSwipe: shouldStampSwipe, passChatId });
             } else if (shouldStampSwipe) {
                 stampTriggerMessage(ctx, snapshot);
             }
@@ -593,16 +607,16 @@ export async function runMapUpdaterPass({ isManual = false, lookback = null, bui
                         createdAssets: mapResult.createdAssets || [],
                     }),
                 );
-                persistMapEvolutionState();
+                persistMapEvolutionState(passChatId);
             }
             return { ok: true, result: mapResult };
         }
 
         const concise = lastIssues.slice(0, 8).map(issue => `${issue.code} at ${issue.path}: ${issue.hint}`).join('; ');
         console.warn('[RPG Tracker] Map Updater could not apply a valid transaction:', concise || 'unknown error');
-        if (!deferWatermark) {
-            persistMapUpdaterLastRunWatermark(ctx.chat?.length || 0);
-            persistMapUpdaterLastRunTimestamp();
+        if (!deferWatermark && canCommit()) {
+            persistMapUpdaterLastRunWatermark(ctx.chat?.length || 0, passChatId);
+            persistMapUpdaterLastRunTimestamp(Date.now(), passChatId);
         }
         broadcastStep('error', concise || 'Validation failure.');
         return { ok: false, errors: lastIssues };
