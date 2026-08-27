@@ -49,6 +49,15 @@ import { bindRenderedCardEvents } from './src/ui/panel/card-events.js';
 import { createDetachedPanel } from './src/ui/panel/detached-panel.js';
 import { scalePanelBackgroundImage, getPanelBgConfig, applyPanelBackgroundToDom, applyTrackerThemeToDom, PANEL_BG_TRACKER_KEYS, PANEL_BG_AGENT_KEYS } from './src/ui/panel/panel-appearance.js';
 import { createMemoRecoveryManager } from './src/features/recovery/memo-recovery.js';
+import {
+    checkpointMultihogState,
+    flushCheckpoint,
+    getPersistenceStatus,
+    initializeDurablePersistence,
+    markPersistenceDirty,
+    recordMemoDraft,
+    shouldBlockPersistenceUnload,
+} from './src/state/durable-persistence.js';
 import { runtimeState } from './src/app/runtime-state.js';
 import {
     clearMemoAndMapHistory,
@@ -138,6 +147,23 @@ const snapshotMemoToLocalStorage = (...args) => memoRecovery?.snapshotMemoToLoca
 const ensureLocalMemoRecovery = (...args) => memoRecovery?.ensureLocalMemoRecovery(...args);
 const confirmLocalSettingsRecovery = (...args) => memoRecovery?.confirmLocalSettingsRecovery(...args);
 const markMemoPersistedByCurrentBrowser = (...args) => memoRecovery?.markMemoPersistedByCurrentBrowser(...args);
+
+function syncPersistenceSafetyWarning(status = getPersistenceStatus()) {
+    const warningId = 'rpg-tracker-persistence-warning';
+    let warning = document.getElementById(warningId);
+    if (!status.unsafe) {
+        warning?.remove();
+        return;
+    }
+    if (!warning) {
+        warning = document.createElement('div');
+        warning.id = warningId;
+        warning.className = 'rpg-tracker-persistence-warning';
+        warning.setAttribute('role', 'alert');
+        document.body?.appendChild(warning);
+    }
+    warning.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i><span><b>Multihog changes are not safely stored.</b> Keep this tab open. The framework will keep retrying automatically.</span>';
+}
 
 let _pillDeselectHandler = null;
 globalThis._rpgRenderRouterUI = () => { if (typeof runtimeState.renderRouterUI === 'function') runtimeState.renderRouterUI(); };
@@ -879,6 +905,7 @@ async function syncCampaignPrefixAndWorldsForChat(newChatId, source) {
 let _saveSettingsTimer = null;
 /** Re-entrancy guard: saveSettings → saveChatState must not call saveSettings again. */
 let _saveSettingsInFlight = false;
+let _saveSettingsDrainPromise = null;
 /** If a save is requested while one is in flight, run again after (keeps deletes durable). */
 let _saveSettingsPending = false;
 let _saveSettingsPendingForce = false;
@@ -958,11 +985,8 @@ async function forceDiskCheckpoint() {
     }
     snapshotMemoToLocalStorage(chatId, { force: true });
     s.memoPersistedAt = Date.now();
-    const saveFn = await resolveCoreSaveSettings();
-    if (!saveFn) {
-        throw new Error('Core saveSettings() could not be loaded');
-    }
-    await saveFn();
+    await Promise.resolve(saveSettings(true));
+    await flushCheckpoint({ server: true });
     snapshotMemoToLocalStorage(chatId, { force: true });
 }
 
@@ -974,6 +998,7 @@ async function forceDiskCheckpoint() {
 export function saveSettings(force = false, delay = 0) {
     // Keep UI synchronization immediate so toggle checkboxes and forms respond instantly
     syncOnboardingUI();
+    markPersistenceDirty();
 
     // Always mirror module schema to sync localStorage first — even if a disk save is
     // already in flight (delete/add must not be dropped by the re-entrancy guard).
@@ -1005,13 +1030,13 @@ export function saveSettings(force = false, delay = 0) {
 
     const doSave = async (forceWrite) => {
         _saveSettingsTimer = null;
-        if (_saveSettingsInFlight) {
+        if (_saveSettingsDrainPromise) {
             _saveSettingsPending = true;
             _saveSettingsPendingForce = _saveSettingsPendingForce || !!forceWrite;
-            return;
+            return _saveSettingsDrainPromise;
         }
         _saveSettingsInFlight = true;
-        try {
+        _saveSettingsDrainPromise = (async () => {
             do {
                 _saveSettingsPending = false;
                 const pendingForce = _saveSettingsPendingForce;
@@ -1037,6 +1062,15 @@ export function saveSettings(force = false, delay = 0) {
                 s.memoPersistedAt = Date.now();
                 // Sync WAL for displayGroups / prompt-ack — survives cancelled saves on code-edit reload.
                 stampCriticalSettingsSynced(s, writeCriticalSettingsBackup(s));
+                // The complete Multihog namespace reaches its own durable journal before
+                // SillyTavern is allowed to mirror the much larger whole-settings file.
+                // If both checkpoint targets fail we still attempt the ST mirror, while
+                // the persistence service keeps unload protection and a visible warning on.
+                try {
+                    await checkpointMultihogState(s);
+                } catch (error) {
+                    console.error('[RPG Tracker] Durable Multihog checkpoint failed:', error);
+                }
                 if (useForce) {
                     const saveFn = await resolveCoreSaveSettings();
                     if (saveFn) await saveFn();
@@ -1046,9 +1080,11 @@ export function saveSettings(force = false, delay = 0) {
                 }
                 forceWrite = false;
             } while (_saveSettingsPending);
-        } finally {
+        })().finally(() => {
             _saveSettingsInFlight = false;
-        }
+            _saveSettingsDrainPromise = null;
+        });
+        return _saveSettingsDrainPromise;
     };
 
     if (force || delay <= 0) {
@@ -5057,6 +5093,7 @@ function createPanel() {
         openPcSectionEditor,
         parseInWorldTime,
         reapplyRouterPass,
+        recordMemoDraft,
         refreshAgentManifestNow,
         refreshAll,
         refreshDayNightCycleFromMemo,
@@ -5947,6 +5984,25 @@ function organizeConnectionSettingsUI() {
     const pm = ctx.getPresetManager ? ctx.getPresetManager() : null;
     let _runPromptDefaultsDialog = null;
     let _runPromptDefaultsStartupAction = null;
+
+    // Hydrate the complete Multihog namespace before migrations, UI construction,
+    // or active-chat projection can observe and persist a stale settings.json copy.
+    try {
+        const durableBoot = await initializeDurablePersistence({
+            settingsRoot: ctx.extensionSettings,
+            moduleName: MODULE_NAME,
+            getRequestHeaders,
+            chatId: ctx.chatId || ctx.getCurrentChatId?.() || null,
+            onStatus: syncPersistenceSafetyWarning,
+        });
+        if (durableBoot.needsCheckpoint) {
+            _startupSavePending = true;
+            _startupSavePendingForce = true;
+        }
+    } catch (error) {
+        console.error('[RPG Tracker] Durable persistence initialization failed:', error);
+        syncPersistenceSafetyWarning({ unsafe: true });
+    }
 
     configureRuntimeActions({
         saveSettings,
@@ -7803,7 +7859,13 @@ function organizeConnectionSettingsUI() {
                 setTimeout(() => { _navigationSnapshotInFlight = false; }, 0);
             }
         };
-        window.addEventListener('beforeunload', () => snapshotPendingStateForNavigation('beforeunload'));
+        window.addEventListener('beforeunload', event => {
+            snapshotPendingStateForNavigation('beforeunload');
+            if (shouldBlockPersistenceUnload()) {
+                event.preventDefault();
+                event.returnValue = '';
+            }
+        });
         window.addEventListener('pagehide', () => snapshotPendingStateForNavigation('pagehide'));
         document.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'hidden') snapshotPendingStateForNavigation('visibilityhidden');

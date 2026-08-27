@@ -11,6 +11,7 @@ import {
 } from './src/state/player-identity.js';
 import { CHARACTER_CREATOR_NAME_ADDITIONS } from './src/state/character-names.js';
 import { buildInstantActionPromptSection, extractInstantActionLevel, normalizeInstantActionInstructions } from './src/state/instant-action-instructions.js';
+import { assertCharacterGenerationUpdatedMemo } from './src/state/character-generation-validation.js';
 import { findCharacterCreatorPresetByName, upsertCharacterCreatorPreset } from './src/features/character-creator/presets.js';
 import { getCharacterCreationConnectionSettings } from './character-creation-connection.js';
 
@@ -232,6 +233,7 @@ ${cardSnippet ? `\n--- CHARACTER CARD CONTEXT ---${cardSnippet}` : ''}
 ${nameVal ? `• Use the provided name "${nameVal}" exactly; do not alter or replace it.\n` : ''}
 • Fill every blank field above with creative, setting-appropriate content. No field may be empty, "Unknown", "N/A", or a placeholder.
 • The name must be original and fitting. NEVER write "User" or any variation.
+• The PLAYER PREFERENCES above are authoritative for the player character's identity. Never copy the narrator character card's species, ancestry, personality, or appearance, and never substitute traits from an NPC or recent story character.
 • Output every currently active state-memo field (enabled stock modules and custom fields): ${blockListStr}.${spellsClause}
 • Do NOT output a [PARTY] block under any circumstances unless explicitly instructed.
 • Do NOT add quests or output a [QUESTS] block under any circumstances unless explicitly instructed.
@@ -275,16 +277,14 @@ export async function generateQuickStartCharacter(opts) {
         instantActionInstructions: opts.instantActionInstructions,
     });
 
-    await sendDirectPrompt(prompt, {
+    const requestResult = await sendDirectPrompt(prompt, {
         systemPromptMode: 'modules_only',
         connectionSettings: getCharacterCreationConnectionSettings(s),
     });
 
     const s2 = getSettings();
     const memoAfter = s2.currentMemo || '';
-    if (!memoAfter || memoAfter === memoBefore || !/\[CHARACTER\]/i.test(memoAfter)) {
-        throw new Error('Character generation failed — State Model returned no character sheet. Check your API connection.');
-    }
+    assertCharacterGenerationUpdatedMemo(memoBefore, memoAfter, requestResult);
 
     const extractedName = extractCharNameFromMemo(memoAfter);
     return { charName: extractedName || 'My Character' };
@@ -759,13 +759,17 @@ async function handleCharRollGenerate(el, panel) {
     if (genBtn) { genBtn.disabled = true; genBtn.textContent = '🎲 Generating...'; }
 
     try {
-        await sendDirectPrompt(prompt, {
+        const memoBefore = s.currentMemo || '';
+        const requestResult = await sendDirectPrompt(prompt, {
             systemPromptMode: 'modules_only',
             connectionSettings: getCharacterCreationConnectionSettings(s),
         });
 
+        const generatedSettings = getSettings();
+        assertCharacterGenerationUpdatedMemo(memoBefore, generatedSettings.currentMemo || '', requestResult);
+
         if (wantPlayerCard || wantStPersona) {
-            const s2 = getSettings();
+            const s2 = generatedSettings;
             const extractedName = extractCharNameFromMemo(s2.currentMemo);
             const charName = extractedName || nameVal || 'My Character';
             if (wantStPersona) {
@@ -776,6 +780,9 @@ async function handleCharRollGenerate(el, panel) {
             const bio = await generatePersonaBio(charName, wordCount, finalExtraHints);
             if (bio) showPersonaConfirmOverlay(bio, charName, wordCount, extraHints);
         }
+    } catch (error) {
+        console.error('[RPG Tracker] Character Creator generation failed:', error);
+        toastr['error'](String(error?.message || error).substring(0, 260), 'Character Creator');
     } finally {
         const resetEl = resolveOnboardingEl(el) || el;
         const resetPanel = resetEl.querySelector('#rt-char-roll-panel') || panel;
@@ -813,6 +820,7 @@ Rules:
 - Keep the prose grounded and natural. Avoid purple prose, excessive em-dashes, or clichés (e.g. "deliberate step", "breath hitched").
 - Do not include a preamble, title, or closing statement. Output ONLY the ${coreSections.length} sections listed above.
 - CRITICAL: You MUST faithfully and explicitly incorporate ALL provided traits, background hints, species, gender, and appearance hints from the character card and the PLAYER PREFERENCES. Do not ignore user-provided details.
+- Identity details in the character card and PLAYER PREFERENCES override recent story context. Never borrow species, ancestry, personality, or appearance from the narrator or an NPC.
 - CRITICAL: Do NOT describe worn clothing, armor, or gear in the Body section — that belongs exclusively in the Equipment section (if present).
 - CRITICAL: Never output template macro strings such as {{char}}, {{user}}, or any other {{...}} placeholders. Always replace them with the actual character's name or a fitting proper name.
 - Use recent story messages only for voice, relationships, and ongoing situation — do not invent stats that contradict the character card.`;

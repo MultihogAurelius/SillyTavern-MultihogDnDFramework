@@ -672,6 +672,7 @@ export function createPanel(dependencies) {
         openPcSectionEditor,
         parseInWorldTime,
         reapplyRouterPass,
+        recordMemoDraft,
         refreshAgentManifestNow,
         refreshAll,
         refreshDayNightCycleFromMemo,
@@ -6455,7 +6456,8 @@ ${namingRule}`;
         _rawMemoDirty = true;
         settings.currentMemo = applyQuestSyncAndStripMemo(newText);
         _rawMemoDirty = false;
-        saveSettings();
+        recordMemoDraft(runtimeState.currentChatId, settings.currentMemo);
+        saveSettings(false, 600);
         refreshRenderedView();
     });
 

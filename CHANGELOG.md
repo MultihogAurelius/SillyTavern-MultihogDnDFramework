@@ -2,6 +2,17 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.62] - 2026-08-27
+
+### Added
+- **Crash-safe Multihog persistence**: Complete extension-state checkpoints now use checksummed local and rotating server copies, background serialization, memo draft recovery, automatic retries, and a visible warning when no safe storage target is available.
+
+### Fixed
+- **Background generation output limits**: A zero extension token override now inherits SillyTavern's configured response length or the selected completion preset instead of allowing streaming, custom OpenAI/Ollama, profile, and agent requests to fall back to small backend defaults such as KoboldCpp's 512 tokens.
+- **Character Creator silent failures**: Character creation now stops with a clear truncation/connection error unless the State Tracker actually commits a new `[CHARACTER]` block; it no longer continues into persona and Player Card creation with stale level-one state.
+- **Player portrait identity**: Player portraits use the linked Lorebook Player Card as their primary appearance source and no longer inject an unrelated narrator character card as the target.
+- **Player-character trait bleed**: Character-sheet and persona prompts explicitly keep narrator/NPC species, ancestry, personality, and appearance from overriding Player Preferences.
+
 ## [2026.8.61] - 2026-08-27
 
 ### Changed
