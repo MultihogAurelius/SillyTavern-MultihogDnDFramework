@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.61] - 2026-08-27
+
+### Changed
+- **Startup menu**: Removed the Discord join badge from the character creation / onboarding screen.
+
 ## [2026.8.60] - 2026-08-27
 
 ### Changed
