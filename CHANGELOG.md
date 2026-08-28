@@ -2,6 +2,15 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.64] - 2026-08-28
+
+### Added
+- **Fractional ((SLOTS))**: Slot markers accept decimal values such as `1.5/4` and `.25/1`, drawing a proportional partial pip and showing the exact value on hover.
+
+### Fixed
+- **Durable persistence recovery**: Unsynced IndexedDB checkpoints stay above the durable floor so recovery can still walk to the tip when settings.json or the server lag. After a commit, newer memo drafts are rebased instead of deleted, and mismatched `_persistence` metadata is not stamped onto live state that moved during encode.
+- **Slot recolor preview**: Live color dragging now paints `.rt-slot-fill` (including partial pips) instead of the old filled-box background that fractional slots no longer use.
+
 ## [2026.8.63] - 2026-08-28
 
 ### Changed

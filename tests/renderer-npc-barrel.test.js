@@ -53,6 +53,17 @@ describe('((SLOTS))', () => {
         expect(html).toContain('class="rt-slot partial"');
         expect(html).toContain('title="Charge: .25/1"');
     });
+
+    it('still renders whole slots as filled or empty pips', () => {
+        const html = tryRenderMarker('Arrows: ((SLOTS)) 3/4', 'CUSTOM');
+        const filled = html.match(/class="rt-slot filled"/g) || [];
+        const empty = html.match(/class="rt-slot empty"/g) || [];
+
+        expect(filled).toHaveLength(3);
+        expect(empty).toHaveLength(1);
+        expect(html).toContain('class="rt-slot-fill" style="width:100%');
+        expect(html).not.toContain('class="rt-slot partial"');
+    });
 });
 
 describe('universal tag colors', () => {
