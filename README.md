@@ -1,4 +1,4 @@
-### I'm around to accept PRs but probably won't do shit other than that. The storage layer of ST is fundamentally a hot pile of garbage that dumps all extension data into a single settings.json, and this extension tries to cope by having a massive stack of defensive patches just to prevent stale writes from rolling everything back constantly due to race conditions.
+### I'm around to accept PRs but probably won't do shit other than that. The storage layer of ST is fundamentally a hot pile of garbage that dumps all extension data into a single settings.json, and this extension tries to cope by having a massive stack of defensive patches just to prevent stale writes from rolling everything back constantly due to race conditions. For that reason, I'm continuing development on a private fork of ST built around this extension. I may or may not publish it one day. If you want to continue building this extension, feel free to fork it or make PRs.
 
 <p align="center">
   <img src="https://github.com/user-attachments/assets/368d05be-009b-4f0d-b753-5c3cf8ae7dad" width="75%" alt="Combat in progress" />
