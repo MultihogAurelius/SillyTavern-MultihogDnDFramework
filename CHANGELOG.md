@@ -2,6 +2,14 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.67] - 2026-08-28
+
+### Added
+- **Fractional ((SLOTS))**: Slot markers accept decimal values such as `1.5/4` and `.25/1`, drawing a proportional partial pip and showing the exact value on hover.
+
+### Fixed
+- **Slot recolor preview**: Live color dragging now paints `.rt-slot-fill` (including partial pips) instead of the old filled-box background.
+
 ## [2026.8.66] - 2026-08-28
 
 ### Changed
