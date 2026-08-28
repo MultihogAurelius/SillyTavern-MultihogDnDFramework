@@ -353,7 +353,7 @@ export function handleRecolor(barId, currentBg, targetEl) {
                     wrap.querySelector('.rt-battery-nub').style.background = bg;
                 }
                 else if (wrap.classList.contains('rt-orbs-container')) { wrap.querySelectorAll('.rt-orb.filled').forEach(el => { el.style.background = bg; el.style.boxShadow = `0 0 5px ${bg}`; }); }
-                else if (wrap.classList.contains('rt-slots-container')) { wrap.querySelectorAll('.rt-slot-fill').forEach(el => { el.style.background = bg; }); }
+                else if (wrap.classList.contains('rt-slots-container')) { wrap.querySelectorAll('.rt-slot.filled').forEach(el => { el.style.background = bg; }); }
                 else if (wrap.classList.contains('rt-phase-container')) { 
                     wrap.querySelectorAll('.rt-phase-node.past, .rt-phase-node.current').forEach(el => { el.style.background = bg; el.style.borderColor = bg; });
                     wrap.querySelectorAll('.rt-phase-node.current').forEach(el => { el.style.boxShadow = `0 0 8px ${bg}`; });

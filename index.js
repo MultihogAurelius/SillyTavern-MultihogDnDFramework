@@ -1,6 +1,6 @@
 import { EXAMPLES, COLOR_EXAMPLES, DEFAULT_STOCK_PROMPTS, RT_PROMPTS, BLOCK_ICONS, BLOCK_ORDER, PAGE_SIZE, NO_PAGINATE, buildOnboardingXpHint, buildOnboardingTimeHint, buildStartingGearHint, buildOnboardingActiveBlocks, buildCombatAndSkillScalingHint, resolveTimePromptKey, resolveTimePromptDisplayTag, buildCyoaPrompt, DEFAULT_CYOA_SLOTS, refreshCyoaConfigToShipped, formatTimeOfDay } from './constants.js';
 import { MODULE_NAME, DEFAULT_MODULES, MODULE_BOOK_CATEGORY, FULL_REVIEW_STATE_SYSTEM_PROMPT, FULL_REVIEW_USER_PROMPT_SUFFIX, getSettings, getBarBackground, migrateCustomFields, saveChatState, getActiveChatId, shouldPreserveLiveChatStateOnBoot, writeModuleSchemaBackup, getPendingModuleSchemaBackup, applyModuleSchemaBackup, applyDeletedCustomTagTombstones, recordDeletedCustomTags, clearDeletedCustomTagTombstones, saveProfile, deleteProfile, getEffectiveRouterCampaignPrefix, sanitizeCampaignPrefixString, buildNpcInstruction, LOREBOOK_FULL_AUDIT_INSTRUCTION, loadStockPromptsFromProfile, getNpcRelationshipMax, getNpcRelationshipMaxDefault, clampRelationshipValue, relationshipBarPct, getFriendshipTier, getAffectionTier, getRelTierBadgeStyle, getRelTierDetailedStyle, getRelTierDetailedLabelStyle, applyRelTierBadgeElement, sanitizeRouterState, rebuildAllModuleInstructions, adjustAllStoredTemplatesForTimeFormat, DEFAULT_NPC_SECTIONS, DEFAULT_PC_SECTIONS, computeBundledPromptsFingerprint, computeBundledPromptsFingerprintForSnapshot, normalizeBundledPromptsSnapshot, buildBundledPromptsSnapshot, getSnapshotCategoryBlocks, getPromptCategoryImpactBadge, PROMPT_DEFAULTS_CATEGORIES, PROMPT_DEFAULTS_CATEGORY_LABELS, getDefaultPortraitLocationSystemPrompt, getDefaultPortraitNpcSystemPrompt, getDefaultPortraitCharacterSystemPrompt, isShippedPortraitLocationSystemPrompt, findShippedPortraitLocationPresetId, FACTORY_PORTRAIT_PROMPT_PRESETS, resolveFactoryPortraitPromptBundle, getFactoryPortraitPromptPresetNameSet, DEFAULT_PORTRAIT_PROMPT_PRESET_ID, applyFactoryReset, clearExtensionLocalStorageUiState, stripChatStateGlobalUiPrefs, buildStateTrackerRelationshipCommandInstruction, extractStateTrackerRelationshipCommands, getRelationshipUpdateMode, RELATIONSHIP_UPDATE_MODES, resetLorebookPromptTemplates, writeCriticalSettingsBackup, stampCriticalSettingsSynced, applyCriticalSettingsBackup, isMainSyspromptBackupEnabled, captureMainSyspromptBackup, restoreMainSyspromptStash, hydrateMainSyspromptBackup, getEffectiveBackupText, getLiveMainSyspromptText, setLiveMainSyspromptText, maybeRestoreMainIfTrackerDisabled, isMainSyspromptSourceReady } from './state-manager.js';
-import { snapshotChatSetup, chatSetupsMatch, syncChatSetupCatalogs, replaceChatSetupCatalogsFromLive, removeChatSetupCatalogEntries, clearChatBoundActivations } from './src/state/chat-setup.js';
+import { snapshotChatSetup, chatSetupsMatch, syncChatSetupCatalogs, removeChatSetupCatalogEntries, clearChatBoundActivations } from './src/state/chat-setup.js';
 import { buildDirectPromptSystemPrompt, DIRECT_PROMPT_SYSTEM_MODES } from './src/state/direct-prompt-system.js';
 import { diffTextLines, diffHasChanges } from './prompt-diff.js';
 import { sendStateRequest, fetchOllamaModels, fetchOpenAIModels, testOpenAIConnection, getConnectionProfiles, getCurrentCompletionPreset, setCompletionPreset, syncCombatProfile, resetCombatProfileOverride, isCombatActive } from './llm-client.js';
@@ -49,15 +49,6 @@ import { bindRenderedCardEvents } from './src/ui/panel/card-events.js';
 import { createDetachedPanel } from './src/ui/panel/detached-panel.js';
 import { scalePanelBackgroundImage, getPanelBgConfig, applyPanelBackgroundToDom, applyTrackerThemeToDom, PANEL_BG_TRACKER_KEYS, PANEL_BG_AGENT_KEYS } from './src/ui/panel/panel-appearance.js';
 import { createMemoRecoveryManager } from './src/features/recovery/memo-recovery.js';
-import {
-    checkpointMultihogState,
-    flushCheckpoint,
-    getPersistenceStatus,
-    initializeDurablePersistence,
-    markPersistenceDirty,
-    recordMemoDraft,
-    shouldBlockPersistenceUnload,
-} from './src/state/durable-persistence.js';
 import { runtimeState } from './src/app/runtime-state.js';
 import {
     clearMemoAndMapHistory,
@@ -147,23 +138,6 @@ const snapshotMemoToLocalStorage = (...args) => memoRecovery?.snapshotMemoToLoca
 const ensureLocalMemoRecovery = (...args) => memoRecovery?.ensureLocalMemoRecovery(...args);
 const confirmLocalSettingsRecovery = (...args) => memoRecovery?.confirmLocalSettingsRecovery(...args);
 const markMemoPersistedByCurrentBrowser = (...args) => memoRecovery?.markMemoPersistedByCurrentBrowser(...args);
-
-function syncPersistenceSafetyWarning(status = getPersistenceStatus()) {
-    const warningId = 'rpg-tracker-persistence-warning';
-    let warning = document.getElementById(warningId);
-    if (!status.unsafe) {
-        warning?.remove();
-        return;
-    }
-    if (!warning) {
-        warning = document.createElement('div');
-        warning.id = warningId;
-        warning.className = 'rpg-tracker-persistence-warning';
-        warning.setAttribute('role', 'alert');
-        document.body?.appendChild(warning);
-    }
-    warning.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i><span><b>Multihog changes are not safely stored.</b> Keep this tab open. The framework will keep retrying automatically.</span>';
-}
 
 let _pillDeselectHandler = null;
 globalThis._rpgRenderRouterUI = () => { if (typeof runtimeState.renderRouterUI === 'function') runtimeState.renderRouterUI(); };
@@ -905,7 +879,6 @@ async function syncCampaignPrefixAndWorldsForChat(newChatId, source) {
 let _saveSettingsTimer = null;
 /** Re-entrancy guard: saveSettings → saveChatState must not call saveSettings again. */
 let _saveSettingsInFlight = false;
-let _saveSettingsDrainPromise = null;
 /** If a save is requested while one is in flight, run again after (keeps deletes durable). */
 let _saveSettingsPending = false;
 let _saveSettingsPendingForce = false;
@@ -985,8 +958,11 @@ async function forceDiskCheckpoint() {
     }
     snapshotMemoToLocalStorage(chatId, { force: true });
     s.memoPersistedAt = Date.now();
-    await Promise.resolve(saveSettings(true));
-    await flushCheckpoint({ server: true });
+    const saveFn = await resolveCoreSaveSettings();
+    if (!saveFn) {
+        throw new Error('Core saveSettings() could not be loaded');
+    }
+    await saveFn();
     snapshotMemoToLocalStorage(chatId, { force: true });
 }
 
@@ -998,7 +974,6 @@ async function forceDiskCheckpoint() {
 export function saveSettings(force = false, delay = 0) {
     // Keep UI synchronization immediate so toggle checkboxes and forms respond instantly
     syncOnboardingUI();
-    markPersistenceDirty();
 
     // Always mirror module schema to sync localStorage first — even if a disk save is
     // already in flight (delete/add must not be dropped by the re-entrancy guard).
@@ -1030,13 +1005,13 @@ export function saveSettings(force = false, delay = 0) {
 
     const doSave = async (forceWrite) => {
         _saveSettingsTimer = null;
-        if (_saveSettingsDrainPromise) {
+        if (_saveSettingsInFlight) {
             _saveSettingsPending = true;
             _saveSettingsPendingForce = _saveSettingsPendingForce || !!forceWrite;
-            return _saveSettingsDrainPromise;
+            return;
         }
         _saveSettingsInFlight = true;
-        _saveSettingsDrainPromise = (async () => {
+        try {
             do {
                 _saveSettingsPending = false;
                 const pendingForce = _saveSettingsPendingForce;
@@ -1062,15 +1037,6 @@ export function saveSettings(force = false, delay = 0) {
                 s.memoPersistedAt = Date.now();
                 // Sync WAL for displayGroups / prompt-ack — survives cancelled saves on code-edit reload.
                 stampCriticalSettingsSynced(s, writeCriticalSettingsBackup(s));
-                // The complete Multihog namespace reaches its own durable journal before
-                // SillyTavern is allowed to mirror the much larger whole-settings file.
-                // If both checkpoint targets fail we still attempt the ST mirror, while
-                // the persistence service keeps unload protection and a visible warning on.
-                try {
-                    await checkpointMultihogState(s);
-                } catch (error) {
-                    console.error('[RPG Tracker] Durable Multihog checkpoint failed:', error);
-                }
                 if (useForce) {
                     const saveFn = await resolveCoreSaveSettings();
                     if (saveFn) await saveFn();
@@ -1080,11 +1046,9 @@ export function saveSettings(force = false, delay = 0) {
                 }
                 forceWrite = false;
             } while (_saveSettingsPending);
-        })().finally(() => {
+        } finally {
             _saveSettingsInFlight = false;
-            _saveSettingsDrainPromise = null;
-        });
-        return _saveSettingsDrainPromise;
+        }
     };
 
     if (force || delay <= 0) {
@@ -2480,11 +2444,6 @@ function onChatChanged(newChatId) {
     if (runtimeState.stateController) {
         try { runtimeState.stateController.abort(); } catch (_) { /* ignore */ }
     }
-    // Same affinity class: Map Updater / Map Evolution await LLM work then persist
-    // timers and map mutations via getActiveChatId(). Abort before flipping chat id
-    // so any best-effort persist still targets the departing partition.
-    try { stopMapUpdaterPass(); } catch (_) { /* ignore */ }
-    try { stopMapEvolutionPass(); } catch (_) { /* ignore */ }
 
     // Flush Adventure Companion under the departing chat BEFORE flipping currentChatId /
     // loading the arriving partition (history is per-chat, including when Chat Link is off).
@@ -3521,12 +3480,7 @@ function loadProfile(name) {
     s.blockOrder = p.blockOrder ? JSON.parse(JSON.stringify(p.blockOrder)) : s.blockOrder;
     s.stockPrompts = loadStockPromptsFromProfile(p.stockPrompts);
     s.modulePageSizes = p.modulePageSizes ? JSON.parse(JSON.stringify(p.modulePageSizes)) : {};
-    if (Array.isArray(p.customFields)) {
-        s.customFields = JSON.parse(JSON.stringify(p.customFields));
-        replaceChatSetupCatalogsFromLive(s, { customFields: true });
-    } else {
-        s.customFields = [];
-    }
+    s.customFields = p.customFields ? JSON.parse(JSON.stringify(p.customFields)) : [];
     // quests are always derived from currentMemo — never from the profile snapshot
     s.quests = [];
     s.currentMemo = applyQuestSyncAndStripMemo(s.currentMemo);
@@ -5098,7 +5052,6 @@ function createPanel() {
         openPcSectionEditor,
         parseInWorldTime,
         reapplyRouterPass,
-        recordMemoDraft,
         refreshAgentManifestNow,
         refreshAll,
         refreshDayNightCycleFromMemo,
@@ -5989,25 +5942,6 @@ function organizeConnectionSettingsUI() {
     const pm = ctx.getPresetManager ? ctx.getPresetManager() : null;
     let _runPromptDefaultsDialog = null;
     let _runPromptDefaultsStartupAction = null;
-
-    // Hydrate the complete Multihog namespace before migrations, UI construction,
-    // or active-chat projection can observe and persist a stale settings.json copy.
-    try {
-        const durableBoot = await initializeDurablePersistence({
-            settingsRoot: ctx.extensionSettings,
-            moduleName: MODULE_NAME,
-            getRequestHeaders,
-            chatId: ctx.chatId || ctx.getCurrentChatId?.() || null,
-            onStatus: syncPersistenceSafetyWarning,
-        });
-        if (durableBoot.needsCheckpoint) {
-            _startupSavePending = true;
-            _startupSavePendingForce = true;
-        }
-    } catch (error) {
-        console.error('[RPG Tracker] Durable persistence initialization failed:', error);
-        syncPersistenceSafetyWarning({ unsafe: true });
-    }
 
     configureRuntimeActions({
         saveSettings,
@@ -7864,13 +7798,7 @@ function organizeConnectionSettingsUI() {
                 setTimeout(() => { _navigationSnapshotInFlight = false; }, 0);
             }
         };
-        window.addEventListener('beforeunload', event => {
-            snapshotPendingStateForNavigation('beforeunload');
-            if (shouldBlockPersistenceUnload()) {
-                event.preventDefault();
-                event.returnValue = '';
-            }
-        });
+        window.addEventListener('beforeunload', () => snapshotPendingStateForNavigation('beforeunload'));
         window.addEventListener('pagehide', () => snapshotPendingStateForNavigation('pagehide'));
         document.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'hidden') snapshotPendingStateForNavigation('visibilityhidden');

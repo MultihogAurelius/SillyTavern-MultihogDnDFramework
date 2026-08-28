@@ -2,40 +2,10 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
-## [2026.8.65] - 2026-08-28
-
-### Fixed
-- **Cartridge and profile module stacking**: Loading a Game Cartridge or Scenario Profile now replaces the shared tracker-module / Game System / snippet library for the loaded groups. Previously, save-time catalog sync merged the new game on top of the old one, so Game A's modules stayed in the inactive pool (and GLOBAL items could even stay enabled) after loading Game B.
-
-## [2026.8.64] - 2026-08-28
-
-### Added
-- **Fractional ((SLOTS))**: Slot markers accept decimal values such as `1.5/4` and `.25/1`, drawing a proportional partial pip and showing the exact value on hover.
-
-### Fixed
-- **Durable persistence recovery**: Unsynced IndexedDB checkpoints stay above the durable floor so recovery can still walk to the tip when settings.json or the server lag. After a commit, newer memo drafts are rebased instead of deleted, and mismatched `_persistence` metadata is not stamped onto live state that moved during encode.
-- **Slot recolor preview**: Live color dragging now paints `.rt-slot-fill` (including partial pips) instead of the old filled-box background that fractional slots no longer use.
-
-## [2026.8.63] - 2026-08-28
+## [2026.8.66] - 2026-08-28
 
 ### Changed
-- **Anti-Museum Tour**: Continue now opens a second popup that repeats the summarizer requirement before the overlay closes. It tells people to use a hiding summarizer such as Summaryception (last ~10 turns verbatim) or the context will balloon and wreck cost and output quality.
-
-## [2026.8.62] - 2026-08-27
-
-### Added
-- **Crash-safe Multihog persistence**: Complete extension-state checkpoints now use checksummed local and rotating server copies, background serialization, memo draft recovery, automatic retries, and a visible warning when no safe storage target is available.
-
-### Fixed
-- **Background generation output limits**: A zero extension token override now inherits SillyTavern's configured response length or the selected completion preset instead of allowing streaming, custom OpenAI/Ollama, profile, and agent requests to fall back to small backend defaults such as KoboldCpp's 512 tokens.
-- **Character Creator silent failures**: Character creation now stops with a clear truncation/connection error unless the State Tracker actually commits a new `[CHARACTER]` block; it no longer continues into persona and Player Card creation with stale level-one state.
-- **Player portrait identity**: Player portraits use the linked Lorebook Player Card as their primary appearance source and no longer inject an unrelated narrator character card as the target.
-- **Player-character trait bleed**: Character-sheet and persona prompts explicitly keep narrator/NPC species, ancestry, personality, and appearance from overriding Player Preferences.
-
-## [2026.8.61] - 2026-08-27
-
-### Changed
-- **Startup menu**: Removed the Discord join badge from the character creation / onboarding screen.
+- **Frozen 2026.8.60 tree**: Republished the 2026.8.60 codebase under a newer version so SillyTavern's auto-updater installs this freeze over 2026.8.61–2026.8.65.
 
 ## [2026.8.60] - 2026-08-27
 

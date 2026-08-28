@@ -1,5 +1,5 @@
 import { describe, expect, it, afterEach } from 'vitest';
-import { resolveStateRequestMaxTokens, sendAgentTurn, sendStateRequest } from '../llm-client.js';
+import { sendStateRequest } from '../llm-client.js';
 
 const originalGetContext = globalThis.SillyTavern.getContext;
 
@@ -8,66 +8,6 @@ afterEach(() => {
 });
 
 describe('sendStateRequest default (generateRaw) mode disables trimNames', () => {
-    it('inherits the live SillyTavern response length when maxTokens is zero', async () => {
-        let capturedOptions = null;
-        globalThis.SillyTavern.getContext = () => ({
-            ...originalGetContext(),
-            mainApi: 'openai',
-            chatCompletionSettings: { openai_max_tokens: 4096 },
-            generateRaw: async (opts) => {
-                capturedOptions = opts;
-                return 'complete response';
-            },
-        });
-
-        await sendStateRequest(
-            { connectionSource: 'default', maxTokens: 0 },
-            'system prompt',
-            'user prompt',
-        );
-
-        expect(capturedOptions.responseLength).toBe(4096);
-    });
-
-    it('keeps an explicit extension token limit authoritative', () => {
-        expect(resolveStateRequestMaxTokens(
-            { maxTokens: 2048 },
-            { mainApi: 'openai', chatCompletionSettings: { openai_max_tokens: 8192 } },
-        )).toBe(2048);
-    });
-
-    it('inherits the response length from a selected completion preset', () => {
-        expect(resolveStateRequestMaxTokens(
-            { maxTokens: 0, completionPresetId: 'Creator' },
-            {
-                getPresetManager: () => ({
-                    getCompletionPresetByName: name => name === 'Creator' ? { genamt: 7168 } : null,
-                }),
-            },
-        )).toBe(7168);
-    });
-
-    it('also inherits the live response length in agent-turn generateRaw fallback', async () => {
-        let capturedOptions = null;
-        globalThis.SillyTavern.getContext = () => ({
-            ...originalGetContext(),
-            mainApi: 'openai',
-            chatCompletionSettings: { openai_max_tokens: 3072 },
-            generateRaw: async (opts) => {
-                capturedOptions = opts;
-                return 'agent response';
-            },
-        });
-
-        const result = await sendAgentTurn(
-            { connectionSource: 'default', maxTokens: 0 },
-            [{ role: 'system', content: 'system' }, { role: 'user', content: 'user' }],
-        );
-
-        expect(capturedOptions.responseLength).toBe(3072);
-        expect(result.content).toBe('agent response');
-    });
-
     it('passes trimNames: false to generateRaw so ST never silently deletes a structured response', async () => {
         let capturedOptions = null;
         globalThis.SillyTavern.getContext = () => ({
@@ -304,11 +244,10 @@ describe('sendStateRequest default (generateRaw) mode disables trimNames', () =>
 
     it('streams Main API Chat Completion instead of quiet generateRaw when asked', async () => {
         let usedRaw = false;
-        let capturedMaxTokens = null;
         globalThis.SillyTavern.getContext = () => ({
             ...originalGetContext(),
             mainApi: 'openai',
-            chatCompletionSettings: { chat_completion_source: 'nanogpt', nanogpt_model: 'gemini-pro', openai_max_tokens: 6144 },
+            chatCompletionSettings: { chat_completion_source: 'nanogpt', nanogpt_model: 'gemini-pro' },
             generateRaw: async () => {
                 usedRaw = true;
                 throw new Error('quiet generateRaw must not be used for keep-alive jobs');
@@ -317,7 +256,6 @@ describe('sendStateRequest default (generateRaw) mode disables trimNames', () =>
                 processRequest: async (data) => {
                     expect(data.stream).toBe(true);
                     expect(data.model).toBe('gemini-pro');
-                    capturedMaxTokens = data.max_tokens;
                     return async function* () {
                         yield { text: '{"ok":true}' };
                     };
@@ -334,7 +272,6 @@ describe('sendStateRequest default (generateRaw) mode disables trimNames', () =>
         );
 
         expect(usedRaw).toBe(false);
-        expect(capturedMaxTokens).toBe(6144);
         expect(result).toBe('{"ok":true}');
     });
 });

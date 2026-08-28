@@ -148,68 +148,17 @@ async function resolveProfilePresetName(context, requestedPreset, profile) {
     return '';
 }
 
-function positiveTokenCount(value) {
-    const number = Number(value);
-    return Number.isFinite(number) && number > 0 ? Math.floor(number) : undefined;
-}
-
-/**
- * Resolve the response cap for background requests.
- *
- * `maxTokens: 0` means "inherit SillyTavern's configured response length", not
- * "let the backend choose a default". Direct ChatCompletionService and custom
- * backend calls bypass generateRaw's normal inheritance, so they need the live
- * value copied into their payload explicitly. A selected completion preset is
- * left authoritative because its own token setting is applied downstream.
- */
-export function resolveStateRequestMaxTokens(settings = {}, context = {}) {
-    const explicit = positiveTokenCount(settings.maxTokens);
-    if (explicit) return explicit;
-
-    const presetName = String(settings.completionPresetId || '').trim();
-    if (presetName) {
-        try {
-            for (const type of [undefined, 'textgenerationwebui', 'openai']) {
-                const manager = type ? context.getPresetManager?.(type) : context.getPresetManager?.();
-                const preset = manager?.getCompletionPresetByName?.(presetName);
-                const fromPreset = positiveTokenCount(
-                    preset?.openai_max_tokens
-                    ?? preset?.genamt
-                    ?? preset?.max_tokens
-                    ?? preset?.max_length,
-                );
-                if (fromPreset) return fromPreset;
-            }
-        } catch { /* the downstream preset service can still apply it */ }
-        return undefined;
-    }
-
-    try {
-        const expanded = context.substituteParams?.('{{maxResponseTokens}}');
-        const fromMacro = positiveTokenCount(expanded);
-        if (fromMacro) return fromMacro;
-    } catch { /* older SillyTavern builds may not expose substituteParams */ }
-
-    if (context.mainApi === 'openai') {
-        return positiveTokenCount(context.chatCompletionSettings?.openai_max_tokens);
-    }
-    return undefined;
-}
-
 /**
  * Profile requests without a CC preset omit custom_url and 404 on Custom OpenAI.
  * "Use Current Settings" must still attach a real preset or the live endpoint URL.
  */
 async function sendViaConnectionProfile(context, settings, messages, { signal = null, extraOverride = {}, stream = false } = {}) {
     const service = context.ConnectionManagerRequestService;
+    const maxTokens = settings.maxTokens && settings.maxTokens > 0 ? settings.maxTokens : undefined;
     const profile = typeof service.getProfile === 'function'
         ? service.getProfile(settings.connectionProfileId)
         : null;
     const effectivePreset = await resolveProfilePresetName(context, settings.completionPresetId, profile);
-    const maxTokens = resolveStateRequestMaxTokens(
-        effectivePreset ? { ...settings, completionPresetId: effectivePreset } : settings,
-        context,
-    );
     const overridePayload = applyLiveChatCompletionOverrides(context, profile, { ...extraOverride });
     let profileOriginalPreset = null;
     try {
@@ -316,7 +265,7 @@ export async function collectCompletionText(raw) {
 async function sendViaLiveChatCompletion(context, settings, messages, { signal = null } = {}) {
     const service = context.ChatCompletionService;
     const live = context.chatCompletionSettings || {};
-    const maxTokens = resolveStateRequestMaxTokens(settings, context);
+    const maxTokens = settings.maxTokens && settings.maxTokens > 0 ? settings.maxTokens : undefined;
     return service.processRequest({
         stream: true,
         messages,
@@ -889,7 +838,6 @@ export async function sendStateRequest(settings, systemPrompt, userPrompt, signa
     }
 
     const context = SillyTavern.getContext();
-    const maxTokens = resolveStateRequestMaxTokens(settings, context);
 
     const activeProfileId = settings.connectionSource === 'profile' ? (settings.connectionProfileId || '') : '(inactive)';
     console.log(`[RPG Tracker] sendStateRequest — source: "${settings.connectionSource}", profileId: "${activeProfileId}", preset: "${settings.completionPresetId}"`);
@@ -955,7 +903,7 @@ export async function sendStateRequest(settings, systemPrompt, userPrompt, signa
     // ── Ollama Mode ──
     if (settings.connectionSource === 'ollama') {
         if (settings.debugMode) console.log(`[RPG Tracker] Sending via Ollama: ${settings.ollamaModel}`);
-        const text = await sendViaOllama(settings.ollamaUrl, settings.ollamaModel, systemPrompt, userPrompt, maxTokens, presetSettings, signal, null, stream);
+        const text = await sendViaOllama(settings.ollamaUrl, settings.ollamaModel, systemPrompt, userPrompt, settings.maxTokens, presetSettings, signal, null, stream);
         logTransaction(debugSource, [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }], text);
         return finalize(text);
     }
@@ -963,7 +911,7 @@ export async function sendStateRequest(settings, systemPrompt, userPrompt, signa
     // ── OpenAI Compatible Mode ──
     if (settings.connectionSource === 'openai') {
         if (settings.debugMode) console.log(`[RPG Tracker] Sending via OpenAI Compatible: ${settings.openaiModel}`);
-        const text = await sendViaOpenAI(settings.openaiUrl, settings.openaiKey, settings.openaiModel, systemPrompt, userPrompt, maxTokens, presetSettings, signal, null);
+        const text = await sendViaOpenAI(settings.openaiUrl, settings.openaiKey, settings.openaiModel, systemPrompt, userPrompt, settings.maxTokens, presetSettings, signal, null);
         logTransaction(debugSource, [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }], text);
         return finalize(text);
     }
@@ -1015,8 +963,8 @@ export async function sendStateRequest(settings, systemPrompt, userPrompt, signa
             jsonSchema: context.mainApi === 'openai' ? jsonSchema : null,
         };
 
-        if (maxTokens) {
-            options.responseLength = maxTokens;
+        if (settings.maxTokens && settings.maxTokens > 0) {
+            options.responseLength = settings.maxTokens;
         }
 
         let result;
@@ -1092,7 +1040,6 @@ export async function sendStateRequest(settings, systemPrompt, userPrompt, signa
  */
 export async function sendAgentTurn(settings, messages, tools = null, signal = null) {
     const context = SillyTavern.getContext();
-    const maxTokens = resolveStateRequestMaxTokens(settings, context);
 
     // ── OpenAI compatible ────────────────────────────────────────────────────
     if (settings.connectionSource === 'openai') {
@@ -1122,7 +1069,7 @@ export async function sendAgentTurn(settings, messages, tools = null, signal = n
             stream: false,
         };
         if (tools?.length) body.tools = tools;
-        if (maxTokens) body.max_tokens = maxTokens;
+        if (settings.maxTokens > 0) body.max_tokens = settings.maxTokens;
 
         // PATCH: always route through ST's server-side CORS proxy (requires enableCorsProxy).
         // Browser-direct fetches to remote endpoints (e.g. opencode.ai) fail CORS preflight.
@@ -1168,7 +1115,6 @@ export async function sendAgentTurn(settings, messages, tools = null, signal = n
             options: {
                 temperature: presetSettings.temperature ?? presetSettings.temp ?? 0.1,
                 top_p: presetSettings.top_p ?? 1.0,
-                num_predict: maxTokens,
             },
         };
         if (tools?.length) body.tools = tools;
@@ -1247,7 +1193,7 @@ export async function sendAgentTurn(settings, messages, tools = null, signal = n
             await setCompletionPreset(settings.completionPresetId);
         }
         const options = { prompt: flatUser, systemPrompt: systemMsg?.content || '', bypassAll: true, signal };
-        if (maxTokens) options.responseLength = maxTokens;
+        if (settings.maxTokens > 0) options.responseLength = settings.maxTokens;
         const result = await generateRaw(options);
         const text = typeof result === 'string' ? result : (/** @type {any} */ (result))?.choices?.[0]?.message?.content ?? '';
         return { content: text, toolCall: null };

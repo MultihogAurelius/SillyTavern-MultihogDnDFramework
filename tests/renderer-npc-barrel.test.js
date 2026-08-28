@@ -37,35 +37,6 @@ describe('((BARREL))', () => {
     });
 });
 
-describe('((SLOTS))', () => {
-    it('renders decimal values with a proportional partial slot and exact hover value', () => {
-        const html = tryRenderMarker('Supply: ((SLOTS)) 1.5/4', 'CUSTOM');
-
-        expect(html).toContain('class="rt-slot partial"');
-        expect(html).toContain('class="rt-slot-fill" style="width:50%');
-        expect(html).toContain('title="Supply: 1.5/4"');
-        expect(html).toContain('aria-label="Supply: 1.5/4"');
-    });
-
-    it('accepts fractional values without a leading zero', () => {
-        const html = tryRenderMarker('Charge: ((SLOTS)) .25/1', 'CUSTOM');
-
-        expect(html).toContain('class="rt-slot partial"');
-        expect(html).toContain('title="Charge: .25/1"');
-    });
-
-    it('still renders whole slots as filled or empty pips', () => {
-        const html = tryRenderMarker('Arrows: ((SLOTS)) 3/4', 'CUSTOM');
-        const filled = html.match(/class="rt-slot filled"/g) || [];
-        const empty = html.match(/class="rt-slot empty"/g) || [];
-
-        expect(filled).toHaveLength(3);
-        expect(empty).toHaveLength(1);
-        expect(html).toContain('class="rt-slot-fill" style="width:100%');
-        expect(html).not.toContain('class="rt-slot partial"');
-    });
-});
-
 describe('universal tag colors', () => {
     it('applies named color suffixes dynamically without listing color variants', () => {
         expect(getMarkerLibraryKeys()).toEqual(expect.arrayContaining(['PILL', 'BAR', 'PROGRESS']));

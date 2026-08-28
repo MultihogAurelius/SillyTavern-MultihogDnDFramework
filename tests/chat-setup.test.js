@@ -12,7 +12,6 @@ import {
     setChatSetupItemScope,
     snapshotChatSetup,
     syncChatSetupCatalogs,
-    replaceChatSetupCatalogsFromLive,
 } from '../state-manager.js';
 
 describe('per-chat Control Room and tracker setup', () => {
@@ -414,76 +413,5 @@ describe('per-chat Control Room and tracker setup', () => {
         syncChatSetupCatalogs(settings);
         expect(settings.trackerModuleDatabase.map(f => f.tag)).toEqual(['BAR']);
         expect(settings.trackerModuleDatabase[0].prompt).toBe('revised');
-    });
-
-    it('keeps previous catalog definitions visible but inactive when live arrays are swapped without replace', () => {
-        const settings = buildDefaultSettings();
-        migrateChatSetupCatalogs(settings);
-        settings.customFields = [{
-            tag: 'SANITY',
-            label: 'Sanity',
-            enabled: true,
-            scope: 'global',
-            globalEnabled: true,
-        }];
-        settings.customSyspromptLibrary = [{ id: 'grim', tag: 'tone', content: 'Grim', enabled: true }];
-        settings.gameSystems = [{
-            id: 'system-a',
-            name: 'Sanity',
-            customFieldTag: 'SANITY',
-            enabled: true,
-            scope: 'global',
-            globalEnabled: true,
-        }];
-        syncChatSetupCatalogs(settings);
-
-        settings.customFields = [{ tag: 'HEAT', label: 'Heat', enabled: true }];
-        settings.customSyspromptLibrary = [{ id: 'noir', tag: 'tone', content: 'Noir', enabled: true }];
-        settings.gameSystems = [{ id: 'system-b', name: 'Heat', customFieldTag: 'HEAT', enabled: true }];
-        syncChatSetupCatalogs(settings);
-
-        expect(settings.customFields.map(field => field.tag).sort()).toEqual(['HEAT', 'SANITY']);
-        expect(settings.customFields.find(field => field.tag === 'SANITY').enabled).toBe(true);
-        expect(settings.customSyspromptLibrary.map(item => item.id).sort()).toEqual(['grim', 'noir']);
-        expect(settings.gameSystems.map(system => system.id).sort()).toEqual(['system-a', 'system-b']);
-    });
-
-    it('replaces catalogs on cartridge/profile load so the previous game is not stacked', () => {
-        const settings = buildDefaultSettings();
-        migrateChatSetupCatalogs(settings);
-        settings.customFields = [{
-            tag: 'SANITY',
-            label: 'Sanity',
-            enabled: true,
-            scope: 'global',
-            globalEnabled: true,
-        }];
-        settings.customSyspromptLibrary = [{ id: 'grim', tag: 'tone', content: 'Grim', enabled: true }];
-        settings.gameSystems = [{
-            id: 'system-a',
-            name: 'Sanity',
-            customFieldTag: 'SANITY',
-            enabled: true,
-            scope: 'global',
-            globalEnabled: true,
-        }];
-        syncChatSetupCatalogs(settings);
-
-        settings.customFields = [{ tag: 'HEAT', label: 'Heat', enabled: true }];
-        settings.customSyspromptLibrary = [{ id: 'noir', tag: 'tone', content: 'Noir', enabled: true }];
-        settings.gameSystems = [{ id: 'system-b', name: 'Heat', customFieldTag: 'HEAT', enabled: true }];
-        replaceChatSetupCatalogsFromLive(settings, {
-            customFields: true,
-            syspromptSnippets: true,
-            gameSystems: true,
-        });
-        syncChatSetupCatalogs(settings);
-
-        expect(settings.customFields.map(field => field.tag)).toEqual(['HEAT']);
-        expect(settings.trackerModuleDatabase.map(field => field.tag)).toEqual(['HEAT']);
-        expect(settings.customSyspromptLibrary.map(item => item.id)).toEqual(['noir']);
-        expect(settings.syspromptSnippetDatabase.map(item => item.id)).toEqual(['noir']);
-        expect(settings.gameSystems.map(system => system.id)).toEqual(['system-b']);
-        expect(settings.gameSystemDatabase.map(system => system.id)).toEqual(['system-b']);
     });
 });

@@ -3,7 +3,6 @@ import {
     CHAT_COMPLETION_API,
     RECOMMENDED_OUTPUT_LENGTH,
     buildOverlayHtml,
-    buildSummarizerNagHtml,
     describeMainApi,
     getApiSetupStatuses,
     getSillyTavernMainApi,
@@ -118,22 +117,5 @@ describe('API setup checklist', () => {
         expect(html).toContain('Multihog doesn&apos;t use a one-on-one chat format but uses a format written like a book, that seamlessly allows for multiple characters. The messages are attributed to a narrator, not a single character.');
         expect(html.match(/type="checkbox"/g)?.length).toBe(4);
         expect(html).not.toContain('These live checkmarks reflect your current SillyTavern settings');
-        expect(html).not.toContain('You probably didn&apos;t read the last box carefully');
-    });
-
-    it('renders a post-Continue summarizer nag as a second Anti-Museum Tour box', () => {
-        const html = buildSummarizerNagHtml();
-        expect(html).toContain('Anti-Museum Tour');
-        expect(html).toContain('Use a summarizer');
-        expect(html).toContain('You probably didn&apos;t read the last box carefully, so I&apos;ll say it again.');
-        expect(html).toContain('Use a summarizer such as');
-        expect(html).toContain('that hides messages. Otherwise this extension will destroy your wallet and outputs because your context will grow absurdly large.');
-        expect(html).toContain('A summarizer (such as');
-        expect(html).toContain(') allows you to only have the last X turns in context verbatim. You only need like 10.');
-        expect(html).toContain('href="https://github.com/Lodactio/Extension-Summaryception"');
-        expect(html).toContain('>Summaryception</a>');
-        expect(html).toContain('id="rt-api-setup-continue"');
-        expect(html).not.toContain('id="rt-api-setup-apply"');
-        expect(html).not.toContain('SillyTavern API settings to check');
     });
 });

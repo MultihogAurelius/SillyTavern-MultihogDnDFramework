@@ -44,17 +44,4 @@ describe('portrait story lookback', () => {
         expect(source.slice(source.indexOf('export async function generatePortraitPrompt'), source.indexOf('export async function generateNpcPortraitPrompt')))
             .toContain('portraitUseStoryLookback');
     });
-
-    it('uses the linked Player Card as the portrait target and excludes unrelated narrator cards', () => {
-        const source = readFileSync(new URL('../portraits.js', import.meta.url), 'utf8');
-        const fn = source.slice(
-            source.indexOf('export async function generatePortraitPrompt'),
-            source.indexOf('export async function generateNpcPortraitPrompt'),
-        );
-
-        expect(fn).toContain('Player Character Lorebook Entry (PRIMARY TARGET');
-        expect(fn).toContain('The Player Character Lorebook Entry is the primary source of truth');
-        expect(fn).toContain("normalizeCharacterLabel(charData.name) === normalizeCharacterLabel(entityName)");
-        expect(fn).not.toContain('contextParts.push(`Character Card Description:');
-    });
 });

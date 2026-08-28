@@ -201,10 +201,10 @@ export function persistRouterLastRunTimestamp(epochMs = Date.now()) {
 }
 
 /** Persist the Map Updater "since last run" chat-length watermark. */
-export function persistMapUpdaterLastRunWatermark(length, passChatId = null) {
+export function persistMapUpdaterLastRunWatermark(length) {
     const s = getSettings();
     s.mapUpdaterLastRunChatLength = length;
-    const chatId = passChatId || getActiveChatId();
+    const chatId = getActiveChatId();
     if (s.chatLinkEnabled && chatId) {
         saveChatState(chatId);
     } else {
@@ -213,10 +213,10 @@ export function persistMapUpdaterLastRunWatermark(length, passChatId = null) {
 }
 
 /** Persist the Map Updater "last ran at" timestamp (display only). */
-export function persistMapUpdaterLastRunTimestamp(epochMs = Date.now(), passChatId = null) {
+export function persistMapUpdaterLastRunTimestamp(epochMs = Date.now()) {
     const s = getSettings();
     s.mapUpdaterLastRunAt = epochMs;
-    const chatId = passChatId || getActiveChatId();
+    const chatId = getActiveChatId();
     if (s.chatLinkEnabled && chatId) {
         saveChatState(chatId);
     } else {
@@ -225,9 +225,9 @@ export function persistMapUpdaterLastRunTimestamp(epochMs = Date.now(), passChat
 }
 
 /** Persist Map Updater active-site and pending-exit bookkeeping. */
-export function persistMapUpdaterState(passChatId = null) {
+export function persistMapUpdaterState() {
     const s = getSettings();
-    const chatId = passChatId || getActiveChatId();
+    const chatId = getActiveChatId();
     if (s.chatLinkEnabled && chatId) {
         saveChatState(chatId);
     } else {
@@ -236,9 +236,9 @@ export function persistMapUpdaterState(passChatId = null) {
 }
 
 /** Persist Map Evolution per-site timers and last-site watermark. */
-export function persistMapEvolutionState(passChatId = null) {
+export function persistMapEvolutionState() {
     const s = getSettings();
-    const chatId = passChatId || getActiveChatId();
+    const chatId = getActiveChatId();
     if (s.chatLinkEnabled && chatId) {
         saveChatState(chatId);
     } else {

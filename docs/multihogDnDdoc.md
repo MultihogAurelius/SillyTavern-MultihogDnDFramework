@@ -139,14 +139,12 @@ Turn that lock off only when you deliberately want to carry the current setup in
 
 Created modules and custom system-prompt snippets live in a reusable library. Switching chats never deletes their definitions: items that are not active in the current chat remain in that chat's inactive pool, ready to be enabled again.
 
-Loading a **Game Cartridge** or a **Scenario Profile** that includes those modules **replaces** that shared library for the loaded groups. Game B does not keep Game A's tracker modules, snippets, or Game Systems in the inactive pool. Reload the previous cartridge/profile to get them back.
-
 - **CHAT-BOUND** — its enabled state is remembered separately for each chat. This is the default for newly created and migrated standalone items and is best for campaign-specific rules.
 - **GLOBAL** — its enabled state is shared across chats. Use it for a rule you want active everywhere. The module/snippet definition is always shared; the scope only controls activation. Module order and Control Room order remain part of each chat's setup.
 
 Choose the scope from the dropdown on a standalone module or snippet. The setting is saved immediately.
 
-**Scenario Profiles** are a separate feature: named snapshots of memo + modules + campaign-related fields you can save/load manually. They are not a full dump of connection settings or UI preferences. Loading a profile that saved `customFields` replaces the tracker-module library with that snapshot.
+**Scenario Profiles** are a separate feature: named snapshots of memo + modules + campaign-related fields you can save/load manually. They are not a full dump of connection settings or UI preferences.
 
 ---
 
@@ -684,8 +682,6 @@ Export/import a portable setup (`multihog-game-cartridge` format), typically inc
 - World Progression report prompt
 
 **Not** included: API connections, most UI preferences, or live per-chat memo/campaign state. A virtual **Stock** cartridge represents factory defaults.
-
-Loading a cartridge replaces the checked groups instead of merging them. Tracker modules, Game Systems, and Control Room snippets from the previously loaded game are removed from the shared library, not left in the inactive pool.
 
 ---
 

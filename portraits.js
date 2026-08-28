@@ -401,18 +401,8 @@ export async function generatePortraitPrompt(entityName) {
     const ctx = SillyTavern.getContext();
     const useStoryLookback = !!s.portraitUseStoryLookback;
 
-    // 1. Entity name and linked Player Card. The Player Card is the primary
-    // visual source for the PC and must be included even when story lookback is off.
+    // 1. Entity name
     let contextParts = [`Character Name: ${entityName}`];
-    const linkedPlayer = getLinkedPlayerCharacter(s, ctx);
-    const primaryCharacterName = getPrimaryCharacterBlockName(s);
-    const isLinkedPlayer = !!linkedPlayer && (
-        normalizeCharacterLabel(linkedPlayer.name) === normalizeCharacterLabel(entityName)
-        || normalizeCharacterLabel(primaryCharacterName) === normalizeCharacterLabel(entityName)
-    );
-    if (isLinkedPlayer && linkedPlayer.bio) {
-        contextParts.push(`Player Character Lorebook Entry (PRIMARY TARGET — use this for appearance):\n${linkedPlayer.bio}`);
-    }
 
     // 2. Current memo — find the entity in CHARACTER, PARTY, COMBAT blocks
     if (s.currentMemo) {
@@ -427,13 +417,12 @@ export async function generatePortraitPrompt(entityName) {
         }
     }
 
-    // 3. The active SillyTavern character card usually describes the narrator,
-    // not the requested PC/NPC. Include it only when it actually names the target.
+    // 3. Character card description
     try {
         const charId = ctx.characterId;
         const charData = ctx.characters?.[charId];
-        if (charData?.description && normalizeCharacterLabel(charData.name) === normalizeCharacterLabel(entityName)) {
-            contextParts.push(`Target Character Card Description:\n${charData.description.substring(0, 2000)}`);
+        if (charData?.description) {
+            contextParts.push(`Character Card Description:\n${charData.description.substring(0, 2000)}`);
         }
     } catch { /* ignore */ }
 
@@ -526,10 +515,7 @@ export async function generatePortraitPrompt(entityName) {
         if (storyContext) contextParts.push(storyContext);
     }
 
-    const targetIdentityRule = isLinkedPlayer
-        ? `TARGET IDENTITY: Depict only "${entityName}". The Player Character Lorebook Entry is the primary source of truth. Never replace the target with the narrator, an NPC, or a person mentioned in recent story context.`
-        : `TARGET IDENTITY: Depict only "${entityName}". Never replace the target with the narrator, another NPC, or a person mentioned in recent story context.`;
-    const systemPrompt = `${targetIdentityRule}\n\n${(s.portraitCharacterSystemPrompt || '')}`
+    const systemPrompt = (s.portraitCharacterSystemPrompt || '')
         .replace(/\{\{name\}\}/g, entityName)
         .replace(/\{\{wordtarget\}\}/g, String(s.portraitPromptWordTarget || 200));
 
