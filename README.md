@@ -1,4 +1,4 @@
-### This extension is feature-complete. As far as this repo goes, I'm still around but in maintenance mode. If someone wants to take up this extension project and develop it further, I encourage forking it fully.
+### This extension is feature-complete. If someone wants to take up this extension project and develop it further, I encourage forking it fully.
 
 <p align="center">
   <img src="https://github.com/user-attachments/assets/368d05be-009b-4f0d-b753-5c3cf8ae7dad" width="75%" alt="Combat in progress" />
