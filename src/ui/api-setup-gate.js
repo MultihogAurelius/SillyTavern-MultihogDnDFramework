@@ -230,7 +230,9 @@ function escapeHtml(value) {
         .replace(/"/g, '&quot;');
 }
 
-const SUMMARIZER_LINK = '<a href="https://github.com/Lodactio/Extension-Summaryception" target="_blank" rel="noopener noreferrer">summarizer</a>';
+const SUMMARYCEPTION_HREF = 'https://github.com/Lodactio/Extension-Summaryception';
+const SUMMARIZER_LINK = `<a href="${SUMMARYCEPTION_HREF}" target="_blank" rel="noopener noreferrer">summarizer</a>`;
+const SUMMARYCEPTION_LINK = `<a href="${SUMMARYCEPTION_HREF}" target="_blank" rel="noopener noreferrer">Summaryception</a>`;
 
 function renderBody(text) {
     return escapeHtml(text)
@@ -289,6 +291,22 @@ export function buildOverlayHtml(statuses = getApiSetupStatuses(), options = {})
         </div>`;
 }
 
+export function buildSummarizerNagHtml() {
+    return `
+        <div class="rt-api-setup-card rt-api-setup-card-nag" role="dialog" aria-labelledby="rt-api-setup-nag-title">
+            <div class="rt-api-setup-scroll">
+            <div class="rt-api-setup-kicker">Anti-Museum Tour</div>
+            <h2 id="rt-api-setup-nag-title">Use a summarizer</h2>
+            <p>You probably didn&apos;t read the last box carefully, so I&apos;ll say it again.</p>
+            <p class="rt-api-setup-nag-warn"><b>Use a summarizer such as ${SUMMARYCEPTION_LINK} that hides messages. Otherwise this extension will destroy your wallet and outputs because your context will grow absurdly large.</b></p>
+            <p>A summarizer (such as ${SUMMARYCEPTION_LINK}) allows you to only have the last X turns in context verbatim. You only need like 10.</p>
+            </div>
+            <div class="rt-api-setup-actions">
+                <button type="button" class="rt-api-setup-continue" id="rt-api-setup-continue">Continue</button>
+            </div>
+        </div>`;
+}
+
 function readNarratorCardNameFromOverlay(overlay) {
     const input = /** @type {HTMLInputElement|null} */ (overlay?.querySelector('#rt-api-setup-gm-name'));
     return resolveNarratorCardName(input?.value);
@@ -297,6 +315,7 @@ function readNarratorCardNameFromOverlay(overlay) {
 function refreshIfOpen() {
     const overlay = document.getElementById(OVERLAY_ID);
     if (!overlay) return;
+    if (overlay.dataset.step === 'summarizer') return;
     const narratorCardName = readNarratorCardNameFromOverlay(overlay);
     overlay.innerHTML = buildOverlayHtml(getApiSetupStatuses(), { narratorCardName });
     bindOverlayControls(overlay);
@@ -325,8 +344,15 @@ function bindOverlayControls(overlay) {
         }
     });
     overlay.querySelector('#rt-api-setup-continue')?.addEventListener('click', () => {
-        markGateSeen();
-        overlay.remove();
+        if (overlay.dataset.step === 'summarizer') {
+            markGateSeen();
+            overlay.remove();
+            return;
+        }
+        overlay.dataset.step = 'summarizer';
+        overlay.classList.add('is-nag');
+        overlay.innerHTML = buildSummarizerNagHtml();
+        bindOverlayControls(overlay);
     });
 }
 
@@ -344,6 +370,8 @@ export function showApiSetupGate() {
         overlay.className = 'rt-api-setup-gate';
         document.body.appendChild(overlay);
     }
+    overlay.className = 'rt-api-setup-gate';
+    overlay.dataset.step = 'checklist';
     overlay.innerHTML = buildOverlayHtml(getApiSetupStatuses());
     bindOverlayControls(overlay);
 }

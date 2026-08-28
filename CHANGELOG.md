@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.63] - 2026-08-28
+
+### Changed
+- **Anti-Museum Tour**: Continue now opens a second popup that repeats the summarizer requirement before the overlay closes. It tells people to use a hiding summarizer such as Summaryception (last ~10 turns verbatim) or the context will balloon and wreck cost and output quality.
+
 ## [2026.8.62] - 2026-08-27
 
 ### Added
