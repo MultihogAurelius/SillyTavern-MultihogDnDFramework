@@ -1,4 +1,4 @@
-### This extension is feature-complete. I'm around to accept PRs but probably won't do shit other than that. The storage layer of ST is fundamentally a hot pile of garbage that dumps all extension data into a single settings.json, and this extension tries to cope by having a massive stack of defensive patches.
+### This extension is feature-complete. I'm around to accept PRs but probably won't do shit other than that. The storage layer of ST is fundamentally a hot pile of garbage that dumps all extension data into a single settings.json, and this extension tries to cope by having a massive stack of defensive patches just to prevent stale writes from rolling everything back constantly due to race conditions.
 
 <p align="center">
   <img src="https://github.com/user-attachments/assets/368d05be-009b-4f0d-b753-5c3cf8ae7dad" width="75%" alt="Combat in progress" />
