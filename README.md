@@ -1,4 +1,4 @@
-### This extension is feature-complete. There will be no more features, but I will still be around to accept pull requests. Fork the whole thing if you want to continue development.
+### This extension is feature-complete.
 <p align="center">
   <img src="https://github.com/user-attachments/assets/368d05be-009b-4f0d-b753-5c3cf8ae7dad" width="75%" alt="Combat in progress" />
   <br>
