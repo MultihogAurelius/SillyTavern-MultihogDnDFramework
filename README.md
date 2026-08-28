@@ -1,5 +1,4 @@
-### This extension is feature-complete. There will be no more features, but I will still fix bugs as they are reported. Preferably make a pull request. Fork the whole damn thing if you want, but be warned: the storage layer of ST is your worst enemy and you will be destroyed by a settings.json write race condition.
-
+### This extension is feature-complete. There will be no more features, but I will still fix bugs as they are reported. Preferably make a pull request. Fork the whole damn thing if you want and continue development.
 <p align="center">
   <img src="https://github.com/user-attachments/assets/368d05be-009b-4f0d-b753-5c3cf8ae7dad" width="75%" alt="Combat in progress" />
   <br>
