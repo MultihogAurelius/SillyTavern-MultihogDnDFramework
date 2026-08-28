@@ -37,6 +37,24 @@ describe('((BARREL))', () => {
     });
 });
 
+describe('((SLOTS))', () => {
+    it('renders decimal values with a proportional partial slot and exact hover value', () => {
+        const html = tryRenderMarker('Supply: ((SLOTS)) 1.5/4', 'CUSTOM');
+
+        expect(html).toContain('class="rt-slot partial"');
+        expect(html).toContain('class="rt-slot-fill" style="width:50%');
+        expect(html).toContain('title="Supply: 1.5/4"');
+        expect(html).toContain('aria-label="Supply: 1.5/4"');
+    });
+
+    it('accepts fractional values without a leading zero', () => {
+        const html = tryRenderMarker('Charge: ((SLOTS)) .25/1', 'CUSTOM');
+
+        expect(html).toContain('class="rt-slot partial"');
+        expect(html).toContain('title="Charge: .25/1"');
+    });
+});
+
 describe('universal tag colors', () => {
     it('applies named color suffixes dynamically without listing color variants', () => {
         expect(getMarkerLibraryKeys()).toEqual(expect.arrayContaining(['PILL', 'BAR', 'PROGRESS']));
