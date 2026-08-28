@@ -402,22 +402,30 @@ export function renderDayNightBadge(str) {
                 return `<div class="rt-entity-sub-line">${labelHtml} ${escapeHtmlWithColor(value)}</div>`;
             }
             case 'slots': {
-                const pm = value.match(/(\d+)\s*\/\s*(\d+)/);
+                const pm = value.match(/(\d+(?:\.\d+)?|\.\d+)\s*\/\s*(\d+(?:\.\d+)?|\.\d+)/);
                 if (pm) {
-                    const cur = parseInt(pm[1], 10), max = parseInt(pm[2], 10);
+                    const rawCurrent = Number(pm[1]), rawMax = Number(pm[2]);
+                    const cur = Math.max(0, Math.min(rawCurrent, rawMax));
+                    const max = rawMax;
                     const extra = value.replace(pm[0], '').trim();
                     let barBg = rule.color ? rule.color : '#aaaaaa';
                     if (barId) barBg = getBarBackground(barId, barBg, max > 0 ? (cur/max)*100 : 0);
-                    const recolorData = barId ? ` data-recolor-id="${escapeHtml(barId)}" data-recolor-current="${escapeHtml(barBg)}" title="Click to recolor"` : '';
+                    const recolorData = barId ? ` data-recolor-id="${escapeHtml(barId)}" data-recolor-current="${escapeHtml(barBg)}"` : '';
                     
                     let slotsHtml = '';
-                    for (let i = 0; i < max; i++) {
-                        const isFilled = i < cur;
-                        slotsHtml += `<div class="rt-slot ${isFilled ? 'filled' : 'empty'}" style="${isFilled ? `background:${barBg};` : ''}"></div>`;
+                    for (let i = 0; i < Math.ceil(max); i++) {
+                        const fill = Math.max(0, Math.min(1, cur - i));
+                        const isFilled = fill >= 1;
+                        const isPartial = fill > 0 && fill < 1;
+                        const fillHtml = fill > 0
+                            ? `<span class="rt-slot-fill" style="width:${fill * 100}%;background:${barBg};"></span>`
+                            : '';
+                        slotsHtml += `<div class="rt-slot ${isFilled ? 'filled' : isPartial ? 'partial' : 'empty'}">${fillHtml}</div>`;
                     }
+                    const tooltip = `${labelText || 'Value'} ${pm[1]}/${pm[2]}${extra ? ` ${extra}` : ''}`;
                     
                     return `<div class="rt-entity-sub-line rt-slots-row">${labelHtml}
-                        <div class="rt-slots-container"${recolorData}>${slotsHtml}</div>
+                        <div class="rt-slots-container"${recolorData} title="${escapeHtml(tooltip)}" aria-label="${escapeHtml(tooltip)}">${slotsHtml}</div>
                         <span class="rt-slots-label">${extra ? escapeHtml(extra) : ''}</span>
                     </div>`;
                 }

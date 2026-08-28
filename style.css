@@ -9690,12 +9690,16 @@ dialog .rt-dungeon-graph-asset-tip,
 .rt-slots-container { display: flex; gap: 2px; flex-wrap: wrap; max-width: 150px; cursor: pointer; }
 .rt-slot {
     width: 12px; height: 12px;
+    position: relative;
+    overflow: hidden;
     border-radius: 2px;
     background: rgba(0,0,0,0.5);
     border: 1px solid rgba(255,255,255,0.3);
     transition: background 0.3s ease;
 }
 .rt-slot.filled { border-color: transparent; }
+.rt-slot.partial { border-color: rgba(255,255,255,0.3); }
+.rt-slot-fill { display: block; height: 100%; border-radius: 1px; }
 
 /* PHASE */
 .rt-phase-row { display: flex; align-items: center; gap: 8px; }
