@@ -1134,7 +1134,7 @@ export async function loadDungeonMapContextForSite(siteRoot) {
     const site = (loaded.sites || []).find(candidate => normalizeDungeonLabel(candidate.siteRoot) === wanted);
     if (!site) return null;
     const footer = loaded.currentLocation || '';
-    const isActiveSite = footer && normalizeDungeonLabel(footer).includes(wanted);
+    const isActiveSite = locationContainsSiteRoot(footer, site.siteRoot);
     return {
         prefix: loaded.prefix,
         books: loaded.books,

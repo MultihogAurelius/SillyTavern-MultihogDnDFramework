@@ -10,10 +10,11 @@ import { sendStateRequest, isCombatActive } from './llm-client.js';
 import { extractCurrentTimeStr } from './memo-processor.js';
 import {
     applyDungeonMapTransaction,
+    dungeonSiteRootsMatch,
     formatDungeonMapForEvolution,
     normalizeDungeonLabel,
     normalizeMapSiteKind,
-    resolveCurrentMapPlacement,
+    pickActiveSiteForLocation,
 } from './dungeon-reality.js';
 import { isLocationMappingEnabled } from './src/state/section-enabled.js';
 import { parseMapArchitectResponse } from './map-architect-parser.js';
@@ -24,6 +25,7 @@ import {
     appendEvolutionBacklogEntry,
     appendEvolutionThreads,
     applyCompressedThreadDigests,
+    annotateEvolutionSitePresence,
     buildReportOutcomeStamps,
     describeEvolutionBacklog,
     describeEvolutionThreads,
@@ -489,15 +491,7 @@ export async function maybeRollbackMapEvolutionForSwipe(msg) {
 }
 
 function activeSiteFrom(loaded, currentLocation) {
-    if (!loaded?.sites?.length) return null;
-    const here = loaded.sites.find(site =>
-        site.siteRoot && currentLocation && normalizeDungeonLabel(currentLocation).includes(normalizeDungeonLabel(site.siteRoot)),
-    );
-    if (here) return here;
-    return loaded.sites.find(site => {
-        const placement = resolveCurrentMapPlacement(site.document, currentLocation);
-        return !!placement.area;
-    }) || null;
+    return pickActiveSiteForLocation(loaded?.sites || [], currentLocation);
 }
 
 async function evolveOneSite({
@@ -507,6 +501,7 @@ async function evolveOneSite({
     worldReports,
     digest,
     currentLocation,
+    currentRoot = '',
     currentTime,
     settings,
     signal,
@@ -514,10 +509,7 @@ async function evolveOneSite({
     ctx,
     directInstruction = '',
 }) {
-    const partyIsHere = !!(currentLocation && (
-        normalizeDungeonLabel(currentLocation).includes(normalizeDungeonLabel(site.siteRoot))
-        || resolveCurrentMapPlacement(site.document, currentLocation).area
-    ));
+    const partyIsHere = dungeonSiteRootsMatch(site.siteRoot, currentRoot);
     const combatActive = partyIsHere && isCombatActive(settings.currentMemo);
     const bubble = partyIsHere
         ? resolvePlayerBubble(site.document, currentLocation, { combatActive })
@@ -752,6 +744,7 @@ export async function runMapEvolutionPass({
         if (!loaded?.sites?.length) return { skipped: 'no_maps' };
 
         const currentLocation = loaded.currentLocation || '';
+        const currentRoot = activeSiteFrom(loaded, currentLocation)?.siteRoot || '';
         const currentTime = periodLabel || currentTimeFrom(settings);
         const currentMinutes = parseInWorldMinutes(currentTime);
         const selected = resolveSitesForPass(loaded, {
@@ -798,6 +791,7 @@ export async function runMapEvolutionPass({
                 worldReports: instruction ? [] : pendingWorldReportsForSite(recentWorldReports, site.siteRoot, settings),
                 digest: digestLines.join('\n'),
                 currentLocation,
+                currentRoot,
                 currentTime,
                 settings,
                 signal,
@@ -917,19 +911,13 @@ export async function maybeRunMapEvolution() {
 export async function listMappedEvolutionSites() {
     if (!isLocationMappingEnabled(getSettings())) return [];
     const loaded = await loadAllMappedSiteContexts();
-    const currentLocation = loaded?.currentLocation || '';
-    return (loaded?.sites || []).map(site => {
-        const here = !!(currentLocation && (
-            normalizeDungeonLabel(currentLocation).includes(normalizeDungeonLabel(site.siteRoot))
-            || resolveCurrentMapPlacement(site.document, currentLocation).area
-        ));
-        return {
-            siteRoot: site.siteRoot,
-            kind: normalizeMapSiteKind(site.document?.kind),
-            hostSite: String(site.document?.hostSite || '').trim(),
-            current: here,
-        };
-    });
+    const annotated = annotateEvolutionSitePresence(loaded?.sites || [], loaded?.currentLocation || '');
+    return annotated.sites.map(site => ({
+        siteRoot: site.siteRoot,
+        kind: normalizeMapSiteKind(site.document?.kind),
+        hostSite: String(site.document?.hostSite || '').trim(),
+        current: !!site.current,
+    }));
 }
 
 /** Reload one mapped site after an on-demand Evolution pass. */

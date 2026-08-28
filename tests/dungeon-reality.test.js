@@ -45,6 +45,7 @@ import {
     resolveCurrentMapPlacement,
     resolveAssetEffectiveArea,
     resolveBuildingPopulationTarget,
+    pickActiveSiteForLocation,
     settlementAbsorptionMatchesCurrentPeer,
     listContainedMapAssets,
     resolveMentionedDungeonSites,
@@ -1840,6 +1841,54 @@ The last guard falls and a loose stone reveals a niche.
         expect(shortFooter.interiorAsset?.id).toBe('hollow-creek-general-store');
         expect(shortFooter.unmatchedInterior).toBe('');
         expect(resolveBuildingPopulationTarget(map, 'Hollow Creek, Main Street, General Store')?.building?.id).toBe('hollow-creek-general-store');
+    });
+
+    it('does not bind a foreign site footer to a trail BUILDING that only names that site', () => {
+        const thornbrook = normalizeDungeonMapDocument({
+            version: 3,
+            site: 'Thornbrook',
+            kind: 'SETTLEMENT',
+            areas: [
+                { id: 'north-road', name: 'North Road', knowledge: 'DISCOVERED', geometry: [], connections: [] },
+                { id: 'civic-hall', name: 'Civic Hall', knowledge: 'VISITED', geometry: [], connections: [] },
+                { id: 'forge-ward', name: 'Forge Ward', knowledge: 'UNREVEALED', geometry: [], connections: [] },
+            ],
+            assets: [{
+                id: 'northeast-trail-toward-coldwater-creek',
+                kind: 'BUILDING',
+                name: 'Northeast Trail toward Coldwater Creek',
+                location: 'north-road',
+                state: 'ACTIVE',
+                knowledge: 'KNOWN',
+                notEntered: true,
+            }],
+        });
+        const coldwater = normalizeDungeonMapDocument({
+            version: 3,
+            site: 'Coldwater Creek',
+            kind: 'DUNGEON',
+            areas: [{
+                id: 'central-forge-hall',
+                name: 'Central Forge Hall',
+                knowledge: 'VISITED',
+                geometry: [],
+                connections: [],
+            }],
+            assets: [],
+        });
+        const footer = 'Coldwater Creek, Central Forge Hall';
+        const thornbrookPlacement = resolveCurrentMapPlacement(thornbrook, footer);
+        expect(thornbrookPlacement.area).toBeNull();
+        expect(thornbrookPlacement.interiorAsset).toBeNull();
+        expect(resolveCurrentMapPlacement(coldwater, footer).area?.id).toBe('central-forge-hall');
+        expect(pickActiveSiteForLocation([
+            { siteRoot: 'Hall of the Ember-Ancestors' },
+            { siteRoot: 'Thornbrook' },
+            { siteRoot: 'Coldwater Creek' },
+        ], footer)?.siteRoot).toBe('Coldwater Creek');
+        expect(extractFooterLocation(
+            '"He was in Thornbrook two nights back—then gone before cockcrow."\n(Location: Coldwater Creek, Central Forge Hall)',
+        )).toBe('Coldwater Creek, Central Forge Hall');
     });
 
     it('preserves peaceful legacy DUNGEON maps without reclassification', () => {

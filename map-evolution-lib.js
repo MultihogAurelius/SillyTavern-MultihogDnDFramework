@@ -2,7 +2,7 @@
  * Pure Map Evolution helpers: scheduled site selection, digest, player bubble, interval due.
  * Kept out of map-evolution.js so filters stay testable without the LLM pass / router.
  */
-import { normalizeDungeonLabel, resolveCurrentMapPlacement } from './dungeon-reality.js';
+import { dungeonSiteRootsMatch, normalizeDungeonLabel, pickActiveSiteForLocation, resolveCurrentMapPlacement } from './dungeon-reality.js';
 import { parseInWorldTime } from './memo-processor.js';
 
 export function isEvolutionNoop(value) {
@@ -86,6 +86,24 @@ export function resolvePlayerBubble(document, currentLocation, { combatActive = 
         frozenAreaIds: [placement.area.id],
         combatActive: !!combatActive,
         area: placement.area,
+    };
+}
+
+/**
+ * Mark the unique current Evolution site from the footer site-root path.
+ * Placement on other maps (a trail BUILDING named after this site, a shared
+ * room name) must not also flag those maps current or steal the on-site timer.
+ */
+export function annotateEvolutionSitePresence(sites, currentLocation) {
+    const rows = Array.isArray(sites) ? sites : [];
+    const active = pickActiveSiteForLocation(rows, currentLocation);
+    const currentRoot = String(active?.siteRoot || '').trim();
+    return {
+        currentRoot,
+        sites: rows.map(site => ({
+            ...site,
+            current: dungeonSiteRootsMatch(site.siteRoot, currentRoot),
+        })),
     };
 }
 

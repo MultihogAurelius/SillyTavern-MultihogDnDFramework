@@ -1382,13 +1382,14 @@ function classifyFooterInteriorLeaf(label) {
     return { kind: 'named', referent: text };
 }
 
-function findSettlementInteriorAsset(map, label) {
+function findSettlementInteriorAsset(map, label, { allowContainment = true } = {}) {
     const text = String(label || '').trim();
     if (!text) return null;
     const exact = resolveMapAsset(map, text).asset
         || map.assets.find(asset => dungeonLabelIdentitiesMatch(asset.name, text))
         || null;
     if (exact) return exact;
+    if (!allowContainment) return null;
     return map.assets.find(asset =>
         FOOTER_REFERENTIAL_STRUCTURE_KINDS.has(String(asset.kind || '').toUpperCase())
         && dungeonLabelContainsMatch(asset.name, text)
@@ -1399,7 +1400,7 @@ function findSettlementInteriorAsset(map, label) {
  * Decide whether a footer leaf after the matched district is a real interior
  * name, an exterior-relative landmark phrase, or an "inside X" phrasing.
  */
-function resolveFooterInteriorAgainstMap(map, unmatchedInterior) {
+function resolveFooterInteriorAgainstMap(map, unmatchedInterior, { allowContainment = true } = {}) {
     const classified = classifyFooterInteriorLeaf(unmatchedInterior);
     if (classified.kind === 'empty') {
         return { interiorAsset: null, unmatchedInterior: '' };
@@ -1409,8 +1410,8 @@ function resolveFooterInteriorAgainstMap(map, unmatchedInterior) {
     if (classified.kind === 'exterior_relative') {
         return { interiorAsset: null, unmatchedInterior: '' };
     }
-    const interiorAsset = findSettlementInteriorAsset(map, unmatchedInterior)
-        || findSettlementInteriorAsset(map, classified.referent);
+    const interiorAsset = findSettlementInteriorAsset(map, unmatchedInterior, { allowContainment })
+        || findSettlementInteriorAsset(map, classified.referent, { allowContainment });
     if (interiorAsset) {
         return { interiorAsset, unmatchedInterior: '' };
     }
@@ -1440,6 +1441,12 @@ export function resolveCurrentMapPlacement(document, currentLocation = '') {
     const map = normalizeDungeonMapDocument(document, document?.site);
     const parts = splitLocationSegments(currentLocation);
     if (!parts.length) return { area: null, interiorAsset: null, unmatchedInterior: '' };
+    // Containment aliases ("general store" ⊂ "Hollow Creek General Store") are
+    // only safe after this map's site is named in the footer. Otherwise a
+    // BUILDING such as "Northeast Trail toward Coldwater Creek" binds a
+    // different site's footer onto this map.
+    const allowContainment = !String(map.site || '').trim()
+        || locationContainsSiteRoot(currentLocation, map.site);
 
     for (let i = parts.length - 1; i >= 0; i--) {
         const part = parts[i];
@@ -1447,14 +1454,14 @@ export function resolveCurrentMapPlacement(document, currentLocation = '') {
         if (area) {
             const rawInterior = parts.slice(i + 1).join(', ');
             if (!rawInterior) return { area, interiorAsset: null, unmatchedInterior: '' };
-            const resolved = resolveFooterInteriorAgainstMap(map, rawInterior);
+            const resolved = resolveFooterInteriorAgainstMap(map, rawInterior, { allowContainment });
             return { area, interiorAsset: resolved.interiorAsset, unmatchedInterior: resolved.unmatchedInterior };
         }
         // Exterior-relative leaves never bind as interiors even if a wrongly
         // named asset exists from a prior bad updater pass.
         if (classifyFooterInteriorLeaf(part).kind === 'exterior_relative') continue;
         const asset = resolveMapAsset(map, part).asset
-            || findSettlementInteriorAsset(map, part)
+            || findSettlementInteriorAsset(map, part, { allowContainment })
             || null;
         if (asset) {
             const host = resolveAssetEffectiveArea(map, asset);
@@ -2885,11 +2892,15 @@ export function findLatestDungeonLocation(chat) {
     return '';
 }
 
-/** Resolve the stored site active under the current footer hierarchy. */
-export function resolveActiveDungeonSite(state, currentLocation) {
-    if (!splitLocationSegments(currentLocation).length || !state?.sites) return null;
+/**
+ * Deepest mapped site named in a footer hierarchy.
+ * Asset/area placement on other maps does not count: a trail BUILDING named
+ * after another site must not make this map current.
+ */
+export function pickActiveSiteForLocation(sites, currentLocation) {
+    if (!splitLocationSegments(currentLocation).length) return null;
     let best = null;
-    for (const site of Object.values(state.sites)) {
+    for (const site of sites || []) {
         const score = locationPathMatchScore(currentLocation, site?.siteRoot);
         if (!score) continue;
         if (!best || score.depth > best.score.depth || (score.depth === best.score.depth && score.endIndex > best.score.endIndex)) {
@@ -2897,6 +2908,12 @@ export function resolveActiveDungeonSite(state, currentLocation) {
         }
     }
     return best?.site || null;
+}
+
+/** Resolve the stored site active under the current footer hierarchy. */
+export function resolveActiveDungeonSite(state, currentLocation) {
+    if (!state?.sites) return null;
+    return pickActiveSiteForLocation(Object.values(state.sites), currentLocation);
 }
 
 function escapeRegExp(value) {

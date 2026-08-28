@@ -6,6 +6,7 @@ import {
     appendEvolutionBacklogEntry,
     appendEvolutionThreads,
     applyCompressedThreadDigests,
+    annotateEvolutionSitePresence,
     buildReportOutcomeStamps,
     clearEvolutionHistoryForSite,
     collectEvolutionArcSubjects,
@@ -18,6 +19,7 @@ import {
     describeEvolutionTimeWindow,
     estimateMapHistoryTokens,
     evolutionHistoryNeedsCompression,
+    evolutionIntervalHoursForSettings,
     filterSitesByRoots,
     formatNarratorSiteActivity,
     normalizeMapEvolutionCompressThreshold,
@@ -200,6 +202,43 @@ describe('Map Evolution', () => {
         expect(bubble.frozenAreaIds).toEqual(['threshold']);
         expect(bubble.combatActive).toBe(true);
         expect(bubble.area.id).toBe('threshold');
+    });
+
+    it('treats only the footer site-root as current, not a trail BUILDING named after another map', () => {
+        const thornbrook = {
+            siteRoot: 'Thornbrook',
+            document: {
+                version: 3,
+                site: 'Thornbrook',
+                kind: 'SETTLEMENT',
+                areas: [{ id: 'north-road', name: 'North Road', knowledge: 'DISCOVERED', geometry: [], connections: [] }],
+                assets: [{
+                    id: 'northeast-trail-toward-coldwater-creek',
+                    kind: 'BUILDING',
+                    name: 'Northeast Trail toward Coldwater Creek',
+                    location: 'north-road',
+                    state: 'ACTIVE',
+                    knowledge: 'KNOWN',
+                    notEntered: true,
+                }],
+            },
+        };
+        const hall = { siteRoot: 'Hall of the Ember-Ancestors', document: { site: 'Hall of the Ember-Ancestors', kind: 'DUNGEON', areas: [], assets: [] } };
+        const coldwater = { siteRoot: 'Coldwater Creek', document: { site: 'Coldwater Creek', kind: 'DUNGEON', areas: [], assets: [] } };
+        const annotated = annotateEvolutionSitePresence(
+            [hall, thornbrook, coldwater],
+            'Coldwater Creek, Central Forge Hall',
+        );
+        expect(annotated.currentRoot).toBe('Coldwater Creek');
+        expect(annotated.sites.filter(site => site.current).map(site => site.siteRoot)).toEqual(['Coldwater Creek']);
+        const hoursFor = evolutionIntervalHoursForSettings({
+            mapEvolutionIntervalHours: 6,
+            mapEvolutionOnSiteIntervalHours: 1,
+            mapEvolutionOnSiteIntervalMinutes: 0,
+        }, annotated.currentRoot);
+        expect(hoursFor('Thornbrook')).toBe(6);
+        expect(hoursFor('Hall of the Ember-Ancestors')).toBe(6);
+        expect(hoursFor('Coldwater Creek')).toBe(1);
     });
 
     it('stamps a first-visit baseline and later fires on elapsed in-world hours', () => {
@@ -869,6 +908,8 @@ describe('Map Evolution', () => {
         expect(evolution).toContain('delete transaction.report_outcomes');
         expect(evolution).toContain('siteRoots');
         expect(evolution).toContain('listMappedEvolutionSites');
+        expect(evolution).toContain('annotateEvolutionSitePresence');
+        expect(evolution).not.toContain('normalizeDungeonLabel(currentLocation).includes(normalizeDungeonLabel(site.siteRoot))');
         expect(evolution).toContain("scope === 'active'");
         expect(evolution).toContain('for (const site of [...baselineOnly, ...toEvolve])');
         expect(evolution).toContain("{ stream: true, debugSource: 'Map Evolution' }");
