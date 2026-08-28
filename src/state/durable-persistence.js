@@ -5,6 +5,7 @@ import {
     encodeCheckpoint,
     mirrorMetadataFromEnvelope,
     randomCommitId,
+    stateWithoutPersistenceMetadata,
     validateMirrorState,
 } from './durable-checkpoint-codec.js';
 import {
@@ -135,6 +136,7 @@ export class DurablePersistenceManager {
         this.writerId = null;
         this.head = null;
         this.serverSlots = { a: null, b: null };
+        this.durableFloorRevision = -1;
         this.initialized = false;
         this.dirtyGeneration = 0;
         this.safeGeneration = 0;
@@ -237,8 +239,11 @@ export class DurablePersistenceManager {
         const mirrorCandidate = validatedMirror
             ? { ...validatedMirror, source: 'mirror', slot: null }
             : syntheticLegacyCandidate(rawMirror);
+        const durableCandidates = [...serverCandidates, mirrorCandidate];
+        const durableBase = [...durableCandidates].sort(compareCandidates)[0] || null;
+        this.durableFloorRevision = durableBase?.envelope?.revision ?? -1;
         const winner = selectRecoveryCandidate({
-            durableCandidates: [...serverCandidates, mirrorCandidate],
+            durableCandidates,
             localCandidates: locals,
         }) || mirrorCandidate;
 
@@ -299,7 +304,9 @@ export class DurablePersistenceManager {
             const envelope = await encodeInWorker(stateSnapshot, metadata);
             let localDurable = false;
             try {
-                await this.localStore.putCheckpoint(envelope);
+                await this.localStore.putCheckpoint(envelope, {
+                    durableFloorRevision: this.durableFloorRevision,
+                });
                 this.localAvailable = true;
                 localDurable = true;
             } catch (error) {
@@ -310,7 +317,20 @@ export class DurablePersistenceManager {
                 this.pendingLocal = Math.max(0, this.pendingLocal - 1);
             }
 
-            state[PERSISTENCE_METADATA_KEY] = mirrorMetadataFromEnvelope(envelope);
+            const snapshotPayload = JSON.stringify(stateWithoutPersistenceMetadata(stateSnapshot));
+            const livePayload = JSON.stringify(stateWithoutPersistenceMetadata(state));
+            const liveMatchesCommit = snapshotPayload === livePayload;
+            // Only stamp mirror metadata when the live object still matches the
+            // committed snapshot. Typing during encode would otherwise poison
+            // settings.json with a checksum that no longer matches the memo.
+            if (liveMatchesCommit) {
+                state[PERSISTENCE_METADATA_KEY] = mirrorMetadataFromEnvelope(envelope);
+            } else {
+                // Drop stale mirror metadata so settings.json cannot claim a commit
+                // whose checksum no longer matches the live Multihog payload.
+                delete state[PERSISTENCE_METADATA_KEY];
+                this.markDirty();
+            }
             const candidate = { envelope, state: stateSnapshot, source: 'local', slot: null };
             candidate.state[PERSISTENCE_METADATA_KEY] = mirrorMetadataFromEnvelope(envelope);
             this.head = candidate;
@@ -323,7 +343,9 @@ export class DurablePersistenceManager {
             }
             if (localDurable || serverDurable) {
                 this.safeGeneration = Math.max(this.safeGeneration, generation);
-                try { await this.localStore.deleteDraft(); } catch (_) { /* local store may be unavailable */ }
+                try {
+                    await this.reconcileDraftAfterCheckpoint(envelope, stateSnapshot);
+                } catch (_) { /* local store may be unavailable */ }
             } else {
                 this.lastError = this.lastError || new Error('No durable checkpoint target accepted the state');
             }
@@ -356,6 +378,10 @@ export class DurablePersistenceManager {
                 if (!candidate) throw new Error(`Server checkpoint ${slot.toUpperCase()} failed validation`);
                 this.serverSlots[slot] = candidate;
                 this.serverAvailable = true;
+                this.durableFloorRevision = Math.max(
+                    this.durableFloorRevision,
+                    Number(candidate.envelope.revision) || 0,
+                );
                 this.retryAttempt = 0;
                 if (this.retryTimer) clearTimeout(this.retryTimer);
                 this.retryTimer = null;
@@ -384,6 +410,41 @@ export class DurablePersistenceManager {
             this.retryTimer = null;
             void this.queueServerSync(this.latestEnvelope);
         }, delay);
+    }
+
+    /**
+     * After a durable commit, drop the memo draft only when it was fully captured.
+     * If the user kept typing during encode, rebase the draft onto the new head so
+     * crash recovery can still re-apply the newer text.
+     */
+    async reconcileDraftAfterCheckpoint(envelope, stateSnapshot) {
+        if (!this.localStore?.getDraft || !envelope) return;
+        const draft = await this.localStore.getDraft();
+        if (!draft) return;
+        const committedMemo = String(stateSnapshot?.currentMemo ?? '');
+        const draftText = String(draft.text ?? '');
+        if (draftText === committedMemo) {
+            await this.localStore.deleteDraft();
+            if (this.draftRequest && String(this.draftRequest.text ?? '') === committedMemo) {
+                this.draftRequest = null;
+                this.pendingDraft = false;
+            }
+            return;
+        }
+        const rebased = {
+            ...draft,
+            baseRevision: envelope.revision,
+            baseCommitId: envelope.commitId,
+            createdAt: Number(draft.createdAt) || Date.now(),
+        };
+        await this.localStore.putDraft(rebased);
+        if (this.draftRequest && String(this.draftRequest.text ?? '') === draftText) {
+            this.draftRequest = {
+                ...this.draftRequest,
+                baseRevision: envelope.revision,
+                baseCommitId: envelope.commitId,
+            };
+        }
     }
 
     recordMemoDraft(chatId, text) {
