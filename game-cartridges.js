@@ -10,7 +10,7 @@
 // the pack that ships in the box.
 // ─────────────────────────────────────────────────────────────────────────
 
-import { getSettings, getFactoryCartridgePayload, CARTRIDGE_PAYLOAD_GROUPS } from './state-manager.js';
+import { getSettings, getFactoryCartridgePayload, CARTRIDGE_PAYLOAD_GROUPS, replaceChatSetupCatalogsFromLive } from './state-manager.js';
 import { escapeHtml } from './memo-processor.js';
 import { refreshOrderList } from './ui-editors.js';
 import {
@@ -112,6 +112,7 @@ export function applyCartridgePayload(settings, payload) {
     // "-- No Preset --" and let the user choose/save explicitly.
     delete settings['_activePreset_npcSectionPresets'];
     delete settings['_activePreset_pcSectionPresets'];
+    replaceCatalogsTouchedByCartridgeKeys(settings, Object.keys(factory));
 }
 
 /**
@@ -132,6 +133,21 @@ function applyCartridgePayloadKeys(settings, payload, keysToApply) {
     // Only clear preset side-channel keys if the character-sheet group was applied.
     if (keysToApply.includes('npcSectionPresets')) delete settings['_activePreset_npcSectionPresets'];
     if (keysToApply.includes('pcSectionPresets'))  delete settings['_activePreset_pcSectionPresets'];
+    replaceCatalogsTouchedByCartridgeKeys(settings, keysToApply);
+}
+
+/**
+ * Cartridge payloads snapshot live Game Systems / tracker modules / snippets,
+ * not the shared catalogs. After replacing those live arrays, rebuild the
+ * matching catalogs so a later saveSettings → syncChatSetupCatalogs cannot
+ * hydrate the previous game back into the inactive pool.
+ */
+function replaceCatalogsTouchedByCartridgeKeys(settings, keysApplied) {
+    replaceChatSetupCatalogsFromLive(settings, {
+        customFields: keysApplied.includes('customFields'),
+        syspromptSnippets: keysApplied.includes('customSyspromptLibrary'),
+        gameSystems: keysApplied.includes('gameSystems'),
+    });
 }
 
 /**
@@ -230,7 +246,8 @@ export async function loadCartridge(cartridge) {
                 ${rowsHtml}
             </div>
             <p style="margin:6px 0 0; font-size:10px; opacity:0.45;">
-                ⚠️ Checked sections will fully replace your current settings for those areas.
+                ⚠️ Checked sections will fully replace your current settings for those areas,
+                including the shared Game System / tracker-module / snippet library.
                 This cannot be undone unless you first saved your current setup as a cartridge.
             </p>
         </div>`;

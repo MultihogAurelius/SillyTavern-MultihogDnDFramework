@@ -1,6 +1,6 @@
 import { EXAMPLES, COLOR_EXAMPLES, DEFAULT_STOCK_PROMPTS, RT_PROMPTS, BLOCK_ICONS, BLOCK_ORDER, PAGE_SIZE, NO_PAGINATE, buildOnboardingXpHint, buildOnboardingTimeHint, buildStartingGearHint, buildOnboardingActiveBlocks, buildCombatAndSkillScalingHint, resolveTimePromptKey, resolveTimePromptDisplayTag, buildCyoaPrompt, DEFAULT_CYOA_SLOTS, refreshCyoaConfigToShipped, formatTimeOfDay } from './constants.js';
 import { MODULE_NAME, DEFAULT_MODULES, MODULE_BOOK_CATEGORY, FULL_REVIEW_STATE_SYSTEM_PROMPT, FULL_REVIEW_USER_PROMPT_SUFFIX, getSettings, getBarBackground, migrateCustomFields, saveChatState, getActiveChatId, shouldPreserveLiveChatStateOnBoot, writeModuleSchemaBackup, getPendingModuleSchemaBackup, applyModuleSchemaBackup, applyDeletedCustomTagTombstones, recordDeletedCustomTags, clearDeletedCustomTagTombstones, saveProfile, deleteProfile, getEffectiveRouterCampaignPrefix, sanitizeCampaignPrefixString, buildNpcInstruction, LOREBOOK_FULL_AUDIT_INSTRUCTION, loadStockPromptsFromProfile, getNpcRelationshipMax, getNpcRelationshipMaxDefault, clampRelationshipValue, relationshipBarPct, getFriendshipTier, getAffectionTier, getRelTierBadgeStyle, getRelTierDetailedStyle, getRelTierDetailedLabelStyle, applyRelTierBadgeElement, sanitizeRouterState, rebuildAllModuleInstructions, adjustAllStoredTemplatesForTimeFormat, DEFAULT_NPC_SECTIONS, DEFAULT_PC_SECTIONS, computeBundledPromptsFingerprint, computeBundledPromptsFingerprintForSnapshot, normalizeBundledPromptsSnapshot, buildBundledPromptsSnapshot, getSnapshotCategoryBlocks, getPromptCategoryImpactBadge, PROMPT_DEFAULTS_CATEGORIES, PROMPT_DEFAULTS_CATEGORY_LABELS, getDefaultPortraitLocationSystemPrompt, getDefaultPortraitNpcSystemPrompt, getDefaultPortraitCharacterSystemPrompt, isShippedPortraitLocationSystemPrompt, findShippedPortraitLocationPresetId, FACTORY_PORTRAIT_PROMPT_PRESETS, resolveFactoryPortraitPromptBundle, getFactoryPortraitPromptPresetNameSet, DEFAULT_PORTRAIT_PROMPT_PRESET_ID, applyFactoryReset, clearExtensionLocalStorageUiState, stripChatStateGlobalUiPrefs, buildStateTrackerRelationshipCommandInstruction, extractStateTrackerRelationshipCommands, getRelationshipUpdateMode, RELATIONSHIP_UPDATE_MODES, resetLorebookPromptTemplates, writeCriticalSettingsBackup, stampCriticalSettingsSynced, applyCriticalSettingsBackup, isMainSyspromptBackupEnabled, captureMainSyspromptBackup, restoreMainSyspromptStash, hydrateMainSyspromptBackup, getEffectiveBackupText, getLiveMainSyspromptText, setLiveMainSyspromptText, maybeRestoreMainIfTrackerDisabled, isMainSyspromptSourceReady } from './state-manager.js';
-import { snapshotChatSetup, chatSetupsMatch, syncChatSetupCatalogs, removeChatSetupCatalogEntries, clearChatBoundActivations } from './src/state/chat-setup.js';
+import { snapshotChatSetup, chatSetupsMatch, syncChatSetupCatalogs, replaceChatSetupCatalogsFromLive, removeChatSetupCatalogEntries, clearChatBoundActivations } from './src/state/chat-setup.js';
 import { buildDirectPromptSystemPrompt, DIRECT_PROMPT_SYSTEM_MODES } from './src/state/direct-prompt-system.js';
 import { diffTextLines, diffHasChanges } from './prompt-diff.js';
 import { sendStateRequest, fetchOllamaModels, fetchOpenAIModels, testOpenAIConnection, getConnectionProfiles, getCurrentCompletionPreset, setCompletionPreset, syncCombatProfile, resetCombatProfileOverride, isCombatActive } from './llm-client.js';
@@ -3521,7 +3521,12 @@ function loadProfile(name) {
     s.blockOrder = p.blockOrder ? JSON.parse(JSON.stringify(p.blockOrder)) : s.blockOrder;
     s.stockPrompts = loadStockPromptsFromProfile(p.stockPrompts);
     s.modulePageSizes = p.modulePageSizes ? JSON.parse(JSON.stringify(p.modulePageSizes)) : {};
-    s.customFields = p.customFields ? JSON.parse(JSON.stringify(p.customFields)) : [];
+    if (Array.isArray(p.customFields)) {
+        s.customFields = JSON.parse(JSON.stringify(p.customFields));
+        replaceChatSetupCatalogsFromLive(s, { customFields: true });
+    } else {
+        s.customFields = [];
+    }
     // quests are always derived from currentMemo — never from the profile snapshot
     s.quests = [];
     s.currentMemo = applyQuestSyncAndStripMemo(s.currentMemo);

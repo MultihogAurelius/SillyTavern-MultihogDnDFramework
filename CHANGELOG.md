@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.65] - 2026-08-28
+
+### Fixed
+- **Cartridge and profile module stacking**: Loading a Game Cartridge or Scenario Profile now replaces the shared tracker-module / Game System / snippet library for the loaded groups. Previously, save-time catalog sync merged the new game on top of the old one, so Game A's modules stayed in the inactive pool (and GLOBAL items could even stay enabled) after loading Game B.
+
 ## [2026.8.64] - 2026-08-28
 
 ### Added

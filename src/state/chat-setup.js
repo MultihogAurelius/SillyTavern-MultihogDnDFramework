@@ -371,6 +371,45 @@ export function migrateChatSetupCatalogs(settings) {
     return true;
 }
 
+/**
+ * Rebuild selected global catalogs from the current live arrays, discarding
+ * definitions that are not in those arrays.
+ *
+ * Used by Game Cartridge and scenario-profile loads so swapping Game B for
+ * Game A does not keep Game A's modules in the inactive pool. Ordinary
+ * saveSettings → syncChatSetupCatalogs remains additive so modules created
+ * in another chat stay discoverable until a cartridge/profile load
+ * explicitly replaces that library.
+ */
+export function replaceChatSetupCatalogsFromLive(settings, {
+    customFields = false,
+    syspromptSnippets = false,
+    gameSystems = false,
+} = {}) {
+    if (!settings || (!customFields && !syspromptSnippets && !gameSystems)) return false;
+    if (Number(settings.chatSetupCatalogVersion) < CHAT_SETUP_CATALOG_VERSION) migrateChatSetupCatalogs(settings);
+
+    if (customFields) {
+        settings.trackerModuleDatabase = mergeCatalog([], [settings.customFields], customFieldKey, false);
+    }
+    if (syspromptSnippets) {
+        settings.syspromptSnippetDatabase = mergeCatalog([], [settings.customSyspromptLibrary], snippetKey, false);
+    }
+    if (gameSystems) {
+        settings.gameSystemDatabase = mergeCatalog([], [settings.gameSystems], gameSystemKey, false);
+    }
+    alignWizardScopes(settings);
+
+    const fieldStates = stateMap(settings.customFields, customFieldKey);
+    const snippetStates = stateMap(settings.customSyspromptLibrary, snippetKey);
+    const gameStates = stateMap(settings.gameSystems, gameSystemKey);
+    if (gameSystems) settings.gameSystems = hydrateCatalog(settings.gameSystemDatabase, gameStates, gameSystemKey);
+    if (customFields) settings.customFields = hydrateCatalog(settings.trackerModuleDatabase, fieldStates, customFieldKey);
+    if (syspromptSnippets) settings.customSyspromptLibrary = hydrateCatalog(settings.syspromptSnippetDatabase, snippetStates, snippetKey);
+    alignWizardScopes(settings);
+    return true;
+}
+
 /** Merge newly created or edited live definitions into their global catalogs. */
 export function syncChatSetupCatalogs(settings) {
     if (!settings) return false;
