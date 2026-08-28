@@ -209,7 +209,7 @@ export const AGENT_CONNECTION_SETUPS = [
     },
     {
         key: 'map_runtime',
-        label: 'Map Updater & Evolution',
+        label: 'Map Updater',
         settingsKeys: {
             connectionSource: 'mapRuntimeConnectionSource',
             connectionProfileId: 'mapRuntimeConnectionProfileId',
@@ -233,6 +233,34 @@ export const AGENT_CONNECTION_SETUPS = [
             profileGroup: '#rpg_map_runtime_profile_group',
             ollamaGroup: '#rpg_map_runtime_ollama_group',
             openaiGroup: '#rpg_map_runtime_openai_group',
+        },
+    },
+    {
+        key: 'map_evolution',
+        label: 'Map Evolution',
+        settingsKeys: {
+            connectionSource: 'mapEvolutionConnectionSource',
+            connectionProfileId: 'mapEvolutionConnectionProfileId',
+            completionPresetId: 'mapEvolutionCompletionPresetId',
+            ollamaUrl: 'mapEvolutionOllamaUrl',
+            ollamaModel: 'mapEvolutionOllamaModel',
+            openaiUrl: 'mapEvolutionOpenaiUrl',
+            openaiKey: 'mapEvolutionOpenaiKey',
+            openaiModel: 'mapEvolutionOpenaiModel',
+        },
+        ui: {
+            source: '#rpg_map_evolution_connection_source',
+            profile: '#rpg_map_evolution_connection_profile',
+            preset: '#rpg_map_evolution_completion_preset',
+            ollamaUrl: '#rpg_map_evolution_ollama_url',
+            ollamaModel: '#rpg_map_evolution_ollama_model',
+            openaiUrl: '#rpg_map_evolution_openai_url',
+            openaiKey: '#rpg_map_evolution_openai_key',
+            openaiModel: '#rpg_map_evolution_openai_model',
+            openaiManual: '#rpg_map_evolution_openai_model_manual',
+            profileGroup: '#rpg_map_evolution_profile_group',
+            ollamaGroup: '#rpg_map_evolution_ollama_group',
+            openaiGroup: '#rpg_map_evolution_openai_group',
         },
     },
     {

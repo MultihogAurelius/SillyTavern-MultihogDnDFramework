@@ -3,7 +3,46 @@
  * Kept out of map-evolution.js so filters stay testable without the LLM pass / router.
  */
 import { dungeonSiteRootsMatch, normalizeDungeonLabel, pickActiveSiteForLocation, resolveCurrentMapPlacement } from './dungeon-reality.js';
-import { parseInWorldTime } from './memo-processor.js';
+import { findNthUserMessageStartIdx, formatAgentChatLogFromIndex, parseInWorldTime } from './memo-processor.js';
+
+export const DEFAULT_MAP_EVOLUTION_LOOKBACK = 10;
+
+/**
+ * Clamp Map Evolution story lookback to 0–100 user turns.
+ * 0 means skip recent story entirely (do not treat as "from the start of chat").
+ */
+export function normalizeMapEvolutionLookback(value, fallback = DEFAULT_MAP_EVOLUTION_LOOKBACK) {
+    if (value == null || value === '') return fallback;
+    const n = Math.floor(Number(value));
+    if (!Number.isFinite(n)) return fallback;
+    return Math.max(0, Math.min(100, n));
+}
+
+/** Per-run override wins; otherwise the settings Story Lookback. */
+export function resolveMapEvolutionLookback(settings, lookback = null) {
+    return normalizeMapEvolutionLookback(
+        lookback != null && lookback !== '' ? lookback : settings?.mapEvolutionLookback,
+        DEFAULT_MAP_EVOLUTION_LOOKBACK,
+    );
+}
+
+/**
+ * Recent chat supplied to Map Evolution. Empty when lookback is 0.
+ * @param {any[]} chat
+ * @param {object} [settings]
+ * @param {number|null} [lookback] Per-run override (Direct Command).
+ */
+export function formatMapEvolutionRecentStory(chat, settings, lookback = null) {
+    const turns = resolveMapEvolutionLookback(settings, lookback);
+    const messages = Array.isArray(chat) ? chat : [];
+    if (!turns || !messages.length) return '';
+    return formatAgentChatLogFromIndex(
+        messages,
+        findNthUserMessageStartIdx(messages, turns),
+        !!settings?.routerIncludeHidden,
+        false,
+    );
+}
 
 export function isEvolutionNoop(value) {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return false;

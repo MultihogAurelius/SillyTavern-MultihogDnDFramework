@@ -30,7 +30,7 @@ describe('agent terminal direct prompts', () => {
         expect(builder).toContain('wireAgentTerminalDirectPrompts');
         expect(builder).not.toContain("queryAgentUi('#rt-agent-prompt-btn')");
         expect(direct).toContain("runRouterPass(combinedNarrative, msg, lookback, true)");
-        expect(direct).toContain('directInstruction: msg');
+        expect(direct).toMatch(/directInstruction: msg,\s*lookback,/);
         expect(direct).toContain('inferMapArchitectArgs');
         expect(direct).toContain('const siteRoot = directive?.site || activeSiteRoot');
         expect(direct).toContain('args.kind = directive.kind');

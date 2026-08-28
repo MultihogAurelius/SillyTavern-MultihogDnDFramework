@@ -1,8 +1,8 @@
 /**
  * Map Evolution — off-screen site simulation with lazy World Report pressure.
  *
- * Separate module from Map Updater occupancy: own prompt, own cadence, same
- * transaction API. Never mixed into the occupancy request.
+ * Separate module from Map Updater occupancy: own prompt, own cadence, own
+ * connection, same transaction API. Never mixed into the occupancy request.
  */
 import { getEffectiveRouterCampaignPrefix, getSettings, hydrateWorldProgressionFromChatState, persistMapEvolutionState } from './state-manager.js';
 import { runtimeState } from './src/app/runtime-state.js';
@@ -36,6 +36,7 @@ import {
     formatClosedThreadsForCompression,
     formatEvolutionElapsedMinutes,
     formatEvolutionThreadLine,
+    formatMapEvolutionRecentStory,
     isEvolutionNoop,
     normalizeEvolutionTickScope,
     normalizeMapEvolutionCompressThreshold,
@@ -104,14 +105,14 @@ function broadcastStep(type, content, metadata = {}) {
 
 function requestSettings(settings) {
     return {
-        connectionSource: settings.mapRuntimeConnectionSource || 'default',
-        connectionProfileId: settings.mapRuntimeConnectionProfileId || '',
-        completionPresetId: settings.mapRuntimeCompletionPresetId || '',
-        ollamaUrl: settings.mapRuntimeOllamaUrl || 'http://localhost:11434',
-        ollamaModel: settings.mapRuntimeOllamaModel || '',
-        openaiUrl: settings.mapRuntimeOpenaiUrl || '',
-        openaiKey: settings.mapRuntimeOpenaiKey || '',
-        openaiModel: settings.mapRuntimeOpenaiModel || '',
+        connectionSource: settings.mapEvolutionConnectionSource || 'default',
+        connectionProfileId: settings.mapEvolutionConnectionProfileId || '',
+        completionPresetId: settings.mapEvolutionCompletionPresetId || '',
+        ollamaUrl: settings.mapEvolutionOllamaUrl || 'http://localhost:11434',
+        ollamaModel: settings.mapEvolutionOllamaModel || '',
+        openaiUrl: settings.mapEvolutionOpenaiUrl || '',
+        openaiKey: settings.mapEvolutionOpenaiKey || '',
+        openaiModel: settings.mapEvolutionOpenaiModel || '',
         maxTokens: Math.max(1000, Number(settings.mapEvolutionMaxTokens) || 25000),
         debugMode: !!settings.debugMode,
     };
@@ -368,7 +369,13 @@ The party is inside this map. Outside the frozen player area, make this site fee
 Do not manufacture arbitrary catastrophe, mutate the frozen area, narrate events the party directly witnessed, or contradict the immediate scene. Map Updater owns observed/current-area events. Your job is durable state just beyond the player bubble whose consequences can become noticeable during continued exploration. Noop remains valid when nothing has a plausible cause, but do not default to quiet merely because the party is nearby.`;
 }
 
-function initialUserPrompt({ site, trigger, worldReports, digest, bubble, currentLocation, partyIsHere, onSitePreset = 'dynamic', timeWindow, backlog, threads, directInstruction = '' }) {
+function formatRecentStoryBlock(recentStory) {
+    return `## RECENT STORY
+${recentStory || '(No additional recent context.)'}
+Use this only to ground off-screen change in what play already established. Do not restage events the party witnessed in the frozen bubble. If empty, do not invent from chat.`;
+}
+
+function initialUserPrompt({ site, trigger, worldReports, digest, bubble, currentLocation, partyIsHere, onSitePreset = 'dynamic', timeWindow, backlog, threads, directInstruction = '', recentStory = '' }) {
     const kind = normalizeMapSiteKind(site.document?.kind);
     const bubbleLine = bubble.area
         ? `${bubble.area.id} (${bubble.area.name})${bubble.combatActive ? ' — combat is active' : ''}`
@@ -391,6 +398,8 @@ ${currentLocation || 'Unknown'}
 
 ## CURRENT MAP
 ${formatDungeonMapForEvolution(site.document, partyIsHere ? currentLocation : '')}
+
+${formatRecentStoryBlock(recentStory)}
 ${formatDirectInstructionBlock(instruction)}
 Output only the required JSON object. Apply only the direct instruction. Prefer {"noop":true} when the instruction cannot be applied safely.`;
     }
@@ -424,6 +433,8 @@ ${currentLocation || 'Unknown'}
 ## CURRENT MAP
 ${formatDungeonMapForEvolution(site.document, partyIsHere ? currentLocation : '')}
 
+${formatRecentStoryBlock(recentStory)}
+
 ## WORLD REPORT PRESSURES
 ${reportBlock}
 
@@ -435,7 +446,7 @@ ${digestBlock}
 Output only the required JSON object. Include report_outcomes when World Report pressures are supplied: [{"report_id":"exact supplied id","status":"materialized|already_realized_by_play|considered"}]. Prefer durable change when in-world time has passed, but only if it makes logical and narrative sense for this site. Hours plus several living occupants may yield several operations when several would stir; idle occupants may stay. Use {"noop":true} only when this site would not plausibly stir.`;
 }
 
-function correctionPrompt({ site, trigger, worldReports, digest, bubble, currentLocation, partyIsHere, onSitePreset = 'dynamic', timeWindow, backlog, threads, priorOutput, errors, attempt, directInstruction = '' }) {
+function correctionPrompt({ site, trigger, worldReports, digest, bubble, currentLocation, partyIsHere, onSitePreset = 'dynamic', timeWindow, backlog, threads, priorOutput, errors, attempt, directInstruction = '', recentStory = '' }) {
     return `CORRECTION PASS ${attempt}
 Your previous map evolution was rejected. Return a complete corrected JSON object, not a patch. Reuse the same operation_id unless the error says to mint a new one.
 
@@ -449,7 +460,7 @@ Field reminder: Every operation needs cause. DEAD/DESTROYED also needs actor ("p
 PREVIOUS OUTPUT
 ${priorOutput}
 
-${initialUserPrompt({ site, trigger, worldReports, digest, bubble, currentLocation, partyIsHere, onSitePreset, timeWindow, backlog, threads, directInstruction })}`;
+${initialUserPrompt({ site, trigger, worldReports, digest, bubble, currentLocation, partyIsHere, onSitePreset, timeWindow, backlog, threads, directInstruction, recentStory })}`;
 }
 
 function swipeSnapshotKey(ctx, message, swipeId = message?.swipe_id ?? 0) {
@@ -508,6 +519,7 @@ async function evolveOneSite({
     snapshot,
     ctx,
     directInstruction = '',
+    recentStory = '',
 }) {
     const partyIsHere = dungeonSiteRootsMatch(site.siteRoot, currentRoot);
     const combatActive = partyIsHere && isCombatActive(settings.currentMemo);
@@ -560,7 +572,7 @@ AUTHORITATIVE CAUSAL THREAD CONTRACT
     let prompt = initialUserPrompt({
         site, trigger, worldReports, digest, bubble, currentLocation, partyIsHere,
         onSitePreset: settings.mapEvolutionOnSitePreset === 'standard' ? 'standard' : 'dynamic',
-        timeWindow, backlog, threads, directInstruction: instruction,
+        timeWindow, backlog, threads, directInstruction: instruction, recentStory,
     });
     let lastIssues = [];
     let lastOutput = '';
@@ -587,7 +599,7 @@ AUTHORITATIVE CAUSAL THREAD CONTRACT
                     site, trigger, worldReports, digest, bubble, currentLocation, partyIsHere,
                     onSitePreset: settings.mapEvolutionOnSitePreset === 'standard' ? 'standard' : 'dynamic',
                     timeWindow, backlog, threads,
-                    priorOutput: output, errors: lastIssues, attempt: attempt + 1, directInstruction: instruction,
+                    priorOutput: output, errors: lastIssues, attempt: attempt + 1, directInstruction: instruction, recentStory,
                 });
                 continue;
             }
@@ -618,7 +630,7 @@ AUTHORITATIVE CAUSAL THREAD CONTRACT
                     site, trigger, worldReports, digest, bubble, currentLocation, partyIsHere,
                     onSitePreset: settings.mapEvolutionOnSitePreset === 'standard' ? 'standard' : 'dynamic',
                     timeWindow, backlog, threads,
-                    priorOutput: output, errors: lastIssues, attempt: attempt + 1, directInstruction: instruction,
+                    priorOutput: output, errors: lastIssues, attempt: attempt + 1, directInstruction: instruction, recentStory,
                 });
                 continue;
             }
@@ -638,7 +650,7 @@ AUTHORITATIVE CAUSAL THREAD CONTRACT
                     site, trigger, worldReports, digest, bubble, currentLocation, partyIsHere,
                     onSitePreset: settings.mapEvolutionOnSitePreset === 'standard' ? 'standard' : 'dynamic',
                     timeWindow, backlog, threads,
-                    priorOutput: output, errors: lastIssues, attempt: attempt + 1, directInstruction: instruction,
+                    priorOutput: output, errors: lastIssues, attempt: attempt + 1, directInstruction: instruction, recentStory,
                 });
                 continue;
             }
@@ -719,6 +731,7 @@ function dungeonRootsEqual(left, right) {
  *   isManual?: boolean,
  *   siteRoots?: string[],
  *   directInstruction?: string,
+ *   lookback?: number|null,
  * }} [options]
  */
 export async function runMapEvolutionPass({
@@ -727,6 +740,7 @@ export async function runMapEvolutionPass({
     isManual = false,
     siteRoots = null,
     directInstruction = '',
+    lookback = null,
 } = {}) {
     hydrateWorldProgressionFromChatState();
     const settings = getSettings();
@@ -778,6 +792,7 @@ export async function runMapEvolutionPass({
         const results = [];
         const books = loaded.books;
         const recentWorldReports = await loadRecentWorldReports(settings, ctx);
+        const recentStory = formatMapEvolutionRecentStory(ctx.chat, settings, lookback);
 
         for (const site of [...baselineOnly, ...toEvolve]) {
             if (site.stampBaselineOnly) {
@@ -798,6 +813,7 @@ export async function runMapEvolutionPass({
                 snapshot,
                 ctx,
                 directInstruction: instruction,
+                recentStory,
             });
             results.push(siteResult);
             if (siteResult?.digestLine) digestLines.push(siteResult.digestLine);

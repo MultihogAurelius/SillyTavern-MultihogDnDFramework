@@ -1186,6 +1186,17 @@ function getSettingsInternal(extensionSettings) {
         s.mapRuntimeOpenaiModel = s.mapArchitectOpenaiModel || '';
         s.mapRuntimeConnectionSeeded = true;
     }
+    if (!s.mapEvolutionConnectionSeeded) {
+        s.mapEvolutionConnectionSource = s.mapRuntimeConnectionSource ?? 'default';
+        s.mapEvolutionConnectionProfileId = s.mapRuntimeConnectionProfileId || '';
+        s.mapEvolutionCompletionPresetId = s.mapRuntimeCompletionPresetId || '';
+        s.mapEvolutionOllamaUrl = s.mapRuntimeOllamaUrl || 'http://localhost:11434';
+        s.mapEvolutionOllamaModel = s.mapRuntimeOllamaModel || '';
+        s.mapEvolutionOpenaiUrl = s.mapRuntimeOpenaiUrl || '';
+        s.mapEvolutionOpenaiKey = s.mapRuntimeOpenaiKey || '';
+        s.mapEvolutionOpenaiModel = s.mapRuntimeOpenaiModel || '';
+        s.mapEvolutionConnectionSeeded = true;
+    }
     const tickScope = String(s.mapEvolutionTickScope || '').trim().toLowerCase();
     s.mapEvolutionTickScope = ['active', 'count', 'all', 'selected'].includes(tickScope) ? tickScope : 'all';
     const tickCount = Number(s.mapEvolutionTickCount);
@@ -1207,6 +1218,10 @@ function getSettingsInternal(extensionSettings) {
         return Number.isFinite(minutes) ? Math.max(0, Math.min(59, minutes)) : 0;
     })();
     s.mapEvolutionOnSitePreset = s.mapEvolutionOnSitePreset === 'standard' ? 'standard' : 'dynamic';
+    s.mapEvolutionLookback = (() => {
+        const n = Math.floor(Number(s.mapEvolutionLookback));
+        return Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : 10;
+    })();
     if (!s.mapEvolutionIntervalHoursBySite || typeof s.mapEvolutionIntervalHoursBySite !== 'object' || Array.isArray(s.mapEvolutionIntervalHoursBySite)) {
         s.mapEvolutionIntervalHoursBySite = {};
     }
@@ -1484,6 +1499,15 @@ export const CHAT_STATE_GLOBAL_UI_KEYS = [
     'mapRuntimeOpenaiKey',
     'mapRuntimeOpenaiModel',
     'mapRuntimeConnectionSeeded',
+    'mapEvolutionConnectionSource',
+    'mapEvolutionConnectionProfileId',
+    'mapEvolutionCompletionPresetId',
+    'mapEvolutionOllamaUrl',
+    'mapEvolutionOllamaModel',
+    'mapEvolutionOpenaiUrl',
+    'mapEvolutionOpenaiKey',
+    'mapEvolutionOpenaiModel',
+    'mapEvolutionConnectionSeeded',
     'mapUpdaterEnabled',
     'mapUpdaterRunEvery',
     'mapUpdaterMaxTokens',
@@ -1496,6 +1520,7 @@ export const CHAT_STATE_GLOBAL_UI_KEYS = [
     'mapEvolutionOnSiteIntervalHours',
     'mapEvolutionOnSiteIntervalMinutes',
     'mapEvolutionOnSitePreset',
+    'mapEvolutionLookback',
     'mapEvolutionMaxTokens',
     'mapEvolutionCompressEnabled',
     'mapEvolutionCompressThreshold',

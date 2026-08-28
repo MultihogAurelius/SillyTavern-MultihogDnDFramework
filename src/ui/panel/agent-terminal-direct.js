@@ -222,6 +222,7 @@ export function wireAgentTerminalDirectPrompts({
                 isManual: true,
                 siteRoots,
                 directInstruction: msg,
+                lookback,
             });
             if (typeof updateAgentStatusIndicator === 'function' && typeof isRouterRunning === 'function') {
                 updateAgentStatusIndicator(isRouterRunning());

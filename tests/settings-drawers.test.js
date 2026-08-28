@@ -78,6 +78,7 @@ describe('General & Visuals settings', () => {
             'rpg_connection_slot_game_system_wizard',
             'rpg_connection_slot_map_architect',
             'rpg_connection_slot_map_runtime',
+            'rpg_connection_slot_map_evolution',
             'rpg_connection_slot_world_progression',
             'rpg_connection_slot_portraits',
         ].forEach(id => expect(settingsMarkup).toContain(`id="${id}"`));
@@ -92,12 +93,14 @@ describe('General & Visuals settings', () => {
         expect(indexSource).toContain("control: '#rpg_gs_wizard_connection_source'");
         expect(indexSource).toContain("control: '#rpg_map_architect_connection_source'");
         expect(indexSource).toContain("control: '#rpg_map_runtime_connection_source'");
+        expect(indexSource).toContain("control: '#rpg_map_evolution_connection_source'");
         expect(indexSource).toContain("control: '#rpg_world_connection_source'");
         expect(indexSource).toContain("control: '#rpg_portrait_connection_source'");
         expect(indexSource).toContain('I recommend a cheap mid-tier model such as GPT-5.6 Luna, Gemini Flash/Flash-Lite series, or Deepseek V4 Flash latest.');
         expect(indexSource).toContain('Same models work fine here as with the State Tracker.');
         expect(indexSource).toContain('I recommend using a somewhat better model here such as Sonnet 5 or above for more robust and complex systems. Your mileage varies a lot here. Experiment.');
         expect(indexSource).toContain('A lightweight model should do fine.');
+        expect(indexSource).toContain('Prefer a fast model above all');
         expect(indexSource).toContain("chevron.className = 'inline-drawer-icon fa-solid fa-circle-chevron-down rt-central-connection-chevron'");
         expect(settingsMarkup).toContain('id="rpg_connection_apply_all_box"');
         expect(settingsMarkup).toContain('Apply Connection Setup to All');

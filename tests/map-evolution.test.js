@@ -21,8 +21,10 @@ import {
     evolutionHistoryNeedsCompression,
     evolutionIntervalHoursForSettings,
     filterSitesByRoots,
+    formatMapEvolutionRecentStory,
     formatNarratorSiteActivity,
     normalizeMapEvolutionCompressThreshold,
+    normalizeMapEvolutionLookback,
     normalizeMapEvolutionNarratorCommitTokens,
     partitionCompressibleThreads,
     pickCompleteNarratorCommits,
@@ -73,6 +75,24 @@ const docks = {
 };
 
 describe('Map Evolution', () => {
+    it('treats story lookback 0 as empty rather than the whole chat', () => {
+        expect(normalizeMapEvolutionLookback(0)).toBe(0);
+        expect(normalizeMapEvolutionLookback(12)).toBe(12);
+        expect(normalizeMapEvolutionLookback(999)).toBe(100);
+        expect(normalizeMapEvolutionLookback('')).toBe(10);
+        const chat = [
+            { is_user: true, mes: 'Alpha turn' },
+            { is_user: false, mes: 'Narrator one' },
+            { is_user: true, mes: 'Beta turn' },
+            { is_user: false, mes: 'Narrator two' },
+        ];
+        expect(formatMapEvolutionRecentStory(chat, { mapEvolutionLookback: 0 })).toBe('');
+        expect(formatMapEvolutionRecentStory(chat, { mapEvolutionLookback: 10 }, 0)).toBe('');
+        const story = formatMapEvolutionRecentStory(chat, { mapEvolutionLookback: 1 });
+        expect(story).toContain('Beta turn');
+        expect(story).not.toContain('Alpha turn');
+    });
+
     it('ships a dedicated prompt that occupancy never sees', () => {
         expect(DEFAULT_MAP_EVOLUTION_SYSTEM_PROMPT).toContain('You are Map Evolution');
         expect(DEFAULT_MAP_EVOLUTION_SYSTEM_PROMPT).toContain('evidence "EVOLVED"');
@@ -940,6 +960,9 @@ describe('Map Evolution', () => {
 
         expect(settingsMarkup).toContain('<b>Map Evolution</b>');
         expect(settingsMarkup).toContain('id="rpg_map_evolution_enabled"');
+        expect(settingsMarkup).toContain('id="rpg_map_evolution_connection_source"');
+        expect(settingsMarkup).toContain('Uses the Map Evolution connection');
+        expect(settingsMarkup).not.toContain('Map Updater &amp; Evolution');
         expect(settingsMarkup).toContain('id="rpg_map_evolution_interval_hours"');
         expect(settingsMarkup).toContain('id="rpg_map_evolution_onsite_interval_hours"');
         expect(settingsMarkup).toContain('id="rpg_map_evolution_onsite_interval_minutes"');
@@ -947,6 +970,8 @@ describe('Map Evolution', () => {
         expect(settingsMarkup).toContain('High Dynamism — tactical and soon discoverable');
         expect(settingsMarkup).toContain('Standard — same behavior as background maps');
         expect(defaultsSource).toContain('mapEvolutionIntervalHours: 12');
+        expect(defaultsSource).toContain('mapEvolutionConnectionSource: "default"');
+        expect(defaultsSource).not.toContain('mapEvolutionConnectionSeeded');
         expect(defaultsSource).toContain('mapEvolutionOnSiteIntervalHours: 1');
         expect(defaultsSource).toContain('mapEvolutionOnSiteIntervalMinutes: 0');
         expect(defaultsSource).toContain("mapEvolutionOnSitePreset: 'dynamic'");
@@ -972,25 +997,32 @@ describe('Map Evolution', () => {
         expect(settingsMarkup).toContain('does not enable or disable a per-map timer');
         expect(indexSource).not.toContain("$('#rpg_map_evolution_selected_row').toggle(scope === 'selected')");
         expect(indexSource).toContain("$('#rpg_map_evolution_interval_selected_hint').toggle(scope === 'selected')");
+        expect(settingsMarkup).toMatch(/id="rpg_map_evolution_lookback"[^>]*max="100"/);
         expect(settingsMarkup).toMatch(/id="rpg_map_evolution_max_tokens"[^>]*max="32000"/);
         expect(settingsMarkup).toContain('id="rpg_map_evolution_compress_enabled"');
         expect(settingsMarkup).toMatch(/id="rpg_map_evolution_compress_threshold"[^>]*value="10000"/);
         expect(settingsMarkup).toMatch(/id="rpg_map_evolution_narrator_commit_tokens"[^>]*value="2000"/);
         expect(settingsMarkup).toContain('Map Evolution memory');
         expect(settingsMarkup).toContain('transferred to the <b>narrator</b>');
+        expect(defaultsSource).toContain('mapEvolutionLookback: 10');
         expect(defaultsSource).toContain('mapEvolutionCompressThreshold: 10000');
         expect(defaultsSource).toContain('mapEvolutionNarratorCommitTokens: 2000');
+        expect(indexSource).toContain('rpg_map_evolution_lookback');
         expect(indexSource).toContain('rpg_map_evolution_narrator_commit_tokens');
         expect(hooks).toContain('mapEvolutionNarratorCommitTokens');
         expect(settingsMarkup).toContain('id="rpg_map_evolution_compress_prompt"');
         expect(evolution).toContain('Number(settings.mapEvolutionMaxTokens) || 25000');
+        expect(evolution).toContain('formatMapEvolutionRecentStory');
+        expect(evolution).toContain('## RECENT STORY');
+        expect(evolution).toContain('lookback = null');
         expect(evolution).toContain('maybeCompressSiteThreads');
         expect(evolution).toContain('mapEvolutionCompressThreshold');
         expect(evolution).toContain('compressing evolution history');
         expect(DEFAULT_MAP_EVOLUTION_COMPRESS_SYSTEM_PROMPT).toContain('You are Map Evolution History Compression');
         expect(DEFAULT_MAP_EVOLUTION_COMPRESS_SYSTEM_PROMPT).toContain('Open threads must survive unchanged');
         expect(DEFAULT_MAP_EVOLUTION_COMPRESS_SYSTEM_PROMPT).toContain('do not rewrite them');
-        expect(evolution).toContain('mapRuntimeConnectionSource');
+        expect(evolution).toContain('mapEvolutionConnectionSource');
+        expect(evolution).not.toContain('mapRuntimeConnectionSource');
         expect(evolution).not.toContain('mapArchitectConnectionSource');
         expect(panelMarkup).toContain('id="rt-research-map-evolution"');
         expect(indexSource).toContain('rpg_map_evolution_evolve_now');

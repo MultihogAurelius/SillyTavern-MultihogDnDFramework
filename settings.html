@@ -591,6 +591,7 @@
                     <div id="rpg_connection_slot_game_system_wizard" class="rt-connection-drawer-slot"></div>
                     <div id="rpg_connection_slot_map_architect" class="rt-connection-drawer-slot"></div>
                     <div id="rpg_connection_slot_map_runtime" class="rt-connection-drawer-slot"></div>
+                    <div id="rpg_connection_slot_map_evolution" class="rt-connection-drawer-slot"></div>
                     <div id="rpg_connection_slot_world_progression" class="rt-connection-drawer-slot"></div>
                     <div id="rpg_connection_slot_portraits" class="rt-connection-drawer-slot"></div>
 
@@ -1374,7 +1375,7 @@
                 <div class="inline-drawer-content">
                     <div class="flex-container flexFlowColumn gap-1">
                         <div style="font-size: 0.8em; opacity: 0.72; line-height: 1.4; margin-bottom: 8px;">
-                            Persistent maps for dungeons and significant interiors (room-scale) and settlements (district-scale). Ordinary settlement buildings stay on their district until <b>CreateAreaMap</b> explicitly promotes one. <b>Map Architect</b> creates the first map on its own connection; <b>Map Updater</b> and <b>Map Evolution</b> share a second connection for occupancy and off-screen change.
+                            Persistent maps for dungeons and significant interiors (room-scale) and settlements (district-scale). Ordinary settlement buildings stay on their district until <b>CreateAreaMap</b> explicitly promotes one. <b>Map Architect</b>, <b>Map Updater</b>, and <b>Map Evolution</b> each have their own connection.
                         </div>
 
                         <div class="inline-drawer">
@@ -1457,6 +1458,45 @@
 
                         <div class="inline-drawer">
                             <div class="inline-drawer-toggle inline-drawer-header">
+                                <b>Connection Settings</b>
+                                <div class="inline-drawer-icon fa-solid fa-circle-down down"></div>
+                            </div>
+                            <div class="inline-drawer-content">
+                                <div class="flex-container flexFlowColumn gap-1">
+                                    <label>Connection Source</label>
+                                    <select id="rpg_map_evolution_connection_source" class="text_pole">
+                                        <option value="default">Main API</option>
+                                        <option value="profile">Connection Profile (recommended)</option>
+                                        <option value="ollama">Ollama</option>
+                                        <option value="openai">OpenAI</option>
+                                    </select>
+                                    <div id="rpg_map_evolution_profile_group" style="display:none;">
+                                        <select id="rpg_map_evolution_connection_profile" class="text_pole"></select>
+                                    </div>
+                                    <div id="rpg_map_evolution_ollama_group" style="display:none;">
+                                        <input id="rpg_map_evolution_ollama_url" type="text" class="text_pole" placeholder="URL" />
+                                        <div class="flex-container gap-1">
+                                            <select id="rpg_map_evolution_ollama_model" class="text_pole" style="flex:1;"></select>
+                                            <button id="rpg_map_evolution_ollama_refresh" class="menu_button interactable" title="Refresh Ollama models"><i class="fa-solid fa-arrows-rotate"></i></button>
+                                        </div>
+                                    </div>
+                                    <div id="rpg_map_evolution_openai_group" style="display:none;">
+                                        <input id="rpg_map_evolution_openai_url" type="text" class="text_pole" placeholder="URL" />
+                                        <input id="rpg_map_evolution_openai_key" type="password" class="text_pole" placeholder="Key" />
+                                        <div class="flex-container gap-1">
+                                            <select id="rpg_map_evolution_openai_model" class="text_pole" style="flex:1;"></select>
+                                            <button id="rpg_map_evolution_openai_refresh" class="menu_button interactable" title="Refresh OpenAI-compatible models"><i class="fa-solid fa-arrows-rotate"></i></button>
+                                        </div>
+                                        <input id="rpg_map_evolution_openai_model_manual" type="text" class="text_pole" placeholder="Manual Model Name" />
+                                    </div>
+                                    <label>Preset</label>
+                                    <select id="rpg_map_evolution_completion_preset" class="text_pole"></select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="inline-drawer">
+                            <div class="inline-drawer-toggle inline-drawer-header">
                                 <b>Map Architect</b>
                                 <div class="inline-drawer-icon fa-solid fa-circle-down down"></div>
                             </div>
@@ -1502,7 +1542,7 @@
                             <div class="inline-drawer-content">
                                 <div class="flex-container flexFlowColumn gap-1">
                                     <div style="font-size: 0.8em; opacity: 0.72; line-height: 1.4;">
-                                        After a map exists, this dedicated pass keeps occupancy current. It does not record NPC biographies or relationships — those stay on the Lorebook Agent. Uses the Map Updater &amp; Evolution connection. Default is every turn, so Lorebook Agent can stay on a slower cadence.
+                                        After a map exists, this dedicated pass keeps occupancy current. It does not record NPC biographies or relationships — those stay on the Lorebook Agent. Uses the Map Updater connection. Default is every turn, so Lorebook Agent can stay on a slower cadence.
                                     </div>
                                     <label class="checkbox_label">
                                         <input id="rpg_map_updater_enabled" type="checkbox" checked />
@@ -1533,7 +1573,7 @@
                             <div class="inline-drawer-content">
                                 <div class="flex-container flexFlowColumn gap-1">
                                     <div style="font-size: 0.8em; opacity: 0.72; line-height: 1.4;">
-                                        Separate from occupancy. Advances mapped sites off-screen on in-world time. During an ordinary interval, site-exit, or manual pass, each map also interprets any relevant unconsumed World Report prose. Reports never trigger an immediate map fan-out. Uses the Map Updater &amp; Evolution connection.
+                                        Separate from occupancy. Advances mapped sites off-screen on in-world time. During an ordinary interval, site-exit, or manual pass, each map also interprets any relevant unconsumed World Report prose. Reports never trigger an immediate map fan-out. Uses the Map Evolution connection. Prefer a fast model — Evolution can tick several sites in one turn.
                                     </div>
                                     <label class="checkbox_label">
                                         <input id="rpg_map_evolution_enabled" type="checkbox" checked />
@@ -1575,6 +1615,11 @@
                                                 <input id="rpg_map_evolution_onsite_interval_minutes" type="text" inputmode="numeric" pattern="[0-9]*" min="0" max="59" value="0" class="text_pole" aria-label="Current map interval minutes" title="Additional current-map interval minutes (0–59). 0h 0m skips automatic current-map ticks." />
                                                 <span style="font-size:0.78em; opacity:0.65;">m</span>
                                             </span>
+                                        </label>
+                                    </div>
+                                    <div class="flex-container gap-1" style="align-items:end; flex-wrap:wrap;">
+                                        <label style="flex:1; min-width:140px;">Story Lookback
+                                            <input id="rpg_map_evolution_lookback" type="text" inputmode="numeric" pattern="[0-9]*" min="0" max="100" value="10" class="text_pole" title="Recent user turns supplied to Map Evolution as established context. 0 skips recent story." />
                                         </label>
                                         <label style="flex:1; min-width:140px;">Max Output Tokens
                                             <input id="rpg_map_evolution_max_tokens" type="text" inputmode="numeric" pattern="[0-9]*" min="1000" max="32000" value="25000" class="text_pole" title="Maximum generation length for one Map Evolution site pass." />

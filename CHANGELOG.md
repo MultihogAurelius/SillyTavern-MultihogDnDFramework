@@ -2,6 +2,15 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.68] - 2026-08-29
+
+### Added
+- **Map Evolution connection**: Map Evolution has its own Connection Settings slot instead of sharing Map Updater. Existing installs copy the Updater connection once.
+- **Map Evolution story lookback**: Configurable Story Lookback (default 10 user turns; 0 skips recent story) for scheduled and manual ticks. Direct Command's lookback now actually reaches the pass.
+
+### Fixed
+- **Map Evolution current site**: Footer matching no longer treats another map's BUILDING whose name contains the current site (for example a trail named toward Coldwater Creek) as the party location.
+
 ## [2026.8.67] - 2026-08-28
 
 ### Added

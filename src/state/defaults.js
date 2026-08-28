@@ -1335,6 +1335,22 @@ Include the entity name/title itself (without timestamps like "[Day 1]") as a ke
 
         mapRuntimeOpenaiModel: "",
 
+        mapEvolutionConnectionSource: "default",
+
+        mapEvolutionConnectionProfileId: "",
+
+        mapEvolutionCompletionPresetId: "",
+
+        mapEvolutionOllamaUrl: "http://localhost:11434",
+
+        mapEvolutionOllamaModel: "",
+
+        mapEvolutionOpenaiUrl: "",
+
+        mapEvolutionOpenaiKey: "",
+
+        mapEvolutionOpenaiModel: "",
+
         mapUpdaterEnabled: true,
 
         dungeonMapRevealAll: false,
@@ -1384,6 +1400,8 @@ Include the entity name/title itself (without timestamps like "[Day 1]") as a ke
         mapEvolutionOnSitePreset: 'dynamic',
 
         mapEvolutionIntervalHoursBySite: {},
+
+        mapEvolutionLookback: 10,
 
         mapEvolutionMaxTokens: 25000,
 
@@ -1551,7 +1569,7 @@ You may be asked to use Markers: ((PLS)), ((B)), ((XB)), ((BDG)), ((HGT)). These
 
 /** Latest settings migration version — factory reset skips legacy upgrade paths at or below this. */
 
-export const FACTORY_SETTINGS_VERSION = '2026.8.67';
+export const FACTORY_SETTINGS_VERSION = '2026.8.68';
 
 
 /** Remove extension UI keys from localStorage so a factory reset does not rehydrate stale panel state. */
