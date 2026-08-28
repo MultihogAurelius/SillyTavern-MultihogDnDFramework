@@ -12,6 +12,44 @@ const DRAFT_STORE = 'drafts';
 const META_STORE = 'meta';
 const MAX_LOCAL_CHECKPOINTS = 5;
 
+/**
+ * Decide which local checkpoint records to retain.
+ *
+ * Every checkpoint above `durableFloorRevision` must be kept: recovery walks
+ * contiguous parentRevision links from the mirror/server head, so pruning an
+ * unsynced bridge commit orphans newer full-state tips.
+ * Below the floor we only keep a small redundancy window.
+ */
+export function planLocalCheckpointRetention(records, {
+    maxLocal = MAX_LOCAL_CHECKPOINTS,
+    durableFloorRevision = -1,
+} = {}) {
+    if (!Array.isArray(records) || !records.length) return { keep: [], drop: [] };
+    const sorted = [...records].sort((left, right) => (
+        right.revision - left.revision
+        || String(right.commitId).localeCompare(String(left.commitId))
+    ));
+    const keepIds = new Set();
+    for (const record of sorted) {
+        if (Number(record.revision) > Number(durableFloorRevision)) {
+            keepIds.add(record.commitId);
+        }
+    }
+    let belowFloorKept = 0;
+    for (const record of sorted) {
+        if (keepIds.has(record.commitId)) continue;
+        if (belowFloorKept >= maxLocal) break;
+        keepIds.add(record.commitId);
+        belowFloorKept += 1;
+    }
+    const keep = [];
+    const drop = [];
+    for (const record of records) {
+        (keepIds.has(record.commitId) ? keep : drop).push(record);
+    }
+    return { keep, drop };
+}
+
 function requestPromise(request) {
     return new Promise((resolve, reject) => {
         request.onsuccess = () => resolve(request.result);
@@ -65,7 +103,7 @@ export function createIndexedDbCheckpointStore(indexedDb = globalThis.indexedDB)
                 .map(record => record.envelope);
         },
 
-        async putCheckpoint(envelope) {
+        async putCheckpoint(envelope, { durableFloorRevision = -1 } = {}) {
             const db = await open();
             const transaction = db.transaction(CHECKPOINT_STORE, 'readwrite');
             const store = transaction.objectStore(CHECKPOINT_STORE);
@@ -76,10 +114,8 @@ export function createIndexedDbCheckpointStore(indexedDb = globalThis.indexedDB)
                 envelope,
             });
             const records = await requestPromise(store.getAll());
-            const obsolete = records
-                .sort((left, right) => right.revision - left.revision || String(right.commitId).localeCompare(String(left.commitId)))
-                .slice(MAX_LOCAL_CHECKPOINTS);
-            for (const record of obsolete) store.delete(record.commitId);
+            const { drop } = planLocalCheckpointRetention(records, { durableFloorRevision });
+            for (const record of drop) store.delete(record.commitId);
             await transactionPromise(transaction);
         },
 
