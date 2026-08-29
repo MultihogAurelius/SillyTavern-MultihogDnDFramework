@@ -98,28 +98,9 @@ https://www.youtube.com/watch?v=82Lt9pRYFS0
 
 ---
 
-## Suggested Companions
+## A Summarizer is Mandatory
 
-- 🧠 **[Summaryception](https://github.com/Lodactio/Extension-Summaryception):** A brilliant summarizer/context compression extension. Also handy for crunching all the combat mechanics of the context into summarized history.
-
-## Don't Care About D&D?
-
-You can scrap the entire system prompt and all the default fields and track your own things completely. The D&D setup is just a plug & play system that works by default. 
-
-## What Model to Use?
-Your primary narrator model must support **Tool Calling** for the Hybrid RNG system to work properly, though this is only relevant if you're using tool calls. The extension also works without them (selectable in the settings.)
-
-For the narrator, I'd recommend trying at least the following:
-
-- MiMo 2.5 Pro
-- Deepseek V4 Pro and latest Flash
-- GPT-5.6 Luna, for its great cost-efficiency. Seems to be a decent model overall.
-
-*For the State Tracker and Lorebook Agent, I've been recommending the Gemini Flash-Lite and Flash models. However, now I'm not sure at all anymore. Deepseek V4 Flash 0731 recently came out and is very promising, and the same goes for GPT-5.6 Luna. These are seriously inexpensive models and seem to be heavy-hitters in terms of performance.*
-
-*If your model thinks too long in combat, enable* ***Combat API Override*** *in State Tracker settings — it auto-switches when the* *[COMBAT]* *tag is active in the tracker and switches back when combat ends.* ***This way you can have a faster model, so combat is faster.***
-
-These are recommendations, not rules — experiment. Different models shine for different styles of play.
+- 🧠 **[Summaryception](https://github.com/Lodactio/Extension-Summaryception):** Get this or an equivalent one that can summarize and hide verbatim messages. The extension is intended to be used with one.
 
 ---
 
