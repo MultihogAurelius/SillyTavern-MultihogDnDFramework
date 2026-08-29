@@ -4,7 +4,7 @@
  * Separate module from Map Updater occupancy: own prompt, own cadence, own
  * connection, same transaction API. Never mixed into the occupancy request.
  */
-import { getEffectiveRouterCampaignPrefix, getSettings, hydrateWorldProgressionFromChatState, persistMapEvolutionState } from './state-manager.js';
+import { getActiveChatId, getEffectiveRouterCampaignPrefix, getSettings, hydrateWorldProgressionFromChatState, persistMapEvolutionState } from './state-manager.js';
 import { runtimeState } from './src/app/runtime-state.js';
 import { sendStateRequest, isCombatActive } from './llm-client.js';
 import { extractCurrentTimeStr } from './memo-processor.js';
@@ -17,6 +17,7 @@ import {
     pickActiveSiteForLocation,
 } from './dungeon-reality.js';
 import { isLocationMappingEnabled } from './src/state/section-enabled.js';
+import { canCommitPassForChat } from './src/state/pass-affinity.js';
 import { parseMapArchitectResponse } from './map-architect-parser.js';
 import { DEFAULT_MAP_EVOLUTION_SYSTEM_PROMPT } from './map-evolution-prompt.js';
 import { DEFAULT_MAP_EVOLUTION_COMPRESS_SYSTEM_PROMPT } from './map-evolution-compress-prompt.js';
@@ -520,6 +521,7 @@ async function evolveOneSite({
     ctx,
     directInstruction = '',
     recentStory = '',
+    passChatId = null,
 }) {
     const partyIsHere = dungeonSiteRootsMatch(site.siteRoot, currentRoot);
     const combatActive = partyIsHere && isCombatActive(settings.currentMemo);
@@ -597,6 +599,9 @@ AUTHORITATIVE RECENT STORY CONTRACT
         else broadcastStep('thought', `${site.siteRoot}: requesting evolution (${trigger})...`);
         const output = await sendStateRequest(requestSettings(settings), systemPrompt, prompt, signal, { stream: true, debugSource: 'Map Evolution' });
         lastOutput = output;
+        if (!canCommitPassForChat(passChatId, runtimeState.currentChatId || getActiveChatId(), { aborted: signal.aborted })) {
+            return { ok: false, skipped: 'chat_changed', siteRoot: site.siteRoot };
+        }
         const parsed = parseMapArchitectResponse(output);
         if (!parsed.value) {
             lastIssues = [{ code: 'INVALID_JSON', path: '$', hint: parsed.error || 'No JSON object was found.' }];
@@ -641,6 +646,9 @@ AUTHORITATIVE RECENT STORY CONTRACT
                 continue;
             }
             break;
+        }
+        if (!canCommitPassForChat(passChatId, runtimeState.currentChatId || getActiveChatId(), { aborted: signal.aborted })) {
+            return { ok: false, skipped: 'chat_changed', siteRoot: site.siteRoot };
         }
         const mapResult = await applyDungeonMapCommit(
             transaction,
@@ -758,9 +766,16 @@ export async function runMapEvolutionPass({
     }
 
     const ctx = SillyTavern.getContext();
+    const passChatId = getActiveChatId() || runtimeState.currentChatId || ctx.chatId || null;
+    const canCommit = () => canCommitPassForChat(
+        passChatId,
+        runtimeState.currentChatId || getActiveChatId(),
+        { aborted: !!_mapEvolutionController?.signal?.aborted },
+    );
     _mapEvolutionStarting = true;
     try {
         const loaded = await loadAllMappedSiteContexts();
+        if (!canCommit()) return { skipped: 'chat_changed' };
         if (!loaded?.sites?.length) return { skipped: 'no_maps' };
 
         const currentLocation = loaded.currentLocation || '';
@@ -775,8 +790,9 @@ export async function runMapEvolutionPass({
         const baselineOnly = selected.filter(site => site.stampBaselineOnly);
         const toEvolve = selected.filter(site => !site.stampBaselineOnly);
         if (baselineOnly.length && !toEvolve.length) {
+            if (!canCommit()) return { skipped: 'chat_changed' };
             for (const site of baselineOnly) stampSiteFired(settings, site.siteRoot, currentTime);
-            persistMapEvolutionState();
+            persistMapEvolutionState(passChatId);
             return { ok: true, baseline: true, sites: baselineOnly.map(site => site.siteRoot) };
         }
 
@@ -799,8 +815,10 @@ export async function runMapEvolutionPass({
         const books = loaded.books;
         const recentWorldReports = await loadRecentWorldReports(settings, ctx);
         const recentStory = formatMapEvolutionRecentStory(ctx.chat, settings, lookback);
+        if (!canCommit()) return { skipped: 'chat_changed' };
 
         for (const site of [...baselineOnly, ...toEvolve]) {
+            if (!canCommit()) return { skipped: 'chat_changed', results };
             if (site.stampBaselineOnly) {
                 stampSiteFired(settings, site.siteRoot, currentTime);
                 continue;
@@ -820,7 +838,9 @@ export async function runMapEvolutionPass({
                 ctx,
                 directInstruction: instruction,
                 recentStory,
+                passChatId,
             });
+            if (!canCommit()) return { skipped: 'chat_changed', results };
             results.push(siteResult);
             if (siteResult?.digestLine) digestLines.push(siteResult.digestLine);
             if (siteResult?.ok) {
@@ -857,7 +877,8 @@ export async function runMapEvolutionPass({
             }
         }
 
-        persistMapEvolutionState();
+        if (!canCommit()) return { skipped: 'chat_changed', results };
+        persistMapEvolutionState(passChatId);
         if (typeof runtimeState.updateMapEvolutionScheduleDisplayRef === 'function') {
             runtimeState.updateMapEvolutionScheduleDisplayRef();
         }
@@ -870,8 +891,10 @@ export async function runMapEvolutionPass({
         // Finished sites already wrote map commits to the lorebook and stamped
         // Last Evolved / report applications / backlog in memory. Persist that
         // bookkeeping on abort or throw so a later hydrate cannot re-due a site
-        // whose map was already mutated.
-        try { persistMapEvolutionState(); } catch (_) { /* best-effort */ }
+        // whose map was already mutated — only while still on the originating chat.
+        if (canCommitPassForChat(passChatId, runtimeState.currentChatId || getActiveChatId())) {
+            try { persistMapEvolutionState(passChatId); } catch (_) { /* best-effort */ }
+        }
         if (error?.name === 'AbortError') {
             console.log('[RPG Tracker] Map Evolution aborted by user.');
             if (_mapEvolutionRunning) broadcastStep('error', 'Stopped by user.');
@@ -916,12 +939,14 @@ export async function maybeRunMapEvolution() {
             // Busy/stopped skips must keep the pending exit + lastSiteRoot so a
             // later pass can still fire the site-exit restock/decay contract.
             // Advancing bookkeeping here permanently drops that departure.
-            holdExitBookkeeping = exitResult?.skipped === 'busy' || exitResult?.skipped === 'stopped';
+            holdExitBookkeeping = exitResult?.skipped === 'busy'
+                || exitResult?.skipped === 'stopped'
+                || exitResult?.skipped === 'chat_changed';
         }
         if (!holdExitBookkeeping) settings.mapEvolutionPendingExitRoot = '';
     }
     if (!holdExitBookkeeping) settings.mapEvolutionLastSiteRoot = currentRoot;
-    persistMapEvolutionState();
+    persistMapEvolutionState(getActiveChatId() || runtimeState.currentChatId || null);
 
     const scope = normalizeEvolutionTickScope(settings.mapEvolutionTickScope);
     if (!currentRoot && scope === 'active') return exitResult || { skipped: 'no_active_map' };

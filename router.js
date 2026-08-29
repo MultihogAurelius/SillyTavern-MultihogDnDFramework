@@ -689,10 +689,14 @@ export async function persistArchitectDungeonMap(siteRoot, mapDocument, {
     locationCore = '',
     includeManifest = [],
     hostContext = null,
+    campaignPrefix = null,
+    chatId = null,
 } = {}) {
     const ctx = SillyTavern.getContext();
     const settings = getSettings();
-    const prefix = getLivePrefix();
+    // Prefer the originating-pass prefix/chat. Re-reading getLivePrefix() after a
+    // long LLM await can target another campaign if the user switched chats.
+    const prefix = String(campaignPrefix || getLivePrefix() || '').trim();
     const requestedSite = String(siteRoot || '').trim();
     const site = String(hostContext?.peerSite || requestedSite).trim();
     if (!prefix) throw new Error('No campaign prefix is available for the Locations lorebook.');
@@ -862,13 +866,15 @@ export async function persistArchitectDungeonMap(siteRoot, mapDocument, {
     await saveWorldInfoSnapshot(bookName, bookData, ctx, 'Map Architect persistence');
     recordLiveDungeonMapSnapshot(settings, collectDungeonMapHistorySnapshot(bookData.entries, bookName));
 
-    const chatId = ctx.chatId || (typeof globalThis._rpgCurrentChatId === 'function' ? globalThis._rpgCurrentChatId() : '');
-    if (chatId) {
+    const resolvedChatId = chatId
+        || ctx.chatId
+        || (typeof globalThis._rpgCurrentChatId === 'function' ? globalThis._rpgCurrentChatId() : '');
+    if (resolvedChatId) {
         settings.chatStates = settings.chatStates || {};
-        settings.chatStates[chatId] = settings.chatStates[chatId] || {};
-        const campaignBooks = new Set(settings.chatStates[chatId].campaignBooks || []);
+        settings.chatStates[resolvedChatId] = settings.chatStates[resolvedChatId] || {};
+        const campaignBooks = new Set(settings.chatStates[resolvedChatId].campaignBooks || []);
         campaignBooks.add(bookName);
-        settings.chatStates[chatId].campaignBooks = [...campaignBooks];
+        settings.chatStates[resolvedChatId].campaignBooks = [...campaignBooks];
         void saveSettings();
     }
     if (!bookKnown && typeof ctx.updateWorldInfoList === 'function') {

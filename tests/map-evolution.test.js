@@ -954,7 +954,8 @@ describe('Map Evolution', () => {
         expect(evolution).toContain('holdExitBookkeeping');
         expect(evolution).toContain("exitResult?.skipped === 'busy'");
         expect(evolution).toContain('buildReportOutcomeStamps');
-        expect(evolution).toContain('try { persistMapEvolutionState(); } catch (_) { /* best-effort */ }');
+        expect(evolution).toContain('persistMapEvolutionState(passChatId)');
+        expect(evolution).toContain("skipped: 'chat_changed'");
         expect(evolution).toContain('export async function loadMappedEvolutionSite');
         expect(evolution).toContain("from './map-evolution-lib.js'");
         expect(evolution).not.toContain("from './map-updater.js'");

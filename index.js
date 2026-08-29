@@ -2460,6 +2460,11 @@ function onChatChanged(newChatId) {
     if (runtimeState.stateController) {
         try { runtimeState.stateController.abort(); } catch (_) { /* ignore */ }
     }
+    // Same affinity class: Map Updater / Map Evolution await LLM work then persist
+    // timers and map mutations via getActiveChatId(). Abort before flipping chat id
+    // so any best-effort persist still targets the departing partition.
+    try { stopMapUpdaterPass(); } catch (_) { /* ignore */ }
+    try { stopMapEvolutionPass(); } catch (_) { /* ignore */ }
 
     // Flush Adventure Companion under the departing chat BEFORE flipping currentChatId /
     // loading the arriving partition (history is per-chat, including when Chat Link is off).

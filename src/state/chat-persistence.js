@@ -201,10 +201,10 @@ export function persistRouterLastRunTimestamp(epochMs = Date.now()) {
 }
 
 /** Persist the Map Updater "since last run" chat-length watermark. */
-export function persistMapUpdaterLastRunWatermark(length) {
+export function persistMapUpdaterLastRunWatermark(length, passChatId = null) {
     const s = getSettings();
     s.mapUpdaterLastRunChatLength = length;
-    const chatId = getActiveChatId();
+    const chatId = passChatId || getActiveChatId();
     if (s.chatLinkEnabled && chatId) {
         saveChatState(chatId);
     } else {
@@ -213,10 +213,10 @@ export function persistMapUpdaterLastRunWatermark(length) {
 }
 
 /** Persist the Map Updater "last ran at" timestamp (display only). */
-export function persistMapUpdaterLastRunTimestamp(epochMs = Date.now()) {
+export function persistMapUpdaterLastRunTimestamp(epochMs = Date.now(), passChatId = null) {
     const s = getSettings();
     s.mapUpdaterLastRunAt = epochMs;
-    const chatId = getActiveChatId();
+    const chatId = passChatId || getActiveChatId();
     if (s.chatLinkEnabled && chatId) {
         saveChatState(chatId);
     } else {
@@ -225,9 +225,9 @@ export function persistMapUpdaterLastRunTimestamp(epochMs = Date.now()) {
 }
 
 /** Persist Map Updater active-site and pending-exit bookkeeping. */
-export function persistMapUpdaterState() {
+export function persistMapUpdaterState(passChatId = null) {
     const s = getSettings();
-    const chatId = getActiveChatId();
+    const chatId = passChatId || getActiveChatId();
     if (s.chatLinkEnabled && chatId) {
         saveChatState(chatId);
     } else {
@@ -236,9 +236,9 @@ export function persistMapUpdaterState() {
 }
 
 /** Persist Map Evolution per-site timers and last-site watermark. */
-export function persistMapEvolutionState() {
+export function persistMapEvolutionState(passChatId = null) {
     const s = getSettings();
-    const chatId = getActiveChatId();
+    const chatId = passChatId || getActiveChatId();
     if (s.chatLinkEnabled && chatId) {
         saveChatState(chatId);
     } else {
