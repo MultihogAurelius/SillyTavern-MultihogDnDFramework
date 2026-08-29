@@ -1,17 +1,5 @@
 ### This extension is now mostly feature-complete. Bug-fixing, balancing, adjusting, etc. continues. Pull requests are appreciated in case you find a bug. I want to get this into a good, solid final state.
 
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/368d05be-009b-4f0d-b753-5c3cf8ae7dad" width="75%" alt="Combat in progress" />
-  <br>
-  <em>Area Map</em>
-</p>
-
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/a9873a1e-9bdb-450f-98b4-fdf779b593a6" width="75%" alt="Combat in progress" />
-  <br>
-  <em>Map Assets</em>
-</p>
-
 ---
 
 
@@ -102,6 +90,14 @@ https://www.youtube.com/watch?v=82Lt9pRYFS0
 
 ---
 
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/368d05be-009b-4f0d-b753-5c3cf8ae7dad" width="60%" alt="Combat in progress" />
+  <br>
+  <em>Area Maps are Detailed and Dynamic</em>
+</p>
+
+---
+
 ## Suggested Companions
 
 - 🧠 **[Summaryception](https://github.com/Lodactio/Extension-Summaryception):** A brilliant summarizer/context compression extension. Also handy for crunching all the combat mechanics of the context into summarized history.
@@ -127,37 +123,12 @@ These are recommendations, not rules — experiment. Different models shine for 
 
 ---
 
-<table border="0">
-  <tr>
-    <td align="center" valign="bottom">
-      <img src="https://github.com/user-attachments/assets/829b233c-19f0-407b-99a8-f58e80573a0a" width="100%" alt="Lorebook Agent" />
-      <br>
-      <strong>Lorebook Agent</strong>
-    </td>
-    <td align="center" valign="bottom">
-      <img src="https://github.com/user-attachments/assets/de2f7522-e3ff-4153-8a3f-d38ca49ceca7" width="100%" alt="Lorebook Agent" />
-      <br>
-      <strong>Relationship system within Lorebook Agent</strong>
-    </td>
-  </tr>
-</table>
-
----
-
 <div align="center">
   <figure>
-    <img width="1918" height="982" alt="Screenshot 2026-06-18 195917" src="https://github.com/user-attachments/assets/2379feda-05d2-4e41-988a-06880924619e" />
+    <img width="1918" height="982" alt="Screenshot 2026-06-18 195917" src="https://github.com/user-attachments/assets/cdd183ac-7a22-470d-8800-9cc9e6ce79d4" />
+    <em>Worlf of Warcraft Scenario</em>
   </figure>
 </div>
-
----
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/1539fb88-2db5-4b32-86cb-2f34400cdf35" width="60%" alt="Combat in progress" />
-  <br>
-  <em>Visualization Mode</em>
-</p>
-
-
 
 ---
 
