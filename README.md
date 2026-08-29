@@ -58,6 +58,7 @@ Together they solve the four core problems of LLM tabletop RP: the AI forgetting
 - **d100 support** for percentage-based systems/calculations.
 - **Adventure Companion**: Learn the framework with an optional Tutorial Mode, discuss your adventure, update campaign state or lore, and even ask it to take your next turn.
 - **Efficient Dual-Engine RNG**: Deterministic queue for instant combat; tool calls for narrative skill checks.
+- **Detailed Maps**: Granular asset-level maps that constantly evolve and develop their own micro-narratives even when you're not around.
 
 ---
 
