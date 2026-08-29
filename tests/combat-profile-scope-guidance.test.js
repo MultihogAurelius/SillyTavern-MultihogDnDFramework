@@ -20,8 +20,8 @@ describe('Combat Profile router guidance scopes to a single combatant', () => {
         expect(DEFAULT_ROUTER_COMBAT_PROFILE_GUIDANCE_AGENT).toContain('CRITICAL — ONE COMBATANT PER PROFILE');
         expect(DEFAULT_ROUTER_COMBAT_PROFILE_GUIDANCE_AGENT).toContain('Example (updating only "Schwarzenegev"');
         expect(DEFAULT_ROUTER_COMBAT_PROFILE_GUIDANCE_BASIC).toContain('[[UPDATE_CORE: Marcus Thorne');
-        expect(routerSource).toContain('resolveCombatProfileGuidance(settings, !!activeCombatBlock, \'basic\')');
-        expect(routerSource).toContain('resolveCombatProfileGuidance(settings, !!activeCombatBlock, \'agent\')');
+        expect(routerSource).toContain('resolveCombatProfileGuidance(settings, !!(activeCombatBlock || partyMechanicalBlock), \'basic\')');
+        expect(routerSource).toContain('resolveCombatProfileGuidance(settings, !!(activeCombatBlock || partyMechanicalBlock), \'agent\')');
     });
 
     it('replaces the old malformed comma-flattened example with one matching the real per-entity [COMBAT] stat block shape', () => {
@@ -30,11 +30,20 @@ describe('Combat Profile router guidance scopes to a single combatant', () => {
         expect(fragmentSource).toContain('Att/def: Longsword (1 attack, +5 / 1d8+2 Slashing) | Chainmail (AC: 15)');
     });
 
-    it('only injects combat guidance when combat is active', () => {
+    it('injects Combat Profile guidance when combat or party mechanical stats are available', () => {
         expect(resolveCombatProfileGuidance({}, false, 'basic')).toBe('');
         expect(resolveCombatProfileGuidance({}, true, 'basic')).toContain('COMBAT PROFILE');
+        expect(resolveCombatProfileGuidance({}, true, 'basic')).toContain('PARTY MECHANICAL STATE');
         expect(resolveCombatProfileGuidance({
             routerCombatProfileGuidanceBasicTemplate: 'CUSTOM BASIC COMBAT',
         }, true, 'basic')).toBe('CUSTOM BASIC COMBAT');
+    });
+
+    it('tells the agent to patch existing party Combat Profiles after level-up without inventing new ones', () => {
+        expect(DEFAULT_ROUTER_COMBAT_PROFILE_GUIDANCE_BASIC).toContain('PARTY LEVEL SYNC');
+        expect(DEFAULT_ROUTER_COMBAT_PROFILE_GUIDANCE_AGENT).toContain('Do NOT create a Combat Profile from [PARTY] if none exists');
+        expect(routerSource).toContain('## PARTY MECHANICAL STATE');
+        expect(routerSource).toContain('extractPartyBlock(settings.currentMemo)');
+        expect(routerSource).toContain('${pcCharacterSeedSection}${activeCombatSection}${partyMechanicalSection}## NARRATIVE');
     });
 });

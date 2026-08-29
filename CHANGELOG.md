@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.76] - 2026-08-30
+
+### Changed
+- **Lorebook Agent Combat Profile**: Party members' existing Combat Profiles can now be patched from `[PARTY]` after level-up. LA already allowed Combat Profile updates on automatic passes, but only from `[COMBAT]` — companions never appear there, so PARTY LEVEL SYNC left lorebook stats stale. The `[PARTY]` sheet is now injected as `## PARTY MECHANICAL STATE`; lasting stats (max HP, BAB, AC, saves, HD, class features) sync, while current-HP/status ticks still do not create or rewrite a profile.
+
 ## [2026.8.75] - 2026-08-29
 
 ### Changed

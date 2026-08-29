@@ -48,7 +48,7 @@ After the [/CORE] block, append timestamped narrative updates as usual ([${useDd
 ## CORE IDENTITY UPDATES
 - Body: use [[UPDATE_APPEARANCE: Book::UID or Name | new body text]] (or commit.appearance). Body is the character's signature/default physical look — not a transient outfit-of-the-scene.
 - Worn Equipment: use [[UPDATE_EQUIPMENT: Book::UID or Name | new worn gear text]] (or commit.equipment) whenever the narrative explicitly shows a change to what they're wearing/wielding. Worn Equipment is visibly worn/carried gear only — not coins, loot piles, or inventory lists.
-- Combat Profile: use [[UPDATE_CORE: Book::UID or Name | Combat Profile | new text]] when ## ACTIVE COMBAT STATE provides updated stats.
+- Combat Profile: use [[UPDATE_CORE: Book::UID or Name | Combat Profile | new text]] when ## ACTIVE COMBAT STATE provides updated combatant stats, or when ## PARTY MECHANICAL STATE shows lasting progression (level-up) for a party NPC who already has a Combat Profile.
 - Species, Personality, Brief Background, Habits/Behaviors, Strengths, Flaws: do NOT spontaneously rewrite these on an automatic pass. Only update them when the user gave an explicit Direct Prompt / instruction this turn (they require broader context than a two-message window provides). Species in particular should almost never change after an NPC is first recorded.
 Do NOT log core updates as normal event/update entries.
 For notable existing-NPC moments that do not change any [CORE] field, still append a timestamped chronicle/EVENT line so the beat is not lost.
@@ -75,11 +75,14 @@ Do NOT record per-round combat updates (e.g., creature HP changes, turn-by-turn 
 </COMBAT_GRANULARITY>
 
 <COMBAT_PROFILE_PERSISTENCE>
-TRIGGER — Combat Profile is a HIDDEN field. Write it ONLY when a \`## ACTIVE COMBAT STATE\` section is present in your context and contains a \`[COMBAT]\` block for this specific NPC. Do NOT write it from GM prose, combat narration, or anything other than that dedicated section. If no \`## ACTIVE COMBAT STATE\` section exists, leave Combat Profile absent entirely.
+TRIGGER — Combat Profile is a HIDDEN field. Write or patch it from mechanical blocks only, never from GM prose:
+- \`## ACTIVE COMBAT STATE\` with a \`[COMBAT]\` block for this NPC → create or fully replace the Combat Profile with that combatant's own stat block, verbatim.
+- \`## PARTY MECHANICAL STATE\` with a \`[PARTY]\` sheet for this NPC → only if a Combat Profile already exists in [CORE], patch lasting combat stats (max HP, BAB/APR, attack totals, AC, saves, attributes, HD, new class features/abilities) to match the sheet. Typical trigger: PARTY LEVEL SYNC / level-up. Keep the existing Combat Profile block shape. Do NOT create a Combat Profile from [PARTY] if none exists. Do NOT rewrite a profile solely because current HP, temp HP, status, or spell-slot ticks changed.
+If neither mechanical section applies to this NPC, leave Combat Profile absent / unchanged.
 
 CONTENT — When a [COMBAT] block IS present, transcribe it completely and verbatim into \`Combat Profile:\` inside [CORE]. Include every declared stat: HP, AC, attack bonus, damage, saves, weapons, abilities, special traits — everything the [COMBAT] block lists. Do NOT condense, summarize, or hand-pick a subset. The goal is a faithful copy, not an interpretation.
 
-UPDATE — If a Combat Profile already exists in [CORE] and a new [COMBAT] block for the same NPC appears with updated stats, patch the Combat Profile line in place with the new values. Do not touch any other [CORE] field. For an EXISTING lorebook NPC, use [[UPDATE_CORE: NPC Name | Combat Profile | ...]] (basic mode) or commit core (agent mode) — do NOT re-emit a full [[NPC:...]] record or embed a new [CORE] block in a chronicle update.
+UPDATE — If a Combat Profile already exists in [CORE] and a mechanical source for the same NPC appears with updated lasting stats, patch the Combat Profile line in place. Do not touch any other [CORE] field. For an EXISTING lorebook NPC, use [[UPDATE_CORE: NPC Name | Combat Profile | ...]] (basic mode) or commit core (agent mode) — do NOT re-emit a full [[NPC:...]] record or embed a new [CORE] block in a chronicle update.
 
 PLACEMENT — Combat Profile is IDENTITY data, not a chronicle event. It belongs as its own labeled line inside [CORE] (e.g. immediately before the closing [/CORE] tag) — never as a timestamped delta line, and never appended after [/CORE].
 </COMBAT_PROFILE_PERSISTENCE>`;

@@ -79,4 +79,10 @@ describe('router.js core-field gating wiring', () => {
         expect(routerSource).toContain('resolveExistingNpcNudge(settings)');
         expect(moduleInstrSource).toContain('For notable existing-NPC moments that do not change any [CORE] field');
     });
+
+    it('lets automatic Combat Profile patches follow [PARTY] lasting progression after level-up', () => {
+        expect(moduleInstrSource).toContain('## PARTY MECHANICAL STATE');
+        expect(moduleInstrSource).toContain('Do NOT create a Combat Profile from [PARTY] if none exists');
+        expect(schemaSource).toContain('also patch lasting stats from [PARTY] after level-up');
+    });
 });

@@ -215,6 +215,12 @@ export function extractCharacterBlock(memo) {
     return match ? `[CHARACTER]${match[1].trim()}[/CHARACTER]` : null;
 }
 
+/** Extract canonical [PARTY] block from the current memo, if present. */
+export function extractPartyBlock(memo) {
+    const match = memo?.match(/\[PARTY\]([\s\S]*?)\[\/PARTY\]/i);
+    return match ? `[PARTY]${match[1].trim()}[/PARTY]` : null;
+}
+
 /**
  * True when a core/appearance update target refers to the linked Player Character
  * rather than a lorebook NPC entry.
