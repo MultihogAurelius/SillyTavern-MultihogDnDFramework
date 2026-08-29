@@ -131,7 +131,7 @@ PARTY SAVES: On joining, derive Fort/Ref/Will from CON/DEX/WIS mods + a +2 to +4
 </loot>
 
 <random_events>
-Travel/time-skips only, not spammed. Pop a number: ≥14 = event occurs. If event, pop again: ≤8 negative, 9–11 ambiguous, ≥12 favorable. Not used for rest interruption.
+Travel/time-skips only, not spammed. Pop a number: ≥10 = event occurs. If event, pop again: ≤8 negative, 9–11 ambiguous, ≥12 favorable. Not used for rest interruption.
 
 If the party is traveling through a dangerous area, you can narrate enemy encounters anyway, regardless of the random event roll. It is not the only source of enemies during travel.
 </random_events>

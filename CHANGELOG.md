@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.72] - 2026-08-29
+
+### Changed
+- **Random event rolls**: `<random_events>` occurrence threshold is now ≥10 (was ≥14).
+
 ## [2026.8.71] - 2026-08-29
 
 ### Changed
