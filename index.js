@@ -1815,7 +1815,7 @@ function syncOnboardingUI() {
         rngNone.checked = !s.rngEnabled;
     }
 
-    const narrativePacing = ['normal', 'shorter_outputs', 'high_agency', 'downtime'].includes(s.narrativePacing) ? s.narrativePacing : 'normal';
+    const narrativePacing = ['normal', 'shorter_outputs', 'high_agency', 'downtime'].includes(s.narrativePacing) ? s.narrativePacing : 'shorter_outputs';
     onboarding.querySelectorAll('input[name="rt_onboarding_narrative_pacing"]').forEach(input => {
         input.checked = input.value === narrativePacing;
     });
@@ -10603,7 +10603,7 @@ RULES:
         const syncNarrativePacingUi = () => {
             const mode = validNarrativePacing.has(getSettings().narrativePacing)
                 ? getSettings().narrativePacing
-                : 'normal';
+                : 'shorter_outputs';
             $(`input[name="rpg_narrative_pacing"][value="${mode}"]`).prop('checked', true);
         };
         syncNarrativePacingUi();
@@ -12285,7 +12285,7 @@ RULES:
             syncRngToolsUi(s);
             const narrativePacing = ['normal', 'shorter_outputs', 'high_agency', 'downtime'].includes(s.narrativePacing)
                 ? s.narrativePacing
-                : 'normal';
+                : 'shorter_outputs';
             $(`input[name="rpg_narrative_pacing"][value="${narrativePacing}"]`).prop('checked', true);
 
             // General toggles

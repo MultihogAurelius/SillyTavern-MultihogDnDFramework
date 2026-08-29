@@ -21,6 +21,7 @@ describe('Narrator Configuration pacing', () => {
 
         const indexSource = readFileSync(new URL('../index.js', import.meta.url), 'utf8');
         expect(indexSource).toContain('Keeps outputs short to moderate in length. Also does not have the instruction of lightly expanding on your actions, likely leaving more room for you to respond and direct the scene.');
+        expect(readFileSync(new URL('../src/state/defaults.js', import.meta.url), 'utf8')).toContain("narrativePacing: 'shorter_outputs'");
     });
 
     it('builds the requested modest-length narrative prompt with output_length tag', () => {

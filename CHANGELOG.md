@@ -6,6 +6,7 @@ All notable changes to the **Multihog D&D Framework** will be documented in this
 
 ### Changed
 - **Instant Action level**: Starts at Level 1 with 0 XP. A **Random Level** toggle (off by default) restores the old 1–10 roll. Initial Setup still overrides when it names a level; N/A — No Levels stays level-free.
+- **Pacing/Output Length**: Factory default is now Shorter Outputs.
 
 ## [2026.8.72] - 2026-08-29
 
