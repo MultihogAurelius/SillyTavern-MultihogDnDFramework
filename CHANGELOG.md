@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.79] - 2026-08-30
+
+### Changed
+- **Pacing/Output Length**: Factory default is Normal again. Shorter Outputs length limits were causing dropped level-up sequences and skipped combat turns.
+
 ## [2026.8.78] - 2026-08-30
 
 ### Changed

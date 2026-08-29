@@ -605,7 +605,7 @@ You may be asked to use Markers: ((PLS)), ((B)), ((XB)), ((BDG)), ((HGT)). These
         quests: [],
 
         /** Narrator <narrative> pacing mode: normal | shorter_outputs | high_agency | downtime. */
-        narrativePacing: 'shorter_outputs',
+        narrativePacing: 'normal',
 
         syspromptModules: {
 
@@ -1572,7 +1572,7 @@ You may be asked to use Markers: ((PLS)), ((B)), ((XB)), ((BDG)), ((HGT)). These
 
 /** Latest settings migration version — factory reset skips legacy upgrade paths at or below this. */
 
-export const FACTORY_SETTINGS_VERSION = '2026.8.78';
+export const FACTORY_SETTINGS_VERSION = '2026.8.79';
 
 
 /** Remove extension UI keys from localStorage so a factory reset does not rehydrate stale panel state. */

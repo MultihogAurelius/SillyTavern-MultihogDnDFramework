@@ -372,7 +372,7 @@ export function writeModuleSchemaBackup(chatId) {
             // stock prompts / narrator toggles self-heal on the next boot.
             stockPrompts: JSON.parse(JSON.stringify(s.stockPrompts || {})),
             syspromptModules: JSON.parse(JSON.stringify(s.syspromptModules || {})),
-            narrativePacing: s.narrativePacing || 'shorter_outputs',
+            narrativePacing: s.narrativePacing || 'normal',
             cyoaConfig: JSON.parse(JSON.stringify(s.cyoaConfig || {})),
         };
         localStorage.setItem(MODULE_SCHEMA_BACKUP_KEY, JSON.stringify(payload));
@@ -403,8 +403,8 @@ export function getPendingModuleSchemaBackup() {
         const backupStockPrompts = JSON.stringify(backup.stockPrompts || {});
         const liveSyspromptModules = JSON.stringify(s.syspromptModules || {});
         const backupSyspromptModules = JSON.stringify(backup.syspromptModules || {});
-        const liveNarrativePacing = s.narrativePacing || 'shorter_outputs';
-        const backupNarrativePacing = backup.narrativePacing || 'shorter_outputs';
+        const liveNarrativePacing = s.narrativePacing || 'normal';
+        const backupNarrativePacing = backup.narrativePacing || 'normal';
         const liveCyoaConfig = JSON.stringify(s.cyoaConfig || {});
         const backupCyoaConfig = JSON.stringify(backup.cyoaConfig || {});
         const alreadyMatched = liveTags === backupTags && liveOrder === backupOrder
@@ -433,7 +433,7 @@ export function applyModuleSchemaBackup(preferredChatId, backupOverride = null) 
         if (!backup) return false;
 
         const s = getSettings();
-        const backupNarrativePacing = backup.narrativePacing || 'shorter_outputs';
+        const backupNarrativePacing = backup.narrativePacing || 'normal';
 
         // Always restore live schema from the last known-good in-memory snapshot.
         // If the async disk write completed, this matches disk. If it was cancelled on

@@ -593,7 +593,7 @@ export function bindRenderedCardEvents(el, memo, isDetachedContext = false, onRe
 
     const onboardingPacingInputs = el.querySelectorAll('input[name="rt_onboarding_narrative_pacing"]');
     onboardingPacingInputs.forEach(input => {
-        const pacing = ['normal', 'shorter_outputs', 'high_agency', 'downtime'].includes(s.narrativePacing) ? s.narrativePacing : 'shorter_outputs';
+        const pacing = ['normal', 'shorter_outputs', 'high_agency', 'downtime'].includes(s.narrativePacing) ? s.narrativePacing : 'normal';
         input.checked = input.value === pacing;
         input.addEventListener('change', () => {
             if (!input.checked || !['normal', 'shorter_outputs', 'high_agency', 'downtime'].includes(input.value)) return;
