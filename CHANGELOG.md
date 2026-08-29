@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.70] - 2026-08-29
+
+### Changed
+- **Random event rolls**: `<random_events>` no longer batches RollTheDice calls. Dangerous travel may still produce enemy encounters outside the random-event roll.
+
 ## [2026.8.69] - 2026-08-29
 
 ### Changed

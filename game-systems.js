@@ -412,9 +412,6 @@ export function transformBaseSectionContent(tag, innerContent, settings) {
         // CYOA is injected by rpgTrackerInterceptor above the RNG queue (not Main).
         return '';
     }
-    if (tag === 'random_events' && !(settings.rngEnabled && settings.diceFunctionTool)) {
-        innerContent = innerContent.replace(/\s*Batch both RollTheDice calls together;[^.]*\./g, '');
-    }
 
     if (tag === 'relationship_tracking') {
         if (!settings.npcRelationshipBars) return '';

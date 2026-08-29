@@ -46,6 +46,25 @@ Out-of-range attack attempt → note {{user}} couldn't attack due to range; ask 
         for (const source of sources) expect(source.replaceAll('\r\n', '\n')).toContain(expectedBlock);
     });
 
+    it('ships the travel random-event contract in every narrator prompt source', () => {
+        const expectedBlock = `<random_events>
+Travel/time-skips only, not spammed. Pop a number: ≥14 = event occurs. If event, pop again: ≤8 negative, 9–11 ambiguous, ≥12 favorable. Not used for rest interruption.
+
+If the party is traveling through a dangerous area, you can narrate enemy encounters anyway, regardless of the random event roll. It is not the only source of enemies during travel.
+</random_events>`;
+        const sources = [
+            RT_PROMPTS['sysprompt.txt'],
+            RT_PROMPTS['sysprompt_legacy.txt'],
+            readFileSync(new URL('../sysprompt.txt', import.meta.url), 'utf8'),
+            readFileSync(new URL('../sysprompt_legacy.txt', import.meta.url), 'utf8'),
+        ];
+
+        for (const source of sources) {
+            expect(source.replaceAll('\r\n', '\n')).toContain(expectedBlock);
+            expect(source).not.toContain('Batch both RollTheDice calls together');
+        }
+    });
+
     it('spells out damage types in every shipped combat prompt example', () => {
         const sources = [
             readFileSync(new URL('../constants.js', import.meta.url), 'utf8'),
