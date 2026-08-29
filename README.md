@@ -37,6 +37,14 @@ Together they solve the four core problems of LLM tabletop RP: the AI forgetting
 
 ---
 
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/ea7d9ff2-9c32-4a81-9c28-d4f11a7e26f7" width="60%" alt="Combat in progress" />
+  <br>
+  <em>What is even Map Evolution? Well, this screenshot illustrates it quite well!</em>
+</p>
+
+---
+
 ## Highlights
 
 - **Full Mobile support**: Continue on your phone where you left off on desktop.
