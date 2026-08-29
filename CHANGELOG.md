@@ -2,6 +2,12 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.75] - 2026-08-29
+
+### Changed
+- **Role**: Combat initiative now specifies party rolls first, then enemies.
+- **Level-up protocol**: Party level sync is a flat `PARTY LEVEL SYNC` line in the same level-up output (replaces nested `<party_sync>`).
+
 ## [2026.8.74] - 2026-08-29
 
 ### Changed
