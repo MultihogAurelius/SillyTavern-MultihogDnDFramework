@@ -3587,7 +3587,7 @@ function loadProfile(name) {
     s.mapUpdaterLastSiteRoot = p.mapUpdaterLastSiteRoot || '';
     s.mapUpdaterPendingExitRoot = p.mapUpdaterPendingExitRoot || '';
     s.mapEvolutionEnabled = p.mapEvolutionEnabled !== false;
-    s.mapEvolutionIntervalHours = Math.max(1, Number(p.mapEvolutionIntervalHours) || 12);
+    s.mapEvolutionIntervalHours = Math.max(1, Number(p.mapEvolutionIntervalHours) || 8);
     s.mapEvolutionOnSiteIntervalHours = (() => {
         const hours = Math.floor(Number(p.mapEvolutionOnSiteIntervalHours));
         if (!Number.isFinite(hours)) return 1;
@@ -3726,7 +3726,7 @@ function loadProfile(name) {
     $('#rpg_map_updater_max_tokens').val(s.mapUpdaterMaxTokens ?? 25000);
     $('#rpg_map_updater_system_prompt').val(s.mapUpdaterSystemPrompt || DEFAULT_MAP_UPDATER_SYSTEM_PROMPT);
     $('#rpg_map_evolution_enabled').prop('checked', s.mapEvolutionEnabled !== false);
-    $('#rpg_map_evolution_interval_hours').val(s.mapEvolutionIntervalHours ?? 12);
+    $('#rpg_map_evolution_interval_hours').val(s.mapEvolutionIntervalHours ?? 8);
     $('#rpg_map_evolution_onsite_interval_hours').val(s.mapEvolutionOnSiteIntervalHours ?? 1);
     $('#rpg_map_evolution_onsite_interval_minutes').val(s.mapEvolutionOnSiteIntervalMinutes ?? 0);
     $('#rpg_map_evolution_onsite_preset').val(s.mapEvolutionOnSitePreset === 'standard' ? 'standard' : 'dynamic');
@@ -6220,8 +6220,8 @@ function organizeConnectionSettingsUI() {
                 runtimeState.updateAgentMapEvolutionStatusRef();
             }
         });
-        $('#rpg_map_evolution_interval_hours').val(settings.mapEvolutionIntervalHours ?? 12).on('change', function () {
-            settings.mapEvolutionIntervalHours = Math.max(1, Math.min(168, parseInt(String($(this).val()), 10) || 12));
+        $('#rpg_map_evolution_interval_hours').val(settings.mapEvolutionIntervalHours ?? 8).on('change', function () {
+            settings.mapEvolutionIntervalHours = Math.max(1, Math.min(168, parseInt(String($(this).val()), 10) || 8));
             $(this).val(settings.mapEvolutionIntervalHours);
             saveSettings();
             updateMapEvolutionScheduleDisplay();
@@ -6356,7 +6356,7 @@ function organizeConnectionSettingsUI() {
                 currentMinutes: currentMemoMinutes(),
                 intervalHoursFor: hoursFor,
             });
-            const fallbackHours = Math.max(1, Number(s.mapEvolutionIntervalHours) || 12);
+            const fallbackHours = Math.max(1, Number(s.mapEvolutionIntervalHours) || 8);
             const currentNextMins = schedule.nextMins >= 0
                 ? schedule.nextMins
                 : currentMemoMinutes() >= 0 ? currentMemoMinutes() + fallbackHours * 60 : fallbackHours * 60;
@@ -12367,7 +12367,7 @@ RULES:
             $('#rpg_map_updater_max_tokens').val(s.mapUpdaterMaxTokens ?? 25000);
             $('#rpg_map_updater_system_prompt').val(s.mapUpdaterSystemPrompt || DEFAULT_MAP_UPDATER_SYSTEM_PROMPT);
             $('#rpg_map_evolution_enabled').prop('checked', s.mapEvolutionEnabled !== false);
-            $('#rpg_map_evolution_interval_hours').val(s.mapEvolutionIntervalHours ?? 12);
+            $('#rpg_map_evolution_interval_hours').val(s.mapEvolutionIntervalHours ?? 8);
             $('#rpg_map_evolution_onsite_interval_hours').val(s.mapEvolutionOnSiteIntervalHours ?? 1);
             $('#rpg_map_evolution_onsite_interval_minutes').val(s.mapEvolutionOnSiteIntervalMinutes ?? 0);
             $('#rpg_map_evolution_onsite_preset').val(s.mapEvolutionOnSitePreset === 'standard' ? 'standard' : 'dynamic');

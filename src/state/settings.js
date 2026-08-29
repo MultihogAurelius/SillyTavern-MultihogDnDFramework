@@ -1116,6 +1116,16 @@ function getSettingsInternal(extensionSettings) {
         s.settingsVersion = '2026.8.71';
     }
 
+    // Other-maps Evolution default 12h → 8h. One-shot so settingsVersion can stay put.
+    if (!s.mapEvolutionOtherMapsInterval8Applied) {
+        if (Number(s.mapEvolutionIntervalHours) === 12
+            && Number(s.mapEvolutionOnSiteIntervalHours) === 1
+            && Number(s.mapEvolutionOnSiteIntervalMinutes || 0) === 0) {
+            s.mapEvolutionIntervalHours = 8;
+        }
+        s.mapEvolutionOtherMapsInterval8Applied = true;
+    }
+
     // Stamp factory version even when a release has no field rewrites
     // (8.28.0 mapped-site index is prompt/injection only).
     if (isOlderThan(s.settingsVersion, FACTORY_SETTINGS_VERSION)) {
@@ -1226,7 +1236,7 @@ function getSettingsInternal(extensionSettings) {
     if (!Array.isArray(s.mapEvolutionSelectedRoots)) s.mapEvolutionSelectedRoots = [];
     s.mapEvolutionIntervalHours = (() => {
         const hours = Math.floor(Number(s.mapEvolutionIntervalHours));
-        return Number.isFinite(hours) ? Math.max(1, Math.min(168, hours)) : 12;
+        return Number.isFinite(hours) ? Math.max(1, Math.min(168, hours)) : 8;
     })();
     s.mapEvolutionOnSiteIntervalHours = (() => {
         const hours = Math.floor(Number(s.mapEvolutionOnSiteIntervalHours));

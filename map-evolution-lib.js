@@ -207,7 +207,7 @@ export function setSiteEvolutionIntervalOverride(bySite, siteRoot, hours) {
  * only how often this site is due.
  */
 export function resolveSiteEvolutionIntervalHours(siteRoot, {
-    intervalHours = 12,
+    intervalHours = 8,
     onSiteIntervalHours = 1,
     onSiteIntervalMinutes = 0,
     intervalHoursBySite = {},
@@ -216,7 +216,7 @@ export function resolveSiteEvolutionIntervalHours(siteRoot, {
     const key = normalizeDungeonLabel(siteRoot);
     const overrides = normalizeEvolutionIntervalOverrides(intervalHoursBySite);
     if (key && Object.prototype.hasOwnProperty.call(overrides, key)) return overrides[key];
-    const offSite = normalizeEvolutionIntervalHours(intervalHours, { allowNever: false, fallback: 12 });
+    const offSite = normalizeEvolutionIntervalHours(intervalHours, { allowNever: false, fallback: 8 });
     const rawOnSiteHours = Number(onSiteIntervalHours);
     const currentHours = Number.isFinite(rawOnSiteHours)
         ? Math.max(0, Math.min(MAP_EVOLUTION_INTERVAL_MAX_HOURS, Math.floor(rawOnSiteHours)))

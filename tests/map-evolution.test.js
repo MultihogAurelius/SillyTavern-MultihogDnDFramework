@@ -861,7 +861,7 @@ describe('Map Evolution', () => {
             onSiteIntervalHours: 0,
             onSiteIntervalMinutes: 0,
         })).toBe(0);
-        expect(resolveSiteEvolutionIntervalHours('Other Site', { currentRoot: 'Current Site' })).toBe(12);
+        expect(resolveSiteEvolutionIntervalHours('Other Site', { currentRoot: 'Current Site' })).toBe(8);
     });
 
     it('picks due maps from per-site intervals while leaving others waiting', () => {
@@ -982,7 +982,7 @@ describe('Map Evolution', () => {
         expect(settingsMarkup).toContain('id="rpg_map_evolution_onsite_preset"');
         expect(settingsMarkup).toContain('High Dynamism — tactical and soon discoverable');
         expect(settingsMarkup).toContain('Standard — same behavior as background maps');
-        expect(defaultsSource).toContain('mapEvolutionIntervalHours: 12');
+        expect(defaultsSource).toContain('mapEvolutionIntervalHours: 8');
         expect(defaultsSource).toContain('mapEvolutionConnectionSource: "default"');
         expect(defaultsSource).not.toContain('mapEvolutionConnectionSeeded');
         expect(defaultsSource).toContain('mapEvolutionOnSiteIntervalHours: 1');

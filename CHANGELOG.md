@@ -6,6 +6,7 @@ All notable changes to the **Multihog D&D Framework** will be documented in this
 
 ### Changed
 - **Random event rolls**: `<random_events>` occurrence threshold is now ≥10 (was ≥14).
+- **Map Evolution cadence**: Other-maps interval default is 8 hours (was 12). Current-map stays 1 hour. Untouched 12h/1h installs migrate; custom cadences are kept.
 
 ## [2026.8.71] - 2026-08-29
 

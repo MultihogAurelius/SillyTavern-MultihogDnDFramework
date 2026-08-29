@@ -181,7 +181,7 @@ Map Evolution is a dedicated module (`map-evolution.js`, own prompt) — never m
 
 | Trigger | When | Job |
 |---|---|---|
-| Interval restlessness | In-world hours (default 12 for other maps and for the current map) for the configured tick pool (current map, N due maps, all due maps, or a selected checklist). Optional per-map hours override those globals (`0` skips automatic ticks). Runs even when the party is not inside a mapped site unless the scope is current-map-only. Presence changes only the timer, not Evolution's job. | Sparse local movement, restock, decay |
+| Interval restlessness | In-world hours (default 8 for other maps, 1 hour for the current map) for the configured tick pool (current map, N due maps, all due maps, or a selected checklist). Optional per-map hours override those globals (`0` skips automatic ticks). Runs even when the party is not inside a mapped site unless the scope is current-map-only. Presence changes only the timer, not Evolution's job. | Sparse local movement, restock, decay |
 | Site exit | When the party leaves a mapped site | Immediate local restock/decay for the departed site |
 | On-demand | Play-menu picker or settings **Run now** (always visible, independent of interval tick scope) | Same Evolution writer; skips the interval due-check |
 

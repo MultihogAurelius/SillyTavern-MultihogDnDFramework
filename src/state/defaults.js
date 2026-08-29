@@ -1391,7 +1391,7 @@ Include the entity name/title itself (without timestamps like "[Day 1]") as a ke
 
         mapEvolutionEnabled: true,
 
-        mapEvolutionIntervalHours: 12,
+        mapEvolutionIntervalHours: 8,
 
         mapEvolutionOnSiteIntervalHours: 1,
 

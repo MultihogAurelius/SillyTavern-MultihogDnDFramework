@@ -61,7 +61,7 @@ export function saveProfile(name) {
         mapUpdaterLastSiteRoot: s.mapUpdaterLastSiteRoot || '',
         mapUpdaterPendingExitRoot: s.mapUpdaterPendingExitRoot || '',
         mapEvolutionEnabled: s.mapEvolutionEnabled !== false,
-        mapEvolutionIntervalHours: s.mapEvolutionIntervalHours ?? 12,
+        mapEvolutionIntervalHours: s.mapEvolutionIntervalHours ?? 8,
         mapEvolutionOnSiteIntervalHours: s.mapEvolutionOnSiteIntervalHours ?? 1,
         mapEvolutionOnSiteIntervalMinutes: s.mapEvolutionOnSiteIntervalMinutes ?? 0,
         mapEvolutionOnSitePreset: s.mapEvolutionOnSitePreset === 'standard' ? 'standard' : 'dynamic',

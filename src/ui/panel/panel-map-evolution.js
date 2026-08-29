@@ -78,7 +78,7 @@ export function wireAgentMapEvolution({
 
         const intervalInp = /** @type {HTMLInputElement|null} */ (agentPanel.querySelector('#rt-agent-map-evo-interval'));
         if (intervalInp && document.activeElement !== intervalInp) {
-            intervalInp.value = String(s.mapEvolutionIntervalHours ?? 12);
+            intervalInp.value = String(s.mapEvolutionIntervalHours ?? 8);
         }
         const onSiteInp = /** @type {HTMLInputElement|null} */ (agentPanel.querySelector('#rt-agent-map-evo-onsite-interval'));
         if (onSiteInp && document.activeElement !== onSiteInp) {
@@ -108,7 +108,7 @@ export function wireAgentMapEvolution({
     if (intervalInp) {
         intervalInp.addEventListener('change', () => {
             const s = getSettings();
-            s.mapEvolutionIntervalHours = Math.max(1, Math.min(168, parseInt(intervalInp.value, 10) || 12));
+            s.mapEvolutionIntervalHours = Math.max(1, Math.min(168, parseInt(intervalInp.value, 10) || 8));
             intervalInp.value = String(s.mapEvolutionIntervalHours);
             saveSettings();
             $('#rpg_map_evolution_interval_hours').val(s.mapEvolutionIntervalHours);
