@@ -1,3 +1,5 @@
+# This extension is now mostly feature-complete. Bug-fixing, balancing, adjusting, etc. continues. Pull requests are appreciated in case you find a bug.
+
 <p align="center">
   <img src="https://github.com/user-attachments/assets/368d05be-009b-4f0d-b753-5c3cf8ae7dad" width="75%" alt="Combat in progress" />
   <br>
