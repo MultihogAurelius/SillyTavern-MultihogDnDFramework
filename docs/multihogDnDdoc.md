@@ -280,6 +280,8 @@ Same goes for **combat**, which works on a deterministic initiative/turn grid. T
 | **Pre-Seeded Only** | Queue injected every eligible turn; no dice tools. Default in code settings. Recommended **with CYOA**. |
 | **No RNG** | Neither queue nor tools. |
 
+`<bench_ETA_system>` uses whichever mechanic is live for that turn: `RollTheDice` in Hybrid outside combat, the RNG Queue in Pre-Seeded Only and during Hybrid combat.
+
 ### Combat detection
 
 Combat is considered active when a non-empty `[COMBAT]…[/COMBAT]` block exists and is not `END_COMBAT`. That gate drives Hybrid’s tool↔queue switch and Combat API Override.

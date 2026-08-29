@@ -2,10 +2,15 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.78] - 2026-08-30
+
+### Changed
+- **Bench ETA RNG**: Pre-return task resolution follows the live RNG mechanic. Hybrid (Pre-Seeded + Tool Calls) uses `RollTheDice` outside combat; the RNG Queue is combat-only in that mode. Pre-Seeded Only still pops a queue d20. The assembled `<bench_ETA_system>` is rewritten to match, including if combat starts on the return turn.
+
 ## [2026.8.77] - 2026-08-30
 
 ### Changed
-- **Party bench mechanics**: `<leaving_vs_benching>` now spells out temporary vs permanent separation, and says not to redeclare stats on rejoin. `<bench_ETA_system>` uses an RNG Queue d20 pop (not RollTheDice) for mandatory pre-return task resolution.
+- **Party bench mechanics**: `<leaving_vs_benching>` now spells out temporary vs permanent separation, and says not to redeclare stats on rejoin.
 
 ## [2026.8.76] - 2026-08-30
 

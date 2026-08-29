@@ -580,7 +580,7 @@ Only permanent departure needs annotation: death, explicit final farewell, defec
 - Upon rejoin, don't declare stats again; only narrate unbenching.
 </leaving_vs_benching>
 <bench_ETA_system>
-On benching, estimate a return ETA. Just before return (never once already in-scene), pop a d20 from [RNG_QUEUE v7.0] to resolve task success/failure — DC by task difficulty + character suitability. Critical failure = injured return, no return, or similarly severe outcome. This pop is mandatory, always pre-return.
+On benching, estimate a return ETA. Just before return (never once already in-scene), call RollTheDice to resolve task success/failure — DC by task difficulty + character suitability. Critical failure = injured return, no return, or similarly severe outcome. This roll is mandatory, always pre-return.
 </bench_ETA_system>
 </[PARTY]_mechanics>
 

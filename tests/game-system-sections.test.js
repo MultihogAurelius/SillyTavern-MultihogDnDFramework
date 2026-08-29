@@ -148,3 +148,12 @@ describe('effective system-prompt section state', () => {
         expect(gameSystemsSource).toContain('setLocationMappingEnabled(checked, settings)');
     });
 });
+
+describe('bench ETA follows the live RNG mechanic', () => {
+    it('rewrites <bench_ETA_system> from diceFunctionTool and combat, not a single hard-coded roller', () => {
+        const gameSystemsSource = readFileSync(new URL('../game-systems.js', import.meta.url), 'utf8');
+        expect(gameSystemsSource).toContain('const useQueue = !settings.diceFunctionTool || inCombat');
+        expect(gameSystemsSource).toContain('call ${toolName} to resolve task success/failure');
+        expect(gameSystemsSource).toContain('pop a ${dieWord} from ${queueName} to resolve task success/failure');
+    });
+});

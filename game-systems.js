@@ -471,6 +471,21 @@ export function transformBaseSectionContent(tag, innerContent, settings) {
         if (mods.party_bench === false) {
             content = content.replace(/\s*<leaving_vs_benching>[\s\S]*?<\/leaving_vs_benching>/i, '').trim();
             content = content.replace(/\s*<bench_ETA_system>[\s\S]*?<\/bench_ETA_system>/i, '').trim();
+        } else if (settings.rngEnabled) {
+            const queueName = d100Mode ? '[RNG_QUEUE_d100 v7.0]' : '[RNG_QUEUE v7.0]';
+            const dieWord = d100Mode ? 'd100' : 'd20';
+            const toolName = d100Mode ? 'RollTheDiceD100' : 'RollTheDice';
+            const combatMatch = (settings.currentMemo || '').match(/\[COMBAT\]([\s\S]*?)\[\/COMBAT\]/i);
+            const combatBody = combatMatch?.[1]?.trim() || '';
+            const inCombat = !!combatBody && !/^END_COMBAT$/i.test(combatBody);
+            const useQueue = !settings.diceFunctionTool || inCombat;
+            const benchEta = useQueue
+                ? `On benching, estimate a return ETA. Just before return (never once already in-scene), pop a ${dieWord} from ${queueName} to resolve task success/failure — DC by task difficulty + character suitability. Critical failure = injured return, no return, or similarly severe outcome. This pop is mandatory, always pre-return.`
+                : `On benching, estimate a return ETA. Just before return (never once already in-scene), call ${toolName} to resolve task success/failure — DC by task difficulty + character suitability. Critical failure = injured return, no return, or similarly severe outcome. This roll is mandatory, always pre-return.`;
+            content = content.replace(
+                /<bench_ETA_system>[\s\S]*?<\/bench_ETA_system>/i,
+                `<bench_ETA_system>\n${benchEta}\n</bench_ETA_system>`,
+            );
         }
         return `<[PARTY]_mechanics>\n${content}\n</[PARTY]_mechanics>`;
     }

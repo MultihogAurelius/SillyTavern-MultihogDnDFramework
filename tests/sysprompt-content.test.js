@@ -149,4 +149,23 @@ If the party is traveling through a dangerous area, you can narrate enemy encoun
             expect(source).not.toContain('Lorebook Agent');
         }
     });
+
+    it('ships Hybrid bench ETA as RollTheDice and Pre-Seeded Only as an RNG Queue pop', () => {
+        const hybrid = [
+            RT_PROMPTS['sysprompt.txt'],
+            readFileSync(new URL('../sysprompt.txt', import.meta.url), 'utf8'),
+        ];
+        const legacy = [
+            RT_PROMPTS['sysprompt_legacy.txt'],
+            readFileSync(new URL('../sysprompt_legacy.txt', import.meta.url), 'utf8'),
+        ];
+        for (const source of hybrid) {
+            expect(source.replaceAll('\r\n', '\n')).toContain('call RollTheDice to resolve task success/failure');
+            expect(source).not.toContain('pop a d20 from [RNG_QUEUE v7.0] to resolve task success/failure');
+        }
+        for (const source of legacy) {
+            expect(source.replaceAll('\r\n', '\n')).toContain('pop a d20 from [RNG_QUEUE v7.0] to resolve task success/failure');
+            expect(source).not.toContain('call RollTheDice to resolve task success/failure');
+        }
+    });
 });
