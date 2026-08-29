@@ -108,7 +108,7 @@ https://www.youtube.com/watch?v=82Lt9pRYFS0
 <div align="center">
   <figure>
     <img width="1918" height="982" alt="Screenshot 2026-06-18 195917" src="https://github.com/user-attachments/assets/cdd183ac-7a22-470d-8800-9cc9e6ce79d4" />
-    <em>Worlf of Warcraft Scenario</em>
+    <em>World of Warcraft Scenario</em>
   </figure>
 </div>
 
