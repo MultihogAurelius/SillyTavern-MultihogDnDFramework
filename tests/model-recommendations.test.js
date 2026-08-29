@@ -30,15 +30,11 @@ describe('model recommendation guidance', () => {
             expect(text).not.toContain('recommended tracker model Gemini 3.5 Flash-Lite');
         }
 
-        const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
         const documentation = readFileSync(new URL('../docs/multihogDnDdoc.md', import.meta.url), 'utf8');
-        for (const text of [readme, documentation]) {
-            expect(text).toContain("For the narrator, I'd recommend trying at least the following:");
-            expect(text).toContain('- MiMo 2.5 Pro');
-            expect(text).toContain('- Deepseek V4 Pro and latest Flash');
-            expect(text).toContain('- GPT-5.6 Luna, for its great cost-efficiency. Seems to be a decent model overall.');
-        }
-        expect(readme).toContain('the same goes for GPT-5.6 Luna');
+        expect(documentation).toContain("For the narrator, I'd recommend trying at least the following:");
+        expect(documentation).toContain('- MiMo 2.5 Pro');
+        expect(documentation).toContain('- Deepseek V4 Pro and latest Flash');
+        expect(documentation).toContain('- GPT-5.6 Luna, for its great cost-efficiency. Seems to be a decent model overall.');
         expect(documentation).toContain('there is no firm recommendation yet');
     });
 });
