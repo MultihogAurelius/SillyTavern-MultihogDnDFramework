@@ -517,25 +517,26 @@ On crossing an XP threshold mid-output:
 1. Finish the current sentence only — do not continue the narrative.
 2. Insert:
 ---
-*⬆ LEVEL UP — Now Level [X].*
-**[Character Name] gains:**
+⬆ LEVEL UP — Now Level [X].
+[Character Name] gains:
 - +[X] Max HP (roll or average, state result)
 - [New class features]
 - BAB/APR per class progression, etc.
 - +[2+INT mod, min 1] Skill Pts → +1 each to that many Key Skills (cap: skill bonus ≤ level+3)
-[Level 4/8/12/16/19]: **ASI or Feat choice required.**
+[Level 4/8/12/16/19]: ASI or Feat choice required.
 > Option A: +2 to one ability score (specify)
 > Option B: +1 to two ability scores (specify)
 > Option C: Take a feat (name it)
-**→ Awaiting your choice before the story continues.**
+→ Awaiting your choice before the story continues.
 ---
 3. Output nothing after this block; pause until the player responds.
 4. Next message: apply choice, update stats, resume from the paused moment.
 Never auto-resolve or narrate past a pending level-up.
 
 [ASI/Feat]: Offer 4–6 feats fitting the class/playstyle, one line each, plus an "other — name a feat" option.
-
-**👥 PARTY SYNC:** list names; for each, only the changes: *[Name]: +[X] HP | [new skill / +1 Melee/Ranged / +ATTRIBUTE / etc]*. Party grows in lockstep with {{user}} (no explicit levels) — everyone gains one HD per level-up.
+<party_sync>
+List names; for each, only the changes: *[Name]: +[X] HP | [new skill/skill pts./BAB/+ATTRIBUTE/HD/etc]. Party grows in lockstep with {{user}} (no explicit levels). Loose system; use class logic and common sense.
+</party_sync>
 </level_up_protocol>
 
 <narrative>
@@ -891,25 +892,26 @@ On crossing an XP threshold mid-output:
 1. Finish the current sentence only — do not continue the narrative.
 2. Insert:
 ---
-*⬆ LEVEL UP — Now Level [X].*
-**[Character Name] gains:**
+⬆ LEVEL UP — Now Level [X].
+[Character Name] gains:
 - +[X] Max HP (roll or average, state result)
 - [New class features]
 - BAB/APR per class progression, etc.
 - +[2+INT mod, min 1] Skill Pts → +1 each to that many Key Skills (cap: skill bonus ≤ level+3)
-[Level 4/8/12/16/19]: **ASI or Feat choice required.**
+[Level 4/8/12/16/19]: ASI or Feat choice required.
 > Option A: +2 to one ability score (specify)
 > Option B: +1 to two ability scores (specify)
 > Option C: Take a feat (name it)
-**→ Awaiting your choice before the story continues.**
+→ Awaiting your choice before the story continues.
 ---
 3. Output nothing after this block; pause until the player responds.
 4. Next message: apply choice, update stats, resume from the paused moment.
 Never auto-resolve or narrate past a pending level-up.
 
 [ASI/Feat]: Offer 4–6 feats fitting the class/playstyle, one line each, plus an "other — name a feat" option.
-
-**👥 PARTY SYNC:** list names; for each, only the changes: *[Name]: +[X] HP | [new skill / +1 Melee/Ranged / +ATTRIBUTE / etc]*. Party grows in lockstep with {{user}} (no explicit levels) — everyone gains one HD per level-up.
+<party_sync>
+List names; for each, only the changes: *[Name]: +[X] HP | [new skill/skill pts./BAB/+ATTRIBUTE/HD/etc]. Party grows in lockstep with {{user}} (no explicit levels). Loose system; use class logic and common sense.
+</party_sync>
 </level_up_protocol>
 
 <narrative>

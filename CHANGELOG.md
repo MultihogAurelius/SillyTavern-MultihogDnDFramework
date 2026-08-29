@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.74] - 2026-08-29
+
+### Changed
+- **Level-up protocol**: Nested `<party_sync>` replaces the old PARTY SYNC line. Companions still grow in lockstep with {{user}}, but as a loose class-logic pass (HP, skills, BAB, attributes, HD) rather than a guaranteed HD each. Markdown emphasis is stripped from the pause card.
+
 ## [2026.8.73] - 2026-08-29
 
 ### Changed
