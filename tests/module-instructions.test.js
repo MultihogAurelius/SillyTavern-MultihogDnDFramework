@@ -164,12 +164,14 @@ describe('getSettings fresh install', () => {
         for (const key of Object.keys(testExtensionSettings)) delete testExtensionSettings[key];
         testExtensionSettings.rpg_tracker = {
             settingsVersion: '2026.8.49.1',
-            mapEvolutionSystemPrompt: 'Keep this wrapper.\n- Leaving this site: SET_ASSET state FLEEING or REMOVE_ASSET, with detail naming the destination in prose. You cannot MOVE_ASSET to another map.\nEnd.',
+            mapEvolutionLookback: 10,
+            mapEvolutionSystemPrompt: 'Keep this wrapper.\n- Leaving this site: SET_ASSET state FLEEING or REMOVE_ASSET, with detail naming the destination in prose. You cannot MOVE_ASSET to another map.\n- REMOVE_ASSET deletes the record and its causal history. Use it only for mistaken clutter or when nothing of that identity should be remembered. Never REMOVE_ASSET a departure, visit, or flight that later ticks should continue.\nEnd.',
             mapUpdaterSystemPrompt: 'REMOVE vs DESTROYED (both valid — choose by lasting occupancy)\n- Default.\n- REMOVE_ASSET is additional, not a substitute for DESTROYED. Delete the record only when narration establishes nothing map-worthy remains: body disintegrated or was hauled away and gone, mistaken/retracted asset, NPC left the site permanently, summon dismissed into nothing.',
         };
         const migrated = getSettings();
+        expect(migrated.mapEvolutionLookback).toBe(20);
         expect(migrated.mapEvolutionSystemPrompt).toContain('SET_ASSET state LEFT');
-        expect(migrated.mapEvolutionSystemPrompt).toContain('Never REMOVE_ASSET a departure');
+        expect(migrated.mapEvolutionSystemPrompt).toContain('stale ACTIVE occupancy contradicted by RECENT STORY');
         expect(migrated.mapEvolutionSystemPrompt).not.toContain('Leaving this site: SET_ASSET state FLEEING or REMOVE_ASSET');
         expect(migrated.mapEvolutionSystemPrompt).toContain('Keep this wrapper.');
         expect(migrated.mapUpdaterSystemPrompt).toContain('SET_ASSET state LEFT when a living CREATURE/GROUP departed');

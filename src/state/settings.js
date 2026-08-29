@@ -1095,6 +1095,27 @@ function getSettingsInternal(extensionSettings) {
         s.settingsVersion = '2026.8.55';
     }
 
+    // 2026.8.71: global Evolution story on all due maps; default lookback 20; REMOVE_ASSET for narrative contradictions.
+    if (isOlderThan(s.settingsVersion, '2026.8.71')) {
+        if (s.mapEvolutionLookback === 10) {
+            s.mapEvolutionLookback = 20;
+        }
+        const oldRemove = '- REMOVE_ASSET deletes the record and its causal history. Use it only for mistaken clutter or when nothing of that identity should be remembered. Never REMOVE_ASSET a departure, visit, or flight that later ticks should continue.';
+        const newRemove = [
+            '- RECENT STORY may establish that someone still ACTIVE here actually left, joined the party elsewhere, or died off-map. Reconcile that contradiction on THIS map. Prefer LEFT when cause, destination, or a later return matters. REMOVE_ASSET when play clearly treats the identity as gone with no local thread to preserve (for example joined [PARTY] away from here).',
+            '- REMOVE_ASSET deletes the record and its causal history. Use it for mistaken clutter, identities play treats as gone with no local thread to preserve, or stale ACTIVE occupancy contradicted by RECENT STORY. Prefer SET_ASSET LEFT when cause, destination, or a later return matters. Never REMOVE_ASSET a departure you expect later ticks to continue.',
+        ].join('\n');
+        if (typeof s.mapEvolutionSystemPrompt === 'string' && s.mapEvolutionSystemPrompt.includes(oldRemove)) {
+            s.mapEvolutionSystemPrompt = s.mapEvolutionSystemPrompt.replace(oldRemove, newRemove);
+        }
+        const oldDepart = '- Departing this site: SET_ASSET state LEFT (LEAVING is accepted and stored as LEFT). Keep the record so cause, actor, detail, and threads survive. Name the destination in detail. FLEEING is panic still on this map. Once they have actually left, use LEFT — not FLEEING, and not REMOVE_ASSET. You cannot MOVE_ASSET to another map.';
+        const newDepart = '- Departing this site: SET_ASSET state LEFT (LEAVING is accepted and stored as LEFT). Keep the record so cause, actor, detail, and threads survive. Name the destination in detail. FLEEING is panic still on this map. Once they have actually left, use LEFT — not FLEEING. You cannot MOVE_ASSET to another map.';
+        if (typeof s.mapEvolutionSystemPrompt === 'string' && s.mapEvolutionSystemPrompt.includes(oldDepart)) {
+            s.mapEvolutionSystemPrompt = s.mapEvolutionSystemPrompt.replace(oldDepart, newDepart);
+        }
+        s.settingsVersion = '2026.8.71';
+    }
+
     // Stamp factory version even when a release has no field rewrites
     // (8.28.0 mapped-site index is prompt/injection only).
     if (isOlderThan(s.settingsVersion, FACTORY_SETTINGS_VERSION)) {
@@ -1220,7 +1241,7 @@ function getSettingsInternal(extensionSettings) {
     s.mapEvolutionOnSitePreset = s.mapEvolutionOnSitePreset === 'standard' ? 'standard' : 'dynamic';
     s.mapEvolutionLookback = (() => {
         const n = Math.floor(Number(s.mapEvolutionLookback));
-        return Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : 10;
+        return Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : 20;
     })();
     if (!s.mapEvolutionIntervalHoursBySite || typeof s.mapEvolutionIntervalHoursBySite !== 'object' || Array.isArray(s.mapEvolutionIntervalHoursBySite)) {
         s.mapEvolutionIntervalHoursBySite = {};

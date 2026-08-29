@@ -3597,7 +3597,7 @@ function loadProfile(name) {
     s.mapEvolutionOnSiteIntervalMinutes = Math.max(0, Math.min(59, Math.floor(Number(p.mapEvolutionOnSiteIntervalMinutes) || 0)));
     s.mapEvolutionOnSitePreset = p.mapEvolutionOnSitePreset === 'standard' ? 'standard' : 'dynamic';
     s.mapEvolutionIntervalHoursBySite = JSON.parse(JSON.stringify(p.mapEvolutionIntervalHoursBySite || {}));
-    s.mapEvolutionLookback = p.mapEvolutionLookback ?? 10;
+    s.mapEvolutionLookback = p.mapEvolutionLookback ?? 20;
     s.mapEvolutionMaxTokens = p.mapEvolutionMaxTokens ?? 25000;
     s.mapEvolutionCompressEnabled = p.mapEvolutionCompressEnabled !== false;
     s.mapEvolutionCompressThreshold = (() => {
@@ -3730,7 +3730,7 @@ function loadProfile(name) {
     $('#rpg_map_evolution_onsite_interval_hours').val(s.mapEvolutionOnSiteIntervalHours ?? 1);
     $('#rpg_map_evolution_onsite_interval_minutes').val(s.mapEvolutionOnSiteIntervalMinutes ?? 0);
     $('#rpg_map_evolution_onsite_preset').val(s.mapEvolutionOnSitePreset === 'standard' ? 'standard' : 'dynamic');
-    $('#rpg_map_evolution_lookback').val(s.mapEvolutionLookback ?? 10);
+    $('#rpg_map_evolution_lookback').val(s.mapEvolutionLookback ?? 20);
     $('#rpg_map_evolution_max_tokens').val(s.mapEvolutionMaxTokens ?? 25000);
     $('#rpg_map_evolution_compress_enabled').prop('checked', s.mapEvolutionCompressEnabled !== false);
     $('#rpg_map_evolution_compress_threshold').val(s.mapEvolutionCompressThreshold ?? 10000);
@@ -6251,7 +6251,7 @@ function organizeConnectionSettingsUI() {
             $(this).val(settings.mapEvolutionOnSitePreset);
             saveSettings();
         });
-        $('#rpg_map_evolution_lookback').val(settings.mapEvolutionLookback ?? 10).on('change', function () {
+        $('#rpg_map_evolution_lookback').val(settings.mapEvolutionLookback ?? 20).on('change', function () {
             settings.mapEvolutionLookback = Math.max(0, Math.min(100, parseInt(String($(this).val()), 10) || 0));
             $(this).val(settings.mapEvolutionLookback);
             saveSettings();
@@ -12371,7 +12371,7 @@ RULES:
             $('#rpg_map_evolution_onsite_interval_hours').val(s.mapEvolutionOnSiteIntervalHours ?? 1);
             $('#rpg_map_evolution_onsite_interval_minutes').val(s.mapEvolutionOnSiteIntervalMinutes ?? 0);
             $('#rpg_map_evolution_onsite_preset').val(s.mapEvolutionOnSitePreset === 'standard' ? 'standard' : 'dynamic');
-            $('#rpg_map_evolution_lookback').val(s.mapEvolutionLookback ?? 10);
+            $('#rpg_map_evolution_lookback').val(s.mapEvolutionLookback ?? 20);
             $('#rpg_map_evolution_max_tokens').val(s.mapEvolutionMaxTokens ?? 25000);
             $('#rpg_map_evolution_compress_enabled').prop('checked', s.mapEvolutionCompressEnabled !== false);
             $('#rpg_map_evolution_compress_threshold').val(s.mapEvolutionCompressThreshold ?? 10000);

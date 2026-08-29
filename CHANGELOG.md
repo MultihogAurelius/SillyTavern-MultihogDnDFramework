@@ -2,6 +2,12 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.71] - 2026-08-29
+
+### Changed
+- **Map Evolution story lookback**: Recent chat is now supplied to every due map (default 20 user turns; `0` skips). The same prompt filters to facts relevant to each site so background maps can reconcile stale occupancy when play says someone left or joined the party elsewhere. Map Updater still runs only on the current map.
+- **Map Evolution REMOVE_ASSET**: Evolution may purge stale ACTIVE records contradicted by recent play when no local thread should survive; traceable departures still prefer `LEFT`.
+
 ## [2026.8.70] - 2026-08-29
 
 ### Changed

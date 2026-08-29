@@ -37,7 +37,6 @@ import {
     formatEvolutionElapsedMinutes,
     formatEvolutionThreadLine,
     formatMapEvolutionRecentStory,
-    selectMapEvolutionRecentStory,
     isEvolutionNoop,
     normalizeEvolutionTickScope,
     normalizeMapEvolutionCompressThreshold,
@@ -372,8 +371,8 @@ Do not manufacture arbitrary catastrophe, mutate the frozen area, narrate events
 
 function formatRecentStoryBlock(recentStory) {
     return `## RECENT STORY
-${recentStory || '(None for this site.)'}
-This block may be empty. When it contains chat, it is the causal record of recent play for THIS site — occupancy on the map may not have caught up yet. Use it so local change can react to what just happened. Do not restage events in the frozen bubble. When it is empty, this site has no recent player history: evolve from the map, time window, backlog, threads, and World Reports only. Do not invent party actions or make this map orbit the player.`;
+${recentStory || '(None — lookback is 0 or chat is empty.)'}
+This block may be empty. When present, it is global recent play — not pre-filtered to this site. Apply only facts that belong to THIS map: occupants who left, went elsewhere, joined the party away from here, died off-map, or other contradictions with CURRENT MAP. Ignore unrelated events on other maps. Map Updater runs only on the party's current map; Map Evolution runs on every due map and must reconcile stale ACTIVE occupancy when play says someone is gone. Do not restage events in the frozen bubble. When empty, evolve from the map, time window, backlog, threads, and World Reports only.`;
 }
 
 function initialUserPrompt({ site, trigger, worldReports, digest, bubble, currentLocation, partyIsHere, onSitePreset = 'dynamic', timeWindow, backlog, threads, directInstruction = '', recentStory = '' }) {
@@ -543,7 +542,6 @@ async function evolveOneSite({
         site.siteRoot,
     );
     const instruction = String(directInstruction || '').trim();
-    const siteStory = selectMapEvolutionRecentStory(recentStory, { partyIsHere, trigger });
     const basePrompt = String(settings.mapEvolutionSystemPrompt || DEFAULT_MAP_EVOLUTION_SYSTEM_PROMPT).trim();
     const systemPrompt = instruction
         ? selectMapEvolutionSystemPrompt(instruction, basePrompt)
@@ -574,12 +572,13 @@ AUTHORITATIVE CAUSAL THREAD CONTRACT
 
 AUTHORITATIVE RECENT STORY CONTRACT
 - RECENT STORY may be present or empty. The contract is the same either way.
-- When present, it is the causal record of recent play for this site. Occupancy updates may not exist yet if the party just explored. React to established events outside the frozen bubble.
-- When empty, this site has no recent player history. Do not invent party actions or make this map orbit the player.`;
+- When present, read it as global recent play and apply only facts that affect THIS site.
+- Map Updater does not run on background maps. Reconcile contradictions here: if a CREATURE/GROUP is still ACTIVE on this map but recent play establishes they left, went elsewhere, or joined the party elsewhere, use SET_ASSET LEFT when the identity should stay traceable, or REMOVE_ASSET when play clearly treats them as gone without needing a local record.
+- Do not import unrelated player-centric events from other maps. When empty, do not invent party actions.`;
     let prompt = initialUserPrompt({
         site, trigger, worldReports, digest, bubble, currentLocation, partyIsHere,
         onSitePreset: settings.mapEvolutionOnSitePreset === 'standard' ? 'standard' : 'dynamic',
-        timeWindow, backlog, threads, directInstruction: instruction, recentStory: siteStory,
+        timeWindow, backlog, threads, directInstruction: instruction, recentStory,
     });
     let lastIssues = [];
     let lastOutput = '';
@@ -606,7 +605,7 @@ AUTHORITATIVE RECENT STORY CONTRACT
                     site, trigger, worldReports, digest, bubble, currentLocation, partyIsHere,
                     onSitePreset: settings.mapEvolutionOnSitePreset === 'standard' ? 'standard' : 'dynamic',
                     timeWindow, backlog, threads,
-                    priorOutput: output, errors: lastIssues, attempt: attempt + 1, directInstruction: instruction, recentStory: siteStory,
+                    priorOutput: output, errors: lastIssues, attempt: attempt + 1, directInstruction: instruction, recentStory,
                 });
                 continue;
             }
@@ -637,7 +636,7 @@ AUTHORITATIVE RECENT STORY CONTRACT
                     site, trigger, worldReports, digest, bubble, currentLocation, partyIsHere,
                     onSitePreset: settings.mapEvolutionOnSitePreset === 'standard' ? 'standard' : 'dynamic',
                     timeWindow, backlog, threads,
-                    priorOutput: output, errors: lastIssues, attempt: attempt + 1, directInstruction: instruction, recentStory: siteStory,
+                    priorOutput: output, errors: lastIssues, attempt: attempt + 1, directInstruction: instruction, recentStory,
                 });
                 continue;
             }
@@ -657,7 +656,7 @@ AUTHORITATIVE RECENT STORY CONTRACT
                     site, trigger, worldReports, digest, bubble, currentLocation, partyIsHere,
                     onSitePreset: settings.mapEvolutionOnSitePreset === 'standard' ? 'standard' : 'dynamic',
                     timeWindow, backlog, threads,
-                    priorOutput: output, errors: lastIssues, attempt: attempt + 1, directInstruction: instruction, recentStory: siteStory,
+                    priorOutput: output, errors: lastIssues, attempt: attempt + 1, directInstruction: instruction, recentStory,
                 });
                 continue;
             }

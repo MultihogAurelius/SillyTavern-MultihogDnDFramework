@@ -23,7 +23,6 @@ import {
     filterSitesByRoots,
     formatMapEvolutionRecentStory,
     formatNarratorSiteActivity,
-    mapEvolutionRecentStoryApplies,
     normalizeMapEvolutionCompressThreshold,
     normalizeMapEvolutionLookback,
     normalizeMapEvolutionNarratorCommitTokens,
@@ -80,7 +79,7 @@ describe('Map Evolution', () => {
         expect(normalizeMapEvolutionLookback(0)).toBe(0);
         expect(normalizeMapEvolutionLookback(12)).toBe(12);
         expect(normalizeMapEvolutionLookback(999)).toBe(100);
-        expect(normalizeMapEvolutionLookback('')).toBe(10);
+        expect(normalizeMapEvolutionLookback('')).toBe(20);
         const chat = [
             { is_user: true, mes: 'Alpha turn' },
             { is_user: false, mes: 'Narrator one' },
@@ -94,12 +93,17 @@ describe('Map Evolution', () => {
         expect(story).not.toContain('Alpha turn');
     });
 
-    it('fills recent story only for the current map or a site-exit pass', () => {
-        expect(mapEvolutionRecentStoryApplies({ partyIsHere: true, trigger: 'interval' })).toBe(true);
-        expect(mapEvolutionRecentStoryApplies({ partyIsHere: true, trigger: 'manual' })).toBe(true);
-        expect(mapEvolutionRecentStoryApplies({ partyIsHere: false, trigger: 'interval' })).toBe(false);
-        expect(mapEvolutionRecentStoryApplies({ partyIsHere: false, trigger: 'manual' })).toBe(false);
-        expect(mapEvolutionRecentStoryApplies({ partyIsHere: false, trigger: 'site_exit' })).toBe(true);
+    it('supplies the same global recent story to every due map when lookback > 0', () => {
+        const chat = [
+            { is_user: true, mes: 'Alpha turn' },
+            { is_user: false, mes: 'Narrator one' },
+            { is_user: true, mes: 'Beta turn' },
+            { is_user: false, mes: 'Narrator two' },
+        ];
+        const story = formatMapEvolutionRecentStory(chat, { mapEvolutionLookback: 2 });
+        expect(story).toContain('Beta turn');
+        expect(story).toContain('Narrator two');
+        expect(story).toContain('Alpha turn');
     });
 
     it('ships a dedicated prompt that occupancy never sees', () => {
@@ -150,8 +154,8 @@ describe('Map Evolution', () => {
         expect(DEFAULT_MAP_EVOLUTION_SYSTEM_PROMPT).toContain('set duration to ""');
         expect(DEFAULT_MAP_EVOLUTION_SYSTEM_PROMPT).toContain('leave it for Map Updater');
         expect(DEFAULT_MAP_EVOLUTION_SYSTEM_PROMPT).toContain('SET_ASSET state LEFT');
-        expect(DEFAULT_MAP_EVOLUTION_SYSTEM_PROMPT).toContain('Never REMOVE_ASSET a departure');
-        expect(DEFAULT_MAP_EVOLUTION_SYSTEM_PROMPT).toContain('evo-day2-1500-odran-left');
+        expect(DEFAULT_MAP_EVOLUTION_SYSTEM_PROMPT).toContain('stale ACTIVE occupancy contradicted by RECENT STORY');
+        expect(DEFAULT_MAP_EVOLUTION_SYSTEM_PROMPT).toContain('evo-day2-1600-guide-removed');
         expect(DEFAULT_MAP_EVOLUTION_SYSTEM_PROMPT).not.toContain('Leaving this site: SET_ASSET state FLEEING or REMOVE_ASSET');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('Every operation MUST include cause');
         expect(DEFAULT_MAP_UPDATER_SYSTEM_PROMPT).toContain('ONE GROUP with count');
@@ -1013,7 +1017,7 @@ describe('Map Evolution', () => {
         expect(settingsMarkup).toMatch(/id="rpg_map_evolution_narrator_commit_tokens"[^>]*value="2000"/);
         expect(settingsMarkup).toContain('Map Evolution memory');
         expect(settingsMarkup).toContain('transferred to the <b>narrator</b>');
-        expect(defaultsSource).toContain('mapEvolutionLookback: 10');
+        expect(defaultsSource).toContain('mapEvolutionLookback: 20');
         expect(defaultsSource).toContain('mapEvolutionCompressThreshold: 10000');
         expect(defaultsSource).toContain('mapEvolutionNarratorCommitTokens: 2000');
         expect(indexSource).toContain('rpg_map_evolution_lookback');
@@ -1022,10 +1026,9 @@ describe('Map Evolution', () => {
         expect(settingsMarkup).toContain('id="rpg_map_evolution_compress_prompt"');
         expect(evolution).toContain('Number(settings.mapEvolutionMaxTokens) || 25000');
         expect(evolution).toContain('formatMapEvolutionRecentStory');
-        expect(evolution).toContain('selectMapEvolutionRecentStory');
         expect(evolution).toContain('## RECENT STORY');
         expect(evolution).toContain('This block may be empty');
-        expect(evolution).toContain('make this map orbit the player');
+        expect(evolution).toContain('Map Updater runs only on the party\'s current map');
         expect(evolution).toContain('AUTHORITATIVE RECENT STORY CONTRACT');
         expect(evolution).not.toContain('Use this only to ground off-screen change');
         expect(evolution).toContain('lookback = null');

@@ -66,7 +66,7 @@ export function saveProfile(name) {
         mapEvolutionOnSiteIntervalMinutes: s.mapEvolutionOnSiteIntervalMinutes ?? 0,
         mapEvolutionOnSitePreset: s.mapEvolutionOnSitePreset === 'standard' ? 'standard' : 'dynamic',
         mapEvolutionIntervalHoursBySite: JSON.parse(JSON.stringify(s.mapEvolutionIntervalHoursBySite || {})),
-        mapEvolutionLookback: s.mapEvolutionLookback ?? 10,
+        mapEvolutionLookback: s.mapEvolutionLookback ?? 20,
         mapEvolutionMaxTokens: s.mapEvolutionMaxTokens ?? 25000,
         mapEvolutionCompressEnabled: s.mapEvolutionCompressEnabled !== false,
         mapEvolutionCompressThreshold: s.mapEvolutionCompressThreshold ?? 10000,
