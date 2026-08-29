@@ -37,6 +37,7 @@ import {
     formatEvolutionElapsedMinutes,
     formatEvolutionThreadLine,
     formatMapEvolutionRecentStory,
+    selectMapEvolutionRecentStory,
     isEvolutionNoop,
     normalizeEvolutionTickScope,
     normalizeMapEvolutionCompressThreshold,
@@ -371,8 +372,8 @@ Do not manufacture arbitrary catastrophe, mutate the frozen area, narrate events
 
 function formatRecentStoryBlock(recentStory) {
     return `## RECENT STORY
-${recentStory || '(No additional recent context.)'}
-Use this only to ground off-screen change in what play already established. Do not restage events the party witnessed in the frozen bubble. If empty, do not invent from chat.`;
+${recentStory || '(None for this site.)'}
+This block may be empty. When it contains chat, it is the causal record of recent play for THIS site — occupancy on the map may not have caught up yet. Use it so local change can react to what just happened. Do not restage events in the frozen bubble. When it is empty, this site has no recent player history: evolve from the map, time window, backlog, threads, and World Reports only. Do not invent party actions or make this map orbit the player.`;
 }
 
 function initialUserPrompt({ site, trigger, worldReports, digest, bubble, currentLocation, partyIsHere, onSitePreset = 'dynamic', timeWindow, backlog, threads, directInstruction = '', recentStory = '' }) {
@@ -542,6 +543,7 @@ async function evolveOneSite({
         site.siteRoot,
     );
     const instruction = String(directInstruction || '').trim();
+    const siteStory = selectMapEvolutionRecentStory(recentStory, { partyIsHere, trigger });
     const basePrompt = String(settings.mapEvolutionSystemPrompt || DEFAULT_MAP_EVOLUTION_SYSTEM_PROMPT).trim();
     const systemPrompt = instruction
         ? selectMapEvolutionSystemPrompt(instruction, basePrompt)
@@ -568,11 +570,16 @@ AUTHORITATIVE CAUSAL THREAD CONTRACT
 - Open threads are unfinished plots you may continue. Return to baseline (customary patrol, settled vigil, going back to forage after the disturbance ends) is thread_status resolved, not a new open thread.
 - Omitted thread_status defaults to open — set resolved or transformed explicitly when the plot ends or changes shape.
 - Do not invent a killer when actor is unknown.
-- Third-party killing is allowed when it makes logical and narrative sense.`;
+- Third-party killing is allowed when it makes logical and narrative sense.
+
+AUTHORITATIVE RECENT STORY CONTRACT
+- RECENT STORY may be present or empty. The contract is the same either way.
+- When present, it is the causal record of recent play for this site. Occupancy updates may not exist yet if the party just explored. React to established events outside the frozen bubble.
+- When empty, this site has no recent player history. Do not invent party actions or make this map orbit the player.`;
     let prompt = initialUserPrompt({
         site, trigger, worldReports, digest, bubble, currentLocation, partyIsHere,
         onSitePreset: settings.mapEvolutionOnSitePreset === 'standard' ? 'standard' : 'dynamic',
-        timeWindow, backlog, threads, directInstruction: instruction, recentStory,
+        timeWindow, backlog, threads, directInstruction: instruction, recentStory: siteStory,
     });
     let lastIssues = [];
     let lastOutput = '';
@@ -599,7 +606,7 @@ AUTHORITATIVE CAUSAL THREAD CONTRACT
                     site, trigger, worldReports, digest, bubble, currentLocation, partyIsHere,
                     onSitePreset: settings.mapEvolutionOnSitePreset === 'standard' ? 'standard' : 'dynamic',
                     timeWindow, backlog, threads,
-                    priorOutput: output, errors: lastIssues, attempt: attempt + 1, directInstruction: instruction, recentStory,
+                    priorOutput: output, errors: lastIssues, attempt: attempt + 1, directInstruction: instruction, recentStory: siteStory,
                 });
                 continue;
             }
@@ -630,7 +637,7 @@ AUTHORITATIVE CAUSAL THREAD CONTRACT
                     site, trigger, worldReports, digest, bubble, currentLocation, partyIsHere,
                     onSitePreset: settings.mapEvolutionOnSitePreset === 'standard' ? 'standard' : 'dynamic',
                     timeWindow, backlog, threads,
-                    priorOutput: output, errors: lastIssues, attempt: attempt + 1, directInstruction: instruction, recentStory,
+                    priorOutput: output, errors: lastIssues, attempt: attempt + 1, directInstruction: instruction, recentStory: siteStory,
                 });
                 continue;
             }
@@ -650,7 +657,7 @@ AUTHORITATIVE CAUSAL THREAD CONTRACT
                     site, trigger, worldReports, digest, bubble, currentLocation, partyIsHere,
                     onSitePreset: settings.mapEvolutionOnSitePreset === 'standard' ? 'standard' : 'dynamic',
                     timeWindow, backlog, threads,
-                    priorOutput: output, errors: lastIssues, attempt: attempt + 1, directInstruction: instruction, recentStory,
+                    priorOutput: output, errors: lastIssues, attempt: attempt + 1, directInstruction: instruction, recentStory: siteStory,
                 });
                 continue;
             }

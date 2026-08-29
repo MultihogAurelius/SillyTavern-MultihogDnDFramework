@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.69] - 2026-08-29
+
+### Changed
+- **Map Evolution story lookback**: Recent chat is supplied only for the current map and the site just left. Background maps use the same prompt with an empty `RECENT STORY` block so they do not become player-centric.
+
 ## [2026.8.68] - 2026-08-29
 
 ### Added

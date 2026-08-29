@@ -23,6 +23,7 @@ import {
     filterSitesByRoots,
     formatMapEvolutionRecentStory,
     formatNarratorSiteActivity,
+    mapEvolutionRecentStoryApplies,
     normalizeMapEvolutionCompressThreshold,
     normalizeMapEvolutionLookback,
     normalizeMapEvolutionNarratorCommitTokens,
@@ -91,6 +92,14 @@ describe('Map Evolution', () => {
         const story = formatMapEvolutionRecentStory(chat, { mapEvolutionLookback: 1 });
         expect(story).toContain('Beta turn');
         expect(story).not.toContain('Alpha turn');
+    });
+
+    it('fills recent story only for the current map or a site-exit pass', () => {
+        expect(mapEvolutionRecentStoryApplies({ partyIsHere: true, trigger: 'interval' })).toBe(true);
+        expect(mapEvolutionRecentStoryApplies({ partyIsHere: true, trigger: 'manual' })).toBe(true);
+        expect(mapEvolutionRecentStoryApplies({ partyIsHere: false, trigger: 'interval' })).toBe(false);
+        expect(mapEvolutionRecentStoryApplies({ partyIsHere: false, trigger: 'manual' })).toBe(false);
+        expect(mapEvolutionRecentStoryApplies({ partyIsHere: false, trigger: 'site_exit' })).toBe(true);
     });
 
     it('ships a dedicated prompt that occupancy never sees', () => {
@@ -1013,7 +1022,12 @@ describe('Map Evolution', () => {
         expect(settingsMarkup).toContain('id="rpg_map_evolution_compress_prompt"');
         expect(evolution).toContain('Number(settings.mapEvolutionMaxTokens) || 25000');
         expect(evolution).toContain('formatMapEvolutionRecentStory');
+        expect(evolution).toContain('selectMapEvolutionRecentStory');
         expect(evolution).toContain('## RECENT STORY');
+        expect(evolution).toContain('This block may be empty');
+        expect(evolution).toContain('make this map orbit the player');
+        expect(evolution).toContain('AUTHORITATIVE RECENT STORY CONTRACT');
+        expect(evolution).not.toContain('Use this only to ground off-screen change');
         expect(evolution).toContain('lookback = null');
         expect(evolution).toContain('maybeCompressSiteThreads');
         expect(evolution).toContain('mapEvolutionCompressThreshold');

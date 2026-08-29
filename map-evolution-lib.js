@@ -27,6 +27,19 @@ export function resolveMapEvolutionLookback(settings, lookback = null) {
 }
 
 /**
+ * Recent play is causal for the current map, and for the site the party just
+ * left. Background maps must not receive chat — that makes them player-centric.
+ */
+export function mapEvolutionRecentStoryApplies({ partyIsHere = false, trigger = 'interval' } = {}) {
+    return String(trigger || '') === 'site_exit' || !!partyIsHere;
+}
+
+/** Same prompt either way: story text when it applies, otherwise empty. */
+export function selectMapEvolutionRecentStory(recentStory, options) {
+    return mapEvolutionRecentStoryApplies(options) ? String(recentStory || '') : '';
+}
+
+/**
  * Recent chat supplied to Map Evolution. Empty when lookback is 0.
  * @param {any[]} chat
  * @param {object} [settings]
