@@ -9,6 +9,7 @@ import {
     MAX_INSTANT_ACTION_INSTRUCTION_LENGTH,
     normalizeInstantActionInstructions,
     resolveInstantActionPlayerCardWords,
+    resolveInstantActionStartingLevel,
     rollInstantActionLevel,
 } from '../src/state/instant-action-instructions.js';
 
@@ -57,7 +58,7 @@ describe('Instant Action instructions', () => {
         expect(creatorSource).toContain('extractInstantActionLevel(instantActionInstructions)');
     });
 
-    it('lets Initial Setup override the rolled Instant Action level', () => {
+    it('lets Initial Setup override the Instant Action starting level', () => {
         expect(extractInstantActionLevel('A level 7 ranger.')).toBe(7);
         expect(extractInstantActionLevel('lvl 3 wizard')).toBe(3);
         expect(extractInstantActionLevel('a 7th-level ranger with a crossbow')).toBe(7);
@@ -67,15 +68,24 @@ describe('Instant Action instructions', () => {
         expect(creatorSource).toContain('STARTING LEVEL: ${level} (mandatory — the character MUST be exactly Level ${level}).');
     });
 
-    it('rolls a random level between 1 and 10 for Instant Action instead of using Other Ways', () => {
+    it('starts Instant Action at Level 1 unless Random Level is enabled', () => {
         const { min, max } = getInstantActionLevelRange();
         expect(min).toBe(1);
         expect(max).toBe(10);
-        expect(rollInstantActionLevel(() => 0)).toBe(1);
-        expect(rollInstantActionLevel(() => 0.999)).toBe(10);
+        expect(resolveInstantActionStartingLevel()).toBe(1);
+        expect(resolveInstantActionStartingLevel({ randomLevel: false })).toBe(1);
+        expect(resolveInstantActionStartingLevel({ randomLevel: true, random: () => 0 })).toBe(1);
+        expect(resolveInstantActionStartingLevel({ randomLevel: true, random: () => 0.999 })).toBe(10);
+        expect(resolveInstantActionStartingLevel({ noLevel: true, randomLevel: true })).toBeNull();
         expect(rollInstantActionLevel(() => 0.5)).toBe(6);
-        expect(quickStartSource).toContain('rollInstantActionLevel(secureRandom)');
+        expect(buildDefaultSettings().onboardingInstantActionRandomLevel).toBe(false);
+        expect(quickStartSource).toContain('resolveInstantActionStartingLevel(');
+        expect(quickStartSource).toContain('onboardingInstantActionRandomLevel === true');
         expect(quickStartSource).not.toMatch(/onboardingLevel \|\| 1\)/);
+        expect(rendererSource).toContain('id="rt-quickstart-random-level"');
+        expect(rendererSource).toContain('Random Level?');
+        expect(rendererSource).toContain("obSettings.onboardingInstantActionRandomLevel === true ? 'checked' : ''");
+        expect(quickStartSource).toMatch(/randomLevelCheckbox\?\.addEventListener\('change', persistQuickStartOptions\)/);
     });
 
     it('exposes a selectable Player Card word count in Instant Action', () => {

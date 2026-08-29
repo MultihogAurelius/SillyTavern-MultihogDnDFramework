@@ -356,6 +356,9 @@ export function buildDefaultSettings() {
         /** Instant Action: when true, auto-send "Begin the adventure" after the character is ready. On by default; uncheck to type your own first action. */
         onboardingSendStarterMessage: true,
 
+        /** Instant Action: when true, roll a starting level from 1–10. Off by default so new characters start at Level 1 with 0 XP. */
+        onboardingInstantActionRandomLevel: false,
+
         /** Last Character Creator form values, saved when Generate Character is pressed. */
 
         characterCreatorDraft: null,
@@ -1569,7 +1572,7 @@ You may be asked to use Markers: ((PLS)), ((B)), ((XB)), ((BDG)), ((HGT)). These
 
 /** Latest settings migration version — factory reset skips legacy upgrade paths at or below this. */
 
-export const FACTORY_SETTINGS_VERSION = '2026.8.72';
+export const FACTORY_SETTINGS_VERSION = '2026.8.73';
 
 
 /** Remove extension UI keys from localStorage so a factory reset does not rehydrate stale panel state. */

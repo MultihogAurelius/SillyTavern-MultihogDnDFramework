@@ -14,7 +14,7 @@ import {
     extractInstantActionLevel,
     normalizeInstantActionInstructions,
     resolveInstantActionPlayerCardWords,
-    rollInstantActionLevel,
+    resolveInstantActionStartingLevel,
 } from './src/state/instant-action-instructions.js';
 
 /** @type {boolean} */
@@ -131,7 +131,12 @@ export async function runQuickStart(genre, rootEl = null, selectedName = '', ins
         const archetypes = getArchetypesForGenre(validGenre);
         const className = pickRandomArchetype(archetypes);
         const noLevel = s.onboardingLevel === 'none';
-        const level = noLevel ? null : rollInstantActionLevel(secureRandom);
+        const randomLevel = s.onboardingInstantActionRandomLevel === true;
+        const level = resolveInstantActionStartingLevel({
+            noLevel,
+            randomLevel,
+            random: secureRandom,
+        });
         const gearTier = s.onboardingGearTier || 'auto';
         const wordCount = resolveInstantActionPlayerCardWords(
             s.onboardingPersonaWords || '150',
@@ -214,6 +219,7 @@ export function bindQuickStartEvents(rootEl) {
     const wordCountSelect = /** @type {HTMLSelectElement|null} */ (section.querySelector('#rt-quickstart-persona-words'));
     const wordCountCustom = /** @type {HTMLInputElement|null} */ (section.querySelector('#rt-quickstart-persona-words-custom'));
     const sendStarterCheckbox = /** @type {HTMLInputElement|null} */ (section.querySelector('#rt-quickstart-send-starter'));
+    const randomLevelCheckbox = /** @type {HTMLInputElement|null} */ (section.querySelector('#rt-quickstart-random-level'));
     let selectedGenre = '';
     let selectedName = '';
 
@@ -223,6 +229,7 @@ export function bindQuickStartEvents(rootEl) {
         if (wordCountCustom) s.onboardingPersonaWordsCustom = wordCountCustom.value;
         if (wordCountCustom) wordCountCustom.style.display = wordCountSelect?.value === 'other' ? 'block' : 'none';
         if (sendStarterCheckbox) s.onboardingSendStarterMessage = !!sendStarterCheckbox.checked;
+        if (randomLevelCheckbox) s.onboardingInstantActionRandomLevel = !!randomLevelCheckbox.checked;
         saveSettings();
     };
 
@@ -264,6 +271,7 @@ export function bindQuickStartEvents(rootEl) {
     wordCountSelect?.addEventListener('change', persistQuickStartOptions);
     wordCountCustom?.addEventListener('input', persistQuickStartOptions);
     sendStarterCheckbox?.addEventListener('change', persistQuickStartOptions);
+    randomLevelCheckbox?.addEventListener('change', persistQuickStartOptions);
 
     startButton?.addEventListener('click', (e) => {
         e.preventDefault();

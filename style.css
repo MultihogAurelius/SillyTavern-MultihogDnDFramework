@@ -2729,7 +2729,7 @@
     gap: 2px;
 }
 
-.rt-quickstart-starter-message {
+.rt-quickstart-flag {
     display: flex;
     align-items: center;
     gap: 6px;
@@ -2737,7 +2737,7 @@
     font-size: 0.78em;
 }
 
-.rt-quickstart-starter-message label {
+.rt-quickstart-flag label {
     display: flex;
     align-items: center;
     gap: 6px;
@@ -2746,7 +2746,7 @@
     user-select: none;
 }
 
-.rt-quickstart-starter-message input {
+.rt-quickstart-flag input {
     margin: 0;
     cursor: pointer;
 }

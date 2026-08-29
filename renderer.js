@@ -2005,7 +2005,7 @@ function formatValueToCurrency(totalCp, detectedCurrency) {
 
                 <div class="rt-quickstart" id="rt-quickstart">
                     <div class="rt-quickstart-title">⚡ Instant Action</div>
-                    <div class="rt-quickstart-sub">Choose a genre, optionally enter a name or Initial Setup, then begin. Leave the name blank to let the AI choose it. The extension uses your Narrator Configuration, rolls a random level (1–10), class, and other unspecified details, and builds a Lorebook Agent Player Card plus a name-only ST persona. Uncheck Send Starter Message if you want to type your own first action instead of letting the AI open the campaign.</div>
+                    <div class="rt-quickstart-sub">Choose a genre, optionally enter a name or Initial Setup, then begin. Leave the name blank to let the AI choose it. The extension uses your Narrator Configuration, starts at Level 1 with 0 XP unless Random Level is on, rolls a class and other unspecified details, and builds a Lorebook Agent Player Card plus a name-only ST persona. Uncheck Send Starter Message if you want to type your own first action instead of letting the AI open the campaign.</div>
                     <div class="rt-quickstart-genres" role="group" aria-label="Quick Start genre">
                         <button type="button" class="rt-quickstart-genre-btn" data-genre="fantasy" aria-pressed="false">⚔️ Fantasy</button>
                         <button type="button" class="rt-quickstart-genre-btn" data-genre="realistic" aria-pressed="false">🏙️ Modern</button>
@@ -2033,7 +2033,14 @@ function formatValueToCurrency(totalCp, detectedCurrency) {
                             </select>
                             <input id="rt-quickstart-persona-words-custom" type="number" class="text_pole" value="${escapeHtml(String(obSettings.onboardingPersonaWordsCustom || ''))}" style="display:${obSettings.onboardingPersonaWords === 'other' ? 'block' : 'none'}" placeholder="50–5000" min="50" max="5000" aria-label="Custom Instant Action Player Card word count" />
                         </div>
-                        <div class="rt-quickstart-starter-message">
+                        <div class="rt-quickstart-flag">
+                            <label for="rt-quickstart-random-level" title="When this is off, Instant Action starts at Level 1 with 0 XP. When it is on, a level from 1–10 is rolled. Initial Setup still wins if it names a level.">
+                                <span>Random Level?</span>
+                                <input type="checkbox" id="rt-quickstart-random-level" ${obSettings.onboardingInstantActionRandomLevel === true ? 'checked' : ''} aria-label="Random Level" />
+                            </label>
+                            <span class="rt-cr-help-icon" title="When this is off, Instant Action starts at Level 1 with 0 XP. When it is on, a level from 1–10 is rolled. Initial Setup still wins if it names a level.">?</span>
+                        </div>
+                        <div class="rt-quickstart-flag">
                             <label for="rt-quickstart-send-starter" title="If this is checked, the AI automatically starts the campaign as soon as the rolled character is ready.">
                                 <span>Send Starter Message?</span>
                                 <input type="checkbox" id="rt-quickstart-send-starter" ${obSettings.onboardingSendStarterMessage !== false ? 'checked' : ''} aria-label="Send Starter Message" />

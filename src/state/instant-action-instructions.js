@@ -48,6 +48,23 @@ export function rollInstantActionLevel(random = Math.random) {
     return INSTANT_ACTION_LEVEL_MIN + Math.floor(r * span);
 }
 
+/**
+ * Instant Action starts at Level 1 unless Random Level is on (then 1–10).
+ * Systems set to N/A — No Levels stay level-free. Initial Setup can still
+ * override a numeric level later when it names one.
+ * @param {{ noLevel?: boolean, randomLevel?: boolean, random?: () => number }} [opts]
+ * @returns {number|null}
+ */
+export function resolveInstantActionStartingLevel({
+    noLevel = false,
+    randomLevel = false,
+    random = Math.random,
+} = {}) {
+    if (noLevel) return null;
+    if (randomLevel) return rollInstantActionLevel(random);
+    return 1;
+}
+
 /** @returns {{ min: number, max: number }} */
 export function getInstantActionLevelRange() {
     return { min: INSTANT_ACTION_LEVEL_MIN, max: INSTANT_ACTION_LEVEL_MAX };

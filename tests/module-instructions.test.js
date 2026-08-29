@@ -173,7 +173,7 @@ describe('getSettings fresh install', () => {
         expect(migrated.mapEvolutionOnSiteIntervalHours).toBe(1);
         expect(migrated.mapEvolutionOnSiteIntervalMinutes).toBe(0);
         expect(migrated.mapEvolutionOtherMapsInterval8Applied).toBe(true);
-        expect(migrated.settingsVersion).toBe('2026.8.72');
+        expect(migrated.settingsVersion).toBe(FACTORY_SETTINGS_VERSION);
 
         for (const key of Object.keys(testExtensionSettings)) delete testExtensionSettings[key];
         testExtensionSettings.rpg_tracker = {
