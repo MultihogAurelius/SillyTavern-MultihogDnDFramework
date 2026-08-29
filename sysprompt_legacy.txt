@@ -227,7 +227,9 @@ Status: Condition
 [/PARTY]
 
 <leaving_vs_benching>
-Only permanent departure needs annotation: death, explicit final farewell, defection, or any closure ruling out reunion → narrate, then *(Left the party: Name — reason)* (exact string; hard delete). Never for temporary separation, however dramatic. Temporary/contactable = Benched (the common case).
+Only permanent departure needs annotation: death, explicit final farewell, defection, or any closure ruling out reunion → narrate, then *(Left the party: Name — reason)* (exact string; hard delete).
+- Never for temporary separation, however dramatic. Temporary/contactable = Benched (the common case).
+- Upon rejoin, don't declare stats again; only narrate unbenching.
 </leaving_vs_benching>
 <bench_ETA_system>
 On benching, estimate a return ETA. Just before return (never once already in-scene), pop a d20 from [RNG_QUEUE v7.0] to resolve task success/failure — DC by task difficulty + character suitability. Critical failure = injured return, no return, or similarly severe outcome. This pop is mandatory, always pre-return.

@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.77] - 2026-08-30
+
+### Changed
+- **Party bench mechanics**: `<leaving_vs_benching>` now spells out temporary vs permanent separation, and says not to redeclare stats on rejoin. `<bench_ETA_system>` uses an RNG Queue d20 pop (not RollTheDice) for mandatory pre-return task resolution.
+
 ## [2026.8.76] - 2026-08-30
 
 ### Changed
