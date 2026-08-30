@@ -102,7 +102,7 @@ https://www.youtube.com/watch?v=82Lt9pRYFS0
 <p align="center">
   <img src="https://github.com/user-attachments/assets/368d05be-009b-4f0d-b753-5c3cf8ae7dad" width="60%" alt="Combat in progress" />
   <br>
-  <em>Area Maps are Detailed and Dynamic</em>
+  <em>Area maps are detailed and dynamic</em>
 </p>
 
 ---
@@ -116,7 +116,21 @@ https://www.youtube.com/watch?v=82Lt9pRYFS0
 <div align="center">
   <figure>
     <img width="1918" height="982" alt="Screenshot 2026-06-18 195917" src="https://github.com/user-attachments/assets/e7e9e81d-0cfd-44a1-9a94-61e72d046d5a" />
-    <em>Recruitment in a World of Warcraft Scenario</em>
+    <em>Some pre-dungeon recruitment in a World of Warcraft scenario</em>
+  </figure>
+</div>
+
+<div align="center">
+  <figure>
+    <img width="1918" height="982" alt="Screenshot 2026-06-18 195917" src="https://github.com/user-attachments/assets/6ad4aaca-0d28-4948-a33e-682a02e86791" />
+    <em>A rough-looking situation in the same run</em>
+  </figure>
+</div>
+
+<div align="center">
+  <figure>
+    <img width="1918" height="982" alt="Screenshot 2026-06-18 195917" src="https://github.com/user-attachments/assets/e229e61c-c667-4471-ba44-02adc3836c3f" />
+    <em>A pyrrhic victory — the novice mage saves the day</em>
   </figure>
 </div>
 
