@@ -100,7 +100,7 @@ describe('General & Visuals settings', () => {
         expect(indexSource).toContain('Same models work fine here as with the State Tracker.');
         expect(indexSource).toContain('I recommend using a somewhat better model here such as Sonnet 5 or above for more robust and complex systems. Your mileage varies a lot here. Experiment.');
         expect(indexSource).toContain('A lightweight model should do fine.');
-        expect(indexSource).toContain('Prefer a fast model above all');
+        expect(indexSource).not.toContain('Prefer a fast model above all');
         expect(indexSource).toContain("chevron.className = 'inline-drawer-icon fa-solid fa-circle-chevron-down rt-central-connection-chevron'");
         expect(settingsMarkup).toContain('id="rpg_connection_apply_all_box"');
         expect(settingsMarkup).toContain('Apply Connection Setup to All');

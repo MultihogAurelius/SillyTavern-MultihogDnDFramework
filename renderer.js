@@ -2523,9 +2523,9 @@ function formatValueToCurrency(totalCp, detectedCurrency) {
                             <span>⛺ Benched Party (Tracks temporarily separated companions)</span>
                         </label>
                         <div>
-                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;" title="Alpha: builds a hidden location map before exploring a dungeon, ruin, town, or city. New maps need CreateAreaMap (function calling) or the text-command opener below.">
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;" title="Builds a hidden location map before exploring a dungeon, ruin, town, or city. New maps need CreateAreaMap (function calling) or the text-command opener below.">
                             <input type="checkbox" id="rt_onboarding_mod_dungeon_reality_and_hidden_mapping" />
-                            <span>🗺️ Persistent Maps (Alpha)</span>
+                            <span>🗺️ Persistent Maps</span>
                         </label>
                         <div id="rt_onboarding_map_architect_opener_wrap" style="padding-left: 20px; display: none; flex-direction: column; gap: 4px;">
                             <span style="font-size: 0.75em; opacity: 0.6; text-transform: uppercase; font-weight: bold; margin-top: 2px;">Map Architect opener</span>
@@ -2585,7 +2585,7 @@ function formatValueToCurrency(totalCp, detectedCurrency) {
         const detached = loadDetached();
 
         // Detached/single-module contexts deliberately bypass Display Groups.
-        // The BETA layer only changes the main rendered composition.
+        // Display Groups only change the main rendered composition.
         if (filterTag) {
             return renderSectionCard(filterTag, blocks, collapsed, detached, sectionPages, filterTag, uiOptions);
         }

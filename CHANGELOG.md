@@ -2,6 +2,12 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.81] - 2026-08-31
+
+### Changed
+- **Alpha / Beta labels**: Persistent Maps, Display Groups, and the Relationship System no longer show Alpha or Beta badges.
+- **Map Evolution**: Removed the Gemini Flash / “prefer a fast model” recommendation from the Map Evolution connection and settings copy.
+
 ## [2026.8.80] - 2026-08-31
 
 ### Changed

@@ -48,7 +48,7 @@ beforeEach(() => {
     localStorage.clear();
 });
 
-describe('Display Groups BETA safety and planning', () => {
+describe('Display Groups safety and planning', () => {
     it('is off by default and returns the original flat render plan unchanged', () => {
         const settings = getSettings();
         expect(settings.displayGroupsEnabled).toBe(false);
@@ -175,11 +175,12 @@ describe('Display Group rendering', () => {
         expect(html).toContain('VEHICLE_FUEL is detached');
     });
 
-    it('labels the settings and manager clearly as BETA and keeps them separate from Modules & Order', () => {
+    it('keeps Display Groups in settings and the manager separate from Modules & Order', () => {
         const settingsHtml = readFileSync(new URL('../settings.html', import.meta.url), 'utf8');
         const managerSource = readFileSync(new URL('../display-groups.js', import.meta.url), 'utf8');
         const editorSource = readFileSync(new URL('../ui-editors.js', import.meta.url), 'utf8');
-        expect(settingsHtml).toContain('Display Groups <small style="color:#ffc45c;">BETA</small>');
+        expect(settingsHtml).toContain('Display Groups');
+        expect(settingsHtml).not.toContain('BETA');
         expect(settingsHtml).not.toContain('rpg_tracker_display_groups_enabled');
         expect(settingsHtml).toContain('rpg_tracker_manage_display_groups');
         expect(settingsHtml.indexOf('rpg_tracker_manage_display_groups')).toBeGreaterThan(settingsHtml.indexOf('<b>Modules &amp; Order</b>'));

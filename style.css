@@ -1568,18 +1568,7 @@
     padding: 2px 0;
 }
 
-/* Display Groups BETA: one virtual host with headerless module bodies. */
-.rt-display-group-beta {
-    display: inline-block;
-    margin-left: 5px;
-    padding: 1px 4px;
-    border: 1px solid rgba(255, 196, 92, 0.42);
-    border-radius: 3px;
-    color: #ffc45c;
-    font-size: 0.58em;
-    line-height: 1.2;
-    vertical-align: 1px;
-}
+/* Display Groups: one virtual host with headerless module bodies. */
 
 .rt-display-group-body {
     padding: 0;
@@ -8510,19 +8499,6 @@ textarea.rt-cr-input {
     letter-spacing: 0.06em;
     opacity: 0.55;
     padding: 0 2px;
-}
-.rt-dungeon-alpha-tag {
-    display: inline-block;
-    font-size: 8px;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    color: #ffc45c;
-    border: 1px solid rgba(255, 196, 92, 0.4);
-    border-radius: 3px;
-    padding: 1px 4px;
-    vertical-align: 1px;
-    text-transform: uppercase;
-    opacity: 0.95;
 }
 .rt-dungeon-map-label-actions {
     display: inline-flex;

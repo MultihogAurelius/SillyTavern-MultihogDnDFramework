@@ -496,7 +496,7 @@ export async function openDungeonMapReadablePopup(mapDocument, { siteLabel = '',
     const popupDom = document.createElement('div');
     popupDom.className = 'rt-dungeon-map-popup';
     popupDom.innerHTML = `
-        <div class="rt-dungeon-map-title"><i class="fa-solid fa-map-location-dot"></i> ${escapePopupText(site)} <small class="rt-dungeon-alpha-tag">ALPHA</small></div>
+        <div class="rt-dungeon-map-title"><i class="fa-solid fa-map-location-dot"></i> ${escapePopupText(site)}</div>
         <div class="rt-dungeon-map-subtitle">Revealed rooms, routes, and known assets. Unrevealed map facts and material Evolution details stay hidden unless you turn on Reveal All.</div>
         <div class="rt-dungeon-map-toolbar">
             <label class="rt-dungeon-map-reveal-toggle"><input type="checkbox" class="rt-dungeon-map-reveal-all"${revealAll ? ' checked' : ''}> Reveal All</label>

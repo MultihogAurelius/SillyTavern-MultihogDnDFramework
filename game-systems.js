@@ -347,7 +347,7 @@ const NARRATOR_TOGGLE_IDS = {
     dungeon_reality_and_hidden_mapping: 'rpg_sysprompt_mod_dungeon_reality_and_hidden_mapping',
 };
 
-const LOCATION_MAPPING_TOGGLE_TITLE = 'Alpha: builds persistent district-scale settlements and room-scale dungeons or significant interiors. Settlement buildings remain assets unless CreateAreaMap explicitly promotes them. Expect sharp edges.';
+const LOCATION_MAPPING_TOGGLE_TITLE = 'Builds persistent district-scale settlements and room-scale dungeons or significant interiors. Settlement buildings remain assets unless CreateAreaMap explicitly promotes them.';
 
 export function isSectionUnlocked(settings, tag) {
     return !!findActiveUnlockedBaseOverride(settings.customSyspromptLibrary, tag);

@@ -178,7 +178,7 @@ export function buildDefaultSettings() {
 
         panelLayoutMode: 'stack',   // 'stack' = classic vertical stack | 'tabs' = compact tab mode (Character/Combat pinned, rest behind tabs)
 
-        // BETA: global, display-only virtual hosts for related tracker modules.
+        // Global, display-only virtual hosts for related tracker modules.
         // Off by default so existing rendering is byte-for-byte unchanged until opted in.
         displayGroupsEnabled: false,
         displayGroupsShowGaps: false,
@@ -1572,7 +1572,7 @@ You may be asked to use Markers: ((PLS)), ((B)), ((XB)), ((BDG)), ((HGT)). These
 
 /** Latest settings migration version — factory reset skips legacy upgrade paths at or below this. */
 
-export const FACTORY_SETTINGS_VERSION = '2026.8.80';
+export const FACTORY_SETTINGS_VERSION = '2026.8.81';
 
 
 /** Remove extension UI keys from localStorage so a factory reset does not rehydrate stale panel state. */

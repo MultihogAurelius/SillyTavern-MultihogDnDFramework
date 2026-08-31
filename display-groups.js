@@ -46,11 +46,11 @@ export async function openDisplayGroupsManager() {
     const html = `
         <div id="rt-display-groups-manager" style="display:flex;flex-direction:column;gap:10px;width:100%;min-width:0;max-height:72vh;box-sizing:border-box;overflow-x:hidden;">
             <div style="padding:9px 10px;border:1px solid rgba(255,190,70,.45);border-radius:7px;background:rgba(255,190,70,.08);font-size:11px;line-height:1.45;box-sizing:border-box;max-width:100%;overflow-wrap:anywhere;">
-                <b style="color:#ffc45c;">BETA</b> &mdash; Display Groups allow you to visually bundle together related modules without their headers, allowing for a neater, less bulky display. Especially useful in tab mode, so that you don't need an enormous number of tabs for each individual similar module.<br><br>
+                Display Groups allow you to visually bundle together related modules without their headers, allowing for a neater, less bulky display. Especially useful in tab mode, so that you don't need an enormous number of tabs for each individual similar module.<br><br>
                 Display Groups are global and display-only. They never merge memo blocks, prompts, module activation, scope, or Wizard Game Systems. Disable the master toggle to restore the existing renderer immediately.
             </div>
             <div style="display:none;padding:9px 10px;border:1px solid rgba(255,190,70,.45);border-radius:7px;background:rgba(255,190,70,.08);font-size:11px;line-height:1.45;box-sizing:border-box;max-width:100%;overflow-wrap:anywhere;">
-                <b style="color:#ffc45c;">BETA</b> — Display Groups are global and display-only. They never merge memo blocks, prompts, module activation, scope, or Wizard Game Systems. Disable the master toggle to restore the existing renderer immediately.
+                Display Groups are global and display-only. They never merge memo blocks, prompts, module activation, scope, or Wizard Game Systems. Disable the master toggle to restore the existing renderer immediately.
             </div>
             <div class="rt-display-group-options">
                 <label class="rt-display-group-option" title="Turn this off to immediately restore the existing independent module rendering without deleting your groups.">
@@ -79,9 +79,9 @@ export async function openDisplayGroupsManager() {
             refreshRenderedView();
             toastr['info'](
                 settings.displayGroupsEnabled
-                    ? 'Display Groups BETA enabled.'
+                    ? 'Display Groups enabled.'
                     : 'Display Groups disabled. Normal module cards restored.',
-                'Display Groups BETA',
+                'Display Groups',
             );
         });
         root.querySelector('#rt-display-groups-show-gaps')?.addEventListener('change', (event) => {
@@ -100,7 +100,7 @@ export async function openDisplayGroupsManager() {
                         <input class="rt-dg-enabled" data-index="${index}" type="checkbox" ${group.enabled ? 'checked' : ''} title="Enable this global Display Group">
                         <span style="font-size:17px;">${escapeHtml(group.icon)}</span>
                         <div style="flex:1;min-width:0;">
-                            <div style="font-size:12px;font-weight:bold;">${escapeHtml(group.name)} <span style="font-size:8px;color:#ffc45c;border:1px solid rgba(255,196,92,.4);border-radius:3px;padding:1px 4px;vertical-align:1px;">BETA</span></div>
+                            <div style="font-size:12px;font-weight:bold;">${escapeHtml(group.name)}</div>
                             <div style="font:10px/1.35 monospace;opacity:.62;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${group.members.map(escapeHtml).join(' · ')}</div>
                         </div>
                         <button class="rt-dg-edit menu_button interactable" data-index="${index}" title="Edit"><i class="fa-solid fa-pen-to-square"></i></button>
@@ -157,12 +157,12 @@ export async function openDisplayGroupsManager() {
 
             editor.style.display = 'block';
             editor.innerHTML = `
-                <div style="font-size:12px;font-weight:bold;margin-bottom:8px;">${existing ? 'Edit' : 'Create'} Display Group <span style="font-size:8px;color:#ffc45c;">BETA</span></div>
+                <div style="font-size:12px;font-weight:bold;margin-bottom:8px;">${existing ? 'Edit' : 'Create'} Display Group</div>
                 <div style="display:flex;gap:6px;margin-bottom:8px;min-width:0;max-width:100%;">
                     <input id="rt-dg-editor-icon" class="text_pole" value="${escapeHtml(existing?.icon || '🗂️')}" style="width:52px;flex:0 0 52px;text-align:center;box-sizing:border-box;" maxlength="16" title="Group icon">
                     <input id="rt-dg-editor-name" class="text_pole" value="${escapeHtml(existing?.name || '')}" style="flex:1;min-width:0;box-sizing:border-box;" maxlength="80" placeholder="Display Group name">
                 </div>
-                <div style="font-size:10px;opacity:.62;margin-bottom:5px;overflow-wrap:anywhere;">Select modules to render under this shared header. Use the arrows below to choose their order inside the group. Dedicated modules remain unavailable during BETA.</div>
+                <div style="font-size:10px;opacity:.62;margin-bottom:5px;overflow-wrap:anywhere;">Select modules to render under this shared header. Use the arrows below to choose their order inside the group. Combat, Quests, and Benched Party cannot be grouped.</div>
                 <div style="font-size:10px;font-weight:bold;opacity:.72;margin:8px 0 4px;">MODULE ORDER IN THIS GROUP</div>
                 <div id="rt-dg-member-order" style="display:flex;flex-direction:column;gap:3px;margin-bottom:8px;min-width:0;"></div>
                 <div style="max-height:300px;overflow-y:auto;overflow-x:hidden;border:1px solid rgba(255,255,255,.1);border-radius:5px;padding:3px;box-sizing:border-box;min-width:0;max-width:100%;">${memberRows || '<div style="padding:10px;opacity:.55;">No eligible modules found.</div>'}</div>
@@ -213,11 +213,11 @@ export async function openDisplayGroupsManager() {
                 const selectedTags = new Set([...editor.querySelectorAll('.rt-dg-member:checked:not(:disabled)')].map(input => input.value));
                 const members = memberOrder.filter(tag => selectedTags.has(tag));
                 if (!name) {
-                    toastr['warning']('Give the Display Group a name.', 'Display Groups BETA');
+                    toastr['warning']('Give the Display Group a name.', 'Display Groups');
                     return false;
                 }
                 if (!members.length) {
-                    toastr['warning']('Select at least one module.', 'Display Groups BETA');
+                    toastr['warning']('Select at least one module.', 'Display Groups');
                     return false;
                 }
 
@@ -237,7 +237,7 @@ export async function openDisplayGroupsManager() {
         renderList();
     }, 100);
 
-    await Popup.show.confirm('🗂️ Display Groups — BETA', html, {
+    await Popup.show.confirm('🗂️ Display Groups', html, {
         okButton: 'Done',
         cancelButton: 'Cancel',
         onClosing: (popup) => {
