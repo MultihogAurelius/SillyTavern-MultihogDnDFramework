@@ -1,4 +1,4 @@
-## The Future
+# The Future
 This project is entering maintenance mode. I am winding down the development of the extension version of this program (as in, this repo) in favor of a private fork of SillyTavern. Why am I not going public with it? Because I have no interest in becoming a full-on frontend maintainer, responsible for ongoing compatibility of the parent program itself as well as its security.
 
 I may still fix bugs here as they are reported and make adjustments to existing systems, prompts, etc, but there will be no further major features.
