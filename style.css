@@ -2033,22 +2033,6 @@
     line-height: 1.5;
 }
 
-.rt-discord-btn {
-    position: absolute;
-    top: 8px;
-    left: 8px;
-    z-index: 2;
-    display: inline-flex;
-    align-items: center;
-    line-height: 0;
-}
-
-.rt-discord-btn img {
-    display: block;
-    height: 20px;
-    width: auto;
-}
-
 .rt-bmc-btn {
     position: absolute;
     top: 8px;

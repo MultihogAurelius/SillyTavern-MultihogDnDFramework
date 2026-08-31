@@ -126,14 +126,11 @@ describe('onboarding Player Card and ST persona options', () => {
         expect(html).toContain('Releases section of the GitHub page');
     });
 
-    it('puts a Discord join badge at the top left of the startup menu', () => {
+    it('does not show a Discord link on the startup menu', () => {
         const html = renderMemoAsCards('', null, {});
-        const discordAt = html.indexOf('class="rt-discord-btn"');
-        const bmcAt = html.indexOf('class="rt-bmc-btn"');
 
-        expect(discordAt).toBeGreaterThan(-1);
-        expect(bmcAt).toBeGreaterThan(discordAt);
-        expect(html).toContain('href="https://discord.gg/bgjAeWEc2p"');
-        expect(html).toContain('img.shields.io/badge/Discord-Join%20Server-5865F2');
+        expect(html).not.toContain('class="rt-discord-btn"');
+        expect(html).not.toContain('href="https://discord.gg/bgjAeWEc2p"');
+        expect(html).toContain('class="rt-bmc-btn"');
     });
 });
