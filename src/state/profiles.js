@@ -73,7 +73,7 @@ export function saveProfile(name) {
         mapEvolutionNarratorCommitTokens: s.mapEvolutionNarratorCommitTokens ?? 2000,
         mapEvolutionCompressSystemPrompt: s.mapEvolutionCompressSystemPrompt || "",
         mapEvolutionTickScope: s.mapEvolutionTickScope || "all",
-        mapEvolutionTickCount: s.mapEvolutionTickCount ?? 1,
+        mapEvolutionTickCount: s.mapEvolutionTickCount ?? 2,
         mapEvolutionTickRandomize: s.mapEvolutionTickRandomize !== false,
         mapEvolutionSelectedRoots: JSON.parse(JSON.stringify(s.mapEvolutionSelectedRoots || [])),
         mapEvolutionSystemPrompt: s.mapEvolutionSystemPrompt || "",

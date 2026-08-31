@@ -1,0 +1,13 @@
+# Parent SillyTavern .gitignore excludes public/scripts/extensions/third-party/.
+# Re-include this workspace so Cursor Grep/Glob can see the files.
+
+!**
+!**/
+!**/*
+!.**
+!.cursor/
+!.cursor/**
+!.vscode/
+!.vscode/**
+
+node_modules/

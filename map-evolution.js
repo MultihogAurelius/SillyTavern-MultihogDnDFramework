@@ -729,7 +729,8 @@ function dungeonRootsEqual(left, right) {
 
 /**
  * One Map Evolution pass. Sequential per selected site; never dumps every map
- * into a single prompt.
+ * into a single prompt. Interval ticks already capped the due list to this
+ * turn's chunk — leftover due maps wait because they are not stamped.
  *
  * @param {{
  *   trigger?: 'interval'|'site_exit'|'manual',

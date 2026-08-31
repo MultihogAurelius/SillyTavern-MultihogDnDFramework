@@ -574,7 +574,7 @@ export function registerMapArchitectTool() {
                     scale: { type: 'string', enum: ['SMALL', 'MEDIUM', 'LARGE'], description: 'Geographic size, not danger. DUNGEON: SMALL 4-7 rooms, MEDIUM 7-12, LARGE 12-20. SETTLEMENT: SMALL 4-7 districts, MEDIUM 6-10, LARGE 8-14.' },
                     threat: { type: 'string', enum: ['NONE', 'LOW', 'MODERATE', 'HIGH', 'DEADLY'], description: 'Site danger for occupancy and trap density. NONE forbids invented active danger. Independent of party level and scale.' },
                     prompt: { type: 'string', description: 'Complete private map-generation guidance: purpose/history, topology, expected inhabitants or danger, tone, and anything that must not be contradicted. This can be detailed. Prompt facts do not by themselves grant player knowledge.' },
-                    brief_description: { type: 'string', description: 'Brief current description of the site. This is stored as the parent SUBDUNGEON/SUBINTERIOR gateway detail and may be used for the Location CORE; do not copy the full prompt.' },
+                    brief_description: { type: 'string', description: 'Brief current description of the site (1–2 sentences: what it is, notable features, typical atmosphere). Stored as the Location CORE General field, and as parent SUBDUNGEON/SUBINTERIOR gateway detail. Do not copy the full prompt.' },
                     attachTo: {
                         type: 'object',
                         additionalProperties: false,

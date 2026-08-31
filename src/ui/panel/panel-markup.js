@@ -325,14 +325,14 @@ export function buildPanelMarkup({ settings, agentPanelCollapsedClass }) {
                                 <select id="rt-agent-map-evo-tick-scope" style="width:100%; background:var(--rt-card-bg); color:var(--rt-text); border:var(--rt-border); border-radius:3px; font-size:0.769em; padding:3px 4px;">
                                     <option value="active"${(settings.mapEvolutionTickScope || 'all') === 'active' ? ' selected' : ''}>Current map only</option>
                                     <option value="count"${settings.mapEvolutionTickScope === 'count' ? ' selected' : ''}>N maps from every mapped site</option>
-                                    <option value="all"${(settings.mapEvolutionTickScope || 'all') === 'all' ? ' selected' : ''}>Every due mapped site</option>
+                                    <option value="all"${(settings.mapEvolutionTickScope || 'all') === 'all' ? ' selected' : ''}>All mapped sites (N per turn)</option>
                                     <option value="selected"${settings.mapEvolutionTickScope === 'selected' ? ' selected' : ''}>Selected maps</option>
                                 </select>
                             </label>
-                            <div id="rt-agent-map-evo-n-row" style="display:${(settings.mapEvolutionTickScope === 'count' || settings.mapEvolutionTickScope === 'selected') ? 'flex' : 'none'}; align-items:center; gap:8px; flex-wrap:wrap;">
+                            <div id="rt-agent-map-evo-n-row" style="display:${(settings.mapEvolutionTickScope || 'all') === 'active' ? 'none' : 'flex'}; align-items:center; gap:8px; flex-wrap:wrap;">
                                 <label style="font-size:0.769em; opacity:0.7; display:flex; align-items:center; gap:5px;">
                                     How many
-                                    <input type="text" inputmode="numeric" pattern="[0-9]*" id="rt-agent-map-evo-tick-count" value="${settings.mapEvolutionTickCount ?? 1}" style="width:44px; background:var(--rt-card-bg); color:var(--rt-text); border:var(--rt-border); border-radius:3px; text-align:center; font-size:0.769em; padding:2px;" title="0 = all due maps in the set">
+                                    <input type="text" inputmode="numeric" pattern="[0-9]*" id="rt-agent-map-evo-tick-count" value="${settings.mapEvolutionTickCount ?? 2}" style="width:44px; background:var(--rt-card-bg); color:var(--rt-text); border:var(--rt-border); border-radius:3px; text-align:center; font-size:0.769em; padding:2px;" title="Due maps beyond this number wait for later turns. The current map always takes a slot when it is due. 0 = all due maps this turn.">
                                 </label>
                                 <label style="font-size:0.769em; opacity:0.7; display:flex; align-items:center; gap:5px; cursor:pointer; user-select:none;">
                                     <input type="checkbox" id="rt-agent-map-evo-tick-randomize" ${settings.mapEvolutionTickRandomize !== false ? 'checked' : ''} style="margin:0; cursor:pointer;">

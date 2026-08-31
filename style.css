@@ -1445,7 +1445,7 @@
     gap: 6px;
 }
 
-.rt-fullview-btn, .rt-category-settings-btn {
+.rt-fullview-btn, .rt-category-settings-btn, .rt-party-compact-btn {
     background: none;
     border: none;
     padding: 0;
@@ -1461,7 +1461,7 @@
     justify-content: center;
 }
 
-.rt-fullview-btn:hover, .rt-category-settings-btn:hover {
+.rt-fullview-btn:hover, .rt-category-settings-btn:hover, .rt-party-compact-btn:hover {
     opacity: 1;
     color: var(--rt-text);
 }
@@ -1496,7 +1496,7 @@
     cursor: wait;
 }
 
-.rt-fullview-btn.active {
+.rt-fullview-btn.active, .rt-party-compact-btn.active {
     opacity: 0.7;
     filter: drop-shadow(0 0 2px rgba(255,255,255,0.2));
 }
@@ -1517,8 +1517,55 @@
     color: var(--rt-text-muted);
 }
 
+.rt-party-compact-btn {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    text-transform: uppercase;
+    padding: 2px 6px;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 4px;
+    opacity: 0.7;
+}
+
+.rt-party-compact-btn.active {
+    color: var(--rt-accent);
+    border-color: var(--rt-accent-dim);
+    background: var(--rt-accent-bg);
+    opacity: 1;
+    filter: none;
+}
+
 .rt-collapsed .rt-section-body {
     display: none;
+}
+
+/* PARTY compact mode: portrait, name, and HP only. */
+.rt-party-compact .rt-entity-sub-line,
+.rt-party-compact .rt-spell-row,
+.rt-party-compact .rt-multi-marker-row,
+.rt-party-compact .rt-card-item,
+.rt-party-compact .rt-card-kv,
+.rt-party-compact .rt-benched-panel {
+    display: none !important;
+}
+
+.rt-party-compact .rt-entity-container {
+    align-items: center;
+    padding: 3px 0;
+}
+
+.rt-party-compact .rt-entity-portrait-container {
+    width: 40px;
+    height: 40px;
+}
+
+.rt-party-compact .rt-entity-portrait-placeholder {
+    font-size: 18px;
+}
+
+.rt-party-compact .rt-entity-row {
+    padding: 2px 0;
 }
 
 /* Display Groups BETA: one virtual host with headerless module bodies. */

@@ -1679,6 +1679,63 @@ export function migrateDungeonMapSectionToStructured(entry) {
     return true;
 }
 
+export function mappedSiteBoilerplateCore(rootLabel) {
+    const root = String(rootLabel || '').trim();
+    return `${root} is a mapped site. Its private map stores current objective reality; child Location entries preserve player-observable history.`;
+}
+
+export function mappedSiteLegacyBoilerplateCore(rootLabel) {
+    const root = String(rootLabel || '').trim();
+    return `${root} is a mapped site. Persistent room and area changes are recorded in its child Location entries.`;
+}
+
+function mappedSiteCoreInner(content) {
+    const source = String(content || '');
+    const match = source.match(/\[CORE\]([\s\S]*?)\[\/CORE\]/i);
+    return (match ? match[1] : source).trim();
+}
+
+function mappedSiteCoreWithoutHost(text) {
+    return String(text || '')
+        .replace(/^\s*Host Site:\s*.*$/gim, '')
+        .replace(/^\s*Host Brief:\s*.*$/gim, '')
+        .replace(/\n{2,}/g, '\n')
+        .trim();
+}
+
+/** True when CORE is missing, empty, or the shipped mapped-site boilerplate. */
+export function isMappedSiteBoilerplateCore(content, rootLabel) {
+    const inner = mappedSiteCoreWithoutHost(mappedSiteCoreInner(content));
+    if (!inner) return true;
+    const root = String(rootLabel || '').trim();
+    if (!root) return false;
+    return inner === mappedSiteBoilerplateCore(root)
+        || inner === mappedSiteLegacyBoilerplateCore(root)
+        || inner === `${root} is a mapped site.`;
+}
+
+/**
+ * Write a real Location CORE when the entry has none or only mapped-site boilerplate.
+ * Leaves a lore-authored description untouched.
+ */
+export function applyMappedSiteLocationCore(content, siteRoot, locationCore) {
+    const incoming = String(locationCore || '')
+        .replace(/^\s*\[CORE\]\s*/i, '')
+        .replace(/\s*\[\/CORE\]\s*$/i, '')
+        .trim();
+    if (!incoming || isMappedSiteBoilerplateCore(incoming, siteRoot)) return String(content || '');
+    const source = String(content || '');
+    const match = source.match(/\[CORE\]([\s\S]*?)\[\/CORE\]/i);
+    if (match && !isMappedSiteBoilerplateCore(match[0], siteRoot)) return source;
+    const hostBits = String(match?.[1] || '')
+        .split(/\r?\n/)
+        .map(line => line.trim())
+        .filter(line => /^Host Site:/i.test(line) || /^Host Brief:/i.test(line));
+    const inner = [incoming, ...hostBits].filter(Boolean).join('\n');
+    if (!match) return `[CORE]\n${inner}\n[/CORE]\n${source}`.trim();
+    return source.replace(match[0], `[CORE]\n${inner}\n[/CORE]`);
+}
+
 /** Mark mapped areas with real child Location records as visited during migration. */
 export function reconcileDungeonMapAreaKnowledge(entry, allEntries) {
     const body = extractDungeonMapSection(entry?.content);
@@ -1694,8 +1751,8 @@ export function reconcileDungeonMapAreaKnowledge(entry, allEntries) {
             return segments.length > 1 && locationContainsSiteRoot(label, rootLabel);
         });
     let changed = wasMigrated;
-    const legacyCoreSentence = `${rootLabel} is a mapped site. Persistent room and area changes are recorded in its child Location entries.`;
-    const currentCoreSentence = `${rootLabel} is a mapped site. Its private map stores current objective reality; child Location entries preserve player-observable history.`;
+    const legacyCoreSentence = mappedSiteLegacyBoilerplateCore(rootLabel);
+    const currentCoreSentence = mappedSiteBoilerplateCore(rootLabel);
     if (String(entry.content || '').includes(legacyCoreSentence)) {
         entry.content = String(entry.content).replace(legacyCoreSentence, currentCoreSentence);
         changed = true;

@@ -242,6 +242,8 @@ describe('Map Architect component', () => {
         expect(architect).toContain("{ jsonSchema: MAP_ARCHITECT_ASSETS_JSON_SCHEMA, stream: true, debugSource: 'Map Architect: Assets' }");
         expect(architect).toContain('Topology locked with ${topology.areas.length} areas');
         expect(architect).toContain('persistArchitectDungeonMap(args.site, completedMap');
+        expect(architect).toContain('locationCore: rawArgs?.locationCore || args.briefDescription');
+        expect(hooks).toContain('Stored as the Location CORE General field');
         expect(architect).toContain('CreateAreaMap');
         expect(architect).toContain('Threat: ${args.threat}');
         expect(architect).toContain('Current in-world time (authoritative): ${currentTime');
@@ -306,7 +308,7 @@ describe('Map Architect component', () => {
     it('migrates only untouched shipped prompts to the new taxonomy defaults', () => {
         const defaults = readFileSync(new URL('../src/state/defaults.js', import.meta.url), 'utf8');
         const settings = readFileSync(new URL('../src/state/settings.js', import.meta.url), 'utf8');
-        expect(defaults).toContain("FACTORY_SETTINGS_VERSION = '2026.8.79'");
+        expect(defaults).toContain("FACTORY_SETTINGS_VERSION = '2026.8.80'");
         expect(settings).toContain('promptSignature');
         expect(settings).toContain("'14870:8b5acf86'");
         expect(settings).toContain("'9025:d21f2f49'");

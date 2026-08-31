@@ -7,7 +7,7 @@ const BADGE_OFF = 'font-size:0.692em; padding:1px 7px; border-radius:10px; font-
 function syncTickRows(agentPanel, scope) {
     const nRow = agentPanel.querySelector('#rt-agent-map-evo-n-row');
     const hint = agentPanel.querySelector('#rt-agent-map-evo-selected-hint');
-    if (nRow) nRow.style.display = (scope === 'count' || scope === 'selected') ? 'flex' : 'none';
+    if (nRow) nRow.style.display = scope === 'active' ? 'none' : 'flex';
     if (hint) hint.style.display = scope === 'selected' ? 'block' : 'none';
 }
 
@@ -94,7 +94,7 @@ export function wireAgentMapEvolution({
         }
         const countInp = /** @type {HTMLInputElement|null} */ (agentPanel.querySelector('#rt-agent-map-evo-tick-count'));
         if (countInp && document.activeElement !== countInp) {
-            countInp.value = String(s.mapEvolutionTickCount ?? 1);
+            countInp.value = String(s.mapEvolutionTickCount ?? 2);
         }
         const randChk = /** @type {HTMLInputElement|null} */ (agentPanel.querySelector('#rt-agent-map-evo-tick-randomize'));
         if (randChk && document.activeElement !== randChk) {
@@ -165,7 +165,7 @@ export function wireAgentMapEvolution({
             if (typeof runtimeState.applyMapEvolutionTickSettingsToUiRef === 'function') {
                 runtimeState.applyMapEvolutionTickSettingsToUiRef(s);
             } else {
-                $('#rpg_map_evolution_n_row').toggle(s.mapEvolutionTickScope === 'count' || s.mapEvolutionTickScope === 'selected');
+                $('#rpg_map_evolution_n_row').toggle(s.mapEvolutionTickScope !== 'active');
                 $('#rpg_map_evolution_interval_selected_hint').toggle(s.mapEvolutionTickScope === 'selected');
             }
         });
@@ -176,7 +176,7 @@ export function wireAgentMapEvolution({
         countInp.addEventListener('change', () => {
             const s = getSettings();
             const parsed = parseInt(countInp.value, 10);
-            s.mapEvolutionTickCount = Math.max(0, Math.min(50, Number.isFinite(parsed) ? parsed : 1));
+            s.mapEvolutionTickCount = Math.max(0, Math.min(50, Number.isFinite(parsed) ? parsed : 2));
             countInp.value = String(s.mapEvolutionTickCount);
             saveSettings();
             $('#rpg_map_evolution_tick_count').val(s.mapEvolutionTickCount);

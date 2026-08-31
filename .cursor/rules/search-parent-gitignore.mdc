@@ -1,0 +1,15 @@
+---
+description: Use terminal rg/dir when Cursor Grep/Glob miss this nested repo
+alwaysApply: true
+---
+
+# Search this repo on disk
+
+This extension lives at `public/scripts/extensions/third-party/` inside SillyTavern. SillyTavern's `.gitignore` excludes that path, and Cursor Grep/Glob often inherit it and return no matches even though the files exist.
+
+When Grep or Glob returns nothing for a symbol that should be in this repo, search with the Shell from this workspace root:
+
+- `rg -n "pattern" --glob "*.js"`
+- `rg --files -g "*.js"`
+
+Do not conclude a file or symbol is missing until a workspace-root `rg` agrees.

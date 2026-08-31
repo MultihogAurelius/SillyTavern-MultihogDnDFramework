@@ -542,14 +542,54 @@ function shuffleCopy(items, random) {
     return next;
 }
 
+function orderDueSites(due, { randomize, lastFiredMinutesFor, random }) {
+    const rows = Array.isArray(due) ? [...due] : [];
+    if (randomize) return shuffleCopy(rows, typeof random === 'function' ? random : Math.random);
+    return rows.sort((left, right) => {
+        const delta = lastFiredMinutesFor(left.siteRoot) - lastFiredMinutesFor(right.siteRoot);
+        if (delta !== 0) return delta;
+        return String(left.siteRoot || '').localeCompare(String(right.siteRoot || ''));
+    });
+}
+
+/**
+ * Cap this turn's due list. Unpicked sites stay due because Last Evolved is not stamped.
+ * The current map always consumes a slot first when it is due (LoD / High Dynamism).
+ * count 0 means every due site this turn.
+ */
+export function takeDueSitesThisTurn(due, {
+    count = 2,
+    randomize = true,
+    currentRoot = '',
+    lastFiredMinutesFor = () => -1,
+    random = Math.random,
+} = {}) {
+    const rows = Array.isArray(due) ? [...due] : [];
+    const currentKey = normalizeDungeonLabel(currentRoot);
+    const current = currentKey
+        ? rows.find(site => siteRootKey(site) === currentKey) || null
+        : null;
+    const others = current
+        ? rows.filter(site => siteRootKey(site) !== currentKey)
+        : rows;
+    const ranked = current
+        ? [current, ...orderDueSites(others, { randomize, lastFiredMinutesFor, random })]
+        : orderDueSites(others, { randomize, lastFiredMinutesFor, random });
+    const takeAll = !Number.isFinite(Number(count)) || Number(count) <= 0;
+    if (takeAll) return ranked;
+    const limit = Math.max(1, Math.min(50, Number(count) || 2));
+    return ranked.slice(0, limit);
+}
+
 /**
  * Which mapped sites an interval tick should stamp / evolve.
- * Baselines are returned separately so they never consume the per-tick count.
- * count 0 means every due site in the pool.
+ * The due pool is the full matching set; this turn only crunches `count` of them.
+ * Leftover due maps wait for later turns. Baselines never consume a slot.
+ * count 0 means every due site in the pool this turn.
  */
 export function pickSitesForEvolutionTick(sites, {
     scope = 'active',
-    count = 1,
+    count = 2,
     randomize = true,
     selectedRoots = [],
     currentRoot = '',
@@ -579,22 +619,21 @@ export function pickSitesForEvolutionTick(sites, {
         else if (status.due) due.push(site);
     }
 
-    if (normalizedScope === 'active' || normalizedScope === 'all') {
+    if (normalizedScope === 'active') {
         return { baseline, due, pool };
     }
 
-    const takeAll = !Number.isFinite(Number(count)) || Number(count) <= 0;
-    if (takeAll) return { baseline, due, pool };
-
-    const limit = Math.max(1, Math.min(50, Number(count) || 1));
-    const ordered = randomize
-        ? shuffleCopy(due, typeof random === 'function' ? random : Math.random)
-        : [...due].sort((left, right) => {
-            const delta = lastFiredMinutesFor(left.siteRoot) - lastFiredMinutesFor(right.siteRoot);
-            if (delta !== 0) return delta;
-            return String(left.siteRoot || '').localeCompare(String(right.siteRoot || ''));
-        });
-    return { baseline, due: ordered.slice(0, limit), pool };
+    return {
+        baseline,
+        due: takeDueSitesThisTurn(due, {
+            count,
+            randomize,
+            currentRoot,
+            lastFiredMinutesFor,
+            random,
+        }),
+        pool,
+    };
 }
 
 export const MAX_MAP_EVOLUTION_THREADS = 400;

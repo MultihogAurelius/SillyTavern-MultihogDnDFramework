@@ -89,7 +89,7 @@ export function createChatStateLoader({
     s.mapEvolutionLastSiteRoot = saved.mapEvolutionLastSiteRoot || '';
     s.mapEvolutionPendingExitRoot = saved.mapEvolutionPendingExitRoot || '';
     s.mapEvolutionTickScope = saved.mapEvolutionTickScope || 'all';
-    s.mapEvolutionTickCount = saved.mapEvolutionTickCount ?? 1;
+    s.mapEvolutionTickCount = saved.mapEvolutionTickCount ?? 2;
     s.mapEvolutionTickRandomize = saved.mapEvolutionTickRandomize !== false;
     s.mapEvolutionSelectedRoots = JSON.parse(JSON.stringify(saved.mapEvolutionSelectedRoots || []));
     s.mapEvolutionIntervalHoursBySite = JSON.parse(JSON.stringify(saved.mapEvolutionIntervalHoursBySite || {}));

@@ -125,7 +125,7 @@ export const MAP_ARCHITECT_BRIEF_JSON_SCHEMA = Object.freeze({
             scale: { type: 'string', enum: ['SMALL', 'MEDIUM', 'LARGE'] },
             threat: { type: 'string', enum: ['NONE', 'LOW', 'MODERATE', 'HIGH', 'DEADLY'] },
             prompt: { type: 'string', minLength: 1, description: 'Complete private design guidance for generating the map.' },
-            brief_description: { type: 'string', minLength: 1, description: 'Brief current description suitable for the Location CORE and any parent-map gateway asset.' },
+            brief_description: { type: 'string', minLength: 1, description: 'Brief current description stored as the Location CORE General field and any parent-map gateway asset.' },
             keywords: {
                 type: 'array',
                 items: { type: 'string', minLength: 1 },

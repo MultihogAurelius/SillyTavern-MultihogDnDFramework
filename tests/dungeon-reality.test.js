@@ -6,6 +6,9 @@ import {
     listMappedSiteSummaries,
     buildDungeonMapCommitSchema,
     attachDungeonMapToLocationEntry,
+    applyMappedSiteLocationCore,
+    isMappedSiteBoilerplateCore,
+    mappedSiteBoilerplateCore,
     buildDungeonSitesFromLocationEntries,
     collectDungeonMapCandidates,
     dungeonLabelIdentitiesMatch,
@@ -674,6 +677,29 @@ A desecrated altar.
         expect(extractDungeonMapSection(root.content)).toBe('');
         expect(root.content).toBe('[CORE]A crypt.[/CORE]');
         expect(detachDungeonMapFromLocationEntry(root)).toBe(false);
+    });
+
+    it('replaces mapped-site CORE boilerplate with a real location description', () => {
+        const site = 'Echo Ridge Mine';
+        expect(isMappedSiteBoilerplateCore(mappedSiteBoilerplateCore(site), site)).toBe(true);
+        expect(isMappedSiteBoilerplateCore(`[CORE]\n${mappedSiteBoilerplateCore(site)}\n[/CORE]`, site)).toBe(true);
+        expect(isMappedSiteBoilerplateCore('[CORE]\nA worked gold mine above Goldshire.\n[/CORE]', site)).toBe(false);
+
+        const filled = applyMappedSiteLocationCore(
+            `[CORE]\n${mappedSiteBoilerplateCore(site)}\n[/CORE]`,
+            site,
+            'A worked gold mine above Goldshire, marked by a warning-notched timber.',
+        );
+        expect(filled).toContain('A worked gold mine above Goldshire');
+        expect(filled).not.toContain('private map stores current objective reality');
+
+        const kept = applyMappedSiteLocationCore(
+            '[CORE]\nA well-worn dusty track through Mulgore.\n[/CORE]',
+            site,
+            'A worked gold mine.',
+        );
+        expect(kept).toContain('A well-worn dusty track through Mulgore.');
+        expect(kept).not.toContain('A worked gold mine.');
     });
 
     it('migrates the earlier private-extension attachment into normal lore content', () => {

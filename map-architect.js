@@ -512,7 +512,7 @@ async function runMapArchitectOnce(rawArgs) {
     const saved = await persistArchitectDungeonMap(args.site, completedMap, {
         requireNew: !!rawArgs?.requireNew,
         locationKeys: rawArgs?.locationKeys,
-        locationCore: rawArgs?.locationCore,
+        locationCore: rawArgs?.locationCore || args.briefDescription,
         includeManifest,
         hostContext,
     });

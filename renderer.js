@@ -1235,6 +1235,7 @@ export function renderDayNightBadge(str) {
 
     const COLLAPSE_KEY = 'rpg_tracker_collapsed';
     const DETACHED_KEY = 'rpg_tracker_detached';
+    const PARTY_COMPACT_KEY = 'rpg_tracker_party_compact';
 
 
 
@@ -1261,6 +1262,22 @@ export function renderDayNightBadge(str) {
     }
     export function saveDetached(set) {
         localStorage.setItem(DETACHED_KEY, JSON.stringify([...set]));
+    }
+
+    export function loadPartyCompact() {
+        try { return localStorage.getItem(PARTY_COMPACT_KEY) === 'true'; }
+        catch { return false; }
+    }
+
+    export function savePartyCompact(on) {
+        try { localStorage.setItem(PARTY_COMPACT_KEY, String(!!on)); }
+        catch { /* ignore */ }
+    }
+
+    function renderPartyCompactButton(isOn) {
+        const active = isOn ? ' active' : '';
+        const title = isOn ? 'Show full party details' : 'Compact mode: portrait, name, and HP only';
+        return `<button type="button" class="rt-party-compact-btn${active}" data-tag="PARTY" aria-pressed="${isOn ? 'true' : 'false'}" title="${title}">Compact Mode</button>`;
     }
 
     const ACTIVE_TAB_KEY = 'rpg_tracker_active_tab';
@@ -2620,6 +2637,7 @@ function formatValueToCurrency(totalCp, detectedCurrency) {
         const displayName = customField?.label || tag;
         const items = blockToItems(tag, content);
         const isCollapsed = !uiOptions.bodyOnly && collapsed.has(tag);
+        const isPartyCompact = tag === 'PARTY' && loadPartyCompact();
 
         let totalValueBadge = '';
         if (tag === 'INVENTORY' && items.totalValueGP && getSettings().showTotalInventoryValue !== false) {
@@ -2668,6 +2686,8 @@ function formatValueToCurrency(totalCp, detectedCurrency) {
             </button>
         ` : '';
 
+        const partyCompactBtn = tag === 'PARTY' ? renderPartyCompactButton(isPartyCompact) : '';
+
         const fullViewBtn = NO_PAGINATE.has(renderType) ? '' : `
             <button class="rt-fullview-btn${isFullView ? ' active' : ''}" data-tag="${tag}" title="${isFullView ? 'Switch to Paged View' : 'Switch to Full List'}">
                 ${isFullView ? '📜' : '📑'}
@@ -2693,17 +2713,19 @@ function formatValueToCurrency(totalCp, detectedCurrency) {
             benchedPanelHtml = renderBenchedPartyPanel(blocks['BENCHED PARTY'], collapsed.has('BENCHED PARTY'), loadBenchedExpanded());
         }
 
+        const compactClass = isPartyCompact ? ' rt-party-compact' : '';
         const bodyHtml = `<div class="${bodyClass}"${catStyleAttr}>${pageItems.join('')}${pagination}${benchedPanelHtml}</div>`;
         if (uiOptions.bodyOnly) {
-            return `<div class="rt-display-group-member" data-member-tag="${tag}">${bodyHtml}</div>`;
+            return `<div class="rt-display-group-member${compactClass}" data-member-tag="${tag}">${bodyHtml}</div>`;
         }
 
-        return `<div class="rt-section-card${isCollapsed ? ' rt-collapsed' : ''}" data-tag="${tag}">
+        return `<div class="rt-section-card${isCollapsed ? ' rt-collapsed' : ''}${compactClass}" data-tag="${tag}">
             <div class="rt-section-header" data-tag="${tag}">
                 <span>${icon} ${displayName}</span>
                 <div class="rt-section-header-right">
                     ${totalValueBadge}
                     ${personaFromCharBtn}
+                    ${partyCompactBtn}
                     ${detachBtn}
                     ${fullViewBtn}
                     ${uiOptions.showCategorySettings === false ? '' : `<button class="rt-category-settings-btn" data-tag="${tag}" title="Category Rendering Options">
@@ -2732,10 +2754,13 @@ function formatValueToCurrency(totalCp, detectedCurrency) {
         )).join('');
         if (!memberBodies) return '';
 
+        const partyCompactBtn = tags.includes('PARTY') ? renderPartyCompactButton(loadPartyCompact()) : '';
+
         return `<div class="rt-section-card rt-display-group-card${isCollapsed ? ' rt-collapsed' : ''}" data-tag="${key}" data-display-group-id="${escapeHtml(group.id)}">
             <div class="rt-section-header" data-tag="${key}">
                 <span>${escapeHtml(group.icon)} ${escapeHtml(group.name)}</span>
                 <div class="rt-section-header-right">
+                    ${partyCompactBtn}
                     <span class="rt-item-count">${tags.length} ${tags.length === 1 ? 'module' : 'modules'}</span>
                     <span class="rt-collapse-icon">${isCollapsed ? '&#9656;' : '&#9662;'}</span>
                 </div>

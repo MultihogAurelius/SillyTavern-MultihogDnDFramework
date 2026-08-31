@@ -25,6 +25,7 @@ import { findMostRecentNarratorMessage, stripCyoaChoiceBlocks } from './src/stat
 import {
     applyDungeonMapTransaction,
     attachDungeonMapToLocationEntry,
+    applyMappedSiteLocationCore,
     detachDungeonMapFromLocationEntry,
     buildDungeonSitesFromLocationEntries,
     collectDungeonMapCandidates,
@@ -39,6 +40,7 @@ import {
     locationContainsSiteRoot,
     getDungeonMapAttachment,
     listMappedSiteDocuments,
+    mappedSiteBoilerplateCore,
     migrateDungeonMapAttachmentToContent,
     parseDungeonMapDocument,
     reconcileDungeonMapAreaKnowledge,
@@ -548,7 +550,7 @@ export async function syncDungeonMapsToLocationLorebook(chat, { capture = true }
                 key: [map.siteRoot],
                 keysecondary: [],
                 comment: map.siteRoot,
-                content: `[CORE]\n${map.siteRoot} is a mapped site. Its private map stores current objective reality; child Location entries preserve player-observable history.\n[/CORE]`,
+                content: `[CORE]\n${mappedSiteBoilerplateCore(map.siteRoot)}\n[/CORE]`,
                 constant: false,
                 selective: false,
                 selectiveLogic: 0,
@@ -745,13 +747,17 @@ export async function persistArchitectDungeonMap(siteRoot, mapDocument, {
         throw new Error(`A location named "${site}" already exists. Use + MAP on that root instead.`);
     }
 
+    if (rootEntry && String(locationCore || '').trim()) {
+        rootEntry.content = applyMappedSiteLocationCore(rootEntry.content, requestedSite, locationCore);
+    }
+
     if (!rootEntry) {
         const uids = Object.keys(bookData.entries || {}).map(Number).filter(Number.isFinite);
         const nextUid = uids.length ? Math.max(...uids) + 1 : 0;
         const coreBody = String(locationCore || '').trim();
         const coreContent = /\[CORE\]/i.test(coreBody)
             ? coreBody
-            : `[CORE]\n${coreBody || `${requestedSite} is a mapped site. Its private map stores current objective reality; child Location entries preserve player-observable history.`}\n[/CORE]`;
+            : `[CORE]\n${coreBody || mappedSiteBoilerplateCore(requestedSite)}\n[/CORE]`;
         rootEntry = {
             uid: nextUid,
             key: locationKeysForNewRoot(requestedSite, [

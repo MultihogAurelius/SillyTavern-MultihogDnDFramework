@@ -1654,18 +1654,21 @@
                                         <select id="rpg_map_evolution_tick_scope" class="text_pole" title="Which mapped sites the automatic interval may evolve. Only maps selected by the normal pass can consume report pressure.">
                                             <option value="active">Current map only</option>
                                             <option value="count">N maps from every mapped site</option>
-                                            <option value="all" selected>Every due mapped site</option>
+                                            <option value="all" selected>All mapped sites (N per turn)</option>
                                             <option value="selected">Selected maps</option>
                                         </select>
                                     </label>
                                     <div id="rpg_map_evolution_n_row" class="flex-container gap-1" style="align-items:end; flex-wrap:wrap;">
                                         <label style="flex:1; min-width:140px;">How many
-                                            <input id="rpg_map_evolution_tick_count" type="text" inputmode="numeric" pattern="[0-9]*" min="0" max="50" class="text_pole" title="How many due maps to evolve per interval tick. 0 = all due maps in the set. First visits stamp a baseline and do not use a slot." />
+                                            <input id="rpg_map_evolution_tick_count" type="text" inputmode="numeric" pattern="[0-9]*" min="0" max="50" class="text_pole" title="How many due maps to evolve per interval tick. Leftover due maps wait for later turns. The current map always takes a slot when it is due. 0 = all due maps this turn. First visits stamp a baseline and do not use a slot." />
                                         </label>
                                         <label class="checkbox_label" style="flex:1; min-width:180px; padding-bottom:4px;">
                                             <input id="rpg_map_evolution_tick_randomize" type="checkbox" checked />
                                             <span>Randomize which due maps are picked</span>
                                         </label>
+                                    </div>
+                                    <div style="font-size:0.78em; opacity:0.65; line-height:1.35; margin-top:-4px;">
+                                        Leftover due maps stay queued for later turns. The current map always takes a slot when it is due.
                                     </div>
                                     <div id="rpg_map_evolution_interval_selected_hint" style="display:none; font-size:0.78em; opacity:0.65; line-height:1.35;">
                                         Interval ticks use the maps checked under Run now below. That checkbox does not enable or disable a per-map timer.

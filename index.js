@@ -6,7 +6,7 @@ import { diffTextLines, diffHasChanges } from './prompt-diff.js';
 import { sendStateRequest, fetchOllamaModels, fetchOpenAIModels, testOpenAIConnection, getConnectionProfiles, getCurrentCompletionPreset, setCompletionPreset, syncCombatProfile, resetCombatProfileOverride, isCombatActive } from './llm-client.js';
 import { getDiceToolName, getDiceCommandName, getDiceCommandAliases, doDiceRoll, registerDiceFunctionTool, syncLocationMappingRuntime, syncDiceFunctionToolForRngContext, registerDiceSlashCommand, installInterceptor, getNarrativeBlocks, onGenerationStarted, onGenerationEnded, onMapArchitectAssistantMessage, handleRelationshipSwipeChange, applyStateTrackerRelationshipCommands, resetRouterTick, getRouterTick, getMapUpdaterTick, resetRouterAutoTick, getRouterSchedulerInternals, makeRngQueue, buildRngBlock, RNG_QUEUE_LEN } from './narrative-hooks.js';
 import { deduplicateMemo, mergeMemo, computeDelta, escapeHtml, escapeRegex, highlightParens, cleanToolCallMessage, cleanMessageContent, getLastUserAction, buildLorebookContext, buildModulesInstructionText, buildModuleFormatInstruction, parseQuestsFromMemo, syncQuestsFromMemo, syncQuestsToMemo, writeQuestsToMemo, getQuestMood, extractCurrentTimeStr, stripArchivedQuestsFromMemo, stripCompletedQuestsFromMemo, applyQuestSyncAndStripMemo, isArchivedQuestStatus, removeArchivedQuest, parseInWorldTime, formatInWorldTime, sanitizeLorebookRecordContent, memoForTrackerContext, memoForGmContext } from './memo-processor.js';
-import { renderSubFieldByRule, tryRenderMarker, renderCustomBlockLine, stripMemoHtml, escapeHtmlWithColor, parseMemoBlocks, getPageSize, loadCollapsed, saveCollapsed, loadDetached, saveDetached, blockToItems, renderMemoAsCards, renderTabModeView, renderBottomXpBar, renderQuestLog, renderLorebookTerminal, loadActiveTab, saveActiveTab, getTimeOfDayInfo, renderDayNightBadge, MARKER_TYPE_MAP, getMarkerLibraryKeys, loadBenchedExpanded, saveBenchedExpanded } from './renderer.js';
+import { renderSubFieldByRule, tryRenderMarker, renderCustomBlockLine, stripMemoHtml, escapeHtmlWithColor, parseMemoBlocks, getPageSize, loadCollapsed, saveCollapsed, loadDetached, saveDetached, loadPartyCompact, savePartyCompact, blockToItems, renderMemoAsCards, renderTabModeView, renderBottomXpBar, renderQuestLog, renderLorebookTerminal, loadActiveTab, saveActiveTab, getTimeOfDayInfo, renderDayNightBadge, MARKER_TYPE_MAP, getMarkerLibraryKeys, loadBenchedExpanded, saveBenchedExpanded } from './renderer.js';
 import { unregisterLogQuestTool, checkQuestDeadlines, renderQuestsAsPlainText } from './quests.js';
 import { initializeDebugViewer, toggleDebugViewer } from './debug-viewer.js';
 import { installSwipeSchedulerDebug } from './swipe-scheduler-debug.js';
@@ -265,7 +265,7 @@ function persistMapEvolutionIntervalOverrideFromUi(siteRoot, rawValue) {
 
 function syncMapEvolutionTickRows(settings) {
     const scope = settings?.mapEvolutionTickScope || 'all';
-    $('#rpg_map_evolution_n_row').toggle(scope === 'count' || scope === 'selected');
+    $('#rpg_map_evolution_n_row').toggle(scope !== 'active');
     $('#rpg_map_evolution_interval_selected_hint').toggle(scope === 'selected');
 }
 
@@ -397,7 +397,7 @@ function updateMapEvolutionScheduleDisplay(currentRoot = '') {
 function applyMapEvolutionTickSettingsToUi(settings) {
     const s = settings || getSettings();
     $('#rpg_map_evolution_tick_scope').val(s.mapEvolutionTickScope || 'all');
-    $('#rpg_map_evolution_tick_count').val(s.mapEvolutionTickCount ?? 1);
+    $('#rpg_map_evolution_tick_count').val(s.mapEvolutionTickCount ?? 2);
     $('#rpg_map_evolution_tick_randomize').prop('checked', s.mapEvolutionTickRandomize !== false);
     syncMapEvolutionTickRows(s);
     void refreshMapEvolutionSelectedList();
@@ -3609,7 +3609,7 @@ function loadProfile(name) {
     s.mapEvolutionTickScope = p.mapEvolutionTickScope || 'all';
     s.mapEvolutionTickCount = (() => {
         const n = Number(p.mapEvolutionTickCount);
-        return Number.isFinite(n) ? Math.max(0, Math.min(50, n)) : 1;
+        return Number.isFinite(n) ? Math.max(0, Math.min(50, n)) : 2;
     })();
     s.mapEvolutionTickRandomize = p.mapEvolutionTickRandomize !== false;
     s.mapEvolutionSelectedRoots = JSON.parse(JSON.stringify(p.mapEvolutionSelectedRoots || []));
@@ -6020,6 +6020,7 @@ function organizeConnectionSettingsUI() {
         loadBenchedExpanded,
         loadCollapsed,
         loadDetached,
+        loadPartyCompact,
         maybeCreateOnboardingPersona,
         parseMemoBlocks,
         refreshAgentManifest: (...args) => runtimeState.refreshAgentManifest(...args),
@@ -6031,6 +6032,7 @@ function organizeConnectionSettingsUI() {
         saveBenchedExpanded,
         saveCollapsed,
         saveDetached,
+        savePartyCompact,
         scaleImageTo512Square,
         scheduleAutoApply,
         setInitialDateValue,
@@ -6291,9 +6293,9 @@ function organizeConnectionSettingsUI() {
                 runtimeState.updateAgentMapEvolutionStatusRef();
             }
         });
-        $('#rpg_map_evolution_tick_count').val(settings.mapEvolutionTickCount ?? 1).on('change', function () {
+        $('#rpg_map_evolution_tick_count').val(settings.mapEvolutionTickCount ?? 2).on('change', function () {
             const parsed = parseInt(String($(this).val()), 10);
-            settings.mapEvolutionTickCount = Math.max(0, Math.min(50, Number.isFinite(parsed) ? parsed : 1));
+            settings.mapEvolutionTickCount = Math.max(0, Math.min(50, Number.isFinite(parsed) ? parsed : 2));
             $(this).val(settings.mapEvolutionTickCount);
             saveSettings();
             $('#rt-agent-map-evo-tick-count').val(settings.mapEvolutionTickCount);

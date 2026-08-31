@@ -835,6 +835,80 @@ describe('Map Evolution', () => {
         expect(empty.baseline).toEqual([]);
     });
 
+    it('queues leftover due maps for later turns and always prefers the current map', () => {
+        const lastFiredMinutesFor = root => ({
+            'Forgotten Tomb': 0,
+            'Hall of the Ember-Ancestors': 60,
+            Morrowfen: 120,
+        }[root]);
+        const firstTurn = pickSitesForEvolutionTick([tomb, hall, docks], {
+            scope: 'all',
+            count: 2,
+            randomize: false,
+            currentRoot: 'Morrowfen',
+            lastFiredMinutesFor,
+            currentMinutes: 8 * 60,
+            intervalHours: 4,
+        });
+        expect(firstTurn.due.map(site => site.siteRoot)).toEqual(['Morrowfen', 'Forgotten Tomb']);
+
+        const onlyCurrent = pickSitesForEvolutionTick([tomb, hall, docks], {
+            scope: 'all',
+            count: 1,
+            randomize: false,
+            currentRoot: 'Morrowfen',
+            lastFiredMinutesFor,
+            currentMinutes: 8 * 60,
+            intervalHours: 4,
+        });
+        expect(onlyCurrent.due.map(site => site.siteRoot)).toEqual(['Morrowfen']);
+
+        const nextTurn = pickSitesForEvolutionTick([tomb, hall, docks], {
+            scope: 'all',
+            count: 2,
+            randomize: false,
+            currentRoot: 'Morrowfen',
+            lastFiredMinutesFor: root => ({
+                'Forgotten Tomb': 8 * 60,
+                'Hall of the Ember-Ancestors': 60,
+                Morrowfen: 8 * 60,
+            }[root]),
+            currentMinutes: 8 * 60,
+            intervalHours: 4,
+        });
+        expect(nextTurn.due.map(site => site.siteRoot)).toEqual(['Hall of the Ember-Ancestors']);
+
+        const uncapped = pickSitesForEvolutionTick([tomb, hall, docks], {
+            scope: 'all',
+            count: 0,
+            randomize: false,
+            currentRoot: 'Morrowfen',
+            lastFiredMinutesFor,
+            currentMinutes: 8 * 60,
+            intervalHours: 4,
+        });
+        expect(uncapped.due.map(site => site.siteRoot)).toEqual([
+            'Morrowfen',
+            'Forgotten Tomb',
+            'Hall of the Ember-Ancestors',
+        ]);
+    });
+
+    it('does not inject the current map when it is outside the selected checklist', () => {
+        const lastFiredMinutesFor = () => 0;
+        const selected = pickSitesForEvolutionTick([tomb, hall, docks], {
+            scope: 'selected',
+            count: 2,
+            randomize: false,
+            selectedRoots: ['Hall of the Ember-Ancestors'],
+            currentRoot: 'Forgotten Tomb',
+            lastFiredMinutesFor,
+            currentMinutes: 8 * 60,
+            intervalHours: 4,
+        });
+        expect(selected.due.map(site => site.siteRoot)).toEqual(['Hall of the Ember-Ancestors']);
+    });
+
     it('resolves current-map and per-site interval overrides without changing Evolution behavior', () => {
         const options = {
             intervalHours: 12,
@@ -999,6 +1073,8 @@ describe('Map Evolution', () => {
         expect(settingsMarkup).toContain('id="rpg_map_evolution_tick_scope"');
         expect(settingsMarkup).toContain('id="rpg_map_evolution_tick_count"');
         expect(settingsMarkup).toContain('id="rpg_map_evolution_tick_randomize"');
+        expect(settingsMarkup).toContain('All mapped sites (N per turn)');
+        expect(settingsMarkup).toContain('Leftover due maps stay queued for later turns');
         expect(settingsMarkup).toContain('id="rpg_map_evolution_selected_list"');
         expect(settingsMarkup).toContain('id="rpg_map_evolution_evolve_now"');
         expect(settingsMarkup).toContain('id="rpg_map_evolution_last_fired"');

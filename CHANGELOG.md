@@ -2,6 +2,13 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.80] - 2026-08-31
+
+### Changed
+- **Map Evolution queue**: Interval ticks no longer evolve every due map in one turn. The due pool is still collected in full, then only N maps run (default 2); the rest stay due for later turns. If the current map is due, it always takes a slot first. 0 still means “all due maps this turn.”
+- **Mapped site General**: CreateAreaMap `brief_description` is now written into the Location CORE (the General field) instead of the private-map boilerplate. An existing lore-authored description is left alone.
+- **PARTY Compact Mode**: The PARTY module header has a Compact Mode toggle. When on, each member shows only portrait, name, and HP (including hiding Cantrips / leveled spell rows).
+
 ## [2026.8.79] - 2026-08-30
 
 ### Changed

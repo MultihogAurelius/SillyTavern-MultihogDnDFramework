@@ -1418,7 +1418,7 @@ Include the entity name/title itself (without timestamps like "[Day 1]") as a ke
 
         mapEvolutionTickScope: "all",
 
-        mapEvolutionTickCount: 1,
+        mapEvolutionTickCount: 2,
 
         mapEvolutionTickRandomize: true,
 
@@ -1572,7 +1572,7 @@ You may be asked to use Markers: ((PLS)), ((B)), ((XB)), ((BDG)), ((HGT)). These
 
 /** Latest settings migration version — factory reset skips legacy upgrade paths at or below this. */
 
-export const FACTORY_SETTINGS_VERSION = '2026.8.79';
+export const FACTORY_SETTINGS_VERSION = '2026.8.80';
 
 
 /** Remove extension UI keys from localStorage so a factory reset does not rehydrate stale panel state. */

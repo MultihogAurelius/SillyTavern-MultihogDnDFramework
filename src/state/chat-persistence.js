@@ -522,7 +522,7 @@ export function saveChatState(chatId, opts = {}) {
         mapEvolutionLastSiteRoot: s.mapEvolutionLastSiteRoot || '',
         mapEvolutionPendingExitRoot: s.mapEvolutionPendingExitRoot || '',
         mapEvolutionTickScope: s.mapEvolutionTickScope || 'all',
-        mapEvolutionTickCount: s.mapEvolutionTickCount ?? 1,
+        mapEvolutionTickCount: s.mapEvolutionTickCount ?? 2,
         mapEvolutionTickRandomize: s.mapEvolutionTickRandomize !== false,
         mapEvolutionSelectedRoots: JSON.parse(JSON.stringify(s.mapEvolutionSelectedRoots || [])),
         mapEvolutionIntervalHoursBySite: JSON.parse(JSON.stringify(s.mapEvolutionIntervalHoursBySite || {})),

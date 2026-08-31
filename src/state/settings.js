@@ -1231,7 +1231,14 @@ function getSettingsInternal(extensionSettings) {
     const tickScope = String(s.mapEvolutionTickScope || '').trim().toLowerCase();
     s.mapEvolutionTickScope = ['active', 'count', 'all', 'selected'].includes(tickScope) ? tickScope : 'all';
     const tickCount = Number(s.mapEvolutionTickCount);
-    s.mapEvolutionTickCount = Number.isFinite(tickCount) ? Math.max(0, Math.min(50, Math.floor(tickCount))) : 1;
+    s.mapEvolutionTickCount = Number.isFinite(tickCount) ? Math.max(0, Math.min(50, Math.floor(tickCount))) : 2;
+    // `all` previously ignored tickCount (the How many row was hidden; factory 1
+    // was unused). Interval ticks now queue N due maps per turn.
+    if (isOlderThan(s.settingsVersion, '2026.8.80')
+        && s.mapEvolutionTickScope === 'all'
+        && s.mapEvolutionTickCount === 1) {
+        s.mapEvolutionTickCount = 2;
+    }
     s.mapEvolutionTickRandomize = s.mapEvolutionTickRandomize !== false;
     if (!Array.isArray(s.mapEvolutionSelectedRoots)) s.mapEvolutionSelectedRoots = [];
     s.mapEvolutionIntervalHours = (() => {
