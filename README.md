@@ -1,4 +1,11 @@
-### This extension is now mostly feature-complete. Bug-fixing, balancing, adjusting, etc. continues. Pull requests are appreciated in case you find a bug. I want to get this into a good, solid final state.
+## The Future
+This project is entering maintenance mode. I am winding down the development of the extension version of this program (as in, this repo) in favor of a private fork of SillyTavern. Why am I not going public with it? Because I have no interest in becoming a full-on frontend maintainer, responsible for ongoing compatibility of the parent program itself as well as its security.
+
+I may still fix bugs here as they are reported and make adjustments to existing systems, prompts, etc, but there will be no further major features.
+
+This should not be taken to mean that the extension is unfinished. It is already highly feature-rich, and I have always been adamant about maintaining a high standard of quality.
+
+Anyone who wants to continue developing the extension is encouraged to fork it.
 
 ---
 
