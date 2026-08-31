@@ -1998,6 +1998,9 @@ function formatValueToCurrency(totalCp, detectedCurrency) {
             const startTimeInputVal = obSettings.initialTime || '08:00 AM';
 
             return `<div class="rt-empty" style="text-align: left; align-items: flex-start; padding: 12px; gap: 10px; overflow-y: auto;">
+                <a class="rt-discord-btn" href="https://discord.gg/bgjAeWEc2p" target="_blank" rel="noopener noreferrer" title="Join Discord">
+                    <img src="https://img.shields.io/badge/Discord-Join%20Server-5865F2?style=flat-square&logo=discord&logoColor=white" alt="Discord — Join Server" height="20">
+                </a>
                 <a class="rt-bmc-btn" href="https://buymeacoffee.com/multihog" target="_blank" rel="noopener noreferrer" title="Buy Me a Coffee">
                     <img src="${escapeHtml(BUY_ME_A_COFFEE_ICON)}" alt="" width="14" height="20">
                     <span>Buy Me a Coffee</span>
