@@ -275,6 +275,29 @@ export function buildDefaultSettings() {
 
         pollinationsModel: "zimage",
 
+        /** Optional — anonymous key "0000000000" is used when blank (lower priority/slower queue). */
+        hordeApiKey: "",
+
+        /** Blank = let the AI Horde pick any available model. */
+        hordeModel: "",
+
+        /** er_sde is the AI Horde's standard turbo/distilled-safe sampler name — the server injects its own incompatible 'k_euler_a' default when this is omitted, so always send an explicit value. */
+        hordeSampler: "er_sde",
+
+        /** Anima is a turbo/distilled baseline — its official test fixture uses only 8 steps. */
+        hordeSteps: 8,
+
+        /** Anima's official test fixture uses cfg_scale 1.0 (typical of turbo/distilled models); regular SD1.5/SDXL models want ~7.5. */
+        hordeCfgScale: 1,
+
+        /** Matches Anima's native_resolution (1024) per the AI Horde baseline catalog. */
+        hordeWidth: 1024,
+
+        hordeHeight: 1024,
+
+        /** AI Horde's central validation rejected 'normal' with SchedulerMismatch; Anima shares Qwen-Image's pipeline family, whose published requirements restrict schedulers to 'simple'. */
+        hordeScheduler: "simple",
+
         inventoryWorthMode: "hover",   // 'hover' = worth shown as tooltip only | 'display' = coin badge shown inline
 
         npcCoreSections: [],
