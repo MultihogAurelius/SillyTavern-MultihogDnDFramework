@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.82] - 2026-09-01
+
+### Fixed
+- **Map Evolution queue migration**: Upgrading from before 2026.8.80 left `mapEvolutionTickCount` stuck at the unused factory `1` under scope `all`, because the migration ran after `settingsVersion` was already stamped to the factory version. Interval ticks then evolved only one due map (and while the current map was due, only that map). The one-shot now bumps untouched `all`/`1` installs to `2`.
+
 ## [2026.8.81] - 2026-08-31
 
 ### Changed

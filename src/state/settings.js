@@ -1234,10 +1234,13 @@ function getSettingsInternal(extensionSettings) {
     s.mapEvolutionTickCount = Number.isFinite(tickCount) ? Math.max(0, Math.min(50, Math.floor(tickCount))) : 2;
     // `all` previously ignored tickCount (the How many row was hidden; factory 1
     // was unused). Interval ticks now queue N due maps per turn.
-    if (isOlderThan(s.settingsVersion, '2026.8.80')
-        && s.mapEvolutionTickScope === 'all'
-        && s.mapEvolutionTickCount === 1) {
-        s.mapEvolutionTickCount = 2;
+    // One-shot flag: settingsVersion is stamped to FACTORY_SETTINGS_VERSION above,
+    // so an isOlderThan(..., '2026.8.80') check here can never fire.
+    if (!s.mapEvolutionAllScopeQueueCountApplied) {
+        if (s.mapEvolutionTickScope === 'all' && s.mapEvolutionTickCount === 1) {
+            s.mapEvolutionTickCount = 2;
+        }
+        s.mapEvolutionAllScopeQueueCountApplied = true;
     }
     s.mapEvolutionTickRandomize = s.mapEvolutionTickRandomize !== false;
     if (!Array.isArray(s.mapEvolutionSelectedRoots)) s.mapEvolutionSelectedRoots = [];
