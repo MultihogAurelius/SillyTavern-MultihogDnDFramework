@@ -2460,6 +2460,10 @@ function onChatChanged(newChatId) {
     if (runtimeState.stateController) {
         try { runtimeState.stateController.abort(); } catch (_) { /* ignore */ }
     }
+    // Real-Time location art uses the shared image queue and can wait minutes on
+    // AI Horde; abort before flipping chat id so a late apply cannot target the
+    // arriving chat (background portrait jobs pin chatId separately).
+    try { stopRealtimeLocationGeneration(); } catch (_) { /* ignore */ }
 
     // Flush Adventure Companion under the departing chat BEFORE flipping currentChatId /
     // loading the arriving partition (history is per-chat, including when Chat Link is off).

@@ -16,6 +16,7 @@ import {
     normalizeEntityName,
     lookupCustomPortraitSrc,
     snapshotPortraitMapsForChat,
+    portraitWriteMode,
 } from './portrait-storage.js';
 import { buildPortraitStoryContext, portraitStoryLookbackCount } from './src/state/portrait-story-lookback.js';
 
@@ -58,11 +59,47 @@ export function scaleImageTo512Square(dataUrl) {
 // Re-export portrait key helpers (single source of truth in portrait-storage.js)
 export { normalizeEntityName, lookupCustomPortraitSrc } from './portrait-storage.js';
 
-export async function applyPortraitData(entityName, src) {
+/**
+ * Store a portrait for an entity.
+ * @param {string} entityName
+ * @param {string} src
+ * @param {{ chatId?: string|null }} [opts] Chat that owned the generation. When the
+ *   live chat has switched (common during multi-minute AI Horde waits), write into
+ *   that chat's partition only — never the arriving chat's live portrait map.
+ */
+export async function applyPortraitData(entityName, src, opts = {}) {
     const s = getSettings();
-    if (!s.customPortraits) s.customPortraits = {};
     const normName = normalizeEntityName(entityName);
-    const chatId = getActiveChatId();
+    const liveChatId = getActiveChatId();
+    const targetChatId = opts.chatId != null && String(opts.chatId).length > 0
+        ? String(opts.chatId)
+        : liveChatId;
+    const writeLive = portraitWriteMode(liveChatId, opts.chatId) === 'live';
+
+    if (!writeLive) {
+        if (!s.chatStates || typeof s.chatStates !== 'object') s.chatStates = {};
+        const partition = s.chatStates[targetChatId] || {};
+        if (!partition.customPortraits || typeof partition.customPortraits !== 'object') {
+            partition.customPortraits = {};
+        }
+        const previous = partition.customPortraits[normName];
+        if (!src) {
+            delete partition.customPortraits[normName];
+        } else {
+            const stored = await persistPortraitSrc(src, targetChatId, normName);
+            partition.customPortraits[normName] = stored;
+        }
+        s.chatStates[targetChatId] = partition;
+        if (previous && previous !== partition.customPortraits[normName]
+            && isManagedPortraitPath(previous) && countPortraitPathRefs(s, previous) === 0) {
+            await deletePortraitFile(previous);
+        }
+        await saveSettings(true);
+        return;
+    }
+
+    if (!s.customPortraits) s.customPortraits = {};
+    const chatId = targetChatId || liveChatId;
     const previous = s.customPortraits[normName];
 
     if (!src) {
@@ -432,7 +469,7 @@ export async function generateWithHordeAsync(prompt, opts = {}) {
     };
     if (s.hordeScheduler) params.scheduler = s.hordeScheduler;
 
-    const payload = { prompt, params, r2: true };
+    const payload = { prompt, params, r2: false };
     if (s.hordeModel) payload.models = [s.hordeModel];
 
     console.log('[RPG Tracker] AI Horde: submitting generation request', { params, models: payload.models || '(any)' });
@@ -510,24 +547,43 @@ export async function generateWithHordeAsync(prompt, opts = {}) {
         console.error('[RPG Tracker] AI Horde: no image in status response after polling', statusData);
         throw new Error('AI Horde did not return an image (request may have timed out — try again or check your worker availability at aihorde.net)');
     }
-    console.log(`[RPG Tracker] AI Horde: image received from worker "${generation.worker_name || generation.worker_id}", downloading...`);
+    console.log(`[RPG Tracker] AI Horde: image received from worker "${generation.worker_name || generation.worker_id}", decoding...`);
     if (generation.censored) {
         throw new Error('AI Horde image was censored by the worker\'s safety filter');
     }
 
-    // r2:true returns a temporary download URL — fetch and convert to a persistent data URL.
-    const imgResp = await fetch(generation.img, { signal: externalSignal });
-    if (!imgResp.ok) throw new Error(`Failed to download generated image (${imgResp.status})`);
-    const blob = await imgResp.blob();
-    return await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-            if (typeof reader.result === 'string') resolve(reader.result);
-            else reject(new Error('Failed to read image as Base64 string'));
-        };
-        reader.onerror = () => reject(new Error('FileReader error while converting image blob'));
-        reader.readAsDataURL(blob);
-    });
+    // r2:false (SillyTavern's path) returns base64 WebP in the JSON body from
+    // aihorde.net — no second browser fetch to Cloudflare R2. Still accept an
+    // http(s) URL if a worker/proxy ever returns one.
+    return await hordeImageToDataUrl(generation.img, externalSignal);
+}
+
+/**
+ * Convert an AI Horde generation.img payload into a data URL.
+ * @param {string} img Base64 WebP/PNG or an http(s) download URL
+ * @param {AbortSignal} [signal]
+ * @returns {Promise<string>}
+ */
+async function hordeImageToDataUrl(img, signal) {
+    const value = String(img || '').trim();
+    if (!value) throw new Error('AI Horde returned an empty image payload');
+    if (/^https?:\/\//i.test(value)) {
+        const imgResp = await fetch(value, { signal });
+        if (!imgResp.ok) throw new Error(`Failed to download generated image (${imgResp.status})`);
+        const blob = await imgResp.blob();
+        return await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                if (typeof reader.result === 'string') resolve(reader.result);
+                else reject(new Error('Failed to read image as Base64 string'));
+            };
+            reader.onerror = () => reject(new Error('FileReader error while converting image blob'));
+            reader.readAsDataURL(blob);
+        });
+    }
+    if (value.startsWith('data:image/')) return value;
+    // Bare base64 from r2:false — Horde delivers WebP.
+    return `data:image/webp;base64,${value}`;
 }
 
 /** Connection overlay for portrait / location image prompt LLM calls. */
@@ -1210,6 +1266,18 @@ export async function generateWithHorde(prompt, entityName, localApply, refresh)
     const ctx = SillyTavern.getContext();
     if (!ctx.callGenericPopup) return;
 
+    // AI Horde waits can exceed several minutes — pin so Apply cannot write into
+    // a chat the user switched to while the popup was open.
+    const passChatId = getActiveChatId();
+    const pinnedApply = async (url) => {
+        const liveId = getActiveChatId();
+        if (passChatId && liveId && String(passChatId) !== String(liveId)) {
+            await applyPortraitData(entityName, url, { chatId: passChatId });
+            return;
+        }
+        await localApply(url);
+    };
+
     const showPreview = async (preGeneratedUrl = null) => {
         const imgId = `rt-horde-img-${Date.now()}`;
         const spinnerId = `rt-horde-spinner-${Date.now()}`;
@@ -1278,7 +1346,7 @@ export async function generateWithHorde(prompt, entityName, localApply, refresh)
             try {
                 const dataUrl = await genPromise;
                 const finalUrl = dataUrl.startsWith('data:') ? await scaleImageTo512Square(dataUrl) : dataUrl;
-                await localApply(finalUrl);
+                await pinnedApply(finalUrl);
                 if (typeof refresh === 'function') refresh();
                 imageGenToast('success', `Portrait applied for ${entityName}!`, 'RPG Tracker');
             } catch (err) {
@@ -1451,6 +1519,9 @@ export async function autoGeneratePartyPortraits(refresh) {
 
     imageGenToast('info', `Starting auto-generation for ${toGenerate.length} party members...`, 'RPG Tracker');
     let successCount = 0;
+    // AI Horde can take minutes; pin so a mid-flight chat switch cannot land
+    // these portraits in the arriving chat's map.
+    const passChatId = getActiveChatId();
 
     for (const name of toGenerate) {
         imageGenToast('info', `Generating for ${name}...`, 'RPG Tracker');
@@ -1458,7 +1529,7 @@ export async function autoGeneratePartyPortraits(refresh) {
             const prompt = await generatePortraitPrompt(name);
             const dataUrl = await generatePortraitDirect(prompt, name);
             const scaled = await scaleImageTo512Square(dataUrl);
-            await applyPortraitData(name, scaled);
+            await applyPortraitData(name, scaled, { chatId: passChatId });
             successCount++;
             if (typeof refresh === 'function') refresh();
         } catch (err) {
@@ -1492,6 +1563,7 @@ export async function autoGenerateEnemyPortraits(refresh) {
 
     imageGenToast('info', `Starting auto-generation for ${toGenerate.length} enemies...`, 'RPG Tracker');
     let successCount = 0;
+    const passChatId = getActiveChatId();
 
     for (const name of toGenerate) {
         imageGenToast('info', `Generating for enemy ${name}...`, 'RPG Tracker');
@@ -1499,7 +1571,7 @@ export async function autoGenerateEnemyPortraits(refresh) {
             const prompt = await generatePortraitPrompt(name);
             const dataUrl = await generatePortraitDirect(prompt, name);
             const scaled = await scaleImageTo512Square(dataUrl);
-            await applyPortraitData(name, scaled);
+            await applyPortraitData(name, scaled, { chatId: passChatId });
             successCount++;
             if (typeof refresh === 'function') refresh();
         } catch (err) {
@@ -1633,6 +1705,9 @@ export function triggerBackgroundPortraitGeneration(name, refresh, npcContent = 
         imageGenToast('info', `Queued portrait for ${name} (${queuePos} ahead)...`, 'RPG Tracker');
     }
 
+    // Pin before the shared queue / AI Horde wait so a chat switch cannot redirect the write.
+    const passChatId = getActiveChatId();
+
     enqueueImageGen(async () => {
         try {
             console.log(`[RPG Tracker] Generating prompt for "${name}" (NPC content provided: ${!!npcContent})`);
@@ -1649,7 +1724,7 @@ export function triggerBackgroundPortraitGeneration(name, refresh, npcContent = 
             console.log(`[RPG Tracker] Successfully received portrait dataUrl for "${name}". Scaling...`);
             const scaled = await scaleImageTo512Square(dataUrl);
             console.log(`[RPG Tracker] Applying portrait data for "${name}"...`);
-            await applyPortraitData(name, scaled);
+            await applyPortraitData(name, scaled, { chatId: passChatId });
             imageGenToast('success', `Portrait auto-generated and applied for ${name}!`, 'RPG Tracker');
             if (typeof refresh === 'function') {
                 console.log(`[RPG Tracker] Triggering UI refresh callback...`);
@@ -1949,13 +2024,48 @@ export function hasLocationImage(path) {
  * @param {string} locationPath Full hierarchical path
  * @param {string|null} src Image URL, data URL, managed path, or null to clear
  */
-export async function applyLocationImageData(locationPath, src) {
+/**
+ * Store a location image.
+ * @param {string} locationPath
+ * @param {string} src
+ * @param {{ chatId?: string|null }} [opts] Chat that owned the generation. When the
+ *   live chat has switched, write into that chat's partition only.
+ */
+export async function applyLocationImageData(locationPath, src, opts = {}) {
     const s = getSettings();
-    if (!s.customLocationImages) s.customLocationImages = {};
     const normPath = normalizeLocationPath(locationPath);
-    const chatId = getActiveChatId();
-    const previous = s.customLocationImages[normPath];
     const storageKey = `loc__${normPath}`;
+    const liveChatId = getActiveChatId();
+    const targetChatId = opts.chatId != null && String(opts.chatId).length > 0
+        ? String(opts.chatId)
+        : liveChatId;
+    const writeLive = portraitWriteMode(liveChatId, opts.chatId) === 'live';
+
+    if (!writeLive) {
+        if (!s.chatStates || typeof s.chatStates !== 'object') s.chatStates = {};
+        const partition = s.chatStates[targetChatId] || {};
+        if (!partition.customLocationImages || typeof partition.customLocationImages !== 'object') {
+            partition.customLocationImages = {};
+        }
+        const previous = partition.customLocationImages[normPath];
+        if (!src) {
+            delete partition.customLocationImages[normPath];
+        } else {
+            const stored = await persistPortraitSrc(src, targetChatId, storageKey);
+            partition.customLocationImages[normPath] = stored;
+        }
+        s.chatStates[targetChatId] = partition;
+        if (previous && previous !== partition.customLocationImages[normPath]
+            && isManagedPortraitPath(previous) && countPortraitPathRefs(s, previous) === 0) {
+            await deletePortraitFile(previous);
+        }
+        await saveSettings(true);
+        return;
+    }
+
+    if (!s.customLocationImages) s.customLocationImages = {};
+    const chatId = targetChatId || liveChatId;
+    const previous = s.customLocationImages[normPath];
 
     if (!src) {
         delete s.customLocationImages[normPath];
@@ -2262,6 +2372,8 @@ export function triggerBackgroundLocationGeneration(locationPath, refresh, locCo
 
     activeLocationGenerations.add(normPath);
     const leaf = normPath.split(' :: ').pop() || normPath;
+    // Pin before queue / Horde wait — late apply must not hit the arriving chat.
+    const passChatId = getActiveChatId();
     if (!isRealtimeArrival) {
         const queuePos = _imageGenQueue.length + (_imageGenQueueRunning ? 1 : 0);
         if (queuePos <= 0) {
@@ -2297,7 +2409,7 @@ export function triggerBackgroundLocationGeneration(locationPath, refresh, locCo
                 allowFallback: !isRealtimeArrival,
             });
             const scaled = await scaleImageToLandscape(dataUrl);
-            await applyLocationImageData(normPath, scaled);
+            await applyLocationImageData(normPath, scaled, { chatId: passChatId });
             if (!isRealtimeArrival) {
                 imageGenToast('success', `${forceReplace ? 'Location image regenerated' : 'Location image auto-generated'} for ${leaf}!`, 'RPG Tracker');
             }
