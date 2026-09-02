@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import {
     loadPortraitMapsForChat,
     migrateLegacyPortraitMapsToChat,
+    portraitWriteMode,
     snapshotPortraitMapsForChat,
 } from '../src/state/portrait-chat-scope.js';
 
@@ -55,6 +56,14 @@ describe('per-chat portrait ownership', () => {
         expect(settings.chatStates['current-chat'].customPortraits.Legacy).toBe('legacy.png');
     });
 
+    it('routes late Horde/auto-gen writes to the pinned chat partition after a switch', () => {
+        expect(portraitWriteMode('chat-a', 'chat-a')).toBe('live');
+        expect(portraitWriteMode('chat-b', 'chat-a')).toBe('partition');
+        expect(portraitWriteMode(null, 'chat-a')).toBe('partition');
+        expect(portraitWriteMode('chat-b', null)).toBe('live');
+        expect(portraitWriteMode('chat-b', '')).toBe('live');
+    });
+
     it('wires chat switching, persistence, and renames to the active portrait partition only', () => {
         const indexSource = readFileSync(new URL('../index.js', import.meta.url), 'utf8');
         const portraitsSource = readFileSync(new URL('../portraits.js', import.meta.url), 'utf8');
@@ -62,7 +71,11 @@ describe('per-chat portrait ownership', () => {
         expect(indexSource).toContain('snapshotPortraitMapsForChat(s, oldChatId)');
         expect(indexSource).toContain('loadPortraitMapsForChat(s, resolvedId)');
         expect(indexSource).toContain('migrateLegacyPortraitMapsToChat(settings, bootChatId)');
+        expect(indexSource).toContain('stopRealtimeLocationGeneration()');
         expect(portraitsSource).toContain('snapshotPortraitMapsForChat(s, getActiveChatId())');
+        expect(portraitsSource).toContain('portraitWriteMode(');
+        expect(portraitsSource).toContain('{ chatId: passChatId }');
+        expect(portraitsSource).toContain('r2: false');
         expect(portraitsSource).not.toContain('part.customPortraits[newKey] = part.customPortraits[oldKey]');
     });
 });

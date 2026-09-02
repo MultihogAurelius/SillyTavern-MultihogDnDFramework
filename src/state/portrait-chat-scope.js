@@ -5,6 +5,22 @@ function clonePortraitMap(map) {
 }
 
 /**
+ * Decide whether a late portrait/location write should touch the live maps.
+ * Background image jobs (especially AI Horde) can outlive a chat switch; a pinned
+ * passChatId that no longer matches the live chat must write the departing
+ * chat's partition only.
+ *
+ * @param {string|null|undefined} liveChatId
+ * @param {string|null|undefined} passChatId
+ * @returns {'live'|'partition'}
+ */
+export function portraitWriteMode(liveChatId, passChatId) {
+    if (passChatId == null || String(passChatId).length === 0) return 'live';
+    if (liveChatId == null || String(liveChatId).length === 0) return 'partition';
+    return String(passChatId) === String(liveChatId) ? 'live' : 'partition';
+}
+
+/**
  * Snapshot the live portrait and location-image maps into one chat partition.
  * Portrait ownership is always per-chat, independently of the broader Chat Link toggle.
  */

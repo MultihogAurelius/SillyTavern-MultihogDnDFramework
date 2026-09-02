@@ -38,6 +38,7 @@ export {
     snapshotPortraitMapsForChat,
     loadPortraitMapsForChat,
     migrateLegacyPortraitMapsToChat,
+    portraitWriteMode,
 } from './src/state/portrait-chat-scope.js';
 
 /** Resolve a stored portrait ref for an entity label (handles HTML entities + class suffix). */
