@@ -1,6 +1,7 @@
 import { getRuntimeActions, sectionPages } from '../../app/runtime-bridge.js';
 import { runtimeState } from '../../app/runtime-state.js';
 import { pickGenreCharacterName } from '../../state/character-names.js';
+import { getActiveChatId } from '../../state/chat-persistence.js';
 import { setLocationMappingEnabled, LOCATION_MAPPING_SECTION_TAG } from '../../state/section-enabled.js';
 import { applyMapArchitectOpenerToUi, normalizeMapArchitectOpener, syncMapArchitectOpenerNestedVisibility } from '../../../map-architect-opener.js';
 
@@ -999,8 +1000,9 @@ export function bindRenderedCardEvents(el, memo, isDetachedContext = false, onRe
         const entityName = container.closest('.rt-entity-container')?.dataset?.entityName || '';
         if (!entityName) return;
 
+        const passChatId = getActiveChatId();
         const localApply = async (src) => {
-            await applyPortraitData(entityName, src);
+            await applyPortraitData(entityName, src, { chatId: passChatId });
             refresh();
             void refreshNpcManifest().catch(() => { });
         };

@@ -64,6 +64,27 @@ describe('per-chat portrait ownership', () => {
         expect(portraitWriteMode('chat-b', '')).toBe('live');
     });
 
+    it('pins interactive portrait/location Apply to the opening chat, without Horde bypassing into portraits', () => {
+        const indexSource = readFileSync(new URL('../index.js', import.meta.url), 'utf8');
+        const portraitsSource = readFileSync(new URL('../portraits.js', import.meta.url), 'utf8');
+        const cardEventsSource = readFileSync(new URL('../src/ui/panel/card-events.js', import.meta.url), 'utf8');
+
+        // Default chat portrait/location writers pin passChatId into apply*Data.
+        expect(indexSource).toContain('applyPortraitData(entityName, src, { chatId: passChatId })');
+        expect(indexSource).toContain('applyLocationImageData(normPath, finalSrc, { chatId: passChatId })');
+        expect(cardEventsSource).toContain('applyPortraitData(entityName, src, { chatId: passChatId })');
+
+        // generateWithHorde must call the supplied localApply — never applyPortraitData —
+        // so location-image and NPC-library Apply cannot land in customPortraits after a switch.
+        const hordeFn = portraitsSource.slice(
+            portraitsSource.indexOf('export async function generateWithHorde(prompt'),
+            portraitsSource.indexOf('export function getCharacterBlockNames'),
+        );
+        expect(hordeFn).toContain('await localApply(finalUrl)');
+        expect(hordeFn).not.toContain('applyPortraitData(');
+        expect(hordeFn).not.toContain('pinnedApply');
+    });
+
     it('wires chat switching, persistence, and renames to the active portrait partition only', () => {
         const indexSource = readFileSync(new URL('../index.js', import.meta.url), 'utf8');
         const portraitsSource = readFileSync(new URL('../portraits.js', import.meta.url), 'utf8');

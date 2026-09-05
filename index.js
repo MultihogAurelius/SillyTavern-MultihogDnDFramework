@@ -4232,9 +4232,12 @@ async function showPortraitSettingsMenu(entityName, onRefresh, npcContent = null
         popupOpts.customButtons.push({ text: '🗑 Clear Portrait', result: 2, classes: ['menu_button'] });
     }
 
+    // Pin before AI Horde / native / Pollinations waits (and before the Apply
+    // popup can outlive a chat switch). Custom NPC-library writers stay unpinned.
+    const passChatId = getActiveChatId();
     const persistPortrait = typeof options.applyPortrait === 'function'
         ? options.applyPortrait
-        : (src) => applyPortraitData(entityName, src);
+        : (src) => applyPortraitData(entityName, src, { chatId: passChatId });
     const localApply = async (src) => {
         await persistPortrait(src);
         refresh();
@@ -4659,12 +4662,14 @@ async function showLocationImageSettingsMenu(locationPath, onRefresh, locContent
         popupOpts.customButtons.push({ text: '🗑 Clear Image', result: 2, classes: ['menu_button'] });
     }
 
+    // Pin before long image waits / Apply after a mid-popup chat switch.
+    const passChatId = getActiveChatId();
     const localApply = async (src) => {
         let finalSrc = src;
         if (src && typeof src === 'string' && src.startsWith('data:image/')) {
             finalSrc = await scaleImageToLandscape(src);
         }
-        await applyLocationImageData(normPath, finalSrc);
+        await applyLocationImageData(normPath, finalSrc, { chatId: passChatId });
         refresh();
         void runtimeState.refreshNpcManifest().catch(() => { });
     };
