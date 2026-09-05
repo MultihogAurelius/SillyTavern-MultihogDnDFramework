@@ -1266,17 +1266,9 @@ export async function generateWithHorde(prompt, entityName, localApply, refresh)
     const ctx = SillyTavern.getContext();
     if (!ctx.callGenericPopup) return;
 
-    // AI Horde waits can exceed several minutes — pin so Apply cannot write into
-    // a chat the user switched to while the popup was open.
-    const passChatId = getActiveChatId();
-    const pinnedApply = async (url) => {
-        const liveId = getActiveChatId();
-        if (passChatId && liveId && String(passChatId) !== String(liveId)) {
-            await applyPortraitData(entityName, url, { chatId: passChatId });
-            return;
-        }
-        await localApply(url);
-    };
+    // Chat affinity must be pinned by the localApply the caller supplied (portrait
+    // map, location map, or NPC library). Never bypass into applyPortraitData —
+    // location/NPC-library Apply would land in the wrong store after a chat switch.
 
     const showPreview = async (preGeneratedUrl = null) => {
         const imgId = `rt-horde-img-${Date.now()}`;
@@ -1346,7 +1338,7 @@ export async function generateWithHorde(prompt, entityName, localApply, refresh)
             try {
                 const dataUrl = await genPromise;
                 const finalUrl = dataUrl.startsWith('data:') ? await scaleImageTo512Square(dataUrl) : dataUrl;
-                await pinnedApply(finalUrl);
+                await localApply(finalUrl);
                 if (typeof refresh === 'function') refresh();
                 imageGenToast('success', `Portrait applied for ${entityName}!`, 'RPG Tracker');
             } catch (err) {
