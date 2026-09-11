@@ -9,6 +9,7 @@ import { cleanToolCallMessage, memoForGmContext } from './memo-processor.js';
 import { runtimeState } from './src/app/runtime-state.js';
 import { isRouterRunning, runRouterPass, sendDirectPrompt } from './src/app/runtime-bridge.js';
 import { isCyoaEnabled, isLorebookAgentRuntimeActive, isLocationMappingEnabled } from './src/state/section-enabled.js';
+import { canCommitPassForChat } from './src/state/pass-affinity.js';
 import { formatDungeonMapForPlayer, stripDungeonMapSection } from './dungeon-reality.js';
 import { clampFloatingPanelToViewport, isMobileLayout, makeDraggable, makeResizableBL, makeResizableBR, resolveViewportClampedGeometry } from './ui-geometry.js';
 
@@ -431,6 +432,17 @@ function loadCompanionForChat(chatId) {
 }
 
 /**
+ * Abort an in-flight Adventure Companion LLM/action loop.
+ * Chat switches must call this before loading the arriving partition so a late
+ * act_for_user / State Tracker / Lorebook Agent tool call cannot land in chat B.
+ */
+export function abortAdventureCompanionInFlight() {
+    if (!_abort) return;
+    try { _abort.abort(); } catch (_) { /* ignore */ }
+    _abort = null;
+}
+
+/**
  * Flush the in-memory Adventure Companion session under an explicit chat id.
  * Must run before the live companion is swapped on chat switch (currentChatId may already have flipped).
  * @param {string|null|undefined} chatId
@@ -467,6 +479,7 @@ export function loadAdventureCompanionForChat(chatId) {
  * @param {string|null|undefined} newChatId
  */
 export function onChatChangedForAdventureCompanion(oldChatId, newChatId) {
+    abortAdventureCompanionInFlight();
     flushAdventureCompanionForChat(oldChatId);
     loadAdventureCompanionForChat(newChatId);
 }
@@ -474,6 +487,7 @@ export function onChatChangedForAdventureCompanion(oldChatId, newChatId) {
 // Bridges for chat-persistence / chat-state-loader / index without import cycles
 globalThis._rpgGetAdventureCompanionSnapshot = getAdventureCompanionSnapshot;
 globalThis._rpgApplyAdventureCompanionSnapshot = applyAdventureCompanionSnapshot;
+globalThis._rpgAbortAdventureCompanionInFlight = abortAdventureCompanionInFlight;
 globalThis._rpgFlushAdventureCompanionForChat = flushAdventureCompanionForChat;
 globalThis._rpgLoadAdventureCompanionForChat = loadAdventureCompanionForChat;
 globalThis._rpgOnChatChangedForAdventureCompanion = onChatChangedForAdventureCompanion;
@@ -1045,7 +1059,24 @@ function summarizeMapUpdaterCompanionResult(result) {
  * @param {any} action
  * @returns {Promise<{action:string, success:boolean, status:string, message:string, terminal?:boolean}>}
  */
-async function executeCompanionAction(action) {
+async function executeCompanionAction(action, passChatId = null) {
+    const originChatId = passChatId != null && String(passChatId).length > 0
+        ? passChatId
+        : resolveActiveChatId();
+    if (!canCommitPassForChat(originChatId, resolveActiveChatId())) {
+        return {
+            action: action?.name === 'act_for_user'
+                ? 'Player Turn'
+                : action?.name === 'command_state_tracker'
+                    ? 'State Tracker'
+                    : action?.name === 'command_map_updater'
+                        ? 'Map Updater'
+                        : 'Lorebook Agent',
+            success: false,
+            status: 'chat_changed',
+            message: 'Active chat changed; Adventure Companion action was skipped.',
+        };
+    }
     try {
         if (action.name === 'act_for_user') {
             const settings = getSettings();
@@ -1300,12 +1331,23 @@ export function formatPlayerTurnCommentary(action, modelText = '', completedActi
  * @param {AbortSignal} signal
  * @returns {Promise<string>}
  */
-export async function runCompanionAgentLoop(messages, signal) {
+export async function runCompanionAgentLoop(messages, signal, options = {}) {
     const settings = getAdventureCompanionRequestSettings(getSettings());
     let actionCount = 0;
     const completedActions = [];
+    const passChatId = options.passChatId != null && String(options.passChatId).length > 0
+        ? options.passChatId
+        : resolveActiveChatId();
 
     for (let turn = 0; turn < MAX_COMPANION_AGENT_TURNS; turn++) {
+        if (!canCommitPassForChat(passChatId, resolveActiveChatId(), { aborted: !!signal?.aborted })) {
+            if (completedActions.length > 0) {
+                return formatCompanionActionReceipt(completedActions);
+            }
+            const abortError = new Error('The operation was aborted.');
+            abortError.name = 'AbortError';
+            throw abortError;
+        }
         let result;
         try {
             result = await sendAgentTurn(settings, messages, COMPANION_ACTION_TOOLS, signal);
@@ -1319,6 +1361,7 @@ export async function runCompanionAgentLoop(messages, signal) {
             }
             throw err;
         }
+        const affinityOk = canCommitPassForChat(passChatId, resolveActiveChatId(), { aborted: !!signal?.aborted });
         const nativeAction = result?.toolCall
             ? normalizeCompanionAction(result.toolCall.name, result.toolCall.args)
             : null;
@@ -1328,7 +1371,26 @@ export async function runCompanionAgentLoop(messages, signal) {
         const requestedActions = nativeAction ? [nativeAction] : fallback.actions;
 
         if (!requestedActions.length) {
+            if (!affinityOk) {
+                if (completedActions.length > 0) {
+                    return formatCompanionActionReceipt(completedActions);
+                }
+                const abortError = new Error('The operation was aborted.');
+                abortError.name = 'AbortError';
+                throw abortError;
+            }
             return fallback.visibleText || String(result?.content || '').trim() || '(No response from the model.)';
+        }
+
+        if (!affinityOk) {
+            // LLM returned tool calls after a chat switch — refuse each action
+            // rather than executing against the arriving chat.
+            for (const action of requestedActions) {
+                const actionResult = await executeCompanionAction(action, passChatId);
+                actionCount++;
+                completedActions.push(actionResult);
+            }
+            return formatCompanionActionReceipt(completedActions);
         }
 
         if (actionCount + requestedActions.length > MAX_COMPANION_ACTIONS) {
@@ -1349,9 +1411,12 @@ export async function runCompanionAgentLoop(messages, signal) {
                     },
                 }],
             });
-            const actionResult = await executeCompanionAction(nativeAction);
+            const actionResult = await executeCompanionAction(nativeAction, passChatId);
             actionCount++;
             completedActions.push(actionResult);
+            if (actionResult.status === 'chat_changed') {
+                return formatCompanionActionReceipt(completedActions);
+            }
             if (actionResult.success && actionResult.terminal) {
                 return formatPlayerTurnCommentary(nativeAction, result.content, completedActions);
             }
@@ -1366,10 +1431,13 @@ export async function runCompanionAgentLoop(messages, signal) {
         messages.push({ role: 'assistant', content: result.content || '' });
         const batchResults = [];
         for (const action of requestedActions) {
-            const actionResult = await executeCompanionAction(action);
+            const actionResult = await executeCompanionAction(action, passChatId);
             actionCount++;
             completedActions.push(actionResult);
             batchResults.push(actionResult);
+            if (actionResult.status === 'chat_changed') {
+                return formatCompanionActionReceipt(completedActions);
+            }
             if (actionResult.success && actionResult.terminal) {
                 return formatPlayerTurnCommentary(action, fallback.visibleText, completedActions);
             }
@@ -2017,6 +2085,11 @@ async function sendMessage() {
     const text = (input?.value || '').trim();
     if (!text) return;
 
+    // Pin before any await — a mid-flight chat switch must not land companion
+    // actions or history into the arriving chat.
+    const passChatId = resolveActiveChatId();
+    if (!canCommitPassForChat(passChatId, resolveActiveChatId())) return;
+
     if (input) input.value = '';
     const mp = activeModePrefs();
     mp.history.push({ role: 'user', content: text });
@@ -2035,6 +2108,7 @@ async function sendMessage() {
 
     setBusy(true);
     _abort = new AbortController();
+    let stillOwnsChat = true;
 
     try {
         readLookbackFromUi();
@@ -2051,8 +2125,20 @@ async function sendMessage() {
             : '';
         const memo = _prefs.injectMemo ? buildMemoContext() : '';
         const lore = _prefs.injectLore ? await buildLoreContext() : '';
+        if (!canCommitPassForChat(passChatId, resolveActiveChatId(), { aborted: !!_abort?.signal?.aborted })) {
+            stillOwnsChat = false;
+            return;
+        }
         const map = _prefs.injectMap ? await buildMapContext() : '';
+        if (!canCommitPassForChat(passChatId, resolveActiveChatId(), { aborted: !!_abort?.signal?.aborted })) {
+            stillOwnsChat = false;
+            return;
+        }
         const doc = _prefs.tutorialMode ? await loadDocumentation() : '';
+        if (!canCommitPassForChat(passChatId, resolveActiveChatId(), { aborted: !!_abort?.signal?.aborted })) {
+            stillOwnsChat = false;
+            return;
+        }
         const playerAction = buildActForUserContext();
 
         const systemPrompt = buildSystemPrompt({ doc, narrative, memo, lore, map, playerAction });
@@ -2060,10 +2146,18 @@ async function sendMessage() {
             { role: 'system', content: systemPrompt },
             ...mp.history.map((m) => ({ role: m.role, content: m.content })),
         ];
-        const reply = await runCompanionAgentLoop(messages, _abort.signal);
+        const reply = await runCompanionAgentLoop(messages, _abort.signal, { passChatId });
+        if (!canCommitPassForChat(passChatId, resolveActiveChatId(), { aborted: !!_abort?.signal?.aborted })) {
+            stillOwnsChat = false;
+            return;
+        }
         mp.history.push({ role: 'assistant', content: reply });
     } catch (err) {
-        if (err?.name === 'AbortError') {
+        stillOwnsChat = canCommitPassForChat(passChatId, resolveActiveChatId());
+        if (!stillOwnsChat) {
+            // Departing-chat history was already flushed on switch; do not
+            // append cancel/error noise into the arriving companion session.
+        } else if (err?.name === 'AbortError') {
             mp.history.push({ role: 'assistant', content: '(Cancelled.)' });
         } else {
             console.error('[CHAT]', err);
@@ -2077,9 +2171,13 @@ async function sendMessage() {
     } finally {
         _abort = null;
         setBusy(false);
-        savePrefs(_prefs);
+        if (stillOwnsChat && canCommitPassForChat(passChatId, resolveActiveChatId())) {
+            savePrefs(_prefs);
+        }
         chatUiRoot()?.querySelector('#rt-tutorial-pending')?.remove();
-        renderTranscript();
+        if (stillOwnsChat && canCommitPassForChat(passChatId, resolveActiveChatId())) {
+            renderTranscript();
+        }
     }
 }
 

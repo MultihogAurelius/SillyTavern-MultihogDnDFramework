@@ -426,4 +426,95 @@ I can take care of both.
         expect(reply).not.toContain('Submitted');
         expect(reply).not.toContain('✓');
     });
+
+    it('refuses companion actions after the originating chat changes', async () => {
+        const { runtimeState } = await import('../src/app/runtime-state.js');
+        runtimeState.currentChatId = 'chat-a';
+        testExtensionSettings['rpg_tracker'] = { routerEnabled: true };
+
+        const { sendAgentTurn } = await import('../llm-client.js');
+        const { configureRuntimeActions } = await import('../src/app/runtime-bridge.js');
+        const sendDirectPrompt = vi.fn().mockResolvedValue({
+            success: true,
+            status: 'changed',
+            changed: true,
+            message: 'State Tracker updated.',
+        });
+        configureRuntimeActions({
+            sendDirectPrompt,
+            runRouterPass: vi.fn(),
+            isRouterRunning: vi.fn().mockReturnValue(false),
+        });
+
+        sendAgentTurn.mockImplementation(async () => {
+            // Simulate the user switching chats while the Companion LLM is still running.
+            runtimeState.currentChatId = 'chat-b';
+            return {
+                content: '',
+                toolCall: {
+                    name: 'command_state_tracker',
+                    args: { instruction: 'Set gold to 99.' },
+                    id: 'call-switched',
+                },
+            };
+        });
+
+        const { runCompanionAgentLoop } = await import('../adventure-companion.js');
+        const reply = await runCompanionAgentLoop([
+            { role: 'system', content: 'Companion test' },
+            { role: 'user', content: 'Update gold.' },
+        ], new AbortController().signal, { passChatId: 'chat-a' });
+
+        expect(sendDirectPrompt).not.toHaveBeenCalled();
+        expect(reply).toContain('✗ State Tracker: Active chat changed; Adventure Companion action was skipped.');
+    });
+
+    it('refuses act_for_user submissions after the originating chat changes', async () => {
+        const { runtimeState } = await import('../src/app/runtime-state.js');
+        runtimeState.currentChatId = 'chat-a';
+
+        class FakeButton {
+            constructor() {
+                this.clicked = false;
+            }
+            click() {
+                this.clicked = true;
+            }
+        }
+        const sendButton = new FakeButton();
+        const textarea = { value: '', dispatchEvent() {} };
+        globalThis.Event = class Event {
+            constructor(type) { this.type = type; }
+        };
+        globalThis.document = {
+            getElementById(id) {
+                if (id === 'send_textarea') return textarea;
+                if (id === 'send_but') return sendButton;
+                return null;
+            },
+        };
+
+        const { sendAgentTurn } = await import('../llm-client.js');
+        sendAgentTurn.mockImplementation(async () => {
+            runtimeState.currentChatId = 'chat-b';
+            return {
+                content: '',
+                toolCall: {
+                    name: 'act_for_user',
+                    args: { action_text: 'I open the door.', commentary: 'Here goes nothing.' },
+                    id: 'call-act',
+                },
+            };
+        });
+
+        const { runCompanionAgentLoop } = await import('../adventure-companion.js');
+        const reply = await runCompanionAgentLoop([
+            { role: 'system', content: 'Companion test' },
+            { role: 'user', content: 'Take my turn.' },
+        ], new AbortController().signal, { passChatId: 'chat-a' });
+
+        expect(sendButton.clicked).toBe(false);
+        expect(textarea.value).toBe('');
+        expect(reply).toContain('✗ Player Turn: Active chat changed; Adventure Companion action was skipped.');
+    });
 });

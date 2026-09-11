@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.87] - 2026-09-11
+
+### Fixed
+- Adventure Companion aborts in-flight LLM/tool work on chat switch and refuses `act_for_user`, State Tracker, Lorebook Agent, and Map Updater actions when the originating chat is no longer active, so late companion commands cannot mutate or submit into another chat.
+
 ## [2026.8.86] - 2026-09-10
 
 ### Fixed
