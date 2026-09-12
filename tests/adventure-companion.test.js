@@ -203,4 +203,36 @@ describe('Adventure Companion settings', () => {
         expect(source).toContain('--- ACTIVE SITE MAP ---');
         expect(source).toContain("bindCheckbox('rpg_adventure_companion_inject_map', 'injectMap')");
     });
+
+    it('aborts in-flight companion work on chat switch and pins action affinity', async () => {
+        const { readFileSync } = await import('node:fs');
+        const companionSource = readFileSync(new URL('../adventure-companion.js', import.meta.url), 'utf8');
+        const indexSource = readFileSync(new URL('../index.js', import.meta.url), 'utf8');
+
+        expect(companionSource).toContain("import { canCommitPassForChat } from './src/state/pass-affinity.js';");
+        expect(companionSource).toContain('export function abortAdventureCompanionInFlight()');
+        expect(companionSource).toContain('abortAdventureCompanionInFlight()');
+        expect(companionSource).toContain('globalThis._rpgAbortAdventureCompanionInFlight = abortAdventureCompanionInFlight');
+        expect(companionSource).toContain('await executeCompanionAction(nativeAction, passChatId, signal)');
+        expect(companionSource).toContain("signal?.aborted ? 'aborted' : 'chat_changed'");
+        expect(companionSource).toContain('Active chat changed; Adventure Companion action was skipped.');
+
+        const handlerStart = indexSource.indexOf('function onChatChanged(newChatId)');
+        expect(handlerStart).toBeGreaterThanOrEqual(0);
+        const handlerSlice = indexSource.slice(handlerStart, handlerStart + 4500);
+        expect(handlerSlice).toContain('_rpgAbortAdventureCompanionInFlight');
+        expect(handlerSlice.indexOf('_rpgAbortAdventureCompanionInFlight'))
+            .toBeLessThan(handlerSlice.indexOf('_rpgFlushAdventureCompanionForChat'));
+    });
+
+    it('aborts an in-flight companion controller when switching chats', async () => {
+        const { runtimeState } = await import('../src/app/runtime-state.js');
+        const companion = await import('../adventure-companion.js');
+        runtimeState.currentChatId = 'alpha';
+
+        expect(typeof globalThis._rpgAbortAdventureCompanionInFlight).toBe('function');
+        expect(() => companion.abortAdventureCompanionInFlight()).not.toThrow();
+        expect(() => companion.onChatChangedForAdventureCompanion('alpha', 'beta')).not.toThrow();
+        expect(() => globalThis._rpgAbortAdventureCompanionInFlight()).not.toThrow();
+    });
 });

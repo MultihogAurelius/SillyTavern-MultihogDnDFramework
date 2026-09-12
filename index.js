@@ -2466,6 +2466,12 @@ function onChatChanged(newChatId) {
     // arriving chat (background portrait jobs pin chatId separately).
     try { stopRealtimeLocationGeneration(); } catch (_) { /* ignore */ }
 
+    // Drop in-flight Adventure Companion LLM/tool work for the departing chat.
+    // A late act_for_user or agent command would mutate the arriving chat.
+    if (typeof globalThis._rpgAbortAdventureCompanionInFlight === 'function') {
+        try { globalThis._rpgAbortAdventureCompanionInFlight(); } catch (_) { /* ignore */ }
+    }
+
     // Flush Adventure Companion under the departing chat BEFORE flipping currentChatId /
     // loading the arriving partition (history is per-chat, including when Chat Link is off).
     if (typeof globalThis._rpgFlushAdventureCompanionForChat === 'function' && oldChatId) {
