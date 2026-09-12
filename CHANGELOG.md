@@ -2,11 +2,14 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
-## [2026.8.87] - 2026-09-11
+## [2026.8.87] - 2026-09-13
 
 ### Fixed
-- Adventure Companion aborts in-flight LLM/tool work on chat switch and refuses `act_for_user`, State Tracker, Lorebook Agent, and Map Updater actions when the originating chat is no longer active, so late companion commands cannot mutate or submit into another chat.
+- World Progression retains chat ownership across lorebook loads, saves, activation, and LLM awaits, and stops writing reports or advancing timers into another chat after a switch.
+- Chat switches abort in-flight World Progression and Lorebook Agent LLM work before the live projection flips.
+- Adventure Companion aborts in-flight LLM/tool work on chat switch and refuses late actions when the originating chat is no longer active.
 - Cancelled Companion requests retain their abort signal and cannot execute late tools or clear the controls of a newer request.
+- State memo commands stop before changing quests, history, or memo data if the chat or state changes while a map snapshot is captured.
 
 ### Added
 - **`/get-state-memo` and `/set-state-memo` slash commands**: Read the full state memo or a single `[BLOCK]` without an LLM pass. `/get-state-memo block=TIME` returns just the content (`Day 2`); `/get-state-memo TIME` (positional) returns the wrapped block (`[TIME]\nDay 2\n[/TIME]`). `/set-state-memo block=TIME Day 2` sets one block's content (merging into existing memo), or `/set-state-memo <full memo>` replaces everything. Block id uses named `block=` argument so quoted content is never misparsed. `/set-state-memo` pushes the same Linear Stone History delta/version entry as a narrative or Direct Prompt update, so `[ LIVE ]` navigation and the delta panel see the change.

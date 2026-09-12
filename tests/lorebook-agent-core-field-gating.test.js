@@ -48,7 +48,7 @@ describe('getEligibleCoreFieldNames', () => {
 
 describe('router.js core-field gating wiring', () => {
     it('threads isManual into applyAction', () => {
-        expect(routerSource).toContain('async function applyAction(action, allBooks = {}, currentTime = \'\', breadcrumb = \'\', isManual = false)');
+        expect(routerSource).toContain('async function applyAction(action, allBooks = {}, currentTime = \'\', breadcrumb = \'\', isManual = false, options = {})');
         expect(routerSource).toContain('await applyAction(basicAction, archiveBooks, currentTime, breadcrumb, isManual)');
         expect(routerSource).toContain('const commitResult = await applyAction(args, archiveBooks, currentTime, breadcrumb, isManual)');
     });
