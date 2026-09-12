@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.87] - 2026-09-11
+
+### Added
+- **`/get-state-memo` and `/set-state-memo` slash commands**: Read the full state memo or a single `[BLOCK]` without an LLM pass. `/get-state-memo block=TIME` returns just the content (`Day 2`); `/get-state-memo TIME` (positional) returns the wrapped block (`[TIME]\nDay 2\n[/TIME]`). `/set-state-memo block=TIME Day 2` sets one block's content (merging into existing memo), or `/set-state-memo <full memo>` replaces everything. Block id uses named `block=` argument so quoted content is never misparsed. `/set-state-memo` pushes the same Linear Stone History delta/version entry as a narrative or Direct Prompt update, so `[ LIVE ]` navigation and the delta panel see the change.
+
 ## [2026.8.86] - 2026-09-10
 
 ### Fixed
