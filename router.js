@@ -2737,9 +2737,14 @@ ${recordCategoryGuidance}`;
  * @param {object} allBooks - The cached archive books for verification.
  * @param {string} [currentTime=''] - The current time string for timestamping.
  * @param {string} [breadcrumb=''] - The current location hierarchy string (Main :: Sub).
+ * @param {boolean} [isManual=false]
+ * @param {{ canCommit?: () => boolean }} [options] Rechecked after I/O before further writes.
  * @returns {Promise<{success: boolean, errors: string[], recordedIds: string[]}>}
  */
-async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb = '', isManual = false) {
+async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb = '', isManual = false, options = {}) {
+    const canCommit = options.canCommit || (() => true);
+    const staleResult = { success: false, status: 'chat_changed', errors: ['Active chat changed'], recordedIds: [] };
+    if (!canCommit()) return staleResult;
     const settings = getSettings();
     const ctx = SillyTavern.getContext();
     let changed = false;
@@ -2821,6 +2826,7 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
         }
         const [bookName, uid] = up.id.split('::');
         const book = await ctx.loadWorldInfo(bookName);
+        if (!canCommit()) return staleResult;
         if (book?.entries?.[uid]) {
             // Strip [ID:] stamp from anywhere in the delta (model sometimes echoes it)
             let delta = (up.content || '').replace(/\[ID:[^\]]+\]\n?/gi, '').trim();
@@ -2835,6 +2841,7 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
             }
             book.entries[uid].content = existing && delta ? `${existing}\n${delta}` : (existing || delta);
             await ctx.saveWorldInfo(bookName, book);
+            if (!canCommit()) return staleResult;
             changed = true;
         }
     }
@@ -2853,10 +2860,12 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
         }
         const [bookName, uid] = rw.id.split('::');
         const book = await ctx.loadWorldInfo(bookName);
+        if (!canCommit()) return staleResult;
         if (book?.entries?.[uid]) {
             const originalContent = book.entries[uid].content || '';
             book.entries[uid].content = protectCoreBlock(originalContent, rw.content);
             await ctx.saveWorldInfo(bookName, book);
+            if (!canCommit()) return staleResult;
             rewriteIds.push(rw.id);
             changed = true;
         } else {
@@ -2878,15 +2887,19 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
         }
         const [bookName, uid] = rn.id.split('::');
         const book = await ctx.loadWorldInfo(bookName);
+        if (!canCommit()) return staleResult;
         if (book?.entries?.[uid]) {
             const oldLabel = book.entries[uid].comment || '';
             if (rn.label !== undefined) book.entries[uid].comment = rn.label;
             if (rn.keys  !== undefined) book.entries[uid].key = cleanKeys(rn.keys);
             await ctx.saveWorldInfo(bookName, book);
+            if (!canCommit()) return staleResult;
             if (rn.label !== undefined && oldLabel && rn.label !== oldLabel) {
                 // Dynamic import avoids a static cycle (index → router → portraits → index).
                 const { renamePortraitEntity } = await import('./portraits.js');
+                if (!canCommit()) return staleResult;
                 await renamePortraitEntity(oldLabel, rn.label);
+                if (!canCommit()) return staleResult;
             }
             renameIds.push(rn.id);
             changed = true;
@@ -2910,10 +2923,12 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
         // Update the survivor with merged content
         const [sBook, sUid] = op.survivor.split('::');
         const sBookData = await ctx.loadWorldInfo(sBook);
+        if (!canCommit()) return staleResult;
         if (sBookData?.entries?.[sUid]) {
             const originalContent = sBookData.entries[sUid].content || '';
             sBookData.entries[sUid].content = protectCoreBlock(originalContent, op.content);
             await ctx.saveWorldInfo(sBook, sBookData);
+            if (!canCommit()) return staleResult;
             consolidateIds.push(op.survivor);
         } else {
             errors.push(`Consolidate survivor not found: ${op.survivor}`);
@@ -2926,9 +2941,11 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
             if (typeof targetId !== 'string' || !targetId.includes('::')) continue;
             const [tBook, tUid] = targetId.split('::');
             const tBookData = await ctx.loadWorldInfo(tBook);
+            if (!canCommit()) return staleResult;
             if (tBookData?.entries?.[tUid]) {
                 delete tBookData.entries[tUid];
                 await ctx.saveWorldInfo(tBook, tBookData);
+                if (!canCommit()) return staleResult;
             } else {
                 errors.push(`Consolidate target not found: ${targetId}`);
             }
@@ -3048,6 +3065,7 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
         try {
             bookData = await ctx.loadWorldInfo(targetBook);
         } catch (_) { }
+        if (!canCommit()) return staleResult;
 
         if (!bookData) {
             try {
@@ -3056,13 +3074,16 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
                     headers: getRequestHeaders(),
                     body: JSON.stringify({ name: targetBook })
                 });
+                if (!canCommit()) return staleResult;
                 if (res.ok) {
                     const data = await res.json();
+                    if (!canCommit()) return staleResult;
                     if (data && typeof data === 'object' && data.entries) {
                         bookData = data;
                     }
                 }
             } catch (_) {}
+            if (!canCommit()) return staleResult;
         }
 
         if (!bookData) {
@@ -3182,6 +3203,7 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
             headers: getRequestHeaders(),
             body: JSON.stringify({ name: targetBook, data: bookData })
         });
+        if (!canCommit()) return staleResult;
         if (!saveRes.ok) {
             console.error(`[RPG Tracker] Failed to save ${targetBook}: HTTP ${saveRes.status}`);
         } else {
@@ -3191,6 +3213,7 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
             // (the raw HTTP API bypasses the in-memory cache; this syncs them up).
             if (typeof ctx.saveWorldInfo === 'function') {
                 try { await ctx.saveWorldInfo(targetBook, bookData); } catch (_) { /* non-fatal */ }
+                if (!canCommit()) return staleResult;
             }
             booksWritten.add(targetBook);
         }
@@ -3204,9 +3227,11 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
         const createdNewBook = [...booksWritten].some(name => !knownBefore.has(String(name || '').toLowerCase()));
         if (createdNewBook && typeof ctx.updateWorldInfoList === 'function') {
             await ctx.updateWorldInfoList();
+            if (!canCommit()) return staleResult;
         }
         for (const bookName of booksWritten) {
             await ctx.executeSlashCommandsWithOptions(`/world state=on silent=true "${bookName}"`);
+            if (!canCommit()) return staleResult;
         }
         if (settings.debugMode) console.log(`[RPG Tracker] Activated books: ${[...booksWritten].join(', ')}`);
     }
@@ -3227,9 +3252,11 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
         if (parts.length < 2) continue;
         const [bookName, uid] = parts;
         const book = await ctx.loadWorldInfo(bookName);
+        if (!canCommit()) return staleResult;
         if (book?.entries?.[uid]) {
             delete book.entries[uid];
             await ctx.saveWorldInfo(bookName, book);
+            if (!canCommit()) return staleResult;
             // Also remove from active keys if present
             settings.activeRouterKeys = settings.activeRouterKeys.filter(k => k !== id);
             settings.activeWorldKeys = (settings.activeWorldKeys || []).filter(k => k !== id);
@@ -3313,6 +3340,7 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
                 try {
                     npcBook = await ctx.loadWorldInfo(npcBookName);
                 } catch (_) {}
+                if (!canCommit()) return staleResult;
                 
                 let foundUid = null;
                 if (npcBook && npcBook.entries) {
@@ -3409,6 +3437,7 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
         }
 
         const resolvedId = await resolveLoreEntryId(id, allBooks, newlyCreatedMap);
+        if (!canCommit()) return staleResult;
         if (!resolvedId) {
             errors.push(`Could not resolve core update target "${id}" to a Book::UID`);
             continue;
@@ -3419,6 +3448,7 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
         }
         const [bookName, uid] = resolvedId.split('::');
         const book = await ctx.loadWorldInfo(bookName);
+        if (!canCommit()) return staleResult;
         if (!book?.entries?.[uid]) {
             errors.push(`Core update target not found: ${resolvedId}`);
             continue;
@@ -3448,6 +3478,7 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
 
         book.entries[uid].content = entryContent.replace(coreMatch[0], `[CORE]${patched.text}[/CORE]`);
         await ctx.saveWorldInfo(bookName, book);
+        if (!canCommit()) return staleResult;
         changed = true;
     }
 
@@ -4911,6 +4942,7 @@ export async function runWorldProgressionPass(timeStr, currentMinutes, extraInst
     }
 
     // 2. Duplicate check - see if a report for this period already exists in the World book.
+    if (!ownsChat()) return abortForChatChange();
     const worldBook = archiveBooks[worldBookName] ?? null;
     const cleanPeriod = periodLabel.toLowerCase().trim();
     if (worldBook?.entries) {
@@ -5204,7 +5236,7 @@ ${historicalDump}`;
     await applyAction({
         record: [{ label: periodLabel, keys: entryKeys, content: reportContent.trim(), category: 'WORLD' }],
         reason: `World Progression: auto-generated report for ${periodLabel}`,
-    }, archiveBooks, timeStr, '');
+    }, archiveBooks, timeStr, '', false, { canCommit: ownsChat });
     if (!ownsChat()) return abortForChatChange();
 
     // 8. Rolling window: keep only the N most recent WORLD entries active.
@@ -5275,7 +5307,7 @@ ${historicalDump}`;
                 activate: toActivate,
                 deactivate: toDeactivate,
                 reason: `World Progression: rolling window (keep ${keepActive} active)`,
-            }, freshArchive, timeStr, '');
+            }, freshArchive, timeStr, '', false, { canCommit: ownsChat });
             if (!ownsChat()) return abortForChatChange();
         }
     }

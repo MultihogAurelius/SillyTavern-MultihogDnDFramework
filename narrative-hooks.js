@@ -14,12 +14,13 @@
 
 import { getSettings, hydrateWorldProgressionFromChatState, persistWorldProgressionTimer, persistRouterLastRunWatermark, persistMapUpdaterLastRunTimestamp, persistMapUpdaterLastRunWatermark, persistMapUpdaterState, getNpcRelationshipMax, clampRelationshipValue, relationshipBarPct, getFriendshipTier, getAffectionTier, applyRelTierBadgeElement, showRelationshipFloatFeedback, saveChatState, getActiveChatId, getRelationshipUpdateMode, RELATIONSHIP_UPDATE_MODES, shouldProcessRegexRelationshipUpdates, stripCoreMarkersForNarrator } from './state-manager.js';
 import { syncCombatProfile, isCombatActive } from './llm-client.js';
-import { parseQuestsFromMemo, extractCurrentTimeStr, cleanMessageContent, formatInWorldTime, memoForGmContext, stripPromptInjectionsFromUserText, stripCyoaAndPacingInjections } from './memo-processor.js';
-import { runRouterPass, saveSceneToLorebook, scanAssistantOutputForKeywords, parseInWorldMinutes, runWorldProgressionPass, updateLorebookEntry, getLorebookManifest, rollbackRouterPass, isRouterRunning, syncDungeonMapsToLocationLorebook } from './router.js';
+import { parseQuestsFromMemo, extractCurrentTimeStr, cleanMessageContent, formatInWorldTime, memoForGmContext, stripPromptInjectionsFromUserText, stripCyoaAndPacingInjections, mergeMemo, applyQuestSyncAndStripMemo, computeDelta } from './memo-processor.js';
+import { parseMemoBlocks } from './renderer.js';
+import { runRouterPass, saveSceneToLorebook, scanAssistantOutputForKeywords, parseInWorldMinutes, runWorldProgressionPass, updateLorebookEntry, getLorebookManifest, rollbackRouterPass, isRouterRunning, syncDungeonMapsToLocationLorebook, captureActiveDungeonMapHistory } from './router.js';
 import { getActiveMapUpdaterSiteRoot, maybeRollbackMapUpdaterForSwipe, runMapUpdaterPass, shouldForceBuildingPopulationPass, stopMapUpdaterPass } from './map-updater.js';
 import { maybeRollbackMapEvolutionForSwipe, maybeRunMapEvolution, stopMapEvolutionPass } from './map-evolution.js';
 import { formatNarratorSiteActivity } from './map-evolution-lib.js';
-import { shiftMemoAndMapHistory } from './src/state/dungeon-map-history.js';
+import { shiftMemoAndMapHistory, ensureDungeonMapHistory, sliceMemoAndMapHistory, unshiftMemoAndMapHistory } from './src/state/dungeon-map-history.js';
 import { canCommitPassForChat } from './src/state/pass-affinity.js';
 import { logTransaction } from './debug-viewer.js';
 import { recordSchedulerEvent } from './swipe-scheduler-debug.js';
@@ -928,6 +929,127 @@ export function registerDiceSlashCommand() {
             SlashCommandArgument.fromProps({
                 description: 'run | regular | full | audit | lookback N | N (omit for a regular update)',
                 isRequired: false,
+                typeList: [ARGUMENT_TYPE.STRING],
+            }),
+        ],
+    }));
+
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name: 'get-state-memo',
+        callback: async (args, value) => {
+            const settings = getSettings();
+            const memo = String(settings.currentMemo || '').trim();
+            const isNamed = args.block !== undefined && args.block !== null;
+            const blockId = String(args.block ?? value ?? '').trim();
+            if (!blockId) return memo;
+
+            const tag = blockId.toUpperCase();
+            const content = parseMemoBlocks(memo)[tag];
+            if (content === undefined) return '';
+            // Named argument: return just content; positional: wrap in block
+            return isNamed ? content : `[${tag}]\n${content}\n[/${tag}]`;
+        },
+        helpString: 'Get the current State Tracker memo, or a single [BLOCK] from it. '
+            + 'Usage: /get-state-memo | /get-state-memo block=&lt;BLOCK&gt;',
+        returns: 'the memo text, or the requested block only',
+        namedArgumentList: [
+            SlashCommandNamedArgument.fromProps({
+                name: 'block',
+                description: 'block id to return (e.g. CHARACTER, TIME) — omit to return the entire memo',
+                isRequired: false,
+                typeList: [ARGUMENT_TYPE.STRING],
+            }),
+        ],
+        unnamedArgumentList: [
+            SlashCommandArgument.fromProps({
+                description: 'block id to return (alternative to block=) — omit to return the entire memo',
+                isRequired: false,
+                typeList: [ARGUMENT_TYPE.STRING],
+            }),
+        ],
+    }));
+
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name: 'set-state-memo',
+        callback: async (args, value) => {
+            const settings = getSettings();
+            const passChatId = getActiveChatId();
+            const currentMemo = String(settings.currentMemo || '');
+            const historyIndexAtStart = settings.historyIndex;
+            const blockId = String(args.block ?? '').trim();
+            // Use unnamedArgumentList to preserve multiline and special chars like |
+            const unnamedArgs = args.unnamedArgumentList ?? [];
+            const content = unnamedArgs.length > 0 
+                ? unnamedArgs.join(' ').trim()
+                : String(value ?? '').trim();
+
+            let updatedMemo;
+            if (blockId) {
+                // Block form: /set-state-memo block=<BLOCK> <content>
+                if (!content) return 'Usage: /set-state-memo block=<BLOCK> <content>';
+                const tag = blockId.toUpperCase();
+                updatedMemo = mergeMemo(currentMemo, `[${tag}]\n${content}\n[/${tag}]`);
+            } else {
+                // Full memo form: /set-state-memo <full memo>
+                if (!content) return 'Usage: /set-state-memo <full memo> | /set-state-memo block=<BLOCK> <content>';
+                updatedMemo = content;
+            }
+
+            // Capture maps before mutating quests, history, or the live memo.
+            // A chat switch or another editor may finish during this lorebook read.
+            const mapSnapshot = await captureActiveDungeonMapHistory();
+            if (!canCommitPassForChat(passChatId, getActiveChatId())) return 'State memo not updated: active chat changed.';
+            if (String(settings.currentMemo || '') !== currentMemo || settings.historyIndex !== historyIndexAtStart) {
+                return 'State memo not updated: memo or history changed while preparing the update.';
+            }
+            updatedMemo = applyQuestSyncAndStripMemo(updatedMemo);
+            if (updatedMemo === currentMemo) return 'No changes were made.';
+
+            // Linear Stone History: same versioning stones as a normal narrative/direct-prompt update.
+            const delta = computeDelta(currentMemo, updatedMemo);
+            settings.lastDelta = delta;
+            if (settings.historyIndex !== undefined && settings.historyIndex !== -1) {
+                sliceMemoAndMapHistory(settings, settings.historyIndex);
+            }
+            ensureDungeonMapHistory(settings);
+            if (settings.memoHistory?.[0] !== currentMemo) {
+                const previousMap = settings.historyIndex === 0
+                    ? (settings.dungeonMapHistory[0] ?? mapSnapshot)
+                    : mapSnapshot;
+                unshiftMemoAndMapHistory(settings, currentMemo, previousMap);
+            }
+            unshiftMemoAndMapHistory(settings, updatedMemo, mapSnapshot);
+            settings.historyIndex = 0;
+            runtimeState.historyViewIndex = -1;
+            runtimeState.dungeonMapHistoryOverlay = null;
+
+            const deltaPanel = document.getElementById('rpg-tracker-delta-content');
+            if (deltaPanel) deltaPanel.innerHTML = delta;
+
+            settings.prevMemo2 = settings.prevMemo1;
+            settings.prevMemo1 = currentMemo;
+            settings.currentMemo = updatedMemo;
+            saveSettings();
+            if (settings.chatLinkEnabled) saveChatState(passChatId);
+            if (typeof globalThis._rpgUpdateUIMemo === 'function') globalThis._rpgUpdateUIMemo(updatedMemo);
+
+            return 'State memo updated.';
+        },
+        helpString: 'Set the entire State Tracker memo, or one [BLOCK] within it. Please escape pipe characters (|) in the content.'
+            + 'Usage: /set-state-memo &lt;full memo text&gt; | /set-state-memo block=&lt;BLOCK&gt; &lt;content&gt;',
+        returns: 'status message',
+        namedArgumentList: [
+            SlashCommandNamedArgument.fromProps({
+                name: 'block',
+                description: 'block id (e.g. TIME) to set — omit to replace the entire memo with the unnamed argument',
+                isRequired: false,
+                typeList: [ARGUMENT_TYPE.STRING],
+            }),
+        ],
+        unnamedArgumentList: [
+            SlashCommandArgument.fromProps({
+                description: 'content to set for block= (or the full memo text when block= is omitted)',
+                isRequired: true,
                 typeList: [ARGUMENT_TYPE.STRING],
             }),
         ],
