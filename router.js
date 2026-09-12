@@ -1,5 +1,6 @@
-import { getSettings, getEffectiveRouterCampaignPrefix, persistWorldProgressionTimer, persistRouterLastRunWatermark, persistRouterLastRunTimestamp, persistMapEvolutionState, getNpcRelationshipMax, clampRelationshipValue, buildRouterRelationshipInstruction, sanitizeRouterState, adjustPromptTimestamps, DEFAULT_NPC_SECTIONS, saveChatState, computeUnpinnedActiveCount, extractCharacterBlock, extractPartyBlock, isPcCoreTarget, isAppearanceField, isEquipmentField, isCombatProfileField, getEligibleCoreFieldNames, patchLabeledSection, mergePreservedColorMarkup, expandLorebookPromptTemplate, resolveRecordCategoryTag, getEnabledRouterCategoryTags, getRouterCategoryBookSuffix, buildRouterCategoryMap } from './state-manager.js';
+import { getSettings, getActiveChatId, getEffectiveRouterCampaignPrefix, persistWorldProgressionTimer, persistRouterLastRunWatermark, persistRouterLastRunTimestamp, persistMapEvolutionState, getNpcRelationshipMax, clampRelationshipValue, buildRouterRelationshipInstruction, sanitizeRouterState, adjustPromptTimestamps, DEFAULT_NPC_SECTIONS, saveChatState, computeUnpinnedActiveCount, extractCharacterBlock, extractPartyBlock, isPcCoreTarget, isAppearanceField, isEquipmentField, isCombatProfileField, getEligibleCoreFieldNames, patchLabeledSection, mergePreservedColorMarkup, expandLorebookPromptTemplate, resolveRecordCategoryTag, getEnabledRouterCategoryTags, getRouterCategoryBookSuffix, buildRouterCategoryMap } from './state-manager.js';
 import { sendStateRequest, sendAgentTurn } from './llm-client.js';
+import { canCommitPassForChat } from './src/state/pass-affinity.js';
 import { getRequestHeaders } from '../../../../script.js';
 import { extractCurrentTimeStr, cleanMessageContent, parseInWorldTime, formatInWorldTime, findNthUserMessageStartIdx, formatAgentChatLogFromIndex, sanitizeLorebookRecordContent, parseJsonWithColorRepair } from './memo-processor.js';
 import { recordSchedulerEvent } from './swipe-scheduler-debug.js';
@@ -67,6 +68,7 @@ import {
 let _routerRunning = false;
 let _routerNormalRunCount = 0; // tracks completed normal (non-cleanup) passes for auto-cleanup interval
 let _routerController = null; // AbortController for the active router pass
+let _worldProgressionController = null; // AbortController for the active World Progression pass
 
 /** Returns true while a router pass is actively running. */
 export function isRouterRunning() { return _routerRunning; }
@@ -79,6 +81,18 @@ export function stopRouterPass() {
     if (_routerController) {
         _routerController.abort();
         _routerController = null;
+    }
+}
+
+/**
+ * Aborts the currently-running World Progression pass, if any.
+ * Chat switches must cancel WP before flipping the live projection so a late
+ * applyAction / timer persist cannot target the arriving chat.
+ */
+export function stopWorldProgressionPass() {
+    if (_worldProgressionController) {
+        try { _worldProgressionController.abort(); } catch (_) { /* ignore */ }
+        _worldProgressionController = null;
     }
 }
 
@@ -4828,6 +4842,27 @@ function computePeriodLabel(startMinutes, endMinutes, intervalHours) {
  */
 export async function runWorldProgressionPass(timeStr, currentMinutes, extraInstructions = null) {
     const settings = getSettings();
+    // Pin chat ownership before any lorebook/LLM await. applyAction routes WORLD
+    // records via live getLivePrefix(), and persistWorldProgressionTimer() saves
+    // through getActiveChatId() — both become the arriving chat after a switch.
+    const passChatId = getActiveChatId();
+    if (_worldProgressionController) {
+        try { _worldProgressionController.abort(); } catch (_) { /* ignore */ }
+    }
+    _worldProgressionController = new AbortController();
+    const signal = _worldProgressionController.signal;
+    const releaseWorldProgressionController = () => {
+        if (_worldProgressionController?.signal === signal) {
+            _worldProgressionController = null;
+        }
+    };
+    const ownsChat = () => canCommitPassForChat(passChatId, getActiveChatId(), { aborted: signal.aborted });
+    const abortForChatChange = () => {
+        broadcastStep('thought', '🌍 World Progression: stopped because the active chat changed.');
+        releaseWorldProgressionController();
+        return { ok: false, error: 'chat_changed' };
+    };
+
     const prefix = getLivePrefix();
     const worldBookName = prefix ? `${prefix}_World` : 'World';
     const intervalHours = settings.worldProgressionIntervalHours || 24;
@@ -4858,16 +4893,19 @@ export async function runWorldProgressionPass(timeStr, currentMinutes, extraInst
 
     broadcastStep('thought', `\uD83C\uDF0D World Progression: Checking for "${periodLabel}" report...`);
 
+    try {
     // 1. Load ALL campaign lorebooks once.
     //    Used for: duplicate check, full lore context, and applyAction verification.
     //    No double-fetch - archiveBooks is reused throughout the function.
     const ctx = SillyTavern.getContext();
     const allBookNames = await getWorldInfoNamesSafe();
+    if (!ownsChat()) return abortForChatChange();
     const archiveBooks = {};
     for (const n of allBookNames) {
         if (prefix && !bookBelongsToPrefix(n, prefix)) continue;
         try {
             const b = await ctx.loadWorldInfo(n);
+            if (!ownsChat()) return abortForChatChange();
             if (b?.entries) archiveBooks[n] = b;
         } catch (_) {}
     }
@@ -4879,6 +4917,7 @@ export async function runWorldProgressionPass(timeStr, currentMinutes, extraInst
         for (const [uid, entry] of Object.entries(worldBook.entries)) {
             const existingLabel = (entry.comment || '').toLowerCase().trim();
             if (existingLabel === cleanPeriod) {
+                if (!ownsChat()) return abortForChatChange();
                 broadcastStep('thought', `\uD83C\uDF0D World Progression: "${periodLabel}" already exists - advancing timer.`);
                 settings.worldProgressionLastFiredPeriodLabel = periodLabel;
                 const metadata = normalizeWorldReportMetadata(entry, worldBookName, uid);
@@ -4888,6 +4927,7 @@ export async function runWorldProgressionPass(timeStr, currentMinutes, extraInst
                     periodLabel,
                 );
                 persistWorldProgressionTimer();
+                releaseWorldProgressionController();
                 return {
                     ok: true,
                     skipped: 'duplicate',
@@ -4966,15 +5006,18 @@ ${rawDump}`;
 
                 let consolidatedContent = null;
                 try {
-                    consolidatedContent = await sendStateRequest(routerSettings, consolidationSystemPrompt, consolidationUserPrompt, null, { stream: true, debugSource: 'World Progression' });
+                    consolidatedContent = await sendStateRequest(routerSettings, consolidationSystemPrompt, consolidationUserPrompt, signal, { stream: true, debugSource: 'World Progression' });
                 } catch (e) {
+                    if (e?.name === 'AbortError' || !ownsChat()) return abortForChatChange();
                     broadcastStep('error', `World Progression consolidation failed: ${e.message} — continuing without consolidation.`);
                 }
+                if (!ownsChat()) return abortForChatChange();
 
                 if (consolidatedContent && consolidatedContent.trim()) {
                     // Reload the world book from disk for a fresh write
                     let freshBook = null;
                     try { freshBook = await ctx.loadWorldInfo(worldBookName); } catch (_) {}
+                    if (!ownsChat()) return abortForChatChange();
                     if (!freshBook?.entries) freshBook = currentWorldBook;
 
                     // Add the consolidated entry
@@ -5011,7 +5054,9 @@ ${rawDump}`;
                         headers: getRequestHeaders(),
                         body: JSON.stringify({ name: worldBookName, data: freshBook })
                     });
+                    if (!ownsChat()) return abortForChatChange();
                     try { await ctx.saveWorldInfo(worldBookName, freshBook); } catch (_) {}
+                    if (!ownsChat()) return abortForChatChange();
 
                     // Update the in-memory archive so the lore context build step reads fresh data
                     archiveBooks[worldBookName] = freshBook;
@@ -5136,13 +5181,17 @@ ${historicalDump}`;
     broadcastStep('thought', `\uD83C\uDF0D World Progression: Generating report for "${periodLabel}" (${selectedLocations.length} locations, ${historicalReportLines.length} prior reports)...`);
     let reportContent;
     try {
-        reportContent = await sendStateRequest(routerSettings, systemPrompt, userPrompt, null, { stream: true, debugSource: 'World Progression' });
+        reportContent = await sendStateRequest(routerSettings, systemPrompt, userPrompt, signal, { stream: true, debugSource: 'World Progression' });
     } catch (e) {
+        if (e?.name === 'AbortError' || !ownsChat()) return abortForChatChange();
         broadcastStep('error', `World Progression generation failed: ${e.message}`);
+        releaseWorldProgressionController();
         return { ok: false, error: e.message };
     }
+    if (!ownsChat()) return abortForChatChange();
     if (!reportContent || !reportContent.trim()) {
         broadcastStep('error', 'World Progression: LLM returned empty response.');
+        releaseWorldProgressionController();
         return { ok: false, error: 'empty' };
     }
 
@@ -5156,12 +5205,15 @@ ${historicalDump}`;
         record: [{ label: periodLabel, keys: entryKeys, content: reportContent.trim(), category: 'WORLD' }],
         reason: `World Progression: auto-generated report for ${periodLabel}`,
     }, archiveBooks, timeStr, '');
+    if (!ownsChat()) return abortForChatChange();
 
     // 8. Rolling window: keep only the N most recent WORLD entries active.
     await new Promise(r => setTimeout(r, 300));
+    if (!ownsChat()) return abortForChatChange();
     let freshWorldBook = null;
     let reportId = '';
     try { freshWorldBook = await ctx.loadWorldInfo(worldBookName); } catch (_) {}
+    if (!ownsChat()) return abortForChatChange();
     if (!freshWorldBook?.entries) {
         try {
             const r = await fetch('/api/worldinfo/get', {
@@ -5169,9 +5221,11 @@ ${historicalDump}`;
                 headers: getRequestHeaders(),
                 body: JSON.stringify({ name: worldBookName })
             });
+            if (!ownsChat()) return abortForChatChange();
             if (r.ok) { const d = await r.json(); if (d?.entries) freshWorldBook = d; }
         } catch (_) {}
     }
+    if (!ownsChat()) return abortForChatChange();
 
     if (freshWorldBook?.entries) {
         const sorted = Object.entries(freshWorldBook.entries)
@@ -5200,7 +5254,9 @@ ${historicalDump}`;
             } catch (error) {
                 console.warn('[RPG Tracker] Could not persist World Report routing metadata through the API.', error);
             }
+            if (!ownsChat()) return abortForChatChange();
             try { await ctx.saveWorldInfo(worldBookName, freshWorldBook); } catch (_) {}
+            if (!ownsChat()) return abortForChatChange();
         }
         const allWorldIds = sorted.map(([uid]) => `${worldBookName}::${uid}`);
         const toActivate = allWorldIds.slice(-keepActive);
@@ -5211,17 +5267,21 @@ ${historicalDump}`;
             const freshArchive = {};
             for (const n of Object.keys(archiveBooks)) {
                 try { const b = await ctx.loadWorldInfo(n); if (b?.entries) freshArchive[n] = b; } catch (_) {}
+                if (!ownsChat()) return abortForChatChange();
             }
             freshArchive[worldBookName] = freshWorldBook;
+            if (!ownsChat()) return abortForChatChange();
             await applyAction({
                 activate: toActivate,
                 deactivate: toDeactivate,
                 reason: `World Progression: rolling window (keep ${keepActive} active)`,
             }, freshArchive, timeStr, '');
+            if (!ownsChat()) return abortForChatChange();
         }
     }
 
     // 9. Advance the timer — only the period label is stored; numeric field is legacy.
+    if (!ownsChat()) return abortForChatChange();
     settings.worldProgressionLastFiredPeriodLabel = periodLabel;
     settings.worldProgressionLocationLastAdvanced = stampLocationAdvancement(
         settings.worldProgressionLocationLastAdvanced,
@@ -5234,6 +5294,7 @@ ${historicalDump}`;
     if (typeof globalThis._rpgRenderRouterUI === 'function') {
         globalThis._rpgRenderRouterUI();
     }
+    releaseWorldProgressionController();
     return {
         ok: true,
         reportContent: reportContent.trim(),
@@ -5241,6 +5302,11 @@ ${historicalDump}`;
         reportId,
         selectedLocations,
     };
+    } catch (e) {
+        if (e?.name === 'AbortError' || !ownsChat()) return abortForChatChange();
+        releaseWorldProgressionController();
+        throw e;
+    }
 }
 // -- World Skeleton ------------------------------------------------------------------
 

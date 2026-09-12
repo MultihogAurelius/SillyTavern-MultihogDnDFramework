@@ -2,6 +2,12 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.87] - 2026-09-12
+
+### Fixed
+- World Progression retains chat ownership across lorebook loads and LLM awaits, and stops writing `_World` reports or advancing the WP timer into another chat after a switch.
+- Chat switches abort in-flight World Progression and Lorebook Agent LLM work before the live projection flips.
+
 ## [2026.8.86] - 2026-09-10
 
 ### Fixed
