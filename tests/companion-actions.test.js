@@ -19,6 +19,24 @@ afterEach(() => {
 });
 
 describe('Adventure Companion fallback actions', () => {
+    it('does not execute late tools after cancellation in the same chat', async () => {
+        const { runtimeState } = await import('../src/app/runtime-state.js');
+        runtimeState.currentChatId = 'chat-a';
+        const { sendAgentTurn } = await import('../llm-client.js');
+        const { configureRuntimeActions } = await import('../src/app/runtime-bridge.js');
+        const sendDirectPrompt = vi.fn();
+        configureRuntimeActions({ sendDirectPrompt });
+        const controller = new AbortController();
+        sendAgentTurn.mockImplementation(async () => {
+            controller.abort();
+            return { content: '', toolCall: { name: 'command_state_tracker', args: { instruction: 'Set gold to 99.' }, id: 'cancelled' } };
+        });
+        const { runCompanionAgentLoop } = await import('../adventure-companion.js');
+        const reply = await runCompanionAgentLoop([], controller.signal);
+        expect(sendDirectPrompt).not.toHaveBeenCalled();
+        expect(reply).toContain('cancelled');
+    });
+
     it('treats natural requests and underspecified demos as action intent', async () => {
         const { COMPANION_PERSONA, COMPANION_ACTION_TOOLS } = await import('../adventure-companion.js');
 

@@ -213,8 +213,8 @@ describe('Adventure Companion settings', () => {
         expect(companionSource).toContain('export function abortAdventureCompanionInFlight()');
         expect(companionSource).toContain('abortAdventureCompanionInFlight()');
         expect(companionSource).toContain('globalThis._rpgAbortAdventureCompanionInFlight = abortAdventureCompanionInFlight');
-        expect(companionSource).toContain('await executeCompanionAction(nativeAction, passChatId)');
-        expect(companionSource).toContain("status: 'chat_changed'");
+        expect(companionSource).toContain('await executeCompanionAction(nativeAction, passChatId, signal)');
+        expect(companionSource).toContain("signal?.aborted ? 'aborted' : 'chat_changed'");
         expect(companionSource).toContain('Active chat changed; Adventure Companion action was skipped.');
 
         const handlerStart = indexSource.indexOf('function onChatChanged(newChatId)');

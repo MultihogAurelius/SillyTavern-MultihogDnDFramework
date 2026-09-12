@@ -440,6 +440,8 @@ export function abortAdventureCompanionInFlight() {
     if (!_abort) return;
     try { _abort.abort(); } catch (_) { /* ignore */ }
     _abort = null;
+    setBusy(false);
+    chatUiRoot()?.querySelector('#rt-tutorial-pending')?.remove();
 }
 
 /**
@@ -1059,11 +1061,11 @@ function summarizeMapUpdaterCompanionResult(result) {
  * @param {any} action
  * @returns {Promise<{action:string, success:boolean, status:string, message:string, terminal?:boolean}>}
  */
-async function executeCompanionAction(action, passChatId = null) {
+async function executeCompanionAction(action, passChatId = null, signal = null) {
     const originChatId = passChatId != null && String(passChatId).length > 0
         ? passChatId
         : resolveActiveChatId();
-    if (!canCommitPassForChat(originChatId, resolveActiveChatId())) {
+    if (!canCommitPassForChat(originChatId, resolveActiveChatId(), { aborted: !!signal?.aborted })) {
         return {
             action: action?.name === 'act_for_user'
                 ? 'Player Turn'
@@ -1073,8 +1075,10 @@ async function executeCompanionAction(action, passChatId = null) {
                         ? 'Map Updater'
                         : 'Lorebook Agent',
             success: false,
-            status: 'chat_changed',
-            message: 'Active chat changed; Adventure Companion action was skipped.',
+            status: signal?.aborted ? 'aborted' : 'chat_changed',
+            message: signal?.aborted
+                ? 'Adventure Companion request was cancelled; action was skipped.'
+                : 'Active chat changed; Adventure Companion action was skipped.',
         };
     }
     try {
@@ -1386,7 +1390,7 @@ export async function runCompanionAgentLoop(messages, signal, options = {}) {
             // LLM returned tool calls after a chat switch — refuse each action
             // rather than executing against the arriving chat.
             for (const action of requestedActions) {
-                const actionResult = await executeCompanionAction(action, passChatId);
+                const actionResult = await executeCompanionAction(action, passChatId, signal);
                 actionCount++;
                 completedActions.push(actionResult);
             }
@@ -1411,10 +1415,10 @@ export async function runCompanionAgentLoop(messages, signal, options = {}) {
                     },
                 }],
             });
-            const actionResult = await executeCompanionAction(nativeAction, passChatId);
+            const actionResult = await executeCompanionAction(nativeAction, passChatId, signal);
             actionCount++;
             completedActions.push(actionResult);
-            if (actionResult.status === 'chat_changed') {
+            if (actionResult.status === 'chat_changed' || actionResult.status === 'aborted') {
                 return formatCompanionActionReceipt(completedActions);
             }
             if (actionResult.success && actionResult.terminal) {
@@ -1431,11 +1435,11 @@ export async function runCompanionAgentLoop(messages, signal, options = {}) {
         messages.push({ role: 'assistant', content: result.content || '' });
         const batchResults = [];
         for (const action of requestedActions) {
-            const actionResult = await executeCompanionAction(action, passChatId);
+            const actionResult = await executeCompanionAction(action, passChatId, signal);
             actionCount++;
             completedActions.push(actionResult);
             batchResults.push(actionResult);
-            if (actionResult.status === 'chat_changed') {
+            if (actionResult.status === 'chat_changed' || actionResult.status === 'aborted') {
                 return formatCompanionActionReceipt(completedActions);
             }
             if (actionResult.success && actionResult.terminal) {
@@ -2107,7 +2111,8 @@ async function sendMessage() {
     }
 
     setBusy(true);
-    _abort = new AbortController();
+    const controller = new AbortController();
+    _abort = controller;
     let stillOwnsChat = true;
 
     try {
@@ -2125,17 +2130,17 @@ async function sendMessage() {
             : '';
         const memo = _prefs.injectMemo ? buildMemoContext() : '';
         const lore = _prefs.injectLore ? await buildLoreContext() : '';
-        if (!canCommitPassForChat(passChatId, resolveActiveChatId(), { aborted: !!_abort?.signal?.aborted })) {
+        if (!canCommitPassForChat(passChatId, resolveActiveChatId(), { aborted: controller.signal.aborted })) {
             stillOwnsChat = false;
             return;
         }
         const map = _prefs.injectMap ? await buildMapContext() : '';
-        if (!canCommitPassForChat(passChatId, resolveActiveChatId(), { aborted: !!_abort?.signal?.aborted })) {
+        if (!canCommitPassForChat(passChatId, resolveActiveChatId(), { aborted: controller.signal.aborted })) {
             stillOwnsChat = false;
             return;
         }
         const doc = _prefs.tutorialMode ? await loadDocumentation() : '';
-        if (!canCommitPassForChat(passChatId, resolveActiveChatId(), { aborted: !!_abort?.signal?.aborted })) {
+        if (!canCommitPassForChat(passChatId, resolveActiveChatId(), { aborted: controller.signal.aborted })) {
             stillOwnsChat = false;
             return;
         }
@@ -2146,14 +2151,14 @@ async function sendMessage() {
             { role: 'system', content: systemPrompt },
             ...mp.history.map((m) => ({ role: m.role, content: m.content })),
         ];
-        const reply = await runCompanionAgentLoop(messages, _abort.signal, { passChatId });
-        if (!canCommitPassForChat(passChatId, resolveActiveChatId(), { aborted: !!_abort?.signal?.aborted })) {
+        const reply = await runCompanionAgentLoop(messages, controller.signal, { passChatId });
+        if (!canCommitPassForChat(passChatId, resolveActiveChatId(), { aborted: controller.signal.aborted })) {
             stillOwnsChat = false;
             return;
         }
         mp.history.push({ role: 'assistant', content: reply });
     } catch (err) {
-        stillOwnsChat = canCommitPassForChat(passChatId, resolveActiveChatId());
+        stillOwnsChat = !controller.signal.aborted && canCommitPassForChat(passChatId, resolveActiveChatId());
         if (!stillOwnsChat) {
             // Departing-chat history was already flushed on switch; do not
             // append cancel/error noise into the arriving companion session.
@@ -2169,12 +2174,17 @@ async function sendMessage() {
             toastr['error']('CHAT request failed — see conversation.', 'CHAT');
         }
     } finally {
-        _abort = null;
-        setBusy(false);
+        // A cancelled request may finish after a new chat starts another request.
+        // Only the request that still owns the UI may release its controls.
+        const ownsUi = _abort === controller;
+        if (ownsUi) {
+            _abort = null;
+            setBusy(false);
+            chatUiRoot()?.querySelector('#rt-tutorial-pending')?.remove();
+        }
         if (stillOwnsChat && canCommitPassForChat(passChatId, resolveActiveChatId())) {
             savePrefs(_prefs);
         }
-        chatUiRoot()?.querySelector('#rt-tutorial-pending')?.remove();
         if (stillOwnsChat && canCommitPassForChat(passChatId, resolveActiveChatId())) {
             renderTranscript();
         }
