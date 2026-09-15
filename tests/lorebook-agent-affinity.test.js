@@ -51,4 +51,29 @@ describe('Lorebook Agent chat ownership', () => {
         expect(stopAt).toBeGreaterThan(-1);
         expect(flipAt).toBeGreaterThan(stopAt);
     });
+
+    it('pins chat ownership for /la save before the LLM await', () => {
+        const start = routerSource.indexOf('export async function saveSceneToLorebook(');
+        expect(start).toBeGreaterThan(-1);
+        const end = routerSource.indexOf('\n/**\n * Fetches a manifest of all campaign-scoped lorebook entries', start);
+        expect(end).toBeGreaterThan(start);
+        const fn = routerSource.slice(start, end);
+
+        expect(fn).toContain('const passChatId = getActiveChatId()');
+        expect(fn).toContain('const prefix = getLivePrefix()');
+        const llmAt = fn.indexOf('await sendStateRequest(');
+        expect(llmAt).toBeGreaterThan(fn.indexOf('const passChatId'));
+        expect(llmAt).toBeGreaterThan(fn.indexOf('const prefix'));
+        expect(fn.indexOf('ownsChat()', llmAt)).toBeGreaterThan(llmAt);
+        // Must not re-resolve the live prefix after the await (arriving chat).
+        const pinPrefixAt = fn.indexOf('const prefix = getLivePrefix()');
+        expect(pinPrefixAt).toBeGreaterThan(-1);
+        expect(fn.indexOf('getLivePrefix()', llmAt)).toBe(-1);
+        expect(fn).toContain('`${prefix}World_Chronicle`');
+        const addAt = fn.indexOf('await addLorebookEntry(');
+        expect(addAt).toBeGreaterThan(llmAt);
+        expect(fn.indexOf('ownsChat()', addAt)).toBeGreaterThan(addAt);
+        expect(fn.indexOf('settings.activeRouterKeys.push(newId)', addAt))
+            .toBeGreaterThan(fn.indexOf('ownsChat()', addAt));
+    });
 });

@@ -4002,11 +4002,18 @@ async function addLorebookEntry(lorebookName, entryData, allNames) {
 
 /**
  * Manual scene archiving tool.
+ * Pins chat + campaign prefix before the LLM await so a mid-flight chat switch
+ * cannot archive into the arriving campaign or activate keys on its live projection.
  */
 export async function saveSceneToLorebook(hint = "") {
     const settings = getSettings();
     const ctx = SillyTavern.getContext();
     if (!ctx.generateRaw) return;
+
+    // Pin before any await: getLivePrefix() and live settings become the arriving chat after switch.
+    const passChatId = getActiveChatId();
+    const prefix = getLivePrefix();
+    const ownsChat = () => canCommitPassForChat(passChatId, getActiveChatId());
 
     try {
         (/** @type {any} */ (toastr)).info("Saving scene...", "Lorebook Agent");
@@ -4033,11 +4040,14 @@ Output a JSON object:
         };
 
         const result = await sendStateRequest(routerSettings, systemPrompt, userPrompt);
-        const match = result.match(/\{[\s\S]*\}/);
+        if (!ownsChat()) {
+            (/** @type {any} */ (toastr)).warning('Scene not saved: active chat changed.', 'Lorebook Agent');
+            return;
+        }
+        const match = typeof result === 'string' ? result.match(/\{[\s\S]*\}/) : null;
         if (match) {
             const data = JSON.parse(match[0]);
             
-            const prefix = getLivePrefix();
             const lorebookName = prefix ? `${prefix}World_Chronicle` : 'World Chronicle';
             const newId = await addLorebookEntry(lorebookName, {
                 id: data.id,
@@ -4045,6 +4055,11 @@ Output a JSON object:
                 content: data.content,
                 comment: 'LORE_SCENE'
             });
+            // Lorebook write used the pinned prefix; refuse live activation if ownership was lost mid-save.
+            if (!ownsChat()) {
+                (/** @type {any} */ (toastr)).warning('Scene archived, but activation skipped: active chat changed.', 'Lorebook Agent');
+                return;
+            }
             
             const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             settings.routerLog.unshift({
