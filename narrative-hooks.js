@@ -1417,7 +1417,8 @@ export function installInterceptor() {
         if (!skipInjection && (settings.enabled || cyoaActive || pacingInject)) {
             if (settings.enabled) {
                 // [PLAYER_CHARACTER] — always injected at the top of the core block
-                const curChatId = SillyTavern.getContext().chatId || globalThis._rpgCurrentChatId?.();
+                // Prefer tracked chat — ctx.chatId can lag and inject another campaign's PC.
+                const curChatId = getActiveChatId();
                 if (curChatId && settings.chatStates?.[curChatId]?.playerCharacter) {
                     const pc = settings.chatStates[curChatId].playerCharacter;
                     injections += `[PLAYER_CHARACTER]\nName: ${pc.name}\n${pc.bio}\n[/PLAYER_CHARACTER]\n\n`;

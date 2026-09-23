@@ -55,6 +55,17 @@ describe('cold-start PC [CHARACTER] seed wiring', () => {
         const seedUsages = routerSource.match(/\$\{pcCharacterSeedSection\}/g) || [];
         expect(seedUsages.length).toBeGreaterThanOrEqual(2);
     });
+
+    it('persists the seed flag against the pinned pass chat, not stale ctx.chatId', () => {
+        const start = routerSource.indexOf('if (!settings.pcCharacterBlockSeeded)');
+        expect(start).toBeGreaterThan(-1);
+        const end = routerSource.indexOf('// One authoritative runtime list drives schemas', start);
+        expect(end).toBeGreaterThan(start);
+        const block = routerSource.slice(start, end);
+        expect(block).toContain('if (passChatId) saveChatState(passChatId)');
+        expect(block).not.toMatch(/saveChatState\(\s*(?:seedChatId|ctx\.chatId)/);
+        expect(block).not.toMatch(/const seedChatId\s*=/);
+    });
 });
 
 describe('Player Card approval responsiveness', () => {

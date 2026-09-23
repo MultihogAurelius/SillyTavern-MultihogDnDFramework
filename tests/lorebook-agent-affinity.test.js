@@ -76,4 +76,32 @@ describe('Lorebook Agent chat ownership', () => {
         expect(fn.indexOf('settings.activeRouterKeys.push(newId)', addAt))
             .toBeGreaterThan(fn.indexOf('ownsChat()', addAt));
     });
+
+    it('pins campaignBooks, PC seed persistence, purge, and disableManagedEntries to the tracked chat', () => {
+        const persistStart = routerSource.indexOf('export async function persistArchitectDungeonMap(');
+        const persistMid = routerSource.indexOf('export async function persistManualDungeonMapDocument(', persistStart);
+        const persistEnd = routerSource.indexOf('/** True when a Location root with this site name already exists.', persistMid);
+        expect(persistStart).toBeGreaterThan(-1);
+        expect(persistMid).toBeGreaterThan(persistStart);
+        expect(persistEnd).toBeGreaterThan(persistMid);
+        const persistBlock = routerSource.slice(persistStart, persistEnd);
+        expect(persistBlock).toContain('const chatId = getRouterChatId(ctx) || \'\'');
+        expect(persistBlock).not.toMatch(/const chatId = ctx\.chatId/);
+
+        const disableStart = routerSource.indexOf('export async function disableManagedEntries(');
+        const disableEnd = routerSource.indexOf('\n/**\n * Removes duplicates and empty strings', disableStart);
+        expect(disableStart).toBeGreaterThan(-1);
+        expect(disableEnd).toBeGreaterThan(disableStart);
+        const disableFn = routerSource.slice(disableStart, disableEnd);
+        expect(disableFn).toContain('const chatId = getActiveChatId() || \'\'');
+        expect(disableFn).not.toMatch(/const chatId = ctx\.chatId/);
+
+        const purgeStart = routerSource.indexOf('export async function purgeWorldHistoryForChat(');
+        const purgeEnd = routerSource.indexOf('\n/**\n * Parses an in-world time string', purgeStart);
+        expect(purgeStart).toBeGreaterThan(-1);
+        expect(purgeEnd).toBeGreaterThan(purgeStart);
+        const purgeFn = routerSource.slice(purgeStart, purgeEnd);
+        expect(purgeFn).toContain('const chatId = getActiveChatId() || \'\'');
+        expect(purgeFn).not.toMatch(/const chatId = ctx\.chatId/);
+    });
 });

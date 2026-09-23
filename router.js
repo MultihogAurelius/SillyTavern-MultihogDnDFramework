@@ -125,7 +125,8 @@ function extractActiveCombatBlock(memo) {
 function getLinkedPlayerCharacter() {
     try {
         const settings = getSettings();
-        const chatId = SillyTavern.getContext()?.chatId;
+        // Prefer tracked chat — ctx.chatId can lag during CHAT_CHANGED / MESSAGE_SWIPED.
+        const chatId = getActiveChatId();
         if (!chatId || !settings.chatStates?.[chatId]?.playerCharacter) return null;
         return settings.chatStates[chatId].playerCharacter;
     } catch (_) {
@@ -150,7 +151,9 @@ function applyPcCoreUpdate(pc, field, content) {
     pc.bio = result.text;
     pc.timestamp = Date.now();
     try {
-        const chatId = SillyTavern.getContext()?.chatId;
+        // Prefer tracked chat — ctx.chatId can lag and saveChatState would snapshot
+        // the live projection into another campaign's partition.
+        const chatId = getActiveChatId();
         if (chatId) saveChatState(chatId);
         else void saveSettings();
     } catch (_) {
@@ -915,7 +918,8 @@ export async function persistArchitectDungeonMap(siteRoot, mapDocument, {
     chatCommitResult(ownsChat, await saveWorldInfoSnapshot(bookName, bookData, ctx, 'Map Architect persistence', ownsChat));
     recordLiveDungeonMapSnapshot(settings, collectDungeonMapHistorySnapshot(bookData.entries, bookName));
 
-    const chatId = ctx.chatId || (typeof globalThis._rpgCurrentChatId === 'function' ? globalThis._rpgCurrentChatId() : '');
+    // Prefer tracked chat — ctx.chatId can lag and register the book on the wrong campaign.
+    const chatId = getRouterChatId(ctx) || '';
     if (chatId) {
         settings.chatStates = settings.chatStates || {};
         settings.chatStates[chatId] = settings.chatStates[chatId] || {};
@@ -991,7 +995,8 @@ export async function persistManualDungeonMapDocument(siteRoot, mapDocument, opt
     chatCommitResult(ownsChat, await saveWorldInfoSnapshot(bookName, bookData, ctx, 'Manual map JSON edit', ownsChat));
     recordLiveDungeonMapSnapshot(settings, collectDungeonMapHistorySnapshot(bookData.entries, bookName));
 
-    const chatId = ctx.chatId || (typeof globalThis._rpgCurrentChatId === 'function' ? globalThis._rpgCurrentChatId() : '');
+    // Prefer tracked chat — ctx.chatId can lag and register the book on the wrong campaign.
+    const chatId = getRouterChatId(ctx) || '';
     if (chatId) {
         settings.chatStates = settings.chatStates || {};
         settings.chatStates[chatId] = settings.chatStates[chatId] || {};
@@ -1741,8 +1746,10 @@ export async function runRouterPass(narrativeOutput, manualPrompt = null, custom
             }
             settings.pcCharacterBlockSeeded = true;
             try {
-                const seedChatId = ctx.chatId || SillyTavern.getContext()?.chatId;
-                if (seedChatId) saveChatState(seedChatId);
+                // Persist against the pinned pass chat — ctx.chatId can lag behind
+                // runtimeState and would snapshot this chat's live state into another
+                // campaign's partition.
+                if (passChatId) saveChatState(passChatId);
                 else void saveSettings();
             } catch (_) {
                 void saveSettings();
@@ -4738,7 +4745,8 @@ export async function disableManagedEntries() {
     try {
         /** @type {string[]} */
         let scoped;
-        const chatId = ctx.chatId || '';
+        // Prefer tracked chat — ctx.chatId can lag and disable another campaign's books.
+        const chatId = getActiveChatId() || '';
         const savedBooks = chatId && settings.chatStates?.[chatId]?.campaignBooks;
         if (savedBooks?.length) {
             scoped = savedBooks.filter(n => bookBelongsToPrefix(n, prefix) && !isSkeletonBookName(n));
@@ -4961,7 +4969,9 @@ export async function purgeWorldHistoryForChat(opts = {}) {
     const includeSkeleton = opts.includeSkeleton !== false;
     const settings = getSettings();
     const ctx = SillyTavern.getContext();
-    const chatId = ctx.chatId || '';
+    // Prefer tracked chat — ctx.chatId can lag, clearing/saving the wrong partition
+    // while getLivePrefix already follows getActiveChatId.
+    const chatId = getActiveChatId() || '';
     const prefix = getLivePrefix();
     const worldBookName = prefix ? `${prefix}_World` : 'World';
     const skeletonBookName = prefix ? `${prefix}_Skeleton` : 'World_Skeleton';

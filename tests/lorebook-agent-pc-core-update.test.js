@@ -106,6 +106,25 @@ describe('router.js PC core-update wiring', () => {
         expect(routerSource).toContain("PC updates are limited to Body and Worn Equipment");
     });
 
+    it('resolves and persists the linked PC via the tracked chat, not stale ctx.chatId', () => {
+        const linkedStart = routerSource.indexOf('function getLinkedPlayerCharacter()');
+        const linkedEnd = routerSource.indexOf('\nfunction applyPcCoreUpdate(', linkedStart);
+        expect(linkedStart).toBeGreaterThan(-1);
+        expect(linkedEnd).toBeGreaterThan(linkedStart);
+        const linked = routerSource.slice(linkedStart, linkedEnd);
+        expect(linked).toContain('const chatId = getActiveChatId()');
+        expect(linked).not.toContain('SillyTavern.getContext()?.chatId');
+
+        const applyStart = routerSource.indexOf('function applyPcCoreUpdate(pc, field, content)');
+        const applyEnd = routerSource.indexOf('\n/** Router guidance when ACTIVE COMBAT STATE is injected this turn.', applyStart);
+        expect(applyStart).toBeGreaterThan(-1);
+        expect(applyEnd).toBeGreaterThan(applyStart);
+        const apply = routerSource.slice(applyStart, applyEnd);
+        expect(apply).toContain('const chatId = getActiveChatId()');
+        expect(apply).toContain('if (chatId) saveChatState(chatId)');
+        expect(apply).not.toContain('SillyTavern.getContext()?.chatId');
+    });
+
     it('commit.appearance/commit.equipment schemas accept PC sentinel ids', () => {
         expect(routerSource).toContain('or "{{user}}" / "player" / "pc" / PC name for the Player Character card');
         expect(routerSource).toContain('You may update the Player Character\'s own Body via');

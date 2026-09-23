@@ -553,8 +553,7 @@ function bindConnectionApplyAllControls() {
 /** Confirms then wipes World/Skeleton lorebooks + per-chat WP timer state for the active prefix. */
 async function confirmAndPurgeWorldHistory() {
     const ownsChat = createChatCommitGuard(getActiveChatId(), getActiveChatId);
-    const ctx = SillyTavern.getContext();
-    const prefix = getEffectiveRouterCampaignPrefix(ctx.chatId || '');
+    const prefix = getEffectiveRouterCampaignPrefix(getActiveChatId() || '');
     const worldBook = prefix ? `${prefix}_World` : 'World';
     const skeletonBook = prefix ? `${prefix}_Skeleton` : 'World_Skeleton';
     const { Popup } = SillyTavern.getContext();
@@ -3296,7 +3295,7 @@ globalThis._rpgCurrentChatId = () => runtimeState.currentChatId;
 globalThis._rpgResetRouterAutoTick = resetRouterAutoTick;
 globalThis._rpgResetTrackerUi = resetTrackerUi;
 // Expose live prefix derivation for any module that needs the current prefix.
-globalThis._rpgGetCurrentPrefix = () => getEffectiveRouterCampaignPrefix(SillyTavern.getContext().chatId || '');
+globalThis._rpgGetCurrentPrefix = () => getEffectiveRouterCampaignPrefix(getActiveChatId() || '');
 globalThis._rpgUpdateUIMemo = (text) => {
     if (typeof updateUIMemo === 'function') updateUIMemo(text);
     if (typeof syncMemoView === 'function') syncMemoView();
@@ -10959,10 +10958,9 @@ RULES:
 
         // Prefix display: effective value (override or chat id), not only last saved routerCampaignPrefix
         function updateSettingsLorePrefixReadout() {
-            const ctx = SillyTavern.getContext();
             const el = document.getElementById('rpg_tracker_router_prefix_display');
             if (el) {
-                const eff = getEffectiveRouterCampaignPrefix(ctx.chatId || '');
+                const eff = getEffectiveRouterCampaignPrefix(getActiveChatId() || '');
                 el.textContent = eff || '—';
             }
         }
@@ -12049,7 +12047,7 @@ RULES:
         async function updateSkeletonStatus() {
             const ownsChat = createChatCommitGuard(getActiveChatId(), getActiveChatId);
             const ctx = SillyTavern.getContext();
-            const prefix = getEffectiveRouterCampaignPrefix(ctx.chatId || '');
+            const prefix = getEffectiveRouterCampaignPrefix(getActiveChatId() || '');
             const skeletonBookName = prefix ? `${prefix}_Skeleton` : 'World_Skeleton';
             try {
                 const book = chatCommitResult(ownsChat, await ctx.loadWorldInfo(skeletonBookName));
@@ -12170,8 +12168,7 @@ RULES:
                 toastr['warning']('Please enter a Skeleton Source or enable existing lorebook sources before generating.', 'World Skeleton');
                 return;
             }
-            const ctx = SillyTavern.getContext();
-            const prefix = getEffectiveRouterCampaignPrefix(ctx.chatId || '');
+            const prefix = getEffectiveRouterCampaignPrefix(getActiveChatId() || '');
             if (!prefix) {
                 toastr['warning']('No campaign prefix set. Set a prefix or open a chat in SillyTavern first.', 'World Skeleton');
                 return;
@@ -12200,8 +12197,7 @@ RULES:
                 toastr['warning']('Please enter a Skeleton Source or enable an existing source before adding entries.', 'World Skeleton');
                 return;
             }
-            const ctx = SillyTavern.getContext();
-            const prefix = getEffectiveRouterCampaignPrefix(ctx.chatId || '');
+            const prefix = getEffectiveRouterCampaignPrefix(getActiveChatId() || '');
             if (!prefix) {
                 toastr['warning']('No campaign prefix set. Set a prefix or open a chat in SillyTavern first.', 'World Skeleton');
                 return;
