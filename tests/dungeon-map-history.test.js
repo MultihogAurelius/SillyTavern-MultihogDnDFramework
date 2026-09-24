@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
     applyDungeonMapHistorySnapshotToBook,
@@ -10,10 +11,13 @@ import {
     getLiveHistoryIndex,
     previousMapForHistoryArchive,
     recordLiveDungeonMapSnapshot,
+    selectTrackerPriorMemos,
     sliceMemoAndMapHistory,
     syncLiveMemoHistoryAfterSwipe,
     unshiftMemoAndMapHistory,
 } from '../src/state/dungeon-map-history.js';
+
+const indexSource = readFileSync(new URL('../index.js', import.meta.url), 'utf8');
 
 const mappedBook = {
     entries: {
@@ -172,5 +176,58 @@ describe('dungeon map history snapshots', () => {
         expect(settings.memoHistory).toEqual(['base', ...older]);
         expect(settings.dungeonMapHistory).toEqual([null, ...older.map(() => null)]);
         expect(getLiveHistoryIndex(settings)).toBe(0);
+    });
+});
+
+describe('State Tracker prior-history selection', () => {
+    it('keeps the classic LIVE-at-0 window (including LIVE) for parity', () => {
+        const settings = {
+            memoHistory: ['live', 'prev', 'older'],
+            historyIndex: 0,
+        };
+        expect(selectTrackerPriorMemos(settings, 2)).toEqual(['live', 'prev']);
+    });
+
+    it('skips Chat Link conflict archives ahead of LIVE', () => {
+        const settings = {
+            memoHistory: ['displaced-other-chat', 'live', 'prev', 'older'],
+            historyIndex: 1,
+        };
+        expect(selectTrackerPriorMemos(settings, 2)).toEqual(['live', 'prev']);
+        expect(selectTrackerPriorMemos(settings, 2)).not.toContain('displaced-other-chat');
+    });
+
+    it('skips newer stones when LIVE was restored from mid-history', () => {
+        const settings = {
+            memoHistory: ['newest', 'mid', 'restored-live', 'older'],
+            historyIndex: 2,
+        };
+        expect(selectTrackerPriorMemos(settings, 2)).toEqual(['restored-live', 'older']);
+        expect(selectTrackerPriorMemos(settings, 2)).not.toContain('newest');
+        expect(selectTrackerPriorMemos(settings, 2)).not.toContain('mid');
+    });
+
+    it('takes front archives when LIVE sits outside history', () => {
+        const settings = {
+            memoHistory: ['archive0', 'archive1', 'archive2'],
+            historyIndex: -1,
+        };
+        expect(selectTrackerPriorMemos(settings, 2)).toEqual(['archive0', 'archive1']);
+    });
+
+    it('returns an empty list for non-positive counts', () => {
+        expect(selectTrackerPriorMemos({ memoHistory: ['a'], historyIndex: 0 }, 0)).toEqual([]);
+        expect(selectTrackerPriorMemos({ memoHistory: ['a'], historyIndex: 0 }, -1)).toEqual([]);
+        expect(selectTrackerPriorMemos(null, 2)).toEqual([]);
+    });
+
+    it('wires runStateModelPass prior context through selectTrackerPriorMemos', () => {
+        const start = indexSource.indexOf('let priorMemoText = `## TRACKER STATE 0 (Current)');
+        expect(start).toBeGreaterThan(-1);
+        const end = indexSource.indexOf('// ── Per-chunk commit helper ──', start);
+        expect(end).toBeGreaterThan(start);
+        const block = indexSource.slice(start, end);
+        expect(block).toContain('selectTrackerPriorMemos(settings, historyCount)');
+        expect(block).not.toMatch(/memoHistory\.slice\(\s*0\s*,/);
     });
 });

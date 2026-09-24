@@ -83,6 +83,21 @@ export function getLiveHistoryIndex(settings) {
 }
 
 /**
+ * Linear Stones for State Tracker prior context (TRACKER STATE −N).
+ * LIVE follows historyIndex — Chat Link conflict archives and "restore as LIVE"
+ * leave it off index 0. Blind slice(0, N) injects conflict archives or newer
+ * stones ahead of LIVE. Returns newest-first within the LIVE-relative window
+ * (LIVE first when LIVE is in history), matching the former index-0 behavior.
+ */
+export function selectTrackerPriorMemos(settings, count) {
+    if (!Array.isArray(settings?.memoHistory) || !(count > 0)) return [];
+    const liveIdx = getLiveHistoryIndex(settings);
+    // LIVE outside history: every stone is an older archive — take from the front.
+    const start = liveIdx >= 0 ? liveIdx : 0;
+    return settings.memoHistory.slice(start, start + count);
+}
+
+/**
  * Map occupancy to pair with a previousMemo archive after an optional
  * sliceMemoAndMapHistory(historyIndex). When LIVE was in-history, the slice
  * (or a no-op slice at 0) leaves that map at slot 0 — prefer it over a fresh

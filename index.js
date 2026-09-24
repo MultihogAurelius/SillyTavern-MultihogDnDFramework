@@ -55,6 +55,7 @@ import {
     ensureDungeonMapHistory,
     getDungeonMapHistoryEntry,
     previousMapForHistoryArchive,
+    selectTrackerPriorMemos,
     sliceMemoAndMapHistory,
     trimMemoAndMapHistory,
     unshiftMemoAndMapHistory,
@@ -3038,7 +3039,8 @@ async function runStateModelPass(narrativeOutput, isFullContext = false, overrid
         let priorMemoText = `## TRACKER STATE 0 (Current)\n${stripMemoHtml(memoForTrackerContext(settings.currentMemo))}\n\n`;
         const historyCount = (settings.trackerHistoryCount || 1) - 1;
         if (historyCount > 0 && settings.memoHistory && settings.memoHistory.length > 0) {
-            const historyToInclude = settings.memoHistory.slice(0, historyCount).reverse();
+            // LIVE may sit at historyIndex > 0 after Chat Link archives or restore-as-LIVE.
+            const historyToInclude = selectTrackerPriorMemos(settings, historyCount).reverse();
             const historyString = historyToInclude.map((memo, i) => {
                 const offset = -(historyToInclude.length - i);
                 return `## TRACKER STATE ${offset}\n${stripMemoHtml(memoForTrackerContext(memo))}`;
