@@ -37,10 +37,13 @@ describe('archiveDisplacedChatLinkMemo', () => {
         expect(target.dungeonMapHistory[1]).toEqual(explored);
     });
 
-    it('keeps LIVE outside history when its slot is trimmed', () => {
-        const target = { currentMemo: 'live', memoHistory: ['newer', 'live'], historyIndex: 1 };
+    it('preserves the LIVE pair when conflict insertion exceeds retention', () => {
+        const liveMap = { maps: ['live map'] };
+        const target = { currentMemo: 'live', memoHistory: ['newer', 'live'], dungeonMapHistory: [null, liveMap], historyIndex: 1 };
         archiveDisplacedChatLinkMemo(target, 'displaced', { max: 2 });
-        expect(target.historyIndex).toBe(-1);
+        expect(target.historyIndex).toBe(1);
+        expect(target.memoHistory).toEqual(['displaced', 'live']);
+        expect(target.dungeonMapHistory).toEqual([null, liveMap]);
         expect(target.currentMemo).toBe('live');
     });
     it('archives a string memo and keeps dungeonMapHistory paired', () => {

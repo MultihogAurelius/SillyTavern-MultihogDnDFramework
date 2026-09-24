@@ -2,6 +2,13 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.95] - 2026-09-24
+
+### Fixed
+- Linear Stone history now retains 50 paired memo/dungeon-map snapshots instead of 1,000 per chat. Existing live, saved-chat, and profile histories are trimmed on settings load; loading older chat/profile snapshots also applies the limit.
+- Retention preserves the current LIVE stone and its map even when LIVE lies outside the newest 50 entries. Chat Link conflict archives also preserve this pair at the limit.
+- Older rollback snapshots beyond retention are removed to reduce settings.json size. Current memos, campaign lorebooks, and current map contents are unchanged; storage remains in the existing format.
+
 ## [2026.8.94] - 2026-09-23
 
 ### Fixed

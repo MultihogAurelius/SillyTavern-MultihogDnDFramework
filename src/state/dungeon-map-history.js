@@ -4,6 +4,23 @@
  * LIVE writes the matching [MAP] section back to the Locations lorebook.
  */
 
+export const MEMO_HISTORY_LIMIT = 50;
+
+/** Keep recent memo/map pairs, retaining an older LIVE pair in the final slot. */
+export function trimMemoAndMapHistory(settings, max = MEMO_HISTORY_LIMIT) {
+    if (!Array.isArray(settings?.memoHistory)) return false;
+    const limit = Number.isInteger(max) && max > 0 ? max : MEMO_HISTORY_LIMIT;
+    if (settings.memoHistory.length <= limit) return false;
+    const liveIndex = getLiveHistoryIndex(settings);
+    const maps = Array.isArray(settings.dungeonMapHistory) ? settings.dungeonMapHistory : [];
+    const indices = Array.from({ length: limit }, (_, index) => index);
+    if (liveIndex >= limit) indices[limit - 1] = liveIndex;
+    settings.memoHistory = indices.map(index => settings.memoHistory[index]);
+    settings.dungeonMapHistory = indices.map(index => maps[index] ?? null);
+    settings.historyIndex = liveIndex < 0 ? -1 : Math.min(liveIndex, limit - 1);
+    return true;
+}
+
 export function ensureDungeonMapHistory(settings) {
     if (!settings || typeof settings !== 'object') return [];
     if (!Array.isArray(settings.dungeonMapHistory)) settings.dungeonMapHistory = [];
@@ -20,11 +37,19 @@ export function sliceMemoAndMapHistory(settings, fromIndex) {
     settings.dungeonMapHistory = (settings.dungeonMapHistory || []).slice(start);
 }
 
-export function unshiftMemoAndMapHistory(settings, memo, mapSnapshot, { max = 1000 } = {}) {
+export function unshiftMemoAndMapHistory(settings, memo, mapSnapshot, { max = MEMO_HISTORY_LIMIT, preserveLive = false } = {}) {
     if (!Array.isArray(settings.memoHistory)) settings.memoHistory = [];
+    const liveIndex = getLiveHistoryIndex(settings);
     ensureDungeonMapHistory(settings);
     settings.memoHistory.unshift(memo);
     settings.dungeonMapHistory.unshift(mapSnapshot ?? null);
+    // Conflict archives insert before LIVE; ordinary tracker commits instead
+    // make the new result LIVE and reset the pointer in their caller.
+    if (preserveLive) {
+        settings.historyIndex = liveIndex < 0 ? -1 : liveIndex + 1;
+        trimMemoAndMapHistory(settings, max);
+        return;
+    }
     if (settings.memoHistory.length > max) {
         settings.memoHistory.length = max;
         settings.dungeonMapHistory.length = max;

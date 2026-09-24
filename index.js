@@ -56,6 +56,7 @@ import {
     getDungeonMapHistoryEntry,
     previousMapForHistoryArchive,
     sliceMemoAndMapHistory,
+    trimMemoAndMapHistory,
     unshiftMemoAndMapHistory,
 } from './src/state/dungeon-map-history.js';
 import { canCommitPassForChat, createChatCommitGuard, invalidateChatCommitGuards, chatCommitResult, ignoreChatCancellation } from './src/state/pass-affinity.js';
@@ -3545,6 +3546,7 @@ function loadProfile(name) {
     const p = s.profiles?.[name];
     if (!p) return;
     repairChatLinkMemoHistory(p);
+    trimMemoAndMapHistory(p);
     s.currentMemo = p.currentMemo ?? '';
     s.memoHistory = p.memoHistory ?? [];
     s.dungeonMapHistory = p.dungeonMapHistory ?? [];

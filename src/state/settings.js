@@ -16,6 +16,7 @@ import {
 } from './portrait-prompts.js';
 import { bindGetSettings } from './settings-ref.js';
 import { repairChatLinkMemoHistory } from '../features/chat/chat-link-conflict.js';
+import { trimMemoAndMapHistory } from './dungeon-map-history.js';
 import {
     enforceRealtimeVisualizationDisabled,
     setRealtimeVisualizationDisabled,
@@ -91,6 +92,15 @@ function getSettingsInternal(extensionSettings) {
             repairChatLinkMemoHistory(snapshot);
         }
         s.chatLinkObjectHistoryVersion = 1;
+    }
+
+    // Bound existing inactive chats too: their snapshots all share settings.json.
+    // Run once, before any history view is opened, not during intermediate commits.
+    if (s.memoHistoryRetentionVersion !== 1) {
+        for (const snapshot of [s, ...Object.values(s.chatStates || {}), ...Object.values(s.profiles || {})]) {
+            trimMemoAndMapHistory(snapshot);
+        }
+        s.memoHistoryRetentionVersion = 1;
     }
 
     // Custom tracker definitions are framework configuration, not chat state.

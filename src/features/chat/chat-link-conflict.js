@@ -4,7 +4,7 @@
  * computeDelta, and "restore as LIVE". Keep dungeonMapHistory paired.
  */
 
-import { ensureDungeonMapHistory, unshiftMemoAndMapHistory } from '../../state/dungeon-map-history.js';
+import { ensureDungeonMapHistory, MEMO_HISTORY_LIMIT, unshiftMemoAndMapHistory } from '../../state/dungeon-map-history.js';
 
 function isLegacyChatLinkStone(value) {
     return value?.label === 'Global Edit (Pre-Link)' && typeof value.memo === 'string';
@@ -48,13 +48,9 @@ export function repairChatLinkMemoHistory(target) {
  * @param {{ max?: number }} [opts]
  * @returns {boolean} true when a stone was archived
  */
-export function archiveDisplacedChatLinkMemo(targetSettings, memo, { max = 50 } = {}) {
+export function archiveDisplacedChatLinkMemo(targetSettings, memo, { max = MEMO_HISTORY_LIMIT } = {}) {
     if (!targetSettings || typeof memo !== 'string' || !memo) return false;
     repairChatLinkMemoHistory(targetSettings);
-    const liveIndex = targetSettings.historyIndex;
-    unshiftMemoAndMapHistory(targetSettings, memo, null, { max });
-    if (Number.isInteger(liveIndex) && liveIndex >= 0) {
-        targetSettings.historyIndex = liveIndex + 1 < targetSettings.memoHistory.length ? liveIndex + 1 : -1;
-    }
+    unshiftMemoAndMapHistory(targetSettings, memo, null, { max, preserveLive: true });
     return true;
 }
