@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.96] - 2026-09-24
+
+### Changed
+- Reduced paired Linear Stone history retention from 50 to 25 snapshots. Existing histories, including those already migrated to the 50-entry limit, are trimmed on load while preserving LIVE and its map.
+
 ## [2026.8.95] - 2026-09-24
 
 ### Fixed

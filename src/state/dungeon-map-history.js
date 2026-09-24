@@ -4,7 +4,7 @@
  * LIVE writes the matching [MAP] section back to the Locations lorebook.
  */
 
-export const MEMO_HISTORY_LIMIT = 50;
+export const MEMO_HISTORY_LIMIT = 25;
 
 /** Keep recent memo/map pairs, retaining an older LIVE pair in the final slot. */
 export function trimMemoAndMapHistory(settings, max = MEMO_HISTORY_LIMIT) {
