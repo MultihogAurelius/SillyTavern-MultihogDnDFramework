@@ -10940,17 +10940,16 @@ RULES:
         });
 
         const routerSourceSelect = $('#rpg_tracker_router_source');
-        const routerProfileGroup = $('#rpg_tracker_router_profile_group');
         const routerProfileSelect = $('#rpg_tracker_router_connection_profile');
-        const routerOllamaGroup = $('#rpg_tracker_router_ollama_group');
-        const routerOpenaiGroup = $('#rpg_tracker_router_openai_group');
 
 
         function updateRouterConnectionPanels() {
-            const source = routerSourceSelect.val();
-            routerProfileGroup.toggle(source === 'profile');
-            routerOllamaGroup.toggle(source === 'ollama');
-            routerOpenaiGroup.toggle(source === 'openai');
+            // Boot chat projection can call syncSettingsUi before the bindings
+            // above have initialized. Resolve these elements at call time.
+            const source = $('#rpg_tracker_router_source').val();
+            $('#rpg_tracker_router_profile_group').toggle(source === 'profile');
+            $('#rpg_tracker_router_ollama_group').toggle(source === 'ollama');
+            $('#rpg_tracker_router_openai_group').toggle(source === 'openai');
         }
 
         routerSourceSelect.val(settings.routerConnectionSource || 'default').on('change', function () {
