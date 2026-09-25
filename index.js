@@ -67,6 +67,7 @@ import { stripDungeonMapSection } from './dungeon-reality.js';
 import { cloneCampaignStackToPrefix } from './src/features/chat/clone-campaign-stack.js';
 import { branchCampaignChat, isBranchSeedInProgress } from './src/features/chat/branch-campaign.js';
 import { onChatRenamedMigrate } from './src/features/chat/chat-rename-migrate.js';
+import { offerOrphanedLorebookPurge } from './src/features/chat/purge-orphaned-lorebooks.js';
 import { archiveDisplacedChatLinkMemo, repairChatLinkMemoHistory } from './src/features/chat/chat-link-conflict.js';
 import {
     COMPANION_BY_CHAT_KEY,
@@ -7866,6 +7867,45 @@ function organizeConnectionSettingsUI() {
             toastr['info']('Restored the browser-local tracker configuration you selected.', 'RPG Tracker', { timeOut: 6000 });
         }
         eventSource.on(event_types.CHAT_CHANGED, onChatChanged);
+        eventSource.on(event_types.CHAT_DELETED, async (deletedChatId) => {
+            try {
+                const result = await offerOrphanedLorebookPurge(String(deletedChatId || ''), {
+                    getSettings,
+                    getProtectedNames: async () => (await import('../../../world-info.js')).selected_world_info,
+                    listNames: async () => {
+                        const response = await fetch('/api/worldinfo/list', {
+                            method: 'POST',
+                            headers: getRequestHeaders(),
+                        });
+                        if (!response.ok) throw new Error(`Could not list lorebooks (HTTP ${response.status})`);
+                        const books = await response.json();
+                        if (!Array.isArray(books)) throw new Error('Invalid lorebook list');
+                        return books.map(book => book.file_id).filter(name => typeof name === 'string');
+                    },
+                    confirm: async (chatId, books) => {
+                        const list = books.map(name => `<li><code>${escapeHtml(name)}</code></li>`).join('');
+                        const body = `<p>SillyTavern deleted chat <code>${escapeHtml(chatId)}</code>. These lorebooks were recorded for it and are not claimed by another Multihog chat:</p><ul>${list}</ul><p>Delete these lorebooks permanently? Books linked outside Multihog may still be in use.</p>`;
+                        return await SillyTavern.getContext().Popup.show.confirm(
+                            'Purge orphaned lorebooks?', body,
+                            { okButton: 'Purge lorebooks', cancelButton: 'Keep lorebooks' },
+                        ) === 1;
+                    },
+                    deleteBook: async name => {
+                        const { deleteWorldInfo, updateWorldInfoList } = await import('../../../world-info.js');
+                        await updateWorldInfoList();
+                        return deleteWorldInfo(name);
+                    },
+                });
+                if (result.deleted.length) {
+                    toastr.success(`Deleted ${result.deleted.length} orphaned lorebook(s).`, 'RPG Tracker');
+                }
+                if (result.failed.length) {
+                    toastr.error(`Could not delete: ${result.failed.join(', ')}`, 'RPG Tracker');
+                }
+            } catch (error) {
+                console.warn('[RPG Tracker] Orphaned lorebook purge skipped:', error);
+            }
+        });
         if (event_types.CHAT_RENAMED) {
             eventSource.on(event_types.CHAT_RENAMED, (detail) => {
                 return onChatRenamedMigrate(detail || {}, {
