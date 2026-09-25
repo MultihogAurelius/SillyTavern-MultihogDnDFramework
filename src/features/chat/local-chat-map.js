@@ -42,6 +42,21 @@ export function localChatMapHasEntry(storageKey, chatId) {
     return Object.prototype.hasOwnProperty.call(map, chatId);
 }
 
+/** IDs in a browser-local chat map, for finding stale records in Settings. */
+export function localChatMapIds(storageKey) {
+    return Object.keys(readLocalChatMap(storageKey));
+}
+
+/** Remove one deleted chat's browser-local recovery or companion record. */
+export function removeLocalChatMapEntry(storageKey, chatId) {
+    if (!storageKey || !chatId) return false;
+    const map = readLocalChatMap(storageKey);
+    if (!Object.prototype.hasOwnProperty.call(map, chatId)) return false;
+    delete map[chatId];
+    writeLocalChatMap(storageKey, map);
+    return true;
+}
+
 /**
  * Deep-copy a localStorage chat-keyed map entry from oldId to newId.
  * @param {string} storageKey

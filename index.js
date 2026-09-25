@@ -18,7 +18,7 @@ import { summarizeMapEvolutionSchedule, stampEvolutionLastFired, evolutionInterv
 import { getRequestHeaders } from '../../../../script.js';
 import { fileToDataUrl, scaleImageTo512Square, scaleImageToLandscape, applyPortraitData, applyLocationImageData, renamePortraitEntity, reconcileMemoPortraitRenames, generatePortraitPrompt, generateNpcPortraitPrompt, generateLocationImagePrompt, showPortraitPromptPopup, generatePortraitDirect, autoGeneratePartyPortraits, removeAllPortraits, checkAndTriggerAutoGenerations, autoGenerateEnemyPortraits, forceCheckAutoGenerations, resetAutoGenerationTracking, resetRealtimeLocationGenerationFailure, stopRealtimeLocationGeneration, resolveLocationImageWithMeta, normalizeLocationPath, buildLocationPath, getLinkedPlayerCharacter, resolvePortraitSrcForPlayerCharacter, imageGenToast, triggerBackgroundPortraitGeneration, fetchHordeModels } from './portraits.js';
 import { buildImmersionSceneState, renderImmersionViewHtml, getCurrentLocationText, loadLocationEntryByPath, loadNpcEntryByKey, maybeAutoGenerateImmersionSceneArt, runRealtimeSceneArtCheck, resetImmersionSceneArtTracking, hydrateImmersionSceneArtPath } from './immersion.js';
-import { migrateAllEmbeddedPortraits, countEmbeddedPortraitDataUrls, purgeAllPortraitData, resolvePortraitDisplaySrc, lookupCustomPortraitSrc, collectAllPortraitRefs, isManagedPortraitPath, isPortraitMigrationLocked, setPortraitMigrationLocked, PORTRAIT_STORAGE_FOLDER, snapshotPortraitMapsForChat, loadPortraitMapsForChat, migrateLegacyPortraitMapsToChat } from './portrait-storage.js';
+import { migrateAllEmbeddedPortraits, countEmbeddedPortraitDataUrls, purgeAllPortraitData, resolvePortraitDisplaySrc, lookupCustomPortraitSrc, collectAllPortraitRefs, countPortraitPathRefs, deletePortraitFile, isManagedPortraitPath, isPortraitMigrationLocked, setPortraitMigrationLocked, PORTRAIT_STORAGE_FOLDER, snapshotPortraitMapsForChat, loadPortraitMapsForChat, migrateLegacyPortraitMapsToChat } from './portrait-storage.js';
 import { loadPanelGeometry, loadDeltaHeight, makeDraggable, makeResizableTR, makeResizableBR, makeResizableBL, setupResizeObserver, setupDeltaResize, canResizePanels, jqueryToggleSlide, resolveViewportClampedGeometry, clampFloatingPanelToViewport } from './ui-geometry.js';
 import { applyCustomTheme, openThemeWizard, refreshSavedThemesList, handleRecolor, undoThemeChange } from './theme-manager.js';
 import { showCharacterRollPanel, showPcImportPanel, handleCharacterCreatorGenerate, generatePersonaBio, showPersonaConfirmOverlay, extractCharNameFromMemo, activateSillyTavernPersona } from './character-creator.js';
@@ -68,6 +68,7 @@ import { cloneCampaignStackToPrefix } from './src/features/chat/clone-campaign-s
 import { branchCampaignChat, isBranchSeedInProgress } from './src/features/chat/branch-campaign.js';
 import { onChatRenamedMigrate } from './src/features/chat/chat-rename-migrate.js';
 import { offerOrphanedLorebookPurge } from './src/features/chat/purge-orphaned-lorebooks.js';
+import { existingChatIds, removeDeletedChatData, storedChatIds } from './src/features/chat/deleted-chat-data.js';
 import { archiveDisplacedChatLinkMemo, repairChatLinkMemoHistory } from './src/features/chat/chat-link-conflict.js';
 import {
     COMPANION_BY_CHAT_KEY,
@@ -590,6 +591,97 @@ async function confirmAndPurgeWorldHistory() {
 
         toastr['error'](`Purge failed: ${e.message}`, 'World Progression');
     }
+}
+
+/** Read all chat filenames from SillyTavern before classifying a saved partition as orphaned. */
+async function listExistingSillyTavernChatIds() {
+    const post = async (url, body = {}) => {
+        const response = await fetch(url, {
+            method: 'POST', headers: getRequestHeaders(), body: JSON.stringify(body),
+        });
+        if (!response.ok) throw new Error(`Could not list chats from ${url} (HTTP ${response.status})`);
+        return response.json();
+    };
+    const [recent, characters, groups] = await Promise.all([
+        post('/api/chats/recent'), post('/api/characters/all'), post('/api/groups/all'),
+    ]);
+    const ids = existingChatIds(recent);
+    if (!Array.isArray(characters) || !Array.isArray(groups)) throw new Error('Invalid character or group list');
+    // /recent omits a malformed chat whose final JSONL line cannot be parsed.
+    // The simple character listing includes filenames without reading contents.
+    for (const character of characters) {
+        if (!character?.avatar) throw new Error('Character without avatar in chat listing');
+        const chats = await post('/api/characters/chats', { avatar_url: character.avatar, simple: true });
+        if (!Array.isArray(chats)) throw new Error('Invalid character chat list');
+        for (const chat of chats) {
+            if (chat?.file_id) ids.add(String(chat.file_id));
+        }
+    }
+    for (const group of groups) {
+        for (const id of group?.chats || []) ids.add(String(id));
+    }
+    const activeId = getActiveChatId();
+    if (activeId) ids.add(activeId);
+    return ids;
+}
+
+/**
+ * SillyTavern has already deleted this transcript. Purge only its saved Multihog
+ * partition, local recovery/companion records, router snapshots, and unshared
+ * managed portrait files. Lorebooks remain a separate explicit choice.
+ */
+async function cleanDeletedChatRecords(chatId) {
+    if (!chatId || (await listExistingSillyTavernChatIds()).has(chatId)) return { skipped: true };
+    let loreResult = { deleted: [], failed: [] };
+    try {
+        loreResult = await offerOrphanedLorebookPurge(chatId, {
+            getSettings,
+            getProtectedNames: async () => (await import('../../../world-info.js')).selected_world_info,
+            listNames: async () => {
+                const response = await fetch('/api/worldinfo/list', {
+                    method: 'POST',
+                    headers: getRequestHeaders(),
+                });
+                if (!response.ok) throw new Error(`Could not list lorebooks (HTTP ${response.status})`);
+                const books = await response.json();
+                if (!Array.isArray(books)) throw new Error('Invalid lorebook list');
+                return books.map(book => book.file_id).filter(name => typeof name === 'string');
+            },
+            canDelete: async id => !(await listExistingSillyTavernChatIds()).has(id),
+            confirm: async (id, books) => {
+                const list = books.map(name => `<li><code>${escapeHtml(name)}</code></li>`).join('');
+                const body = `<p>SillyTavern no longer has chat <code>${escapeHtml(id)}</code>. These lorebooks were recorded for it and are not claimed by another saved Multihog chat:</p><ul>${list}</ul><p>Delete these lorebooks permanently? Books linked outside Multihog may still be in use. The chat's Multihog state will be removed either way.</p>`;
+                return await SillyTavern.getContext().Popup.show.confirm(
+                    'Purge orphaned lorebooks?', body,
+                    { okButton: 'Purge lorebooks', cancelButton: 'Keep lorebooks' },
+                ) === 1;
+            },
+            deleteBook: async name => {
+                const { deleteWorldInfo, updateWorldInfoList } = await import('../../../world-info.js');
+                await updateWorldInfoList();
+                return deleteWorldInfo(name);
+            },
+        });
+    } catch (error) {
+        console.warn('[RPG Tracker] Lorebook cleanup skipped; cleaning saved chat state:', error);
+    }
+
+    // The user could recreate the filename while the lorebook popup is open.
+    if ((await listExistingSillyTavernChatIds()).has(chatId)) return { skipped: true, ...loreResult };
+    const settings = getSettings();
+    const part = settings.chatStates?.[chatId];
+    const portraitPaths = new Set([
+        ...Object.values(part?.customPortraits || {}),
+        ...Object.values(part?.customLocationImages || {}),
+    ].filter(isManagedPortraitPath));
+    const changed = removeDeletedChatData(settings, chatId);
+    if (changed) {
+        await saveSettings(true);
+        for (const path of portraitPaths) {
+            if (countPortraitPathRefs(settings, path) === 0) await deletePortraitFile(path);
+        }
+    }
+    return { skipped: false, changed, ...loreResult };
 }
 
 /** Last lorebook /world sync diagnostics (JSON-serializable). */
@@ -7751,6 +7843,47 @@ function organizeConnectionSettingsUI() {
             }
         });
 
+        $('#rpg_tracker_clean_deleted_chat').on('click', async function () {
+            const button = $(this).prop('disabled', true);
+            try {
+                const existing = await listExistingSillyTavernChatIds();
+                const orphanIds = storedChatIds(getSettings()).filter(id => !existing.has(id)).sort();
+                if (!orphanIds.length) {
+                    toastr.info('No saved data for deleted chats was found.', 'RPG Tracker');
+                    return;
+                }
+                const options = orphanIds.map(id => `<option value="${escapeHtml(id)}">${escapeHtml(id)}</option>`).join('');
+                const body = `<p>Choose one chat that no longer exists in SillyTavern. Its saved memo, map history, portraits, settings partition, and browser-local records will be removed permanently.</p><select id="rpg-tracker-deleted-chat-choice" class="text_pole" style="width:100%;"><option value="">Choose a deleted chat…</option>${options}</select><p>Any eligible lorebooks will be shown in a separate confirmation.</p>`;
+                let selectedId = '';
+                const onChange = event => {
+                    if (event.target?.id === 'rpg-tracker-deleted-chat-choice') selectedId = event.target.value;
+                };
+                document.addEventListener('change', onChange);
+                let confirmed;
+                try {
+                    confirmed = await SillyTavern.getContext().Popup.show.confirm(
+                        'Clean up deleted chat data?', body,
+                        { okButton: 'Clean up selected chat', cancelButton: 'Cancel' },
+                    );
+                } finally {
+                    document.removeEventListener('change', onChange);
+                }
+                if (confirmed !== 1 || !orphanIds.includes(selectedId)) return;
+                const result = await cleanDeletedChatRecords(selectedId);
+                if (result.skipped) {
+                    toastr.warning('That chat now exists in SillyTavern; nothing was removed.', 'RPG Tracker');
+                } else {
+                    toastr.success(`Removed saved data for “${selectedId}” and ${result.deleted.length} lorebook(s).`, 'RPG Tracker');
+                    if (result.failed.length) toastr.error(`Could not delete: ${result.failed.join(', ')}`, 'RPG Tracker');
+                }
+            } catch (error) {
+                console.warn('[RPG Tracker] Deleted chat cleanup failed:', error);
+                toastr.error('Could not verify the chat list; no saved data was removed.', 'RPG Tracker');
+            } finally {
+                button.prop('disabled', false);
+            }
+        });
+
         $('#rpg_tracker_tutorial_help').on('click', function () {
             openAdventureCompanion();
         });
@@ -7867,45 +8000,23 @@ function organizeConnectionSettingsUI() {
             toastr['info']('Restored the browser-local tracker configuration you selected.', 'RPG Tracker', { timeOut: 6000 });
         }
         eventSource.on(event_types.CHAT_CHANGED, onChatChanged);
-        eventSource.on(event_types.CHAT_DELETED, async (deletedChatId) => {
+        const onDeletedChat = async (deletedChatId) => {
             try {
-                const result = await offerOrphanedLorebookPurge(String(deletedChatId || ''), {
-                    getSettings,
-                    getProtectedNames: async () => (await import('../../../world-info.js')).selected_world_info,
-                    listNames: async () => {
-                        const response = await fetch('/api/worldinfo/list', {
-                            method: 'POST',
-                            headers: getRequestHeaders(),
-                        });
-                        if (!response.ok) throw new Error(`Could not list lorebooks (HTTP ${response.status})`);
-                        const books = await response.json();
-                        if (!Array.isArray(books)) throw new Error('Invalid lorebook list');
-                        return books.map(book => book.file_id).filter(name => typeof name === 'string');
-                    },
-                    confirm: async (chatId, books) => {
-                        const list = books.map(name => `<li><code>${escapeHtml(name)}</code></li>`).join('');
-                        const body = `<p>SillyTavern deleted chat <code>${escapeHtml(chatId)}</code>. These lorebooks were recorded for it and are not claimed by another Multihog chat:</p><ul>${list}</ul><p>Delete these lorebooks permanently? Books linked outside Multihog may still be in use.</p>`;
-                        return await SillyTavern.getContext().Popup.show.confirm(
-                            'Purge orphaned lorebooks?', body,
-                            { okButton: 'Purge lorebooks', cancelButton: 'Keep lorebooks' },
-                        ) === 1;
-                    },
-                    deleteBook: async name => {
-                        const { deleteWorldInfo, updateWorldInfoList } = await import('../../../world-info.js');
-                        await updateWorldInfoList();
-                        return deleteWorldInfo(name);
-                    },
-                });
+                const result = await cleanDeletedChatRecords(String(deletedChatId || ''));
+                if (result.skipped) return;
                 if (result.deleted.length) {
                     toastr.success(`Deleted ${result.deleted.length} orphaned lorebook(s).`, 'RPG Tracker');
                 }
                 if (result.failed.length) {
                     toastr.error(`Could not delete: ${result.failed.join(', ')}`, 'RPG Tracker');
                 }
+                if (result.changed) toastr.success('Removed saved Multihog data for the deleted chat.', 'RPG Tracker');
             } catch (error) {
-                console.warn('[RPG Tracker] Orphaned lorebook purge skipped:', error);
+                console.warn('[RPG Tracker] Deleted chat cleanup skipped:', error);
             }
-        });
+        };
+        eventSource.on(event_types.CHAT_DELETED, onDeletedChat);
+        eventSource.on(event_types.GROUP_CHAT_DELETED, onDeletedChat);
         if (event_types.CHAT_RENAMED) {
             eventSource.on(event_types.CHAT_RENAMED, (detail) => {
                 return onChatRenamedMigrate(detail || {}, {

@@ -43,6 +43,9 @@ export async function offerOrphanedLorebookPurge(chatId, deps) {
     if (!candidates.length) return { offered: [], deleted: [], failed: [] };
     const approved = await deps.confirm(chatId, candidates);
     if (!approved) return { offered: candidates, deleted: [], failed: [] };
+    if (deps.canDelete && !await deps.canDelete(chatId)) {
+        return { offered: candidates, deleted: [], failed: [] };
+    }
 
     // The popup can remain open while another chat claims a book. Check again
     // against fresh settings and the backend before each irreversible deletion.
