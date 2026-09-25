@@ -64,6 +64,19 @@ describe('dungeon map history snapshots', () => {
         expect(getDungeonMapHistoryEntry(settings, 0).maps[0].map).toBe('one');
     });
 
+    it('resets historyIndex to the post-slice LIVE slot at 0', () => {
+        const settings = {
+            memoHistory: ['conflict', 'newer', 'live', 'older'],
+            dungeonMapHistory: [null, null, { maps: ['live'] }, { maps: ['older'] }],
+            historyIndex: 2,
+        };
+        sliceMemoAndMapHistory(settings, settings.historyIndex);
+        expect(settings.memoHistory).toEqual(['live', 'older']);
+        expect(settings.dungeonMapHistory).toEqual([{ maps: ['live'] }, { maps: ['older'] }]);
+        expect(settings.historyIndex).toBe(0);
+        expect(getLiveHistoryIndex(settings)).toBe(0);
+    });
+
     it('pads missing map history for legacy memo stones', () => {
         const settings = { memoHistory: ['a', 'b'], historyIndex: 0 };
         ensureDungeonMapHistory(settings);

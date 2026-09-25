@@ -3470,10 +3470,10 @@ export async function sendDirectPrompt(message, options = {}) {
                 const delta = computeDelta(sanitizedCurrentFull, merged);
                 settings.lastDelta = delta;
 
-                // Linear Stone History Logic
-                if (settings.historyIndex !== undefined && settings.historyIndex !== -1) {
-                    sliceMemoAndMapHistory(settings, settings.historyIndex);
-                }
+                // Capture before mutating Linear Stones. Slicing historyIndex > 0
+                // drops newer/conflict archives; doing that before this await let a
+                // mid-capture chat switch snapshot the truncated list into chatStates
+                // while the early-return path never restored those stones.
                 const mapSnapshot = chatCommitResult(ownsOperation, await captureActiveDungeonMapHistory());
                 if (!canCommitPassForChat(passChatId, runtimeState.currentChatId, { aborted: signal.aborted })) {
                     broadcastStateTrackerStep('error', signal.aborted ? 'Stopped by user.' : 'Stopped because the active chat changed.');
@@ -3483,6 +3483,10 @@ export async function sendDirectPrompt(message, options = {}) {
                         changed: false,
                         message: signal.aborted ? 'State Tracker command was cancelled.' : 'Active chat changed; State Tracker commit was skipped.',
                     };
+                }
+                // Linear Stone History Logic (same order as commitChunkResult)
+                if (settings.historyIndex !== undefined && settings.historyIndex !== -1) {
+                    sliceMemoAndMapHistory(settings, settings.historyIndex);
                 }
                 ensureDungeonMapHistory(settings);
                 if (settings.memoHistory[0] !== sanitizedCurrentFull) {

@@ -45,6 +45,17 @@ describe('State Tracker chat-switch affinity', () => {
         expect(directSlice).toContain('canCommitPassForChat(passChatId, runtimeState.currentChatId');
         expect(directSlice).toContain("status: signal.aborted ? 'cancelled' : 'chat_changed'");
         expect(directSlice).toContain('if (settings.chatLinkEnabled && passChatId) saveChatState(passChatId);');
+        // Slice drops stones before LIVE; must not run until after map capture + affinity.
+        const captureIdx = directSlice.indexOf('await captureActiveDungeonMapHistory()');
+        const sliceIdx = directSlice.indexOf('sliceMemoAndMapHistory(settings, settings.historyIndex)');
+        const affinityAfterCapture = directSlice.indexOf(
+            'canCommitPassForChat(passChatId, runtimeState.currentChatId',
+            captureIdx,
+        );
+        expect(captureIdx).toBeGreaterThanOrEqual(0);
+        expect(sliceIdx).toBeGreaterThan(captureIdx);
+        expect(affinityAfterCapture).toBeGreaterThan(captureIdx);
+        expect(affinityAfterCapture).toBeLessThan(sliceIdx);
     });
 
     it('guards State Tracker relationship applies against a post-await chat switch', () => {

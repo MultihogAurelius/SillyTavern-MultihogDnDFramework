@@ -35,6 +35,11 @@ export function sliceMemoAndMapHistory(settings, fromIndex) {
     ensureDungeonMapHistory(settings);
     settings.memoHistory = (settings.memoHistory || []).slice(start);
     settings.dungeonMapHistory = (settings.dungeonMapHistory || []).slice(start);
+    // LIVE is now at slot 0. Leaving a stale historyIndex > length-1 makes
+    // getLiveHistoryIndex() return -1 until a later writer fixes the pointer.
+    if (Number.isInteger(settings.historyIndex) && settings.historyIndex >= 0) {
+        settings.historyIndex = settings.memoHistory.length ? 0 : -1;
+    }
 }
 
 export function unshiftMemoAndMapHistory(settings, memo, mapSnapshot, { max = MEMO_HISTORY_LIMIT, preserveLive = false } = {}) {
