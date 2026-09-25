@@ -2408,10 +2408,12 @@ export function resetRealtimeLocationGenerationFailure() {
     setRealtimeVisualizationDisabled(false);
 }
 
-/** Stop an active/queued Real-Time request and prevent another attempt. */
-export function stopRealtimeLocationGeneration() {
-    realtimeLocationGenerationFailed = true;
-    setRealtimeVisualizationDisabled(true);
+/** Cancel active work; explicit stops/failures also disable future attempts. */
+export function stopRealtimeLocationGeneration({ disable = true } = {}) {
+    if (disable) {
+        realtimeLocationGenerationFailed = true;
+        setRealtimeVisualizationDisabled(true);
+    }
     activeRealtimeLocationAbortController?.abort();
     activeRealtimeLocationAbortController = null;
 }

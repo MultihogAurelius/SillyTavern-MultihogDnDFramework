@@ -2,6 +2,13 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.8.97] - 2026-09-25
+
+### Fixed
+- Switching chats cancels departing Real-Time Visualization work without permanently disabling the mode. Explicit user stops and generation failures still disable further attempts until re-enabled.
+- "On Location enter (once per place)" reuses existing location art on revisits instead of behaving like "every location change". The other trigger modes retain their existing behavior.
+- Location-background preference is explicitly treated as global, alongside the other visualization preferences, when cleaning legacy chat snapshots.
+
 ## [2026.8.96] - 2026-09-24
 
 ### Changed

@@ -2503,8 +2503,9 @@ function onChatChanged(newChatId) {
     try { stopMapEvolutionPass(); } catch (_) { /* ignore */ }
     // Real-Time location art uses the shared image queue and can wait minutes on
     // AI Horde; abort before flipping chat id so a late apply cannot target the
-    // arriving chat (background portrait jobs pin chatId separately).
-    try { stopRealtimeLocationGeneration(); } catch (_) { /* ignore */ }
+    // arriving chat (background portrait jobs pin chatId separately). Cancelling
+    // for a chat switch must not set the user's persistent Real-Time off switch.
+    try { stopRealtimeLocationGeneration({ disable: false }); } catch (_) { /* ignore */ }
 
     // Drop in-flight Adventure Companion LLM/tool work for the departing chat.
     // A late act_for_user or agent command would mutate the arriving chat.

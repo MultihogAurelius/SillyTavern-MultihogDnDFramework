@@ -528,10 +528,11 @@ export function resetImmersionSceneArtTracking() {
 }
 
 /**
- * @returns {'location_change'|'every_n_outputs'}
+ * @returns {'location_enter'|'location_change'|'every_n_outputs'}
  */
 function getRealtimeTriggerMode(s) {
-    return s.portraitRealtimeTriggerMode === 'every_n_outputs' ? 'every_n_outputs' : 'location_change';
+    return ['location_enter', 'every_n_outputs'].includes(s.portraitRealtimeTriggerMode)
+        ? s.portraitRealtimeTriggerMode : 'location_change';
 }
 
 /**
@@ -593,7 +594,7 @@ export function maybeAutoGenerateImmersionSceneArt(scene, refresh, opts = {}) {
     let dueToLocation = false;
     let dueToOutputs = false;
 
-    if (!hasImage || locationChanged) {
+    if (!hasImage || (mode !== 'location_enter' && locationChanged)) {
         dueToLocation = true;
     }
 

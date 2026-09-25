@@ -32,7 +32,7 @@ vi.mock('../src/ui/panel/dungeon-map-panel.js', () => ({}));
 vi.mock('../src/state/section-enabled.js', () => ({ isLocationMappingEnabled: () => false }));
 vi.mock('../src/app/runtime-state.js', () => ({ runtimeState: {} }));
 
-import { buildImmersionSceneState, loadAllLocationPaths, loadLocationEntryByPath, maybeAutoGenerateImmersionSceneArt, resetImmersionSceneArtTracking, runRealtimeSceneArtCheck } from '../immersion.js';
+import { buildImmersionSceneState, loadAllLocationPaths, loadLocationEntryByPath, maybeAutoGenerateImmersionSceneArt, resetImmersionSceneArtTracking, hydrateImmersionSceneArtPath, runRealtimeSceneArtCheck } from '../immersion.js';
 import { applyLocationImageToChatBackground, triggerBackgroundLocationGeneration } from '../portraits.js';
 import { invalidateChatCommitGuards } from '../src/state/pass-affinity.js';
 import { isWorldInfoBookKnown, scanRecentOutputForPresentNpcs } from '../router.js';
@@ -210,5 +210,33 @@ describe('location background syncing', () => {
             expect(applyLocationImageToChatBackground).not.toHaveBeenCalled();
             expect(host.settings.chatStates).toEqual({ B: {} });
         }
+    });
+
+    it.each(['location_enter', 'location_change', 'every_n_outputs'])('respects %s on revisits and reloads', mode => {
+        Object.assign(host.settings, { portraitAutoGenerateSceneView: true, portraitRealtimeTriggerMode: mode });
+        const enter = (path, image = '') => maybeAutoGenerateImmersionSceneArt({ storagePath: path, locationImage: image }, () => {});
+        enter('Town'); // First visit: all modes create missing art.
+        expect(triggerBackgroundLocationGeneration).toHaveBeenCalledTimes(1);
+        enter('Town', 'town.png'); // Repeated refresh at the same place.
+        expect(triggerBackgroundLocationGeneration).toHaveBeenCalledTimes(1);
+        enter('Forest');
+        expect(triggerBackgroundLocationGeneration).toHaveBeenCalledTimes(2);
+        enter('Town', 'town.png');
+        expect(triggerBackgroundLocationGeneration).toHaveBeenCalledTimes(mode === 'location_enter' ? 2 : 3);
+        resetImmersionSceneArtTracking();
+        hydrateImmersionSceneArtPath('chat');
+        enter('Town', 'town.png');
+        expect(triggerBackgroundLocationGeneration).toHaveBeenCalledTimes(mode === 'location_enter' ? 2 : 3);
+    });
+
+    it.each(['location_enter', 'every_n_outputs'])('only every-N mode regenerates for new outputs (%s)', mode => {
+        Object.assign(host.settings, { portraitAutoGenerateSceneView: true, portraitRealtimeTriggerMode: mode, portraitRealtimeEveryNOutputs: 2 });
+        hydrateImmersionSceneArtPath('chat');
+        const scene = { storagePath: 'Town', locationImage: 'town.png' };
+        maybeAutoGenerateImmersionSceneArt(scene, () => {});
+        triggerBackgroundLocationGeneration.mockClear();
+        host.context.chat.push({ mes: 'one' }, { mes: 'two' });
+        maybeAutoGenerateImmersionSceneArt(scene, () => {});
+        expect(triggerBackgroundLocationGeneration).toHaveBeenCalledTimes(mode === 'every_n_outputs' ? 1 : 0);
     });
 });

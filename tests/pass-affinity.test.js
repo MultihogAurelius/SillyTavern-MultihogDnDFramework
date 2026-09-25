@@ -93,7 +93,7 @@ describe('World Progression / Lorebook Agent chat-switch affinity', () => {
         expect(indexSource).toContain('stopRouterPass()');
         expect(indexSource).toContain('stopWorldProgressionPass()');
         expect(indexSource).toMatch(
-            /Drop in-flight State Tracker work for the departing chat[\s\S]*stopRouterPass\(\)[\s\S]*stopWorldProgressionPass\(\)[\s\S]*stopRealtimeLocationGeneration\(\)/,
+            /Drop in-flight State Tracker work for the departing chat[\s\S]*stopRouterPass\(\)[\s\S]*stopWorldProgressionPass\(\)[\s\S]*stopRealtimeLocationGeneration\(\{ disable: false \}\)/,
         );
     });
 
