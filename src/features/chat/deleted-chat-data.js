@@ -17,6 +17,12 @@ export function existingChatIds(recentChats) {
     return new Set(recentChats.map(chat => String(chat?.file_name || '').replace(/\.jsonl$/i, '')).filter(Boolean));
 }
 
+/** Saved IDs that are absent from a complete SillyTavern chat inventory. */
+export function orphanedStoredChatIds(settings, existingIds) {
+    if (!(existingIds instanceof Set)) throw new Error('Invalid SillyTavern chat inventory');
+    return storedChatIds(settings).filter(id => !existingIds.has(id)).sort();
+}
+
 /** Remove every chat-keyed Multihog record for one verified deleted chat. */
 export function removeDeletedChatData(settings, chatId) {
     if (!chatId) return false;
