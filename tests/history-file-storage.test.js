@@ -1,10 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createHash } from 'node:crypto';
 import {
     cleanupSupersededHistoryFiles,
     countLegacyHistories,
     holdLegacyHistories,
     hydrateChatHistories,
     hydrateGlobalHistories,
+    hydrateProfileHistories,
     migrateLegacyHistories,
     persistChatHistories,
     persistGlobalHistories,
@@ -15,12 +17,14 @@ let files;
 let registry;
 let failUpload;
 let diskSettings;
+let onUpload;
 
 beforeEach(() => {
     files = new Map();
     registry = { attachments: [], disabled_attachments: [] };
     failUpload = false;
     diskSettings = null;
+    onUpload = null;
     holdLegacyHistories({ chatLinkEnabled: true, chatStates: {}, profiles: {} });
     vi.stubGlobal('SillyTavern', { getContext: () => ({
         extensionSettings: registry,
@@ -32,6 +36,7 @@ beforeEach(() => {
             const { name, data } = JSON.parse(options.body);
             const path = `/user/files/${name}`;
             files.set(path, Uint8Array.from(Buffer.from(data, 'base64')));
+            if (onUpload) onUpload();
             return Response.json({ path });
         }
         if (url === '/api/files/delete') {
@@ -84,7 +89,9 @@ describe('file-backed histories', () => {
 
     it('includes global-mode and saved-profile histories in the explicit migration', async () => {
         const settings = { chatLinkEnabled: false, memoHistory: ['global'], dungeonMapHistory: [null],
-            profiles: { preset: { memoHistory: ['profile'], dungeonMapHistory: [null] } }, chatStates: {} };
+            mapEvolutionThreadsBySite: { harbor: [{ cause: 'A ship departed.' }] },
+            profiles: { preset: { memoHistory: ['profile'], dungeonMapHistory: [null],
+                mapEvolutionBacklogBySite: { woods: [{ summary: 'The forest changed.' }] } } }, chatStates: {} };
         holdLegacyHistories(settings);
         expect(countLegacyHistories(settings)).toBe(2);
         expect(await persistGlobalHistories(settings)).toBe(false);
@@ -92,6 +99,14 @@ describe('file-backed histories', () => {
         expect(settings.globalHistoryStorage?.url).toMatch(/^\/user\/files\//);
         expect(settings.profiles.preset.historyStorage?.url).toMatch(/^\/user\/files\//);
         expect(countLegacyHistories(settings)).toBe(0);
+        const saved = JSON.parse(JSON.stringify(settings));
+        expect(saved.mapEvolutionThreadsBySite).toBeUndefined();
+        expect(saved.profiles.preset.mapEvolutionBacklogBySite).toBeUndefined();
+        expect(await hydrateGlobalHistories(saved)).toBe(true);
+        expect(await hydrateProfileHistories(saved, 'preset')).toBe(true);
+        expect(saved.mapEvolutionThreadsBySite.harbor[0].cause).toBe('A ship departed.');
+        expect(saved.profiles.preset.mapEvolutionBacklogBySite.woods[0].summary)
+            .toBe('The forest changed.');
     });
 
     it('uploads paired histories, omits them from settings, and restores them after reload', async () => {
@@ -176,5 +191,80 @@ describe('file-backed histories', () => {
         expect(await hydrateGlobalHistories(saved)).toBe(true);
         expect(saved.memoHistory).toEqual(['global']);
         expect(saved.dungeonMapHistory).toEqual([{ map: 2 }]);
+    });
+
+    it('stores evolution-only chat records outside settings and restores them', async () => {
+        const evolution = {
+            mapEvolutionBacklogBySite: { forest: [{ kind: 'quiet', summary: 'A quiet day.' }] },
+            mapEvolutionThreadsBySite: { forest: [{ id: 't1', cause: 'A flood began.' }] },
+            mapEvolutionWorldReportApplications: { forest: { report1: { status: 'considered' } } },
+        };
+        const settings = { chatStateProjectionOwner: 'A', memoHistory: [], dungeonMapHistory: [],
+            ...structuredClone(evolution), chatStates: { A: { memoHistory: [], dungeonMapHistory: [],
+                ...structuredClone(evolution) } } };
+        expect(await persistChatHistories(settings, 'A')).toBe(true);
+        const saved = JSON.parse(JSON.stringify(settings));
+        for (const key of Object.keys(evolution)) {
+            expect(saved[key]).toBeUndefined();
+            expect(saved.chatStates.A[key]).toBeUndefined();
+        }
+        expect(await hydrateChatHistories(saved, 'A')).toBe(true);
+        for (const [key, value] of Object.entries(evolution)) expect(saved.chatStates.A[key]).toEqual(value);
+    });
+
+    it('migrates evolution records alongside a version-1 history file without losing either', async () => {
+        const oldData = { version: 1, memoHistory: ['old memo'], dungeonMapHistory: [{ map: 1 }] };
+        const oldJson = JSON.stringify(oldData);
+        const oldUrl = '/user/files/multihog_history_legacy.json';
+        files.set(oldUrl, Uint8Array.from(Buffer.from(oldJson)));
+        const settings = { chatLinkEnabled: true, chatStates: { A: {
+            historyStorage: { version: 1, owner: 'A', url: oldUrl,
+                sha256: createHash('sha256').update(oldJson).digest('hex') },
+            mapEvolutionBacklogBySite: { forest: [{ kind: 'commit', summary: 'The flood spread.' }] },
+            mapEvolutionThreadsBySite: { forest: [{ id: 'flood', cause: 'Heavy rain.' }] },
+            mapEvolutionWorldReportApplications: { forest: { report1: { status: 'applied' } } },
+        } } };
+        holdLegacyHistories(settings);
+        expect(countLegacyHistories(settings)).toBe(1);
+        expect(await persistChatHistories(settings, 'A')).toBe(false);
+        expect(await migrateLegacyHistories(settings)).toMatchObject({ total: 1, migrated: 1, failed: 0 });
+        const saved = JSON.parse(JSON.stringify(settings));
+        expect(saved.chatStates.A.memoHistory).toBeUndefined();
+        expect(saved.chatStates.A.mapEvolutionThreadsBySite).toBeUndefined();
+        expect(saved.chatStates.A.historyStorage.version).toBe(2);
+        expect(await hydrateChatHistories(saved, 'A')).toBe(true);
+        expect(saved.chatStates.A.memoHistory).toEqual(oldData.memoHistory);
+        expect(saved.chatStates.A.dungeonMapHistory).toEqual(oldData.dungeonMapHistory);
+        expect(saved.chatStates.A.mapEvolutionBacklogBySite.forest[0].summary).toBe('The flood spread.');
+        expect(saved.chatStates.A.mapEvolutionThreadsBySite.forest[0].cause).toBe('Heavy rain.');
+        expect(saved.chatStates.A.mapEvolutionWorldReportApplications.forest.report1.status).toBe('applied');
+        expect(files.has(oldUrl)).toBe(true);
+    });
+
+    it('keeps evolution records in settings when a new file upload fails', async () => {
+        const settings = { chatStates: { A: { memoHistory: [], dungeonMapHistory: [],
+            mapEvolutionThreadsBySite: { forest: [{ cause: 'A flood began.' }] } } } };
+        failUpload = true;
+        const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
+        expect(await persistChatHistories(settings, 'A')).toBe(false);
+        expect(JSON.parse(JSON.stringify(settings)).chatStates.A.mapEvolutionThreadsBySite.forest[0].cause)
+            .toBe('A flood began.');
+        errorLog.mockRestore();
+    });
+
+    it('retries when evolution changes during an in-flight upload', async () => {
+        const settings = { chatStates: { A: { memoHistory: [], dungeonMapHistory: [],
+            mapEvolutionThreadsBySite: { forest: [{ cause: 'Before upload.' }] } } } };
+        let changed = false;
+        onUpload = () => {
+            if (changed) return;
+            changed = true;
+            settings.chatStates.A.mapEvolutionThreadsBySite.forest[0].cause = 'After upload.';
+        };
+        expect(await persistChatHistories(settings, 'A')).toBe(true);
+        expect(files.size).toBe(2);
+        const saved = JSON.parse(JSON.stringify(settings));
+        expect(await hydrateChatHistories(saved, 'A')).toBe(true);
+        expect(saved.chatStates.A.mapEvolutionThreadsBySite.forest[0].cause).toBe('After upload.');
     });
 });

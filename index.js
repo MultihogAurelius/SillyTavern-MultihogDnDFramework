@@ -1129,7 +1129,7 @@ async function openSettingsPersistenceGate() {
     }
 }
 
-const HISTORY_MIGRATION_DISMISSED_KEY = 'rpg_tracker_history_migration_dismissed';
+const HISTORY_MIGRATION_DISMISSED_KEY = 'rpg_tracker_history_migration_dismissed_v2';
 let historyMigrationRunning = false;
 let historyMigrationOfferOpen = false;
 
@@ -1138,19 +1138,19 @@ async function offerHistoryMigration(fromSettings = false) {
     const settings = getSettings();
     const count = countLegacyHistories(settings);
     if (!count) {
-        if (fromSettings) toastr.info('No memo or map histories need migration.', 'RPG Tracker');
+        if (fromSettings) toastr.info('No memo, map, or Map Evolution histories need migration.', 'RPG Tracker');
         return;
     }
     if (!fromSettings) {
         try { if (localStorage.getItem(HISTORY_MIGRATION_DISMISSED_KEY)) return; }
         catch (_) { /* Private browsing may block localStorage. */ }
     }
-    const body = `<p><strong>${count} saved ${count === 1 ? 'history' : 'histories'}</strong> still live inside settings.json. Moving them into compressed SillyTavern files can substantially reduce settings size and make saves more reliable.</p><p>Each chat keeps a small file reference in settings.json. Existing history stays there until its file upload succeeds.</p><p>This may take several minutes on a large installation. You can choose Later and run it from General &amp; Visuals → Core &amp; Branching at any time.</p>`;
+    const body = `<p><strong>${count} saved ${count === 1 ? 'history' : 'histories'}</strong> still live inside settings.json. Moving memo snapshots, dungeon-map snapshots, and Map Evolution records into compressed SillyTavern files can substantially reduce settings size and make saves more reliable.</p><p>Each chat keeps a small file reference in settings.json. Existing history stays there until its file upload succeeds.</p><p>This may take several minutes on a large installation. You can choose Later and run it from General &amp; Visuals → Core &amp; Branching at any time.</p>`;
     historyMigrationOfferOpen = true;
     let choice;
     try {
         choice = await SillyTavern.getContext().Popup.show.confirm(
-            'Move memo and map histories to files?', body,
+            'Move memo, map, and Evolution histories to files?', body,
             { okButton: `Migrate ${count} ${count === 1 ? 'history' : 'histories'}`, cancelButton: 'Later' },
         );
     } finally {
@@ -1171,7 +1171,7 @@ async function offerHistoryMigration(fromSettings = false) {
     };
     try {
         const result = await migrateLegacyHistories(settings, async progress => {
-            showProgress(`Migrating memo/map histories: ${progress.completed}/${progress.total} checked, ${progress.migrated} moved.`);
+            showProgress(`Migrating memo/map/Evolution histories: ${progress.completed}/${progress.total} checked, ${progress.migrated} moved.`);
             if (progress.migrated && progress.completed % 5 === 0) await forceDiskCheckpoint();
         });
         if (result.migrated) await forceDiskCheckpoint();

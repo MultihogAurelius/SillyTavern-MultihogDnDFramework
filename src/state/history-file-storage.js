@@ -1,13 +1,19 @@
 /**
- * File-backed memo/map history. The live arrays remain available to existing
- * callers, but are non-enumerable after a successful file write so ST does not
- * copy them into settings.json. Legacy arrays stay enumerable until uploaded.
+ * File-backed memo/map and Map Evolution history. Live values remain available
+ * to existing callers, but are non-enumerable after a successful file write so
+ * ST does not copy them into settings.json. Legacy values remain until uploaded.
  */
 
 import { MODULE_NAME } from './schema-sections.js';
 
 const FILE_PREFIX = 'multihog_history_';
-const FORMAT_VERSION = 1;
+const FORMAT_VERSION = 2;
+const HISTORY_KEYS = ['memoHistory', 'dungeonMapHistory'];
+const EVOLUTION_KEYS = [
+    'mapEvolutionBacklogBySite',
+    'mapEvolutionThreadsBySite',
+    'mapEvolutionWorldReportApplications',
+];
 const pendingByChat = new Map();
 const heldLegacyChats = new Set();
 const heldLegacyProfiles = new Set();
@@ -43,19 +49,34 @@ async function digest(text) {
     return Array.from(hash, byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
+function evolutionRecord(part, key) {
+    const value = part?.[key];
+    return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+}
+
 function historyJson(part) {
-    if (!Array.isArray(part?.memoHistory)) return null;
+    if (!part || typeof part !== 'object') return null;
     return JSON.stringify({
         version: FORMAT_VERSION,
-        memoHistory: part.memoHistory,
+        memoHistory: Array.isArray(part.memoHistory) ? part.memoHistory : [],
         dungeonMapHistory: Array.isArray(part.dungeonMapHistory) ? part.dungeonMapHistory : [],
+        mapEvolutionBacklogBySite: evolutionRecord(part, EVOLUTION_KEYS[0]),
+        mapEvolutionThreadsBySite: evolutionRecord(part, EVOLUTION_KEYS[1]),
+        mapEvolutionWorldReportApplications: evolutionRecord(part, EVOLUTION_KEYS[2]),
     });
 }
 
+function hasEvolutionData(part) {
+    return EVOLUTION_KEYS.some(key => Object.keys(evolutionRecord(part, key)).length > 0);
+}
+
 function hasEmbeddedHistory(part) {
-    return Array.isArray(part?.memoHistory)
+    const embeddedSnapshots = Array.isArray(part?.memoHistory)
         && !!(part.memoHistory.length || part.dungeonMapHistory?.length)
         && Object.getOwnPropertyDescriptor(part, 'memoHistory')?.enumerable === true;
+    const embeddedEvolution = EVOLUTION_KEYS.some(key => Object.keys(evolutionRecord(part, key)).length > 0
+        && Object.getOwnPropertyDescriptor(part, key)?.enumerable === true);
+    return embeddedSnapshots || embeddedEvolution;
 }
 
 /** Hold histories found at startup until the user starts migration. New chats still use files. */
@@ -78,8 +99,8 @@ export function countLegacyHistories(settings) {
         + (!settings?.chatLinkEnabled && hasEmbeddedHistory(settings) ? 1 : 0);
 }
 
-function concealHistories(part) {
-    for (const key of ['memoHistory', 'dungeonMapHistory']) {
+function concealHistories(part, includeEvolution = true) {
+    for (const key of [...HISTORY_KEYS, ...(includeEvolution ? EVOLUTION_KEYS : [])]) {
         if (!Object.hasOwn(part, key)) continue;
         Object.defineProperty(part, key, {
             value: part[key], writable: true, configurable: true, enumerable: false,
@@ -88,7 +109,7 @@ function concealHistories(part) {
 }
 
 function exposeHistories(part) {
-    for (const key of ['memoHistory', 'dungeonMapHistory']) {
+    for (const key of [...HISTORY_KEYS, ...EVOLUTION_KEYS]) {
         if (!Object.hasOwn(part, key)) continue;
         Object.defineProperty(part, key, {
             value: part[key], writable: true, configurable: true, enumerable: true,
@@ -139,7 +160,10 @@ async function readJson(url) {
         bytes = new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
     }
     const parsed = JSON.parse(new TextDecoder().decode(bytes));
-    if (parsed?.version !== FORMAT_VERSION || !Array.isArray(parsed.memoHistory) || !Array.isArray(parsed.dungeonMapHistory)) {
+    if (![1, FORMAT_VERSION].includes(parsed?.version)
+        || !Array.isArray(parsed.memoHistory) || !Array.isArray(parsed.dungeonMapHistory)
+        || (parsed.version === FORMAT_VERSION && EVOLUTION_KEYS.some(key => !parsed[key]
+            || typeof parsed[key] !== 'object' || Array.isArray(parsed[key])))) {
         throw new Error('Invalid history file contents');
     }
     return parsed;
@@ -158,7 +182,10 @@ export async function hydrateChatHistories(settings, chatId) {
         if (settings.chatStates?.[chatId] !== part || part.historyStorage !== pointer) return false;
         part.memoHistory = data.memoHistory;
         part.dungeonMapHistory = data.dungeonMapHistory;
-        concealHistories(part);
+        if (data.version === FORMAT_VERSION) {
+            for (const key of EVOLUTION_KEYS) part[key] = data[key];
+        }
+        concealHistories(part, data.version === FORMAT_VERSION);
         protectFile(pointer.url);
         return true;
     } catch (error) {
@@ -177,7 +204,10 @@ export async function hydrateGlobalHistories(settings) {
         if (settings.globalHistoryStorage !== pointer) return false;
         settings.memoHistory = data.memoHistory;
         settings.dungeonMapHistory = data.dungeonMapHistory;
-        concealHistories(settings);
+        if (data.version === FORMAT_VERSION) {
+            for (const key of EVOLUTION_KEYS) settings[key] = data[key];
+        }
+        concealHistories(settings, data.version === FORMAT_VERSION);
         protectFile(pointer.url);
         return true;
     } catch (error) {
@@ -190,7 +220,9 @@ export async function hydrateGlobalHistories(settings) {
 export async function persistGlobalHistories(settings) {
     if (heldLegacyGlobal) return false;
     try {
-        if (!settings?.globalHistoryStorage && !(settings?.memoHistory?.length || settings?.dungeonMapHistory?.length)) return false;
+        if (settings?.globalHistoryStorage && !Array.isArray(settings.memoHistory)
+            && !await hydrateGlobalHistories(settings)) return false;
+        if (!settings?.globalHistoryStorage && !(settings?.memoHistory?.length || settings?.dungeonMapHistory?.length || hasEvolutionData(settings))) return false;
         const json = historyJson(settings);
         if (!json) return false;
         const sha256 = await digest(json);
@@ -223,7 +255,12 @@ export function persistChatHistories(settings, chatId) {
         let changed = false;
         for (;;) {
             const part = settings.chatStates?.[chatId];
-            if (!part?.historyStorage && !(part?.memoHistory?.length || part?.dungeonMapHistory?.length)) return changed;
+            if (!part) return changed;
+            if (part.historyStorage && !Array.isArray(part.memoHistory)) {
+                if (!await hydrateChatHistories(settings, chatId)) return false;
+                continue;
+            }
+            if (!part.historyStorage && !(part.memoHistory?.length || part.dungeonMapHistory?.length || hasEvolutionData(part))) return changed;
             const json = historyJson(part);
             if (!json) return changed;
             const sha256 = await digest(json);
