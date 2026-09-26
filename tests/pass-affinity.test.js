@@ -37,6 +37,17 @@ describe('State Tracker chat-switch affinity', () => {
         );
     });
 
+    it('skips Linear Stone versioning when a State Tracker chunk makes no memo changes', () => {
+        const passIdx = indexSource.indexOf('async function runStateModelPass');
+        expect(passIdx).toBeGreaterThanOrEqual(0);
+        const passSlice = indexSource.slice(passIdx, passIdx + 28000);
+        expect(passSlice).toContain('if (merged === previousMemoSnapshot)');
+        expect(passSlice).toContain('if (merged === memoBeforeThisChunk)');
+        expect(passSlice).toMatch(
+            /if \(merged === memoBeforeThisChunk\) \{\s*lastDelta = '';\s*\} else \{[\s\S]*?commitChunkResult\(merged, memoBeforeThisChunk, mapSnapshot\)/,
+        );
+    });
+
     it('guards sendDirectPrompt commits against a post-await chat switch', () => {
         const directIdx = indexSource.indexOf('export async function sendDirectPrompt');
         expect(directIdx).toBeGreaterThanOrEqual(0);

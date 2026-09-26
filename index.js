@@ -3213,6 +3213,10 @@ async function runStateModelPass(narrativeOutput, isFullContext = false, overrid
             if (!canCommitPassForChat(passChatId, runtimeState.currentChatId, { aborted: signal.aborted })) {
                 return null;
             }
+            // Defense in depth: callers skip no-ops, but never slice/unshift when unchanged.
+            if (merged === previousMemoSnapshot) {
+                return '';
+            }
             const delta = computeDelta(previousMemoSnapshot, merged);
 
             // Linear Stone History Logic
@@ -3327,17 +3331,24 @@ async function runStateModelPass(narrativeOutput, isFullContext = false, overrid
                     console.log(`[RPG Tracker] Memo ${merged !== memoBeforeThisChunk ? 'updated' : 'unchanged'} after chunk ${i + 1}.`);
                 }
 
-                // ── FULL COMMIT: treat this chunk as a completed turn ──
-                const mapSnapshot = chatCommitResult(ownsOperation, await captureActiveDungeonMapHistory());
-                if (signal.aborted) break;
-                if (!canCommitPassForChat(passChatId, runtimeState.currentChatId)) {
-                    abandonedForChatSwitch = true;
-                    break;
-                }
-                lastDelta = commitChunkResult(merged, memoBeforeThisChunk, mapSnapshot);
-                if (lastDelta == null) {
-                    abandonedForChatSwitch = true;
-                    break;
+                // No-op chunks must not version Linear Stones. sliceMemoAndMapHistory at
+                // historyIndex > 0 permanently drops Chat Link preserveLive archives, and
+                // unshifting an unchanged LIVE duplicates it — same guard as sendDirectPrompt.
+                if (merged === memoBeforeThisChunk) {
+                    lastDelta = '';
+                } else {
+                    // ── FULL COMMIT: treat this chunk as a completed turn ──
+                    const mapSnapshot = chatCommitResult(ownsOperation, await captureActiveDungeonMapHistory());
+                    if (signal.aborted) break;
+                    if (!canCommitPassForChat(passChatId, runtimeState.currentChatId)) {
+                        abandonedForChatSwitch = true;
+                        break;
+                    }
+                    lastDelta = commitChunkResult(merged, memoBeforeThisChunk, mapSnapshot);
+                    if (lastDelta == null) {
+                        abandonedForChatSwitch = true;
+                        break;
+                    }
                 }
                 if (relationshipCommands.length) {
                     // Relationship applies await NPC resolution; refuse if the chat

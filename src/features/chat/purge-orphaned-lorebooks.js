@@ -1,12 +1,36 @@
 import { bookBelongsToPrefix } from './clone-campaign-stack-utils.js';
 
+function cleanPrefix(value) {
+    return String(value || '').replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+}
+
 function campaignPrefix(settings, chatId) {
-    const clean = value => String(value || '').replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
     const part = settings.chatStates?.[chatId];
     if (settings.routerCampaignPrefixOverrideAnchorChatId === chatId && settings.routerCampaignPrefixOverride) {
-        return clean(settings.routerCampaignPrefixOverride);
+        return cleanPrefix(settings.routerCampaignPrefixOverride);
     }
-    return clean(part?.renamedCampaignPrefix || chatId);
+    return cleanPrefix(part?.renamedCampaignPrefix || chatId);
+}
+
+/**
+ * Prefixes claimed by chats other than the deleted one. Includes a live
+ * campaign-prefix override whose anchor has no chatStates partition yet —
+ * otherwise Shared_* books are offered for purge while that chat still uses them.
+ */
+function otherClaimedPrefixes(settings, deletedChatId) {
+    const prefixes = new Set();
+    for (const id of Object.keys(settings?.chatStates || {})) {
+        if (id === deletedChatId) continue;
+        const prefix = campaignPrefix(settings, id);
+        if (prefix) prefixes.add(prefix);
+    }
+    const override = cleanPrefix(settings?.routerCampaignPrefixOverride);
+    if (!override) return prefixes;
+    const anchor = String(settings?.routerCampaignPrefixOverrideAnchorChatId || '').trim();
+    // Anchored: protect when another chat owns the override.
+    // Legacy unanchored: override applies to the active chat — never the deleted one alone.
+    if (!anchor || anchor !== deletedChatId) prefixes.add(override);
+    return prefixes;
 }
 
 /**
@@ -25,14 +49,14 @@ export function orphanedLorebooksForDeletedChat(settings, chatId, existingNames,
     const available = new Set(existingNames);
     const protectedBooks = new Set(protectedNames);
     const otherStates = Object.entries(states).filter(([id]) => id !== chatId);
+    const claimedPrefixes = otherClaimedPrefixes(settings, chatId);
     return [...new Set(recorded)].filter(name =>
         typeof name === 'string'
         && available.has(name)
         && !protectedBooks.has(name)
         && bookBelongsToPrefix(name, prefix)
-        && !otherStates.some(([otherId, part]) =>
-            (part?.campaignBooks || []).includes(name)
-            || bookBelongsToPrefix(name, campaignPrefix(settings, otherId)))
+        && !otherStates.some(([, part]) => (part?.campaignBooks || []).includes(name))
+        && ![...claimedPrefixes].some(otherPrefix => bookBelongsToPrefix(name, otherPrefix))
     );
 }
 

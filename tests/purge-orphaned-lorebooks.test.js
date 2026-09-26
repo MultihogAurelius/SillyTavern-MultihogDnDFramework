@@ -29,6 +29,41 @@ describe('purging lorebooks after chat deletion', () => {
             .toEqual([]);
     });
 
+    it('keeps books claimed by a prefix override even when the anchor has no chatStates entry', () => {
+        const settings = {
+            routerCampaignPrefixOverride: 'Shared',
+            routerCampaignPrefixOverrideAnchorChatId: 'Chat B',
+            chatStates: {
+                'Chat A': { renamedCampaignPrefix: 'Shared', campaignBooks: ['Shared_NPCs', 'Shared_Locations'] },
+            },
+        };
+        expect(orphanedLorebooksForDeletedChat(settings, 'Chat A', ['Shared_NPCs', 'Shared_Locations']))
+            .toEqual([]);
+    });
+
+    it('keeps books under a legacy unanchored override for a different deleted chat', () => {
+        const settings = {
+            routerCampaignPrefixOverride: 'Shared',
+            routerCampaignPrefixOverrideAnchorChatId: '',
+            chatStates: {
+                'Chat A': { renamedCampaignPrefix: 'Shared', campaignBooks: ['Shared_NPCs'] },
+            },
+        };
+        expect(orphanedLorebooksForDeletedChat(settings, 'Chat A', ['Shared_NPCs'])).toEqual([]);
+    });
+
+    it('still offers books when the deleted chat itself owns the override anchor', () => {
+        const settings = {
+            routerCampaignPrefixOverride: 'Shared',
+            routerCampaignPrefixOverrideAnchorChatId: 'Chat A',
+            chatStates: {
+                'Chat A': { campaignBooks: ['Shared_NPCs', 'Shared_Locations'] },
+            },
+        };
+        expect(orphanedLorebooksForDeletedChat(settings, 'Chat A', ['Shared_NPCs', 'Shared_Locations']))
+            .toEqual(['Shared_NPCs', 'Shared_Locations']);
+    });
+
     it('does nothing when the user keeps the lorebooks', async () => {
         const deleteBook = vi.fn();
         const settings = { chatStates: { Old: { campaignBooks: ['Old_NPCs'] } } };
