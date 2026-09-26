@@ -95,7 +95,7 @@ Together they solve the four core problems of LLM tabletop RP: the AI forgetting
 
 ### Memo and map history storage
 
-The extension stores memo and dungeon-map histories as compressed files in SillyTavern's `data/<user>/user/files/` directory. Existing histories migrate after the extension finishes loading; `settings.json` keeps only file references and checksums. This uses SillyTavern's built-in file API and needs no server plugin or download step. Back up both `settings.json` and the `user/files` directory to preserve history. The internal files appear as disabled attachments; leave them in place while their chats exist.
+The extension stores memo and dungeon-map histories as compressed files in SillyTavern's `data/<user>/user/files/` directory. When older histories remain in `settings.json`, a startup popup offers to migrate them; you can defer and use **General & Visuals → Core & Branching → Check and migrate memo/map histories** later. The process keeps a small file reference and checksum in `settings.json`. It uses SillyTavern's built-in file API and needs no server plugin or download step. Back up both `settings.json` and the `user/files` directory to preserve history. The internal files appear as disabled attachments; leave them in place while their chats exist.
 
 ## Usage Guide
 

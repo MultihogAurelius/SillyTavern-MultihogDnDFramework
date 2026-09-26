@@ -9,6 +9,9 @@ import { MODULE_NAME } from './schema-sections.js';
 const FILE_PREFIX = 'multihog_history_';
 const FORMAT_VERSION = 1;
 const pendingByChat = new Map();
+const heldLegacyChats = new Set();
+const heldLegacyProfiles = new Set();
+let heldLegacyGlobal = false;
 let persistenceBlocked = false;
 
 export function blockHistoryPersistence() { persistenceBlocked = true; }
@@ -47,6 +50,32 @@ function historyJson(part) {
         memoHistory: part.memoHistory,
         dungeonMapHistory: Array.isArray(part.dungeonMapHistory) ? part.dungeonMapHistory : [],
     });
+}
+
+function hasEmbeddedHistory(part) {
+    return Array.isArray(part?.memoHistory)
+        && !!(part.memoHistory.length || part.dungeonMapHistory?.length)
+        && Object.getOwnPropertyDescriptor(part, 'memoHistory')?.enumerable === true;
+}
+
+/** Hold histories found at startup until the user starts migration. New chats still use files. */
+export function holdLegacyHistories(settings) {
+    heldLegacyChats.clear();
+    heldLegacyProfiles.clear();
+    for (const [chatId, part] of Object.entries(settings?.chatStates || {})) {
+        if (hasEmbeddedHistory(part)) heldLegacyChats.add(chatId);
+    }
+    for (const [name, profile] of Object.entries(settings?.profiles || {})) {
+        if (hasEmbeddedHistory(profile)) heldLegacyProfiles.add(name);
+    }
+    heldLegacyGlobal = !settings?.chatLinkEnabled && hasEmbeddedHistory(settings);
+}
+
+/** Count remaining embedded histories without uploading or changing settings. */
+export function countLegacyHistories(settings) {
+    return Object.values(settings?.chatStates || {}).filter(hasEmbeddedHistory).length
+        + Object.values(settings?.profiles || {}).filter(hasEmbeddedHistory).length
+        + (!settings?.chatLinkEnabled && hasEmbeddedHistory(settings) ? 1 : 0);
 }
 
 function concealHistories(part) {
@@ -159,6 +188,7 @@ export async function hydrateGlobalHistories(settings) {
 
 /** Store the history used while Chat Link is disabled. */
 export async function persistGlobalHistories(settings) {
+    if (heldLegacyGlobal) return false;
     try {
         if (!settings?.globalHistoryStorage && !(settings?.memoHistory?.length || settings?.dungeonMapHistory?.length)) return false;
         const json = historyJson(settings);
@@ -187,6 +217,7 @@ export async function persistGlobalHistories(settings) {
 /** Upload one chat's arrays before omitting them from future settings saves. */
 export function persistChatHistories(settings, chatId) {
     if (!chatId || !settings?.chatStates?.[chatId]) return Promise.resolve(false);
+    if (heldLegacyChats.has(chatId)) return Promise.resolve(false);
     if (pendingByChat.has(chatId)) return pendingByChat.get(chatId);
     const pending = (async () => {
         let changed = false;
@@ -231,23 +262,13 @@ export function persistChatHistories(settings, chatId) {
     return pending;
 }
 
-/** Move legacy histories gradually; every successful upload reduces settings.json. */
-export async function migrateLegacyChatHistories(settings, onMigrated) {
-    for (const chatId of Object.keys(settings?.chatStates || {})) {
-        const part = settings.chatStates[chatId];
-        if (!Array.isArray(part?.memoHistory)) continue;
-        if (part.historyStorage?.sha256 && !Object.getOwnPropertyDescriptor(part, 'memoHistory')?.enumerable) continue;
-        const changed = await persistChatHistories(settings, chatId);
-        if (changed) await onMigrated();
-    }
-}
-
 function profileView(settings, name) {
     const id = `profile:${name}`;
     return { id, view: { chatStates: { [id]: settings?.profiles?.[name] } } };
 }
 
 export function persistProfileHistories(settings, name) {
+    if (heldLegacyProfiles.has(name)) return Promise.resolve(false);
     const { id, view } = profileView(settings, name);
     return persistChatHistories(view, id);
 }
@@ -257,13 +278,45 @@ export function hydrateProfileHistories(settings, name) {
     return hydrateChatHistories(view, id);
 }
 
-export async function migrateLegacyProfileHistories(settings, onMigrated) {
-    for (const name of Object.keys(settings?.profiles || {})) {
-        const profile = settings.profiles[name];
-        if (!Array.isArray(profile?.memoHistory)) continue;
-        if (profile.historyStorage?.sha256 && !Object.getOwnPropertyDescriptor(profile, 'memoHistory')?.enumerable) continue;
-        if (await persistProfileHistories(settings, name)) await onMigrated();
+/** Migrate only after the user opts in. Report every step and yield to keep the UI responsive. */
+export async function migrateLegacyHistories(settings, onProgress = async () => {}) {
+    const jobs = [
+        ...Object.entries(settings?.chatStates || {}).filter(([, part]) => hasEmbeddedHistory(part))
+            .map(([id]) => ({ type: 'chat', id })),
+        ...Object.entries(settings?.profiles || {}).filter(([, part]) => hasEmbeddedHistory(part))
+            .map(([id]) => ({ type: 'profile', id })),
+        ...(!settings?.chatLinkEnabled && hasEmbeddedHistory(settings) ? [{ type: 'global' }] : []),
+    ];
+    let migrated = 0;
+    let failed = 0;
+    for (const job of jobs) {
+        let part;
+        if (job.type === 'chat') {
+            heldLegacyChats.delete(job.id);
+            part = settings.chatStates?.[job.id];
+            if (part) await persistChatHistories(settings, job.id);
+            part = settings.chatStates?.[job.id];
+        } else if (job.type === 'profile') {
+            heldLegacyProfiles.delete(job.id);
+            part = settings.profiles?.[job.id];
+            if (part) await persistProfileHistories(settings, job.id);
+            part = settings.profiles?.[job.id];
+        } else {
+            heldLegacyGlobal = false;
+            part = settings;
+            await persistGlobalHistories(settings);
+        }
+        if (part && !hasEmbeddedHistory(part)) migrated++;
+        else {
+            failed++;
+            if (job.type === 'chat') heldLegacyChats.add(job.id);
+            else if (job.type === 'profile') heldLegacyProfiles.add(job.id);
+            else heldLegacyGlobal = true;
+        }
+        await onProgress({ completed: migrated + failed, total: jobs.length, migrated, failed });
+        await new Promise(resolve => setTimeout(resolve, 0));
     }
+    return { total: jobs.length, migrated, failed };
 }
 
 /** Remove an unreferenced history file after a deleted chat is purged. */

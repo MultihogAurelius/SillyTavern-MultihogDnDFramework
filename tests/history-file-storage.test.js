@@ -1,8 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
     cleanupSupersededHistoryFiles,
+    countLegacyHistories,
+    holdLegacyHistories,
     hydrateChatHistories,
     hydrateGlobalHistories,
+    migrateLegacyHistories,
     persistChatHistories,
     persistGlobalHistories,
     removeUnreferencedHistoryFile,
@@ -18,6 +21,7 @@ beforeEach(() => {
     registry = { attachments: [], disabled_attachments: [] };
     failUpload = false;
     diskSettings = null;
+    holdLegacyHistories({ chatLinkEnabled: true, chatStates: {}, profiles: {} });
     vi.stubGlobal('SillyTavern', { getContext: () => ({
         extensionSettings: registry,
         getRequestHeaders: () => ({ 'Content-Type': 'application/json' }),
@@ -46,6 +50,50 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('file-backed histories', () => {
+    it('waits for explicit migration of old histories while new chats use files', async () => {
+        const settings = { chatLinkEnabled: true, chatStates: {
+            old: { memoHistory: ['old memo'], dungeonMapHistory: [null] },
+        } };
+        holdLegacyHistories(settings);
+        expect(countLegacyHistories(settings)).toBe(1);
+        expect(await persistChatHistories(settings, 'old')).toBe(false);
+        expect(files.size).toBe(0);
+        settings.chatStates.new = { memoHistory: ['new memo'], dungeonMapHistory: [null] };
+        expect(await persistChatHistories(settings, 'new')).toBe(true);
+        const progress = [];
+        expect(await migrateLegacyHistories(settings, p => { progress.push(p); })).toMatchObject({ total: 1, migrated: 1, failed: 0 });
+        expect(progress).toHaveLength(1);
+        expect(countLegacyHistories(settings)).toBe(0);
+        expect(JSON.parse(JSON.stringify(settings)).chatStates.old.memoHistory).toBeUndefined();
+    });
+
+    it('keeps a failed legacy upload embedded and held until a later explicit retry', async () => {
+        const settings = { chatLinkEnabled: true, chatStates: {
+            old: { memoHistory: ['safe'], dungeonMapHistory: [null] },
+        } };
+        holdLegacyHistories(settings);
+        failUpload = true;
+        const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
+        expect(await migrateLegacyHistories(settings)).toMatchObject({ migrated: 0, failed: 1 });
+        expect(JSON.parse(JSON.stringify(settings)).chatStates.old.memoHistory).toEqual(['safe']);
+        failUpload = false;
+        expect(await persistChatHistories(settings, 'old')).toBe(false);
+        expect(await migrateLegacyHistories(settings)).toMatchObject({ migrated: 1, failed: 0 });
+        errorLog.mockRestore();
+    });
+
+    it('includes global-mode and saved-profile histories in the explicit migration', async () => {
+        const settings = { chatLinkEnabled: false, memoHistory: ['global'], dungeonMapHistory: [null],
+            profiles: { preset: { memoHistory: ['profile'], dungeonMapHistory: [null] } }, chatStates: {} };
+        holdLegacyHistories(settings);
+        expect(countLegacyHistories(settings)).toBe(2);
+        expect(await persistGlobalHistories(settings)).toBe(false);
+        expect(await migrateLegacyHistories(settings)).toMatchObject({ total: 2, migrated: 2, failed: 0 });
+        expect(settings.globalHistoryStorage?.url).toMatch(/^\/user\/files\//);
+        expect(settings.profiles.preset.historyStorage?.url).toMatch(/^\/user\/files\//);
+        expect(countLegacyHistories(settings)).toBe(0);
+    });
+
     it('uploads paired histories, omits them from settings, and restores them after reload', async () => {
         const settings = {
             chatStateProjectionOwner: 'A',

@@ -90,12 +90,13 @@ import { isRealtimeVisualizationDisabled } from './src/state/realtime-visualizat
 import {
     blockHistoryPersistence,
     cleanupSupersededHistoryFiles,
+    countLegacyHistories,
     hydrateChatHistories,
     hydrateGlobalHistories,
     hydrateProfileHistories,
+    holdLegacyHistories,
     isHistoryPersistenceBlocked,
-    migrateLegacyChatHistories,
-    migrateLegacyProfileHistories,
+    migrateLegacyHistories,
     persistChatHistories,
     persistGlobalHistories,
 } from './src/state/history-file-storage.js';
@@ -1126,19 +1127,76 @@ async function openSettingsPersistenceGate() {
         _startupSavePendingForce = false;
         await Promise.resolve(saveSettings(force));
     }
-    // Old partitions migrate one at a time. A failed upload leaves its arrays in
-    // settings.json, and later saves can retry without losing the old snapshot.
-    const s = getSettings();
-    let migrated = 0;
-    void migrateLegacyChatHistories(s, async () => {
-        migrated++;
-        if (migrated % 5 === 0) await Promise.resolve(saveSettings(true));
-    }).then(() => migrateLegacyProfileHistories(s, async () => {
-        migrated++;
-        if (migrated % 5 === 0) await Promise.resolve(saveSettings(true));
-    })).then(() => {
-        if (migrated % 5) void saveSettings(true);
-    }).catch(error => console.warn('[RPG Tracker] History migration paused:', error));
+}
+
+const HISTORY_MIGRATION_DISMISSED_KEY = 'rpg_tracker_history_migration_dismissed';
+let historyMigrationRunning = false;
+let historyMigrationOfferOpen = false;
+
+async function offerHistoryMigration(fromSettings = false) {
+    if (historyMigrationRunning || historyMigrationOfferOpen || !_settingsPersistenceGateOpen || isHistoryPersistenceBlocked()) return;
+    const settings = getSettings();
+    const count = countLegacyHistories(settings);
+    if (!count) {
+        if (fromSettings) toastr.info('No memo or map histories need migration.', 'RPG Tracker');
+        return;
+    }
+    if (!fromSettings) {
+        try { if (localStorage.getItem(HISTORY_MIGRATION_DISMISSED_KEY)) return; }
+        catch (_) { /* Private browsing may block localStorage. */ }
+    }
+    const body = `<p><strong>${count} saved ${count === 1 ? 'history' : 'histories'}</strong> still live inside settings.json. Moving them into compressed SillyTavern files can substantially reduce settings size and make saves more reliable.</p><p>Each chat keeps a small file reference in settings.json. Existing history stays there until its file upload succeeds. Back up both settings.json and SillyTavern's user/files folder together.</p><p>This may take several minutes on a large installation. You can choose Later and run it from General &amp; Visuals → Core &amp; Branching at any time.</p>`;
+    historyMigrationOfferOpen = true;
+    let choice;
+    try {
+        choice = await SillyTavern.getContext().Popup.show.confirm(
+            'Move memo and map histories to files?', body,
+            { okButton: `Migrate ${count} ${count === 1 ? 'history' : 'histories'}`, cancelButton: 'Later' },
+        );
+    } finally {
+        historyMigrationOfferOpen = false;
+    }
+    if (choice !== 1) {
+        if (!fromSettings) {
+            try { localStorage.setItem(HISTORY_MIGRATION_DISMISSED_KEY, '1'); } catch (_) { /* optional */ }
+        }
+        return;
+    }
+    historyMigrationRunning = true;
+    const button = $('#rpg_tracker_migrate_histories').prop('disabled', true);
+    const toast = toastr.info(`Preparing to migrate ${count} histories…`, 'RPG Tracker', { timeOut: 0, extendedTimeOut: 0, closeButton: false });
+    const showProgress = message => {
+        $(toast).find('.toast-message').text(message);
+        $('#rpg_tracker_migration_status').text(message);
+    };
+    try {
+        const result = await migrateLegacyHistories(settings, async progress => {
+            showProgress(`Migrating memo/map histories: ${progress.completed}/${progress.total} checked, ${progress.migrated} moved.`);
+            if (progress.migrated && progress.completed % 5 === 0) await forceDiskCheckpoint();
+        });
+        if (result.migrated) await forceDiskCheckpoint();
+        if (result.migrated) {
+            try { if (await cleanupSupersededHistoryFiles(settings)) await forceDiskCheckpoint(); }
+            catch (error) { console.warn('[RPG Tracker] History file cleanup deferred:', error); }
+        }
+        const remaining = countLegacyHistories(settings);
+        const message = remaining
+            ? `Moved ${result.migrated} histories. ${remaining} remain in settings.json; use this button to retry.`
+            : `Moved ${result.migrated} histories into SillyTavern files.`;
+        showProgress(message);
+        toastr[remaining ? 'warning' : 'success'](message, 'RPG Tracker');
+        if (!remaining) {
+            try { localStorage.removeItem(HISTORY_MIGRATION_DISMISSED_KEY); } catch (_) { /* optional */ }
+        }
+    } catch (error) {
+        console.error('[RPG Tracker] History migration stopped:', error);
+        showProgress('History migration stopped. Existing data remains in settings.json; retry from settings.');
+        toastr.error('History migration stopped. Retry from settings after checking the console.', 'RPG Tracker');
+    } finally {
+        toastr.clear(toast);
+        button.prop('disabled', false);
+        historyMigrationRunning = false;
+    }
 }
 
 /**
@@ -6364,6 +6422,7 @@ function organizeConnectionSettingsUI() {
 
     {
         const earlySettings = getSettings();
+        holdLegacyHistories(earlySettings);
         applyMapThemeToRoot(earlySettings.mapTheme);
         // Heal displayGroups / prompt-ack before the Prompt Defaults dialog or UI bind.
         // Disk settings.json saves (~12MB) are often cancelled when reloading after code edits;
@@ -8012,6 +8071,10 @@ function organizeConnectionSettingsUI() {
             }
         });
 
+        $('#rpg_tracker_migrate_histories').on('click', function () {
+            void offerHistoryMigration(true);
+        });
+
         $('#rpg_tracker_tutorial_help').on('click', function () {
             openAdventureCompanion();
         });
@@ -8222,6 +8285,7 @@ function organizeConnectionSettingsUI() {
                         _runPromptDefaultsStartupAction = null;
                         void action();
                     }
+                    setTimeout(() => { void offerHistoryMigration(); }, 1500);
                 });
             }, 0);
         };
