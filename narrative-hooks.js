@@ -21,6 +21,7 @@ import { getActiveMapUpdaterSiteRoot, maybeRollbackMapUpdaterForSwipe, runMapUpd
 import { maybeRollbackMapEvolutionForSwipe, maybeRunMapEvolution, stopMapEvolutionPass } from './map-evolution.js';
 import { formatNarratorSiteActivity } from './map-evolution-lib.js';
 import { ensureDungeonMapHistory, previousMapForHistoryArchive, sliceMemoAndMapHistory, syncLiveMemoHistoryAfterSwipe, unshiftMemoAndMapHistory } from './src/state/dungeon-map-history.js';
+import { HISTORY_ENTRY_LIMIT } from './src/state/history-retention.js';
 import { canCommitPassForChat, createChatCommitGuard, chatCommitResult } from './src/state/pass-affinity.js';
 import { logTransaction } from './debug-viewer.js';
 import { recordSchedulerEvent } from './swipe-scheduler-debug.js';
@@ -1950,7 +1951,7 @@ function applyRelationshipSwipeRollback(lastAiMsg, settings) {
                                 newValue: settings.npcRelationshipValues[rb.npcId][rb.field],
                                 source: 'Swipe restore'
                             });
-                            if (settings.npcRelationshipLog[rb.npcId].length > 50) {
+                            if (settings.npcRelationshipLog[rb.npcId].length > HISTORY_ENTRY_LIMIT) {
                                 settings.npcRelationshipLog[rb.npcId].shift();
                             }
                         }
@@ -2252,8 +2253,8 @@ export async function handleRelationshipSwipeChange() {
             timestamp: logTimestamp, field: m.field, delta: m.delta, newValue: newVal, source: 'narrative' 
         });
         
-        if (settings.npcRelationshipLog[resolvedId].length > 50) {
-            settings.npcRelationshipLog[resolvedId].length = 50;
+        if (settings.npcRelationshipLog[resolvedId].length > HISTORY_ENTRY_LIMIT) {
+            settings.npcRelationshipLog[resolvedId].length = HISTORY_ENTRY_LIMIT;
         }
 
         const sign = m.delta > 0 ? '+' : '';
@@ -2352,7 +2353,7 @@ async function applyNarrativeRelationshipRegex(lastAiMsg, settings, ctx, options
         if (!Array.isArray(settings.npcRelationshipLog[resolvedId])) settings.npcRelationshipLog[resolvedId] = [];
         const logTimestamp = Date.now();
         settings.npcRelationshipLog[resolvedId].unshift({ timestamp: logTimestamp, field, delta, newValue, source: 'narrative' });
-        if (settings.npcRelationshipLog[resolvedId].length > 50) settings.npcRelationshipLog[resolvedId].length = 50;
+        if (settings.npcRelationshipLog[resolvedId].length > HISTORY_ENTRY_LIMIT) settings.npcRelationshipLog[resolvedId].length = HISTORY_ENTRY_LIMIT;
 
         lastAiMsg.extra.rpgRollbackData[swipeId].push({ npcId: resolvedId, field, actualAppliedDelta, expectedValue: newValue, logTimestamp });
         lastAiMsg.extra.rpgProcessedTags[swipeId].push(rawTag);
@@ -2445,7 +2446,7 @@ export async function applyStateTrackerRelationshipCommands(commands, options = 
             newValue,
             source: 'state_tracker',
         });
-        if (settings.npcRelationshipLog[resolvedId].length > 50) settings.npcRelationshipLog[resolvedId].length = 50;
+        if (settings.npcRelationshipLog[resolvedId].length > HISTORY_ENTRY_LIMIT) settings.npcRelationshipLog[resolvedId].length = HISTORY_ENTRY_LIMIT;
 
         lastAiMsg.extra = lastAiMsg.extra || {};
         lastAiMsg.extra.rpgRollbackData = lastAiMsg.extra.rpgRollbackData || {};

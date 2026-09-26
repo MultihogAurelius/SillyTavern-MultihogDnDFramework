@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { createContext, runInContext } from 'node:vm';
 import { expect, it, vi } from 'vitest';
 import { canCommitPassForChat } from '../src/state/pass-affinity.js';
+import { HISTORY_ENTRY_LIMIT } from '../src/state/history-retention.js';
 
 it('keeps a new request active when an aborted old request finishes after returning to its chat', async () => {
     const source = readFileSync(new URL('../adventure-companion.js', import.meta.url), 'utf8');
@@ -11,7 +12,7 @@ it('keeps a new request active when an aborted old request finishes after return
     let mode = { history: [] };
     const input = { value: 'first' };
     const context = createContext({
-        _panel: {}, _busy: false, _abort: null, _prefs: {}, AbortController, canCommitPassForChat,
+        _panel: {}, _busy: false, _abort: null, _prefs: {}, AbortController, canCommitPassForChat, HISTORY_ENTRY_LIMIT,
         resolveActiveChatId: () => 'A', activeModePrefs: () => mode,
         chatUiRoot: () => ({ querySelector: id => id === '#rt-tutorial-input' ? input : null }),
         savePrefs() {}, renderTranscript() {}, getMessageEl: () => null, readLookbackFromUi() {},

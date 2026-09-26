@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { createContext, runInContext } from 'node:vm';
+import { HISTORY_ENTRY_LIMIT } from '../src/state/history-retention.js';
 import { describe, expect, it, vi } from 'vitest';
 import { parseAst } from 'rollup/parseAst';
 import * as affinity from '../src/state/pass-affinity.js';
@@ -56,7 +57,7 @@ function harness(phase) {
         reloadWorldInfoEditor: vi.fn(), updateWorldInfoList: () => wait('registry'),
     };
     const context = createContext({
-        ...affinity, AbortController, console: { log() {}, warn() {}, error() {}, info() {} },
+        ...affinity, HISTORY_ENTRY_LIMIT, AbortController, console: { log() {}, warn() {}, error() {}, info() {} },
         getActiveChatId: () => chatId, getLivePrefix: () => chatId,
         getSettings: () => settings, SillyTavern: { getContext: () => ctx },
         toastr: { info() {}, warning() {}, success() {}, error() {} },

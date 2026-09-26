@@ -55,6 +55,7 @@ import {
     DUNGEON_MAP_OPERATION_IDS_KEY,
 } from './dungeon-reality.js';
 import { recordLiveDungeonMapSnapshot } from './src/state/dungeon-map-history.js';
+import { HISTORY_ENTRY_LIMIT, LOREBOOK_ROLLBACK_LIMIT } from './src/state/history-retention.js';
 import { buildHostedPeerSitePath, ensureHostCoreMirror, MAX_HOSTED_MAP_DEPTH, reparentHostedLocationEntries, stampHostedPeerDocument } from './map-hosting.js';
 import { clearEvolutionHistoryForSite, setSiteEvolutionIntervalOverride } from './map-evolution-lib.js';
 import {
@@ -1541,7 +1542,7 @@ export async function runRouterPass(narrativeOutput, manualPrompt = null, custom
             }
             if (!settings.routerHistory) settings.routerHistory = [];
             settings.routerHistory.unshift(snapshot);
-            if (settings.routerHistory.length > 5) settings.routerHistory.length = 5;
+            if (settings.routerHistory.length > LOREBOOK_ROLLBACK_LIMIT) settings.routerHistory.length = LOREBOOK_ROLLBACK_LIMIT;
             recordSchedulerEvent('la_pass_snapshot', {
                 runId: snapshot.runId,
                 preWm: _routerPrePassWatermark,
@@ -3375,7 +3376,7 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
             rename: renameIds,
             reason: action.reason || (settings.routerBasicMode ? "Tag-based update." : "Agent tool update.")
         });
-        if (settings.routerLog.length > 50) settings.routerLog.length = 50;
+        if (settings.routerLog.length > HISTORY_ENTRY_LIMIT) settings.routerLog.length = HISTORY_ENTRY_LIMIT;
 
         // Track campaign lorebooks per chat_id so they auto-activate on chat switch
         if (booksWritten.size > 0) {
@@ -3485,7 +3486,7 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
         if (!settings.npcRelationshipLog[resolvedId]) settings.npcRelationshipLog[resolvedId] = [];
         const relLogTimestamp = Date.now();
         settings.npcRelationshipLog[resolvedId].unshift({ timestamp: relLogTimestamp, field: f, delta, newValue, source: 'agent' });
-        if (settings.npcRelationshipLog[resolvedId].length > 50) settings.npcRelationshipLog[resolvedId].length = 50;
+        if (settings.npcRelationshipLog[resolvedId].length > HISTORY_ENTRY_LIMIT) settings.npcRelationshipLog[resolvedId].length = HISTORY_ENTRY_LIMIT;
         changed = true;
 
         // Record rollback data so a swipe on this AI message can undo this delta (see comment above).
@@ -3790,7 +3791,7 @@ export async function reapplyRouterPass(prePassSnapshot, postPassState) {
         // Step 1: Put the pre-pass snapshot back so the user can undo again
         if (!settings.routerHistory) settings.routerHistory = [];
         settings.routerHistory.unshift(prePassSnapshot);
-        if (settings.routerHistory.length > 5) settings.routerHistory.length = 5;
+        if (settings.routerHistory.length > LOREBOOK_ROLLBACK_LIMIT) settings.routerHistory.length = LOREBOOK_ROLLBACK_LIMIT;
 
         // Re-delete only books the original pass is known to have deleted.
         const prefix = postPassState.campaignPrefix || prePassSnapshot.campaignPrefix || livePrefix;
@@ -4137,6 +4138,7 @@ Output a JSON object:
                 activate: [newId], deactivate: [],
                 reason: `Saved scene: ${data.desc} -> ${lorebookName} (${data.id})`
             });
+            if (settings.routerLog.length > HISTORY_ENTRY_LIMIT) settings.routerLog.length = HISTORY_ENTRY_LIMIT;
             settings.activeRouterKeys.push(newId);
             void saveSettings();
             document.dispatchEvent(new CustomEvent('rt_lore_agent_updated'));

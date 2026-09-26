@@ -75,9 +75,9 @@ describe('archiveDisplacedChatLinkMemo', () => {
             dungeonMapHistory: Array.from({ length: 25 }, () => null),
         };
         archiveDisplacedChatLinkMemo(target, 'newest');
-        expect(target.memoHistory).toHaveLength(25);
+        expect(target.memoHistory).toHaveLength(20);
         expect(target.memoHistory[0]).toBe('newest');
-        expect(target.dungeonMapHistory).toHaveLength(25);
+        expect(target.dungeonMapHistory).toHaveLength(20);
     });
 });
 

@@ -10,6 +10,7 @@ import { runtimeState } from './src/app/runtime-state.js';
 import { isRouterRunning, runRouterPass, sendDirectPrompt } from './src/app/runtime-bridge.js';
 import { isCyoaEnabled, isLorebookAgentRuntimeActive, isLocationMappingEnabled } from './src/state/section-enabled.js';
 import { canCommitPassForChat } from './src/state/pass-affinity.js';
+import { HISTORY_ENTRY_LIMIT } from './src/state/history-retention.js';
 import { formatDungeonMapForPlayer, stripDungeonMapSection } from './dungeon-reality.js';
 import { clampFloatingPanelToViewport, isMobileLayout, makeDraggable, makeResizableBL, makeResizableBR, resolveViewportClampedGeometry } from './ui-geometry.js';
 
@@ -213,7 +214,8 @@ function loadPrefs() {
                 if (Array.isArray(parsed)) {
                     base.companion.history = parsed
                         .filter((m) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
-                        .map((m) => ({ role: m.role, content: m.content }));
+                        .map((m) => ({ role: m.role, content: m.content }))
+                        .slice(-HISTORY_ENTRY_LIMIT);
                 }
             }
             if (legacyLook != null && legacyLook !== '') {
@@ -266,7 +268,8 @@ function mergeModePrefs(base, parsed) {
         ? parsed.history
             .filter((m) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
             .map((m) => ({ role: m.role, content: m.content }))
-        : [...base.history];
+            .slice(-HISTORY_ENTRY_LIMIT)
+        : base.history.slice(-HISTORY_ENTRY_LIMIT);
     return {
         lookback,
         lookbackAll: !!parsed.lookbackAll,
@@ -337,7 +340,7 @@ function snapshotCompanion(companion) {
     return {
         lookback: companion?.lookback ?? 5,
         lookbackAll: !!companion?.lookbackAll,
-        history: JSON.parse(JSON.stringify(companion?.history || [])),
+        history: JSON.parse(JSON.stringify((companion?.history || []).slice(-HISTORY_ENTRY_LIMIT))),
     };
 }
 
@@ -346,7 +349,7 @@ function companionWithPreservedLookback(history) {
     return {
         lookback: _prefs.companion?.lookback ?? 5,
         lookbackAll: !!_prefs.companion?.lookbackAll,
-        history: Array.isArray(history) ? history : [],
+        history: Array.isArray(history) ? history.slice(-HISTORY_ENTRY_LIMIT) : [],
     };
 }
 
@@ -2097,6 +2100,7 @@ async function sendMessage() {
     if (input) input.value = '';
     const mp = activeModePrefs();
     mp.history.push({ role: 'user', content: text });
+    if (mp.history.length > HISTORY_ENTRY_LIMIT) mp.history.splice(0, mp.history.length - HISTORY_ENTRY_LIMIT);
     savePrefs(_prefs);
     renderTranscript();
 
@@ -2157,6 +2161,7 @@ async function sendMessage() {
             return;
         }
         mp.history.push({ role: 'assistant', content: reply });
+        if (mp.history.length > HISTORY_ENTRY_LIMIT) mp.history.splice(0, mp.history.length - HISTORY_ENTRY_LIMIT);
     } catch (err) {
         stillOwnsChat = !controller.signal.aborted && canCommitPassForChat(passChatId, resolveActiveChatId());
         if (!stillOwnsChat) {
@@ -2164,6 +2169,7 @@ async function sendMessage() {
             // append cancel/error noise into the arriving companion session.
         } else if (err?.name === 'AbortError') {
             mp.history.push({ role: 'assistant', content: '(Cancelled.)' });
+            if (mp.history.length > HISTORY_ENTRY_LIMIT) mp.history.splice(0, mp.history.length - HISTORY_ENTRY_LIMIT);
         } else {
             console.error('[CHAT]', err);
             const msg = err?.message || String(err);
@@ -2171,6 +2177,7 @@ async function sendMessage() {
                 role: 'assistant',
                 content: `I could not reach the model. Check Adventure Companion connection settings.\n\n${msg}`,
             });
+            if (mp.history.length > HISTORY_ENTRY_LIMIT) mp.history.splice(0, mp.history.length - HISTORY_ENTRY_LIMIT);
             toastr['error']('CHAT request failed — see conversation.', 'CHAT');
         }
     } finally {

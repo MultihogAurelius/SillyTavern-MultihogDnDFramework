@@ -17,6 +17,19 @@ beforeEach(() => {
 });
 
 describe('Adventure Companion chat partitions', () => {
+    it('keeps only the newest 20 conversation messages when restoring a chat', async () => {
+        const { runtimeState } = await import('../src/app/runtime-state.js');
+        const companion = await import('../adventure-companion.js');
+        runtimeState.currentChatId = 'alpha';
+        const history = Array.from({ length: 50 }, (_, i) => ({ role: i % 2 ? 'assistant' : 'user', content: `message ${i}` }));
+
+        companion.applyAdventureCompanionSnapshot({ history });
+
+        expect(companion.getAdventureCompanionSnapshot().history).toEqual(history.slice(-20));
+        const stored = JSON.parse(localStorage.getItem('rpg_tracker_companion_by_chat_v1'));
+        expect(stored.alpha.history).toEqual(history.slice(-20));
+    });
+
     it('starts an unseen chat with empty history while keeping global lookback prefs', async () => {
         localStorage.setItem('rpg_tracker_chat_prefs_v1', JSON.stringify({
             tutorialMode: false,

@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { createContext, runInContext } from 'node:vm';
 import { describe, expect, it, vi } from 'vitest';
 import { canCommitPassForChat } from '../src/state/pass-affinity.js';
+import { LOREBOOK_ROLLBACK_LIMIT } from '../src/state/history-retention.js';
 
 const source = readFileSync(new URL('../router.js', import.meta.url), 'utf8');
 function functionSource(name, text = source) {
@@ -50,7 +51,7 @@ function harness({ basic = true, pause = 'llm', cleanupEvery = 0 } = {}) {
         rewrite: [{ id: 'A_NPCs::0', content: 'Short chronicle' }], consolidate: [] });
     const context = createContext({
         ...chatAffinity,
-        AbortController, console, canCommitPassForChat, LORE_EXISTENCE_RULE: '',
+        AbortController, console, canCommitPassForChat, LOREBOOK_ROLLBACK_LIMIT, LORE_EXISTENCE_RULE: '',
         getActiveChatId: () => chatId, getLivePrefix: () => chatId,
         getSettings: () => settings, isLocationMappingEnabled: () => false,
         isLorebookAgentRuntimeActive: () => true,

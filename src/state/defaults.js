@@ -331,7 +331,7 @@ export function buildDefaultSettings() {
 
         npcRelationshipValues: {},
 
-        npcRelationshipLog: {},      // { [fullId]: [{timestamp,field,delta,newValue,source}] } — capped 50/NPC
+        npcRelationshipLog: {},      // { [fullId]: [{timestamp,field,delta,newValue,source}] } — capped 20/NPC
 
         experimentalNpcImport: true,
 

@@ -4,13 +4,22 @@
  * LIVE writes the matching [MAP] section back to the Locations lorebook.
  */
 
-export const MEMO_HISTORY_LIMIT = 25;
+export const MEMO_HISTORY_LIMIT = 20;
 
 /** Keep recent memo/map pairs, retaining an older LIVE pair in the final slot. */
 export function trimMemoAndMapHistory(settings, max = MEMO_HISTORY_LIMIT) {
-    if (!Array.isArray(settings?.memoHistory)) return false;
+    if (!Array.isArray(settings?.memoHistory)) {
+        if (!Array.isArray(settings?.dungeonMapHistory) || !settings.dungeonMapHistory.length) return false;
+        settings.dungeonMapHistory = [];
+        return true;
+    }
     const limit = Number.isInteger(max) && max > 0 ? max : MEMO_HISTORY_LIMIT;
-    if (settings.memoHistory.length <= limit) return false;
+    if (settings.memoHistory.length <= limit) {
+        const oldMaps = Array.isArray(settings.dungeonMapHistory) ? settings.dungeonMapHistory : [];
+        if (oldMaps.length === settings.memoHistory.length && Array.isArray(settings.dungeonMapHistory)) return false;
+        settings.dungeonMapHistory = Array.from({ length: settings.memoHistory.length }, (_, index) => oldMaps[index] ?? null);
+        return true;
+    }
     const liveIndex = getLiveHistoryIndex(settings);
     const maps = Array.isArray(settings.dungeonMapHistory) ? settings.dungeonMapHistory : [];
     const indices = Array.from({ length: limit }, (_, index) => index);

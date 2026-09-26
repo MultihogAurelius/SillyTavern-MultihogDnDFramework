@@ -2,6 +2,7 @@ import * as chatAffinity from '../src/state/pass-affinity.js';
 import { readFileSync } from 'node:fs';
 import { createContext, runInContext } from 'node:vm';
 import { describe, expect, it, vi } from 'vitest';
+import { HISTORY_ENTRY_LIMIT } from '../src/state/history-retention.js';
 
 const source = readFileSync(new URL('../router.js', import.meta.url), 'utf8');
 function deferred() { let resolve; const promise = new Promise(done => { resolve = done; }); return { promise, resolve }; }
@@ -23,7 +24,7 @@ describe('World Progression action commit ownership', () => {
         const activate = vi.fn(() => wait('activate'));
         const persist = vi.fn();
         const context = createContext({
-        ...chatAffinity,
+        ...chatAffinity, HISTORY_ENTRY_LIMIT,
             getSettings: () => settings, getActiveChatId: () => ownsChat ? 'A' : 'B',
             SillyTavern: { getContext: () => ({ loadWorldInfo: load, saveWorldInfo: cache,
                 updateWorldInfoList: () => wait('registry'), executeSlashCommandsWithOptions: activate }) },
