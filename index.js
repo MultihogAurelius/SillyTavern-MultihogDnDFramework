@@ -68,7 +68,7 @@ import { cloneCampaignStackToPrefix } from './src/features/chat/clone-campaign-s
 import { branchCampaignChat, isBranchSeedInProgress } from './src/features/chat/branch-campaign.js';
 import { onChatRenamedMigrate } from './src/features/chat/chat-rename-migrate.js';
 import { offerOrphanedLorebookPurge, orphanedLorebooksForDeletedChat } from './src/features/chat/purge-orphaned-lorebooks.js';
-import { existingChatIds, orphanedStoredChatIds, removeDeletedChatData } from './src/features/chat/deleted-chat-data.js';
+import { characterChatsListFromApi, existingChatIds, orphanedStoredChatIds, removeDeletedChatData } from './src/features/chat/deleted-chat-data.js';
 import { archiveDisplacedChatLinkMemo, repairChatLinkMemoHistory } from './src/features/chat/chat-link-conflict.js';
 import {
     COMPANION_BY_CHAT_KEY,
@@ -611,8 +611,9 @@ async function listExistingSillyTavernChatIds() {
     // The simple character listing includes filenames without reading contents.
     for (const character of characters) {
         if (!character?.avatar) throw new Error('Character without avatar in chat listing');
-        const chats = await post('/api/characters/chats', { avatar_url: character.avatar, simple: true });
-        if (!Array.isArray(chats)) throw new Error('Invalid character chat list');
+        const chats = characterChatsListFromApi(
+            await post('/api/characters/chats', { avatar_url: character.avatar, simple: true }),
+        );
         for (const chat of chats) {
             if (chat?.file_id) ids.add(String(chat.file_id));
         }

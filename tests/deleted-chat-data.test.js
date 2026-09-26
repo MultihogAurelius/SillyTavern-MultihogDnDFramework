@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { existingChatIds, orphanedStoredChatIds, removeDeletedChatData, storedChatIds } from '../src/features/chat/deleted-chat-data.js';
+import { characterChatsListFromApi, existingChatIds, orphanedStoredChatIds, removeDeletedChatData, storedChatIds } from '../src/features/chat/deleted-chat-data.js';
 import { COMPANION_BY_CHAT_KEY, MEMO_RECOVERY_KEY } from '../src/features/chat/local-chat-map.js';
 
 describe('deleted chat data cleanup', () => {
@@ -17,6 +17,13 @@ describe('deleted chat data cleanup', () => {
         expect(() => existingChatIds({ error: true })).toThrow();
         expect(orphanedStoredChatIds(settings, new Set(['Active']))).toEqual(['Deleted']);
         expect(() => orphanedStoredChatIds(settings, [])).toThrow();
+    });
+
+    it('treats ST { error: true } character-chat listings as empty, not fatal', () => {
+        expect(characterChatsListFromApi({ error: true })).toEqual([]);
+        expect(characterChatsListFromApi([{ file_id: 'ChatA' }])).toEqual([{ file_id: 'ChatA' }]);
+        expect(() => characterChatsListFromApi({ oops: true })).toThrow(/Invalid character chat list/);
+        expect(() => characterChatsListFromApi(null)).toThrow(/Invalid character chat list/);
     });
 
     it('removes only the deleted chat’s partition, snapshots and local records', () => {
