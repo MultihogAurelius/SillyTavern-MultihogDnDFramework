@@ -5,6 +5,7 @@
  */
 
 import { MODULE_NAME } from './schema-sections.js';
+import { historyFileId, sha256Hex } from './history-crypto.js';
 
 const FILE_PREFIX = 'multihog_history_';
 const FORMAT_VERSION = 2;
@@ -45,8 +46,11 @@ async function compressedBytes(text) {
 
 async function digest(text) {
     const bytes = new TextEncoder().encode(text);
-    const hash = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
-    return Array.from(hash, byte => byte.toString(16).padStart(2, '0')).join('');
+    if (globalThis.crypto?.subtle?.digest) {
+        const hash = new Uint8Array(await globalThis.crypto.subtle.digest('SHA-256', bytes));
+        return Array.from(hash, byte => byte.toString(16).padStart(2, '0')).join('');
+    }
+    return sha256Hex(bytes);
 }
 
 function evolutionRecord(part, key) {
@@ -234,7 +238,7 @@ export async function persistGlobalHistories(settings) {
         }
         // Never overwrite the file named by a settings.json pointer. A reload
         // between upload and settings save must still be able to read that file.
-        const url = await uploadJson(`${FILE_PREFIX}${crypto.randomUUID()}`, json);
+        const url = await uploadJson(`${FILE_PREFIX}${historyFileId()}`, json);
         settings.globalHistoryStorage = { version: FORMAT_VERSION, url, sha256 };
         protectFile(url);
         if (historyJson(settings) === json) concealHistories(settings);
@@ -277,7 +281,7 @@ export function persistChatHistories(settings, chatId) {
                 if (settings.chatStateProjectionOwner === chatId && historyJson(settings) === json) concealHistories(settings);
                 return changed;
             }
-            const url = await uploadJson(`${FILE_PREFIX}${crypto.randomUUID()}`, json);
+            const url = await uploadJson(`${FILE_PREFIX}${historyFileId()}`, json);
             const current = settings.chatStates?.[chatId];
             if (!current) return changed;
             current.historyStorage = { version: FORMAT_VERSION, owner: chatId, url, sha256 };

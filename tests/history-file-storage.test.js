@@ -131,6 +131,40 @@ describe('file-backed histories', () => {
         expect(saved.chatStates.A.dungeonMapHistory).toEqual([{ map: 1 }, null]);
     });
 
+    it('loads and saves a chat over plain HTTP without subtle or randomUUID', async () => {
+        let nextByte = 0;
+        vi.stubGlobal('crypto', { getRandomValues: bytes => {
+            for (let i = 0; i < bytes.length; i++) bytes[i] = nextByte++ & 0xff;
+            return bytes;
+        } });
+        const settings = { chatStateProjectionOwner: 'A', chatStates: {
+            A: { memoHistory: ['first memo'], dungeonMapHistory: [{ map: 'old' }] },
+            B: { memoHistory: ['other chat memo'], dungeonMapHistory: [null] },
+        } };
+        expect(await persistChatHistories(settings, 'A')).toBe(true);
+        expect(await persistChatHistories(settings, 'B')).toBe(true);
+        const saved = JSON.parse(JSON.stringify(settings));
+        const pointer = saved.chatStates.A.historyStorage;
+        expect(pointer.sha256).toBe(createHash('sha256').update(JSON.stringify({
+            version: 2,
+            memoHistory: ['first memo'],
+            dungeonMapHistory: [{ map: 'old' }],
+            mapEvolutionBacklogBySite: {},
+            mapEvolutionThreadsBySite: {},
+            mapEvolutionWorldReportApplications: {},
+        })).digest('hex'));
+        expect(await hydrateChatHistories(saved, 'A')).toBe(true);
+        expect(saved.chatStates.A.memoHistory).toEqual(['first memo']);
+        expect(await hydrateChatHistories(saved, 'B')).toBe(true);
+        expect(saved.chatStates.B.memoHistory).toEqual(['other chat memo']);
+        saved.chatStates.A.memoHistory.unshift('new memo');
+        expect(await persistChatHistories(saved, 'A')).toBe(true);
+        expect(saved.chatStates.A.historyStorage.url).not.toBe(pointer.url);
+        const reloaded = JSON.parse(JSON.stringify(saved));
+        expect(await hydrateChatHistories(reloaded, 'A')).toBe(true);
+        expect(reloaded.chatStates.A.memoHistory).toEqual(['new memo', 'first memo']);
+    });
+
     it('keeps legacy arrays in settings if upload fails', async () => {
         const settings = { chatStateProjectionOwner: 'A', memoHistory: ['memo'], dungeonMapHistory: [null],
             chatStates: { A: { memoHistory: ['memo'], dungeonMapHistory: [null] } } };

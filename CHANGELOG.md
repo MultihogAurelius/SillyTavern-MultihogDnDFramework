@@ -2,6 +2,11 @@
 
 All notable changes to the **Multihog D&D Framework** will be documented in this file.
 
+## [2026.9.25] - 2026-09-27
+
+### Fixed
+- File-backed memo, map, and Map Evolution history now loads and saves from phones or other browsers connected over plain HTTP on a local network. Chat switching can restore each chat's own history without browser APIs that are reserved for secure contexts.
+
 ## [2026.8.97] - 2026-09-25
 
 ### Fixed
