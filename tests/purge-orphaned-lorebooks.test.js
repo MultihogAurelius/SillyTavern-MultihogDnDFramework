@@ -86,6 +86,24 @@ describe('purging lorebooks after chat deletion', () => {
         expect(deleteBook).not.toHaveBeenCalled();
     });
 
+    it('stops deleting when the chat filename is recreated mid-loop', async () => {
+        const deleteBook = vi.fn(async () => true);
+        const settings = { chatStates: { Old: { campaignBooks: ['Old_NPCs', 'Old_Locations', 'Old_World'] } } };
+        let checks = 0;
+        const result = await offerOrphanedLorebookPurge('Old', {
+            listNames: async () => ['Old_NPCs', 'Old_Locations', 'Old_World'],
+            getSettings: () => settings,
+            confirm: async () => true,
+            // Post-confirm check + first book OK; recreate before the second book.
+            canDelete: async () => (++checks) < 3,
+            deleteBook,
+        });
+        expect(deleteBook).toHaveBeenCalledTimes(1);
+        expect(deleteBook).toHaveBeenCalledWith('Old_NPCs');
+        expect(result.deleted).toEqual(['Old_NPCs']);
+        expect(result.failed).toEqual([]);
+    });
+
     it('rechecks ownership after confirmation and reports per-book failures', async () => {
         const settings = { chatStates: { Old: { campaignBooks: ['Old_NPCs', 'Old_World'] } } };
         const deleteBook = vi.fn(async name => name === 'Old_World');

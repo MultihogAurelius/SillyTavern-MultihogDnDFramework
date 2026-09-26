@@ -71,12 +71,14 @@ export async function offerOrphanedLorebookPurge(chatId, deps) {
         return { offered: candidates, deleted: [], failed: [] };
     }
 
-    // The popup can remain open while another chat claims a book. Check again
-    // against fresh settings and the backend before each irreversible deletion.
+    // The popup can remain open while another chat is recreated or claims a book.
+    // Recheck ST existence and Multihog ownership before each irreversible deletion
+    // (batch cleanOrphanedChatRecords already rechecks per book the same way).
     const deleted = [];
     const failed = [];
     for (const name of candidates) {
         try {
+            if (deps.canDelete && !await deps.canDelete(chatId)) break;
             const currentNames = await deps.listNames();
             if (!orphanedLorebooksForDeletedChat(deps.getSettings(), chatId, currentNames, await deps.getProtectedNames?.() || []).includes(name)) continue;
             if (await deps.deleteBook(name)) deleted.push(name);
