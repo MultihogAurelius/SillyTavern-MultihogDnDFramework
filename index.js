@@ -87,6 +87,18 @@ import { captureXpGainAnimationState, playXpGainAnimation } from './src/ui/panel
 import { captureBarChangeAnimationState, playBarChangeAnimations } from './src/ui/panel/bar-change-animation.js';
 import { buildCombatDisplayMemo } from './src/state/combat-persistence.js';
 import { isRealtimeVisualizationDisabled } from './src/state/realtime-visualization-guard.js';
+import {
+    blockHistoryPersistence,
+    cleanupSupersededHistoryFiles,
+    hydrateChatHistories,
+    hydrateGlobalHistories,
+    hydrateProfileHistories,
+    isHistoryPersistenceBlocked,
+    migrateLegacyChatHistories,
+    migrateLegacyProfileHistories,
+    persistChatHistories,
+    persistGlobalHistories,
+} from './src/state/history-file-storage.js';
 import { normalizeActivePersonaIdentity } from './src/state/player-identity.js';
 import { replacePromptArray, stripSupersededChoicesFromChatPrompt, stripSupersededChoicesFromTextPromptMessages } from './src/features/cyoa-prompt-history.js';
 import { DEFAULT_MAP_ARCHITECT_SYSTEM_PROMPT } from './map-architect-prompt.js';
@@ -680,6 +692,8 @@ async function cleanDeletedChatRecords(chatId) {
     const changed = removeDeletedChatData(settings, chatId);
     if (changed) {
         await saveSettings(true);
+        try { if (await cleanupSupersededHistoryFiles(settings)) await saveSettings(true); }
+        catch (error) { console.warn('[RPG Tracker] Could not remove orphaned history file:', error); }
         for (const path of portraitPaths) {
             if (countPortraitPathRefs(settings, path) === 0) await deletePortraitFile(path);
         }
@@ -743,6 +757,8 @@ async function cleanOrphanedChatRecords(plannedIds) {
     }
     if (cleaned) {
         await saveSettings(true);
+        try { if (await cleanupSupersededHistoryFiles(settings)) await saveSettings(true); }
+        catch (error) { console.warn('[RPG Tracker] Could not remove orphaned history files:', error); }
         for (const path of portraitPaths) {
             if (countPortraitPathRefs(settings, path) === 0) await deletePortraitFile(path);
         }
@@ -1104,12 +1120,25 @@ function markStartupChatProjectionReady(chatId) {
 async function openSettingsPersistenceGate() {
     if (_settingsPersistenceGateOpen) return;
     _settingsPersistenceGateOpen = true;
-    if (!_startupSavePending) return;
-
-    const force = _startupSavePendingForce;
-    _startupSavePending = false;
-    _startupSavePendingForce = false;
-    await Promise.resolve(saveSettings(force));
+    if (_startupSavePending) {
+        const force = _startupSavePendingForce;
+        _startupSavePending = false;
+        _startupSavePendingForce = false;
+        await Promise.resolve(saveSettings(force));
+    }
+    // Old partitions migrate one at a time. A failed upload leaves its arrays in
+    // settings.json, and later saves can retry without losing the old snapshot.
+    const s = getSettings();
+    let migrated = 0;
+    void migrateLegacyChatHistories(s, async () => {
+        migrated++;
+        if (migrated % 5 === 0) await Promise.resolve(saveSettings(true));
+    }).then(() => migrateLegacyProfileHistories(s, async () => {
+        migrated++;
+        if (migrated % 5 === 0) await Promise.resolve(saveSettings(true));
+    })).then(() => {
+        if (migrated % 5) void saveSettings(true);
+    }).catch(error => console.warn('[RPG Tracker] History migration paused:', error));
 }
 
 /**
@@ -1141,6 +1170,7 @@ async function resolveCoreSaveSettings() {
  * @returns {Promise<void>}
  */
 async function forceDiskCheckpoint() {
+    if (isHistoryPersistenceBlocked()) throw new Error('File-backed history could not be loaded; reload before saving');
     if (typeof globalThis._rpgFlushRawMemoChanges === 'function') {
         globalThis._rpgFlushRawMemoChanges();
     }
@@ -1148,8 +1178,12 @@ async function forceDiskCheckpoint() {
     markMemoPersistedByCurrentBrowser(s);
     const chatId = runtimeState.currentChatId || SillyTavern.getContext()?.chatId || null;
     snapshotPortraitMapsForChat(s, chatId);
+    let historyChanged = false;
     if (s.chatLinkEnabled && chatId) {
         saveChatState(chatId, { skipDiskWrite: true });
+        historyChanged = await persistChatHistories(s, chatId);
+    } else if (!s.chatLinkEnabled) {
+        historyChanged = await persistGlobalHistories(s);
     }
     snapshotMemoToLocalStorage(chatId, { force: true });
     s.memoPersistedAt = Date.now();
@@ -1158,6 +1192,10 @@ async function forceDiskCheckpoint() {
         throw new Error('Core saveSettings() could not be loaded');
     }
     await saveFn();
+    if (historyChanged) {
+        try { if (await cleanupSupersededHistoryFiles(s)) await saveFn(); }
+        catch (error) { console.warn('[RPG Tracker] Old history file cleanup deferred:', error); }
+    }
     snapshotMemoToLocalStorage(chatId, { force: true });
 }
 
@@ -1167,6 +1205,7 @@ async function forceDiskCheckpoint() {
  * @returns {Promise<void>|void}
  */
 export function saveSettings(force = false, delay = 0) {
+    if (isHistoryPersistenceBlocked()) return;
     // Keep UI synchronization immediate so toggle checkboxes and forms respond instantly
     syncOnboardingUI();
 
@@ -1218,11 +1257,14 @@ export function saveSettings(force = false, delay = 0) {
                 const ctx = SillyTavern.getContext();
                 const activeChatId = runtimeState.currentChatId || ctx.chatId;
                 snapshotPortraitMapsForChat(s, activeChatId);
+                let historyChanged = false;
                 // Snapshot chat-linked state into extension settings before persisting to disk.
                 if (s.chatLinkEnabled && activeChatId && !isPortraitMigrationLocked()) {
                     saveChatState(activeChatId, { skipDiskWrite: true });
+                    historyChanged = await persistChatHistories(s, activeChatId);
                 } else {
                     writeModuleSchemaBackup(activeChatId);
+                    if (!s.chatLinkEnabled) historyChanged = await persistGlobalHistories(s);
                 }
                 // Mirror the live memo into localStorage on every save cycle — regardless of
                 // chatLinkEnabled — so a lost/raced disk write is recoverable at next boot.
@@ -1232,9 +1274,15 @@ export function saveSettings(force = false, delay = 0) {
                 s.memoPersistedAt = Date.now();
                 // Sync WAL for displayGroups / prompt-ack — survives cancelled saves on code-edit reload.
                 stampCriticalSettingsSynced(s, writeCriticalSettingsBackup(s));
-                if (useForce) {
+                if (useForce || historyChanged) {
                     const saveFn = await resolveCoreSaveSettings();
-                    if (saveFn) await saveFn();
+                    if (saveFn) {
+                        await saveFn();
+                        if (historyChanged) {
+                            try { if (await cleanupSupersededHistoryFiles(s)) await saveFn(); }
+                            catch (error) { console.warn('[RPG Tracker] Old history file cleanup deferred:', error); }
+                        }
+                    }
                     else ctx.saveSettingsDebounced();
                 } else {
                     ctx.saveSettingsDebounced();
@@ -2599,7 +2647,8 @@ function syncRouterPrefixDisplays(raw) {
  * this is a new/unseen chat (no saved state).
  * @param {string} newChatId
  */
-function onChatChanged(newChatId) {
+async function onChatChanged(newChatId) {
+    if (isHistoryPersistenceBlocked()) return;
     const s = getSettings();
     const ctx = SillyTavern.getContext();
 
@@ -2637,6 +2686,7 @@ function onChatChanged(newChatId) {
     const isDeferredBootAttachment = !_startupChatProjectionReady && !oldChatId;
     if (isDeferredBootAttachment
         && s.chatLinkEnabled
+        && !s.chatStates?.[resolvedId]?.historyStorage
         && shouldPreserveLiveChatStateOnBoot(s, resolvedId)) {
         saveChatState(resolvedId, { skipDiskWrite: true });
         console.warn('[RPG Tracker] Preserved live tracker state during deferred boot chat attachment:', resolvedId);
@@ -2684,15 +2734,32 @@ function onChatChanged(newChatId) {
     // Redo stack is in-memory and chat-scoped; never replay another chat's pass here.
     runtimeState.loreRedoStack = [];
 
-    runtimeState.currentChatId = resolvedId;
-    const ownsChat = createChatCommitGuard(resolvedId, getActiveChatId);
-    runtimeState.hasActiveDungeonMap = false;
-
     // Snapshot the departing chat's state BEFORE resetRouterTick mutates shared pools.
     // resetRouterTick(true) zeroes keywordActivatedKeys in-place; if saveChatState ran
     // after that, the yellow-pill keyword state for the departing chat would be lost.
     // Guard matches the later chatLinkEnabled block so we only persist when linking is on.
     if (s.chatLinkEnabled && oldChatId) saveChatState(oldChatId, { skipDiskWrite: true });
+
+    // A file-backed arriving partition must be hydrated before its synchronous
+    // loadChatState projection. Keep the old owner in place while fetching so
+    // an overlapping switch cannot snapshot the old memo under the new chat.
+    if (s.chatLinkEnabled && s.chatStates?.[resolvedId]?.historyStorage
+        && !Array.isArray(s.chatStates[resolvedId].memoHistory)) {
+        const hydrated = await hydrateChatHistories(s, resolvedId);
+        if (!hydrated) {
+            blockHistoryPersistence();
+            toastr.error(`Could not load Multihog history for ${resolvedId}. Reload or restore the history file before editing.`, 'RPG Tracker');
+            return;
+        }
+        if ((SillyTavern.getContext().getCurrentChatId?.() || SillyTavern.getContext().chatId) !== resolvedId) return;
+    }
+
+    runtimeState.currentChatId = resolvedId;
+    const ownsChat = createChatCommitGuard(resolvedId, getActiveChatId);
+    runtimeState.hasActiveDungeonMap = false;
+    if (s.chatLinkEnabled && oldChatId) {
+        void persistChatHistories(s, oldChatId).then(changed => { if (changed) void saveSettings(true); });
+    }
 
     // Reset the run-every tick so the agent fires promptly on the first generation of each chat.
     // Only clear keyword-activated lore when actually switching to a different chat.
@@ -3701,10 +3768,14 @@ export async function sendDirectPrompt(message, options = {}) {
 
 
 /** Profile system — load a named profile into live settings. */
-function loadProfile(name) {
+async function loadProfile(name) {
     const s = getSettings();
     const p = s.profiles?.[name];
     if (!p) return;
+    if (p.historyStorage && !await hydrateProfileHistories(s, name)) {
+        toastr.error(`Could not load the saved history for profile "${name}".`, 'RPG Tracker');
+        return false;
+    }
     repairChatLinkMemoHistory(p);
     trimMemoAndMapHistory(p);
     s.currentMemo = p.currentMemo ?? '';
@@ -6372,6 +6443,9 @@ function organizeConnectionSettingsUI() {
         });
 
         const settings = getSettings();
+        if (!settings.chatLinkEnabled && settings.globalHistoryStorage && !await hydrateGlobalHistories(settings)) {
+            throw new Error('Could not load the file-backed global memo/map history; persistence remains closed');
+        }
         syncMapThemeUi(settings);
         bindMapThemeControls();
         bindCharacterCreationConnectionSettings(getSettingsOverlayRoot() || document.querySelector('.rpg-tracker-settings'));
@@ -8029,6 +8103,10 @@ function organizeConnectionSettingsUI() {
         // Bootstrap: restore state for whichever chat is already open (before CHAT_CHANGED can fire).
         sanitizeRouterState(settings);
         const bootChatId = ctx.chatId || ctx.getCurrentChatId?.() || null;
+        if (bootChatId && settings.chatLinkEnabled && settings.chatStates?.[bootChatId]?.historyStorage
+            && !await hydrateChatHistories(settings, bootChatId)) {
+            throw new Error(`Could not load file-backed memo/map history for ${bootChatId}; persistence remains closed`);
+        }
         runtimeState.currentChatId = bootChatId;
         const migratedPortraitScope = migrateLegacyPortraitMapsToChat(settings, bootChatId);
         if (bootChatId && !settings.chatLinkEnabled) {
@@ -8088,7 +8166,8 @@ function organizeConnectionSettingsUI() {
             // Never expose an empty transient projection during that window. If the
             // active partition is missing, empty, or older/poorer than the already
             // visible live state, seed it from live memory instead of clearing it.
-            const preserveLiveBootState = shouldPreserveLiveChatStateOnBoot(settings, bootChatId);
+            const preserveLiveBootState = !settings.chatStates?.[bootChatId]?.historyStorage
+                && shouldPreserveLiveChatStateOnBoot(settings, bootChatId);
             const restoredBootChat = preserveLiveBootState ? false : loadChatState(bootChatId);
             if (preserveLiveBootState || (!restoredBootChat && !settings.chatStates?.[bootChatId])) {
                 saveChatState(bootChatId, { skipDiskWrite: true });
@@ -12568,12 +12647,11 @@ RULES:
             toastr['success'](`Profile "${name}" saved.`, 'RPG Tracker');
         });
 
-        $('#rpg_tracker_profile_load').on('click', function () {
+        $('#rpg_tracker_profile_load').on('click', async function () {
             const sel = /** @type {HTMLSelectElement} */ (document.getElementById('rpg_tracker_profile_select'));
             const name = sel.value;
             if (!name) return toastr['info']('No profile selected.', 'RPG Tracker');
-            loadProfile(name);
-            toastr['success'](`Profile "${name}" loaded.`, 'RPG Tracker');
+            if (await loadProfile(name) !== false) toastr['success'](`Profile "${name}" loaded.`, 'RPG Tracker');
         });
 
         $('#rpg_tracker_profile_delete').on('click', async function () {
@@ -12589,7 +12667,7 @@ RULES:
                 if (!confirm(`Delete profile "${name}"?`)) return;
             }
 
-            deleteProfile(name);
+            await deleteProfile(name);
             refreshProfileDropdown();
             toastr['success'](`Profile "${name}" deleted.`, 'RPG Tracker');
         });

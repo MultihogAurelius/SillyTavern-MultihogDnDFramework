@@ -93,6 +93,10 @@ Together they solve the four core problems of LLM tabletop RP: the AI forgetting
 2. Click on "Install extension" at the top.
 3. Enter this repo's URL.
 
+### Memo and map history storage
+
+The extension stores memo and dungeon-map histories as compressed files in SillyTavern's `data/<user>/user/files/` directory. Existing histories migrate after the extension finishes loading; `settings.json` keeps only file references and checksums. This uses SillyTavern's built-in file API and needs no server plugin or download step. Back up both `settings.json` and the `user/files` directory to preserve history. The internal files appear as disabled attachments; leave them in place while their chats exist.
+
 ## Usage Guide
 
 1. **Initial Setup:** Use the archetype buttons on the empty tracker to roll a new character, or paste an existing sheet into the "Raw View" (if your sheet doesn't align with what the UI expects, ask the model via 💬 to fix the formatting). Create a character card for your "narrator," such as Simulation Engine that I use. You can also name it something like Game Master.

@@ -47,11 +47,11 @@ describe('startup settings persistence gate', () => {
 
     it('never lets saveChatState bypass the centralized startup gate', () => {
         const saveStart = chatPersistenceSource.indexOf('export function saveChatState(chatId, opts = {})');
-        const saveEnd = chatPersistenceSource.indexOf('\n}', chatPersistenceSource.indexOf('void requestSettingsSave()', saveStart));
+        const saveEnd = chatPersistenceSource.indexOf('\n}', chatPersistenceSource.indexOf('void requestSettingsSave(true)', saveStart));
         const body = chatPersistenceSource.slice(saveStart, saveEnd);
 
         expect(saveStart).toBeGreaterThan(-1);
-        expect(body).toContain('void requestSettingsSave()');
+        expect(body).toContain('void persistChatHistories(s, chatId).then(() => { void requestSettingsSave(true); });');
         expect(body).not.toContain('ctx.saveSettings(');
         expect(body).not.toContain('ctx.saveSettingsDebounced(');
     });

@@ -76,6 +76,10 @@ export function copyChatStatePartition(s, oldId, newId, newPrefix, bookRenameMap
         throw new Error(`No Multihog chat state found for "${oldId}".`);
     }
     const copy = JSON.parse(JSON.stringify(source));
+    // File-backed arrays are non-enumerable in settings, but a new branch must
+    // start with the source's actual history rather than an empty projection.
+    if (Array.isArray(source.memoHistory)) copy.memoHistory = JSON.parse(JSON.stringify(source.memoHistory));
+    if (Array.isArray(source.dungeonMapHistory)) copy.dungeonMapHistory = JSON.parse(JSON.stringify(source.dungeonMapHistory));
     // Branches own newly cloned books, so the source's rename pin must not follow.
     delete copy.renamedCampaignPrefix;
     if (newPrefix) copy.routerCampaignPrefix = newPrefix;

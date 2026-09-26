@@ -5,6 +5,7 @@
 import { DEFAULT_STOCK_PROMPTS, BLOCK_ORDER } from '../../constants.js';
 import { getSettings } from './settings.js';
 import { saveSettings } from '../app/runtime-bridge.js';
+import { cleanupSupersededHistoryFiles, isHistoryPersistenceBlocked, persistProfileHistories } from './history-file-storage.js';
 
 export function snapshotStockPromptsForProfile(stockPrompts) {
     return {
@@ -34,6 +35,7 @@ export function loadStockPromptsFromProfile(profileStockPrompts) {
  * @param {string} name
  */
 export function saveProfile(name) {
+    if (isHistoryPersistenceBlocked()) return;
     const s = getSettings();
     if (!name) return;
     if (!s.profiles) s.profiles = {};
@@ -41,6 +43,7 @@ export function saveProfile(name) {
         currentMemo: s.currentMemo,
         memoHistory: JSON.parse(JSON.stringify(s.memoHistory)),
         dungeonMapHistory: JSON.parse(JSON.stringify(s.dungeonMapHistory || [])),
+        historyStorage: s.profiles[name]?.historyStorage,
         modules: JSON.parse(JSON.stringify(s.modules)),
         blockOrder: JSON.parse(JSON.stringify(s.blockOrder || BLOCK_ORDER)),
         stockPrompts: snapshotStockPromptsForProfile(s.stockPrompts),
@@ -216,19 +219,25 @@ export function saveProfile(name) {
         gameSystemWizardSystemPrompt: s.gameSystemWizardSystemPrompt || "",
     };
     s.activeProfile = name;
-    void saveSettings();
+    if (!s.profiles[name].historyStorage) delete s.profiles[name].historyStorage;
+    void persistProfileHistories(s, name).then(() => saveSettings());
 }
 
 /**
  * Deletes a named profile slot.
  * @param {string} name
  */
-export function deleteProfile(name) {
+export async function deleteProfile(name) {
     const s = getSettings();
     if (!s.profiles?.[name]) return;
     delete s.profiles[name];
     if (s.activeProfile === name) s.activeProfile = '';
-    void saveSettings();
+    await Promise.resolve(saveSettings(true));
+    try {
+        if (await cleanupSupersededHistoryFiles(s)) await Promise.resolve(saveSettings(true));
+    } catch (error) {
+        console.warn('[RPG Tracker] Could not remove deleted profile history file:', error);
+    }
 }
 
 /**

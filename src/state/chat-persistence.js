@@ -8,6 +8,7 @@ import { getSettings, stripChatStateGlobalUiPrefs } from './settings.js';
 import { snapshotStockPromptsForProfile } from './profiles.js';
 import { snapshotChatSetup } from './chat-setup.js';
 import { saveSettings as requestSettingsSave } from '../app/runtime-bridge.js';
+import { isHistoryPersistenceBlocked, persistChatHistories } from './history-file-storage.js';
 
 // Kept only so legacy recovery code can be re-enabled deliberately. Normal tracker
 // operation must not create or consume a browser-local recovery copy.
@@ -467,6 +468,7 @@ export function applyModuleSchemaBackup(preferredChatId, backupOverride = null) 
 
 export function saveChatState(chatId, opts = {}) {
     if (!chatId) return;
+    if (isHistoryPersistenceBlocked()) return;
     if (typeof globalThis._rpgPortraitMigrationLocked === 'function' && globalThis._rpgPortraitMigrationLocked()) {
         return;
     }
@@ -495,6 +497,9 @@ export function saveChatState(chatId, opts = {}) {
         memoPersistedBy: s.memoPersistedBy || null,
         memoHistory:  JSON.parse(JSON.stringify(s.memoHistory)),
         dungeonMapHistory: JSON.parse(JSON.stringify(s.dungeonMapHistory || [])),
+        // The file reference follows chat renames; branch copies get their own
+        // file on first write because historyStorage.owner remains the source id.
+        historyStorage: existing.historyStorage,
         lastDelta:    s.lastDelta || '',
         customPortraits: JSON.parse(JSON.stringify(s.customPortraits || {})),
         customLocationImages: JSON.parse(JSON.stringify(s.customLocationImages || {})),
@@ -611,6 +616,7 @@ export function saveChatState(chatId, opts = {}) {
             return existing.adventureCompanion || liveSnap || null;
         })(),
     };
+    if (!existing.historyStorage) delete s.chatStates[chatId].historyStorage;
 
     // Sync WAL before the async disk write — survives F5 if /api/settings/save is cancelled.
     writeModuleSchemaBackup(chatId);
@@ -622,5 +628,5 @@ export function saveChatState(chatId, opts = {}) {
     // the gate and write a boot-time Chat Link projection later. When called from
     // our saveSettings(), skipDiskWrite also avoids a duplicate in-flight save.
     if (opts.skipDiskWrite) return;
-    void requestSettingsSave();
+    void persistChatHistories(s, chatId).then(() => { void requestSettingsSave(true); });
 }
