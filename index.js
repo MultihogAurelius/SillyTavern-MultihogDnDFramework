@@ -1145,7 +1145,7 @@ async function offerHistoryMigration(fromSettings = false) {
         try { if (localStorage.getItem(HISTORY_MIGRATION_DISMISSED_KEY)) return; }
         catch (_) { /* Private browsing may block localStorage. */ }
     }
-    const body = `<p><strong>${count} saved ${count === 1 ? 'history' : 'histories'}</strong> still live inside settings.json. Moving them into compressed SillyTavern files can substantially reduce settings size and make saves more reliable.</p><p>Each chat keeps a small file reference in settings.json. Existing history stays there until its file upload succeeds. Back up both settings.json and SillyTavern's user/files folder together.</p><p>This may take several minutes on a large installation. You can choose Later and run it from General &amp; Visuals → Core &amp; Branching at any time.</p>`;
+    const body = `<p><strong>${count} saved ${count === 1 ? 'history' : 'histories'}</strong> still live inside settings.json. Moving them into compressed SillyTavern files can substantially reduce settings size and make saves more reliable.</p><p>Each chat keeps a small file reference in settings.json. Existing history stays there until its file upload succeeds.</p><p>This may take several minutes on a large installation. You can choose Later and run it from General &amp; Visuals → Core &amp; Branching at any time.</p>`;
     historyMigrationOfferOpen = true;
     let choice;
     try {
