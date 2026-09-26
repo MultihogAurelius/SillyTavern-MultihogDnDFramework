@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
     buildNpcInstruction,
+    upgradeNpcCreationGuidance,
     buildLocInstruction,
     buildFacInstruction,
     DEFAULT_MODULES,
@@ -60,6 +61,34 @@ describe('module instruction builders', () => {
         expect(text).toContain('[CORE]');
         expect(text).toContain('COLOR MARKUP');
         expect(text).toContain('<font color=#RRGGBB>');
+    });
+
+    it('asks new NPC profiles to extrapolate lasting traits instead of preserving unknowns or scene events', () => {
+        const instruction = buildNpcInstruction(225, 135, true);
+        expect(instruction).toContain('freely invent plausible, specific details for missing identity fields');
+        expect(instruction).toContain('Do not use "Unknown", "not established", "unspecified"');
+        expect(instruction).toContain('A dropped weapon, a gap in an account, and surviving an ambush are story events');
+        expect(instruction).toContain('do NOT spontaneously rewrite these on an automatic pass');
+    });
+
+    it('refreshes the old shipped NPC paragraph while preserving custom prompt text', () => {
+        const oldParagraph = `CRITICAL — [CORE] is permanent identity, still true after this arc ends. Extrapolate enduring traits from behavior; never recap this turn, voyage, or crisis.
+BANNED in [CORE]: momentary actions/states; plot progress ("increasingly…", "first to notice…", "this voyage"); roles defined by ongoing events ("crewman on X who became unhinged by Y"). Scene facts go in timestamped lines after [/CORE] only.`;
+        const prior = `Custom prefix\n${oldParagraph}\nCustom suffix`;
+        const upgraded = upgradeNpcCreationGuidance(prior);
+        expect(upgraded).toContain('Custom prefix');
+        expect(upgraded).toContain('Custom suffix');
+        expect(upgraded).toContain('freely invent plausible, specific details');
+        expect(upgraded).not.toContain('Extrapolate enduring traits from behavior');
+        expect(upgradeNpcCreationGuidance(upgraded)).toBe(upgraded);
+        expect(upgradeNpcCreationGuidance('Entirely custom instruction')).toBe('Entirely custom instruction');
+
+        for (const key of Object.keys(testExtensionSettings)) delete testExtensionSettings[key];
+        testExtensionSettings.rpg_tracker = {
+            settingsVersion: FACTORY_SETTINGS_VERSION,
+            routerModules: { npc: { enabled: true, tag: 'NPC', instruction: prior } },
+        };
+        expect(getSettings().routerModules.npc.instruction).toBe(upgraded);
     });
 
     it('buildNpcInstruction uses overall exactly-N-words targets', () => {

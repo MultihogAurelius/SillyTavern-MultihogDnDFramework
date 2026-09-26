@@ -10,6 +10,20 @@ import { buildNpcRelationshipInstruction } from './relationship-prompts.js';
 /** Passed as the Lorebook Agent Direct Prompt during Full Audit so color markup survives CORE rewrites. */
 export const LOREBOOK_FULL_AUDIT_INSTRUCTION = 'FULL AUDIT: Reconstruct lore from this history chunk. Preserve existing <font color=...> tags and hex color codes already stored in [CORE] (including custom color sections). When writing color markup, use unquoted hex only: <font color=#RRGGBB>text</font> — never color="#RRGGBB" (quoted attributes break JSON tool calls). Do not strip color markup down to plain text.';
 
+const OLD_NPC_CREATION_GUIDANCE = `CRITICAL — [CORE] is permanent identity, still true after this arc ends. Extrapolate enduring traits from behavior; never recap this turn, voyage, or crisis.
+BANNED in [CORE]: momentary actions/states; plot progress ("increasingly…", "first to notice…", "this voyage"); roles defined by ongoing events ("crewman on X who became unhinged by Y"). Scene facts go in timestamped lines after [/CORE] only.`;
+
+const NPC_CREATION_GUIDANCE = `CRITICAL — When FIRST recording an NPC, build a usable, enduring character profile. Preserve established facts, then freely invent plausible, specific details for missing identity fields from the character's role, culture, setting, and behavior. Fill Body, Personality, Brief Background, Habits/Behaviors, Strengths, and Flaws even if the narrative has not described them. Do not use "Unknown", "not established", "unspecified", or similar placeholders. Keep inventions consistent with canon; do not invent consequential plot facts, relationships, secrets, or past events that would change the story.
+[CORE] is the character's lasting identity, still true after this arc ends. Body describes their usual appearance, not a fresh injury; Strengths and Flaws describe repeatable abilities, tendencies, or limitations, not what happened in one scene. A dropped weapon, a gap in an account, and surviving an ambush are story events, not personality flaws or permanent strengths. Put significant scene facts in timestamped lines after [/CORE] instead.
+BANNED in [CORE]: momentary actions/states; plot progress ("increasingly…", "first to notice…", "this voyage"); roles defined by ongoing events ("crewman on X who became unhinged by Y").`;
+
+/** Refresh the exact shipped NPC creation paragraph without replacing custom instructions. */
+export function upgradeNpcCreationGuidance(instruction) {
+    return typeof instruction === 'string'
+        ? instruction.replace(OLD_NPC_CREATION_GUIDANCE, NPC_CREATION_GUIDANCE)
+        : instruction;
+}
+
 export function buildNpcInstruction(majorWords = 225, minorWords = 135, ignoreLimits = false, passedSettings = null) {
     let settings = passedSettings || {};
     if (!passedSettings) {
@@ -36,8 +50,7 @@ You MAY update the Player Character's own Body via [[UPDATE_APPEARANCE: {{user}}
 <CORE_FORMAT — NPC only>
 IMPORTANT: The Description field inside the [[ ]] tags MUST start directly with the [CORE] tag. Do NOT prepend any timestamps, dates, or other text before the [CORE] tag under any circumstances (e.g. do NOT write "[4:47 PM, ${useDdMmYy ? '01/01/2026' : 'Day 1'}] [CORE]" or "[${useDdMmYy ? 'DD/MM/YYYY' : 'Day X'}, HH:MM] [CORE]"). The very first character of the Description MUST be the "[" of the "[CORE]" tag. Wrap the identity sections (${sectionsList}) inside a single \`[CORE]\` and \`[/CORE]\` tag block.
 
-CRITICAL — [CORE] is permanent identity, still true after this arc ends. Extrapolate enduring traits from behavior; never recap this turn, voyage, or crisis.
-BANNED in [CORE]: momentary actions/states; plot progress ("increasingly…", "first to notice…", "this voyage"); roles defined by ongoing events ("crewman on X who became unhinged by Y"). Scene facts go in timestamped lines after [/CORE] only.
+${NPC_CREATION_GUIDANCE}
 
 [CORE]
 ${sectionsTemplate}

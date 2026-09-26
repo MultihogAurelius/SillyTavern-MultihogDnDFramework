@@ -7,7 +7,7 @@ import { MODULE_NAME, DEFAULT_PC_SECTIONS, DEFAULT_NPC_SECTIONS } from './schema
 import { DEFAULT_MODULES } from './default-modules.js';
 import { buildDefaultSettings, FACTORY_SETTINGS_VERSION } from './defaults.js';
 import { isOlderThan } from './versions.js';
-import { buildNpcInstruction, buildLocInstruction, buildFacInstruction } from './module-instructions.js';
+import { buildNpcInstruction, buildLocInstruction, buildFacInstruction, upgradeNpcCreationGuidance } from './module-instructions.js';
 import {
     getDefaultPortraitLocationSystemPrompt,
     isShippedPortraitLocationSystemPrompt,
@@ -1142,6 +1142,12 @@ function getSettingsInternal(extensionSettings) {
             s.mapEvolutionIntervalHours = 8;
         }
         s.mapEvolutionOtherMapsInterval8Applied = true;
+    }
+
+    // Existing installs store the NPC instruction as text. Refresh only the exact
+    // shipped creation paragraph, preserving all other edits to that prompt.
+    if (s.routerModules?.npc) {
+        s.routerModules.npc.instruction = upgradeNpcCreationGuidance(s.routerModules.npc.instruction);
     }
 
     // Stamp factory version even when a release has no field rewrites
