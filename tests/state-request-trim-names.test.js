@@ -138,14 +138,44 @@ describe('sendStateRequest default (generateRaw) mode disables trimNames', () =>
         expect(profile.preset).toBe('');
     });
 
-    it('fills the live Custom OpenAI URL when no completion preset can be attached', async () => {
+    it.each([
+        ['custom', 'custom_url', 'http://192.168.1.20:1234/v1', 'http://127.0.0.1:1234/v1'],
+        ['vertexai', 'vertexai_region', 'europe-west1', 'us-central1'],
+        ['zai', 'zai_endpoint', 'coding', 'common'],
+        ['siliconflow', 'siliconflow_endpoint', 'cn', 'global'],
+        ['minimax', 'minimax_endpoint', 'cn', 'global'],
+    ])('uses the selected %s profile endpoint instead of the live endpoint', async (api, field, profileEndpoint, liveEndpoint) => {
+        const profile = { api, preset: 'Tracker preset', 'api-url': profileEndpoint };
+        let capturedOverride = null;
+        globalThis.SillyTavern.getContext = () => ({
+            ...originalGetContext(),
+            chatCompletionSettings: { [field]: liveEndpoint },
+            ConnectionManagerRequestService: {
+                getProfile: (id) => id === 'tracker-profile' ? profile : null,
+                sendRequest: async (_profileId, _messages, _maxTokens, _options, override) => {
+                    capturedOverride = override;
+                    return { content: '{"ok":true}', reasoning: '' };
+                },
+            },
+        });
+
+        await sendStateRequest(
+            { connectionSource: 'profile', connectionProfileId: 'tracker-profile' },
+            'system prompt',
+            'user prompt',
+        );
+
+        expect(capturedOverride).toEqual({ [field]: profileEndpoint });
+    });
+
+    it('fills the live Custom OpenAI URL when the profile has no saved URL or preset', async () => {
         let capturedOverride = null;
         globalThis.SillyTavern.getContext = () => ({
             ...originalGetContext(),
             executeSlashCommandsWithOptions: async () => ({ pipe: '' }),
             chatCompletionSettings: { custom_url: 'http://127.0.0.1:1234/v1' },
             ConnectionManagerRequestService: {
-                getProfile: () => ({ preset: '' }),
+                getProfile: () => ({ api: 'custom', preset: '' }),
                 sendRequest: async (_profileId, _messages, _maxTokens, options, override) => {
                     capturedOverride = override;
                     return { content: '{"ok":true}', reasoning: '' };

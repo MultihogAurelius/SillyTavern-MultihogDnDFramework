@@ -82,12 +82,17 @@ export async function setCompletionPreset(name) {
     await executeSlashCommandsWithOptions(`/preset "${name}"`);
 }
 
+// Connection Manager saves each of these provider settings as `api-url`.
+const PROFILE_CHAT_COMPLETION_ENDPOINT_FIELDS = {
+    custom: 'custom_url',
+    vertexai: 'vertexai_region',
+    zai: 'zai_endpoint',
+    siliconflow: 'siliconflow_endpoint',
+    minimax: 'minimax_endpoint',
+};
+
 const LIVE_CHAT_COMPLETION_OVERRIDE_FIELDS = [
-    'custom_url',
-    'vertexai_region',
-    'zai_endpoint',
-    'siliconflow_endpoint',
-    'minimax_endpoint',
+    ...Object.values(PROFILE_CHAT_COMPLETION_ENDPOINT_FIELDS),
     'reverse_proxy',
     'proxy_password',
 ];
@@ -115,16 +120,19 @@ function completionPresetExists(context, name) {
     return false;
 }
 
-function applyLiveChatCompletionOverrides(context, profile, overridePayload = {}) {
+function applyChatCompletionOverrides(context, profile, overridePayload = {}) {
     const live = context.chatCompletionSettings || {};
+    const api = String(profile?.api || '').toLowerCase();
+    const endpointField = PROFILE_CHAT_COMPLETION_ENDPOINT_FIELDS[api];
+    const profileEndpoint = profile?.['api-url'];
     for (const field of LIVE_CHAT_COMPLETION_OVERRIDE_FIELDS) {
         if (overridePayload[field] == null || overridePayload[field] === '') {
-            const value = live[field];
+            const value = field === endpointField && profileEndpoint ? profileEndpoint : live[field];
             if (value != null && value !== '') overridePayload[field] = value;
         }
     }
 
-    if (String(profile?.api || '').toLowerCase() === 'openrouter') {
+    if (api === 'openrouter') {
         for (const [settingsField, payloadField] of Object.entries(LIVE_OPENROUTER_ROUTING_FIELDS)) {
             if (overridePayload[payloadField] !== undefined || live[settingsField] === undefined) continue;
             const value = live[settingsField];
@@ -149,8 +157,8 @@ async function resolveProfilePresetName(context, requestedPreset, profile) {
 }
 
 /**
- * Profile requests without a CC preset omit custom_url and 404 on Custom OpenAI.
- * "Use Current Settings" must still attach a real preset or the live endpoint URL.
+ * Send through the selected profile. Use the live preset and endpoint as fallbacks
+ * so Custom OpenAI requests can still resolve a URL with "Use Current Settings".
  */
 async function sendViaConnectionProfile(context, settings, messages, { signal = null, extraOverride = {}, stream = false } = {}) {
     const service = context.ConnectionManagerRequestService;
@@ -159,7 +167,7 @@ async function sendViaConnectionProfile(context, settings, messages, { signal = 
         ? service.getProfile(settings.connectionProfileId)
         : null;
     const effectivePreset = await resolveProfilePresetName(context, settings.completionPresetId, profile);
-    const overridePayload = applyLiveChatCompletionOverrides(context, profile, { ...extraOverride });
+    const overridePayload = applyChatCompletionOverrides(context, profile, { ...extraOverride });
     let profileOriginalPreset = null;
     try {
         if (effectivePreset && profile && profile.preset !== effectivePreset) {
