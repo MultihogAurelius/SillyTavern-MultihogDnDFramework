@@ -400,37 +400,32 @@ export function formatTimeDiff(diffMinutes, isFuture = false) {
 
 // ── Memo deduplication ────────────────────────────────────────────────────────
 
+const MEMO_BLOCK_PATTERN = /\s*\[([^\]\/][^\]]*)\]([\s\S]*?)\[\/\1\]/gi;
+
 /**
  * Sanitizes a memo string to ensure no duplicate [TAG] sections exist.
- * If duplicates are found, the last one in the string is preserved.
+ * Keep the last copy for tags handled by the old deduplicator. For tags it
+ * skipped, keep the first copy because legacy merges applied updates there.
  */
 export function deduplicateMemo(memo) {
     if (!memo) return "";
     const settings = getSettings();
 
-    const tagRegex = /\[([A-Z_]+)\]/gi;
-    const tags = new Set();
-    let match;
-    while ((match = tagRegex.exec(memo)) !== null) {
-        tags.add(match[1].toUpperCase());
-    }
-
-    let cleanedMemo = memo;
-    for (const tag of tags) {
-        const escapedTag = escapeRegex(tag);
-        const pattern = new RegExp(`\\[${escapedTag}\\][\\s\\S]*?\\[\\/${escapedTag}\\]`, 'gi');
-        const blocks = [...memo.matchAll(pattern)];
-
-        if (blocks.length > 1) {
-            if (settings.debugMode) console.warn(`[RPG Tracker] Deduplication: Found ${blocks.length} instances of [${tag}]. Keeping the last one.`);
-            cleanedMemo = cleanedMemo.replace(pattern, "---DEDUP_MARKER---");
-            const lastBlock = blocks[blocks.length - 1][0];
-            const split = cleanedMemo.split("---DEDUP_MARKER---");
-            cleanedMemo = split.join("").trim() + "\n\n" + lastBlock;
+    const keptOffsets = new Map();
+    for (const match of memo.matchAll(MEMO_BLOCK_PATTERN)) {
+        const rawTag = match[1];
+        const tag = rawTag.trim().toUpperCase();
+        if (!keptOffsets.has(tag) || /^[A-Z_]+$/i.test(rawTag)) {
+            keptOffsets.set(tag, match.index);
         }
     }
 
-    return cleanedMemo.replace(/\n{3,}/g, '\n\n').trim();
+    return memo.replace(MEMO_BLOCK_PATTERN, (block, rawTag, _content, offset) => {
+        const tag = rawTag.trim().toUpperCase();
+        if (keptOffsets.get(tag) === offset) return block;
+        if (settings.debugMode) console.warn(`[RPG Tracker] Deduplication: Removing an extra [${tag}] block.`);
+        return '';
+    }).replace(/\n{3,}/g, '\n\n').trim();
 }
 
 // ── Memo merge ────────────────────────────────────────────────────────────────
@@ -447,8 +442,7 @@ export function mergeMemo(currentMemo, aiOutput) {
         ? extractBenchCommands(aiOutput)
         : { benches: [], unbenches: [] };
 
-    const tagPattern = /\[([^\]\/][^\]]*)\]([\s\S]*?)\[\/\1\]/gi;
-    const matches = [...aiOutput.matchAll(tagPattern)];
+    const matches = [...aiOutput.matchAll(MEMO_BLOCK_PATTERN)];
 
     const hasBenchWork = benchCommands.benches.length > 0 || benchCommands.unbenches.length > 0;
 
@@ -472,9 +466,10 @@ export function mergeMemo(currentMemo, aiOutput) {
 
     for (const match of matches) {
         const tag = match[1].trim();
+        const tagKey = tag.toUpperCase();
         const newContent = match[2].trim();
 
-        if (tag.toUpperCase() === 'BENCHED PARTY' && isBenchCommandOnlyContent(newContent)) {
+        if (tagKey === 'BENCHED PARTY' && isBenchCommandOnlyContent(newContent)) {
             if (settings.debugMode) {
                 console.log(`[RPG Tracker] mergeMemo: [${tag}] command-only — deferring to applyBenchCommands`);
             }
@@ -488,9 +483,8 @@ export function mergeMemo(currentMemo, aiOutput) {
         // instead of omitting the section entirely.
         const isRemoval = newContent === '' || /^(?:REMOVED|EXPIRED|CLEARED|NONE|END_COMBAT)$/i.test(newContent);
 
-        const escapedTag = escapeRegex(tag);
         let mergedContent = newContent;
-        if (tag.toUpperCase() === 'COMBAT') {
+        if (tagKey === 'COMBAT') {
             if (isRemoval) {
                 settings.combatDefeatedUi = [];
             } else {
@@ -501,34 +495,26 @@ export function mergeMemo(currentMemo, aiOutput) {
                 settings.combatDefeatedUi = partitioned.defeatedCombatants;
             }
         }
-        const existingPattern = new RegExp(
-            `\\s*\\[${escapedTag}\\][\\s\\S]*?\\[\\/${escapedTag}\\]`,
-            'i'
-        );
-
-        if (settings.debugMode) {
-            console.log(`[RPG Tracker] mergeMemo: processing [${tag}], pattern: ${existingPattern}`);
-        }
+        const fullBlock = `[${tag}]\n${mergedContent}\n[/${tag}]`;
+        let found = false;
+        memo = memo.replace(MEMO_BLOCK_PATTERN, (block, existingTag) => {
+            if (existingTag.trim().toUpperCase() !== tagKey) return block;
+            const replacement = found || isRemoval ? '' : '\n\n' + fullBlock;
+            found = true;
+            return replacement;
+        });
 
         if (isRemoval) {
-            memo = memo.replace(existingPattern, "").trim();
             if (settings.debugMode) console.log(`[RPG Tracker] mergeMemo: [${tag}] REMOVED`);
+        } else if (found) {
+            if (settings.debugMode) console.log(`[RPG Tracker] mergeMemo: [${tag}] REPLACED`);
         } else {
-            const fullBlock = `[${tag}]\n${mergedContent}\n[/${tag}]`;
-            const before = memo;
-            memo = memo.replace(existingPattern, () => '\n\n' + fullBlock);
-            if (memo !== before) {
-                if (settings.debugMode) console.log(`[RPG Tracker] mergeMemo: [${tag}] REPLACED`);
-            } else {
-                memo = memo.trimEnd() + '\n\n' + fullBlock;
-                if (settings.debugMode) console.log(`[RPG Tracker] mergeMemo: [${tag}] APPENDED (new section)`);
-            }
+            memo = memo.trimEnd() + '\n\n' + fullBlock;
+            if (settings.debugMode) console.log(`[RPG Tracker] mergeMemo: [${tag}] APPENDED (new section)`);
         }
     }
 
-    const cleaned = memo.replace(/\n{3,}/g, '\n\n').trim();
-    const deduped = deduplicateMemo(cleaned);
-    let result = deduped;
+    let result = deduplicateMemo(memo);
     if (benchCommands.benches.length || benchCommands.unbenches.length) {
         result = applyBenchCommands(currentMemo, result, benchCommands);
     }
