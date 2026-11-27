@@ -1,7 +1,8 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
     CHAT_COMPLETION_API,
     RECOMMENDED_OUTPUT_LENGTH,
+    applyRecommendedApiSettings,
     buildOverlayHtml,
     describeMainApi,
     getApiSetupStatuses,
@@ -15,6 +16,8 @@ import {
 
 describe('API setup checklist', () => {
     afterEach(() => {
+        vi.unstubAllGlobals();
+        vi.useRealTimers();
         delete globalThis.SillyTavern;
     });
 
@@ -46,6 +49,7 @@ describe('API setup checklist', () => {
             function_calling: true,
             max_context_unlocked: true,
             openai_max_tokens: RECOMMENDED_OUTPUT_LENGTH,
+            openai_max_context: 116384,
         };
         expect(isFunctionCallingEnabled(ready)).toBe(true);
         expect(isMaxContextUnlocked(ready)).toBe(true);
@@ -60,7 +64,29 @@ describe('API setup checklist', () => {
         expect(isMaxContextUnlocked(stale)).toBe(false);
         expect(isOutputLengthRecommended(stale)).toBe(false);
         expect(isOutputLengthRecommended({ openai_max_tokens: 99999 })).toBe(false);
-        expect(isOutputLengthRecommended({ openai_max_tokens: 128000 })).toBe(true);
+        expect(isOutputLengthRecommended({ openai_max_tokens: 128000, openai_max_context: 144383 })).toBe(false);
+        expect(isOutputLengthRecommended({ openai_max_tokens: 128000, openai_max_context: 144384 })).toBe(true);
+    });
+
+    it.each([[4095, 116384], [200000, 200000]])('applies the token budget with a starting context of %i', (initial, expected) => {
+        vi.useFakeTimers();
+        vi.stubGlobal('window', { setTimeout });
+        const settings = { openai_max_context: initial, openai_max_tokens: 300 };
+        const contextSlider = Object.assign(new EventTarget(), { value: String(initial), max: String(initial) });
+        const outputInput = Object.assign(new EventTarget(), { value: '300' });
+        const inputs = { '#openai_max_context': contextSlider, '#openai_max_tokens': outputInput };
+        vi.stubGlobal('document', { querySelector: selector => inputs[selector] ?? null });
+        globalThis.SillyTavern = { getContext: () => ({ mainApi: 'openai', chatCompletionSettings: settings }) };
+
+        applyRecommendedApiSettings();
+        vi.advanceTimersByTime(150);
+
+        expect(settings.openai_max_context).toBe(expected);
+        expect(contextSlider.value).toBe(String(expected));
+        expect(outputInput.value).toBe('100000');
+        expect(getApiSetupStatuses().outputLength).toBe(true);
+        settings.openai_max_context = 4095;
+        expect(getApiSetupStatuses().outputLength).toBe(false);
     });
 
     it('collects all four live statuses independently', () => {
@@ -106,7 +132,7 @@ describe('API setup checklist', () => {
         expect(html).toContain('Maximum context size is unlimited');
         expect(html).toContain('There is no reason to limit this today, and in fact there are reasons not to.');
         expect(html).toContain('Imposing an artificial context limit does nothing but destroy your cache hits, which means you pay more.');
-        expect(html).toContain('Output length is set to 100,000');
+        expect(html).toContain('16,384 tokens left for prompts and history');
         expect(html).toContain('truncating the JSON and giving a schema/syntax error.');
         expect(html).toContain('The result is that my extension throws an error and looks broken. However, this is just another bad default.');
         expect(html).toContain('href="https://github.com/Lodactio/Extension-Summaryception"');

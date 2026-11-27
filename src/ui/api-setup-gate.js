@@ -10,6 +10,7 @@ import { GAME_MASTER_CARD_NAME, resolveNarratorCardName } from './game-master-ca
 
 export const CHAT_COMPLETION_API = 'openai';
 export const RECOMMENDED_OUTPUT_LENGTH = 100000;
+const MIN_PROMPT_CONTEXT = 16384;
 
 const OVERLAY_ID = 'rt-api-setup-gate';
 const PULSE_CLASS = 'rt-api-setup-pulse';
@@ -42,7 +43,7 @@ const CHECKLIST_ITEMS = [
     },
     {
         id: 'outputLength',
-        title: 'Output length is set to 100,000',
+        title: 'Output length is at least 100,000 with 16,384 tokens left for prompts and history',
         body: 'The defaults are extremely low, which make the program completely unusable from the get-go. The model will suddenly stop outputting, and the user is confused. Or worse: an agent is outputting a JSON object and the model hits this pathetic cap, truncating the JSON and giving a schema/syntax error.\n\nThe result is that my extension throws an error and looks broken. However, this is just another bad default.',
     },
 ];
@@ -99,7 +100,9 @@ export function isMaxContextUnlocked(settings = getChatCompletionSettings()) {
 }
 
 export function isOutputLengthRecommended(settings = getChatCompletionSettings()) {
-    return readNumberSetting(settings, 'openai_max_tokens', '#openai_max_tokens') >= RECOMMENDED_OUTPUT_LENGTH;
+    const output = readNumberSetting(settings, 'openai_max_tokens', '#openai_max_tokens');
+    const context = readNumberSetting(settings, 'openai_max_context', '#openai_max_context');
+    return output >= RECOMMENDED_OUTPUT_LENGTH && context - output >= MIN_PROMPT_CONTEXT;
 }
 
 export function getApiSetupStatuses() {
@@ -184,7 +187,6 @@ export function applyRecommendedApiSettings() {
         if (settings) {
             settings.function_calling = true;
             settings.max_context_unlocked = true;
-            settings.openai_max_tokens = RECOMMENDED_OUTPUT_LENGTH;
         }
     } catch (_) { /* settings bag not ready */ }
     setDomCheckbox('#openai_function_calling', true);
@@ -192,9 +194,17 @@ export function applyRecommendedApiSettings() {
     const applyOutput = () => {
         try {
             const settings = getChatCompletionSettings();
-            if (settings) settings.openai_max_tokens = RECOMMENDED_OUTPUT_LENGTH;
+            const context = Math.max(
+                readNumberSetting(settings, 'openai_max_context', '#openai_max_context'),
+                RECOMMENDED_OUTPUT_LENGTH + MIN_PROMPT_CONTEXT,
+            );
+            if (settings) {
+                settings.openai_max_context = context;
+                settings.openai_max_tokens = RECOMMENDED_OUTPUT_LENGTH;
+            }
+            setDomNumber('#openai_max_context', context);
+            setDomNumber('#openai_max_tokens', RECOMMENDED_OUTPUT_LENGTH);
         } catch (_) { /* ignore */ }
-        setDomNumber('#openai_max_tokens', RECOMMENDED_OUTPUT_LENGTH);
     };
     if (typeof window !== 'undefined' && typeof window.setTimeout === 'function') {
         window.setTimeout(applyOutput, 150);
@@ -369,10 +379,10 @@ function bindLiveStatusRefresh() {
     }, true);
     document.addEventListener('input', (event) => {
         const id = event.target?.id;
-        if (id === 'openai_function_calling' || id === 'oai_max_context_unlocked' || id === 'openai_max_tokens') {
+        if (id === 'openai_function_calling' || id === 'oai_max_context_unlocked' || id === 'openai_max_context' || id === 'openai_max_tokens') {
             refreshIfOpen();
         }
-    }, true);
+    });
 }
 
 export function installApiSetupGate() {
